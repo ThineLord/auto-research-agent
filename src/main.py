@@ -71,29 +71,37 @@ def main() -> None:
         console.rule(f"Round {round_index}")
         round_dir = make_round_dir(run_root, round_index)
 
-        draft_output = agents.draft(
-            task=task_text,
-            memory=memory_text,
-            round_index=round_index,
-            previous_best=best_output,
-            previous_judge=previous_judge,
-        )
-        review_output = agents.review(
-            task=task_text,
-            memory=memory_text,
-            draft_output=draft_output,
-        )
-        revised_output = agents.revise(
-            task=task_text,
-            memory=memory_text,
-            draft_output=draft_output,
-            review_output=review_output,
-        )
-        judge_output = agents.judge(
-            task=task_text,
-            memory=memory_text,
-            revised_output=revised_output,
-        )
+        try:
+            draft_output = agents.draft(
+                task=task_text,
+                memory=memory_text,
+                round_index=round_index,
+                previous_best=best_output,
+                previous_judge=previous_judge,
+            )
+            review_output = agents.review(
+                task=task_text,
+                memory=memory_text,
+                draft_output=draft_output,
+            )
+            revised_output = agents.revise(
+                task=task_text,
+                memory=memory_text,
+                draft_output=draft_output,
+                review_output=review_output,
+            )
+            judge_output = agents.judge(
+                task=task_text,
+                memory=memory_text,
+                revised_output=revised_output,
+            )
+        except RuntimeError as exc:
+            console.print(f"[red]{exc}[/red]")
+            console.print(
+                "[yellow]Quick fix:[/yellow] run `ollama serve` and "
+                "`ollama pull llama3.1:8b`, then rerun `python -m src.main`."
+            )
+            break
 
         save_round_outputs(
             round_dir,

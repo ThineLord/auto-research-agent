@@ -39,8 +39,14 @@ class OllamaClient:
             },
         }
 
-        response = requests.post(url, json=payload, timeout=self.timeout_seconds)
-        response.raise_for_status()
-        data = response.json()
+        try:
+            response = requests.post(url, json=payload, timeout=self.timeout_seconds)
+            response.raise_for_status()
+            data = response.json()
+        except requests.RequestException as exc:
+            raise RuntimeError(
+                "Failed to call Ollama API. Ensure Ollama is running at "
+                f"{self.base_url} and model '{self.model}' is available."
+            ) from exc
 
         return data.get("message", {}).get("content", "").strip()

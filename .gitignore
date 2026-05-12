@@ -26,5 +26,6 @@ dist/
 # Logs and generated artifacts
 *.log
 projects/*/runs/
+projects/*/best_output.md
 projects/*/*.pdf
 *.pdf
