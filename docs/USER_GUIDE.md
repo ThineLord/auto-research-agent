@@ -13,6 +13,56 @@
 
 每轮都会把中间结果落盘，避免只存在内存中。
 
+## 模型选择建议
+
+- `qwen3:8b`：推荐默认模型（当前默认）
+- `qwen3:14b`：更强但更慢，内存占用更高
+- `deepseek-r1:8b`：推理实验备选
+- `llama3.1:8b`：稳定回退模型（fallback）
+
+命令行切换模型：
+
+```bash
+python -m src.main --model qwen3:8b
+python -m src.main --model qwen3:14b
+python -m src.main --model deepseek-r1:8b
+python -m src.main --diagnostic --model llama3.1:8b
+```
+
+在 UI 中切换模型：
+
+1. 打开 `streamlit run ui/app.py`
+2. 在 `Model Management` 的下拉框选已安装模型
+3. 点击 `Run Diagnostic / Run Normal / Run Continuous / Resume`
+4. UI 会自动传参：`--model <selected_model>`
+
+在 UI 中拉取模型：
+
+1. 在 `Pull model by name` 输入模型名
+2. 点击 `Pull Model`
+3. 在 `Model operation logs` 查看拉取进度
+
+在 UI 中删除模型：
+
+1. 在删除下拉框选已安装模型
+2. 勾选确认框
+3. 点击 `Delete Selected Model`
+4. 若模型正在被当前运行使用，UI 会阻止删除
+
+常见模型相关错误：
+
+- 未安装模型：
+  - `Model <name> is not installed. Run: ollama pull <name>`
+- Ollama 未运行或不可用：
+  - `Ollama is not available ...`
+
+模型检查命令：
+
+```bash
+ollama list
+ollama run qwen3:8b
+```
+
 ## 我该把输入写在哪里
 
 核心输入写在：`projects/pama/task.md`

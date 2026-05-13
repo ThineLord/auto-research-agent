@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import time
 from datetime import datetime
 from difflib import SequenceMatcher
@@ -54,6 +55,36 @@ def load_config(config_path: Path) -> Dict[str, Any]:
         raise FileNotFoundError(f"Config file not found: {config_path}")
     with config_path.open("r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
+
+
+def list_installed_ollama_models() -> Tuple[List[str], Optional[str]]:
+    try:
+        result = subprocess.run(
+            ["ollama", "list"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+        )
+    except FileNotFoundError:
+        return [], "Ollama is not installed or not in PATH."
+    except subprocess.SubprocessError as exc:
+        return [], f"Failed to query Ollama: {exc}"
+
+    if result.returncode != 0:
+        err = result.stderr.strip() or result.stdout.strip() or "Unknown error from ollama list."
+        return [], f"Ollama is not available: {err}"
+
+    models: List[str] = []
+    for line in result.stdout.splitlines()[1:]:
+        line = line.strip()
+        if not line:
+            continue
+        cols = re.split(r"\s{2,}", line)
+        name = cols[0].strip() if cols else ""
+        if name:
+            models.append(name)
+    return models, None
 
 
 def _normalize_judge_text(text: str) -> str:
@@ -144,6 +175,7 @@ def run_iterative_rounds(
     project_dir: Path,
     memory_path: Path,
     mode: str,
+    model_name: str,
     max_rounds: int,
     stop_if_no_improvement_rounds: int,
     start_round: int = 1,
@@ -163,7 +195,12 @@ def run_iterative_rounds(
     best_output_path = project_dir / "best_output.md"
     interrupted_report_path = project_dir / "interrupted_report.md"
     run_id = run_root.name
-    _log(console, log_path, mode, f"run_start run_id={run_id} run_root={run_root}")
+    _log(
+        console,
+        log_path,
+        mode,
+        f"run_start run_id={run_id} run_root={run_root} model={model_name}",
+    )
     _log(
         console,
         log_path,
@@ -471,6 +508,7 @@ def run_iterative_rounds(
                 "errors": round_errors,
                 "timeout_this_round": timeout_this_round,
                 "invalid_score_this_round": parsed_score is None,
+                "model": model_name,
             }
         )
         write_score_history(score_history_path, score_history)
@@ -508,6 +546,7 @@ def run_iterative_rounds(
             "can_resume": True,
             "updated_at": datetime.now().isoformat(),
             "mode": mode,
+            "model": model_name,
         }
         write_json_file(checkpoint_path, checkpoint_data)
 
@@ -587,6 +626,7 @@ def run_iterative_rounds(
         "can_resume": stop_reason in {STOP_USER_REQUESTED, STOP_MANUAL_INTERRUPT},
         "updated_at": datetime.now().isoformat(),
         "mode": mode,
+        "model": model_name,
     }
     write_json_file(checkpoint_path, checkpoint_final)
 
@@ -636,6 +676,7 @@ def run_diagnostic_mode(
     task_text: str,
     project_dir: Path,
     memory_path: Path,
+    model_name: str,
 ) -> None:
     log_path = project_dir / "run.log"
     console.rule("Diagnostic Mode")
@@ -643,7 +684,7 @@ def run_diagnostic_mode(
         "[cyan]Diagnostic constraints:[/cyan] one round only, short prompts, "
         "no memory update, no retries"
     )
-    _log(console, log_path, "diagnostic", "run_start")
+    _log(console, log_path, "diagnostic", f"run_start model={model_name}")
 
     # Keep diagnostic mode fast: tighten timeout for each LLM call.
     llm.timeout_seconds = min(llm.timeout_seconds, 20)
@@ -791,6 +832,44 @@ def run_diagnostic_mode(
     parsed_score = parse_score(judge_output)
     if parsed_score is None:
         parsed_score = 0.0
+
+    score_history_path = project_dir / "score_history.json"
+    write_score_history(
+        score_history_path,
+        [
+            {
+                "round": 1,
+                "score": parsed_score,
+                "improved": True,
+                "non_improve_streak": 0,
+                "repetitive_judge": False,
+                "errors": [e for e in [draft_error, review_error, revise_error, judge_error] if e],
+                "timeout_this_round": any(
+                    "timed out" in (e or "").lower()
+                    for e in [draft_error, review_error, revise_error, judge_error]
+                    if e
+                ),
+                "invalid_score_this_round": parse_score(judge_output) is None,
+                "model": model_name,
+            }
+        ],
+    )
+    write_json_file(
+        project_dir / "checkpoint.json",
+        {
+            "run_id": run_root.name,
+            "run_root": str(run_root),
+            "last_completed_round": 1,
+            "last_successful_agent": "judge" if not judge_error else ("revise" if not revise_error else "review" if not review_error else "draft" if not draft_error else "none"),
+            "best_score": round(parsed_score, 2),
+            "best_round_path": str(round_dir),
+            "stop_reason": "MAX_ROUNDS",
+            "can_resume": False,
+            "updated_at": datetime.now().isoformat(),
+            "mode": "diagnostic",
+            "model": model_name,
+        },
+    )
     console.rule("Diagnostic Summary")
     console.print(f"[bold]Run root:[/bold] {run_root}")
     console.print(f"[bold]Round saved:[/bold] {round_dir}")
@@ -815,6 +894,7 @@ def run_session_mode(
     task_text: str,
     project_dir: Path,
     memory_path: Path,
+    model_name: str,
     max_rounds: int,
     stop_if_no_improvement_rounds: int,
 ) -> None:
@@ -856,6 +936,7 @@ def run_session_mode(
         project_dir=project_dir,
         memory_path=memory_path,
         mode="session",
+        model_name=model_name,
         max_rounds=max_rounds,
         stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
     )
@@ -910,6 +991,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Resume from projects/<project>/checkpoint.json.",
     )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Override Ollama model name, e.g. qwen3:8b",
+    )
     return parser.parse_args()
 
 
@@ -919,14 +1006,24 @@ def main() -> None:
     root = Path(__file__).resolve().parent.parent
     config = load_config(root / "config.yaml")
 
-    model = config.get("model", "llama3.1:8b")
+    model_cfg = config.get("model", {})
+    if isinstance(model_cfg, dict):
+        config_model_name = str(model_cfg.get("name", "qwen3:8b"))
+        config_temperature = float(model_cfg.get("temperature", config.get("temperature", 0.4)))
+        config_timeout = int(model_cfg.get("timeout_seconds", config.get("timeout_seconds", 120)))
+    else:
+        config_model_name = str(model_cfg) if model_cfg else "qwen3:8b"
+        config_temperature = float(config.get("temperature", 0.4))
+        config_timeout = int(config.get("timeout_seconds", 120))
+
+    model_name = args.model or config_model_name
     base_url = config.get("ollama_base_url", "http://localhost:11434")
     project_name = config.get("project_name", "pama")
     max_rounds = int(config.get("max_rounds", 5))
     stop_if_no_improvement_rounds = int(config.get("stop_if_no_improvement_rounds", 2))
-    temperature = float(config.get("temperature", 0.4))
+    temperature = float(config_temperature)
     top_p = float(config.get("top_p", 0.9))
-    timeout_seconds = min(int(config.get("timeout_seconds", 120)), 120)
+    timeout_seconds = min(int(config_timeout), 120)
 
     project_dir = root / "projects" / project_name
     memory_path = project_dir / "memory.md"
@@ -936,9 +1033,24 @@ def main() -> None:
     if not task_text:
         raise ValueError(f"Task file is empty: {project_dir / 'task.md'}")
 
+    installed_models, ollama_error = list_installed_ollama_models()
+    if ollama_error:
+        console.print(f"[red]{ollama_error}[/red]")
+        console.print("[yellow]Start Ollama service, then retry.[/yellow]")
+        return
+    if model_name not in installed_models:
+        console.print(
+            f"[red]Model {model_name} is not installed. Run: ollama pull {model_name}[/red]"
+        )
+        if args.model is None and "llama3.1:8b" in installed_models:
+            console.print("[yellow]Suggestion: fallback available -> llama3.1:8b[/yellow]")
+        return
+
+    console.print(f"[bold cyan]Using model: {model_name}[/bold cyan]")
+
     llm = OllamaClient(
         base_url=base_url,
-        model=model,
+        model=model_name,
         timeout_seconds=timeout_seconds,
     )
     agents = ResearchAgents.from_prompt_dir(
@@ -978,6 +1090,7 @@ def main() -> None:
                 project_dir=project_dir,
                 memory_path=memory_path,
                 mode="resume",
+                model_name=model_name,
                 max_rounds=max(max_rounds, start_round),
                 stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
                 start_round=start_round,
@@ -994,6 +1107,7 @@ def main() -> None:
                 project_dir=project_dir,
                 memory_path=memory_path,
                 mode="continuous",
+                model_name=model_name,
                 max_rounds=9999,
                 stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
             )
@@ -1006,6 +1120,7 @@ def main() -> None:
                 task_text=task_text,
                 project_dir=project_dir,
                 memory_path=memory_path,
+                model_name=model_name,
             )
             return
 
@@ -1017,6 +1132,7 @@ def main() -> None:
                 task_text=task_text,
                 project_dir=project_dir,
                 memory_path=memory_path,
+                model_name=model_name,
                 max_rounds=max_rounds,
                 stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
             )
@@ -1029,6 +1145,7 @@ def main() -> None:
             project_dir=project_dir,
             memory_path=memory_path,
             mode="normal",
+            model_name=model_name,
             max_rounds=max_rounds,
             stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
         )
