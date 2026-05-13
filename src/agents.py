@@ -57,7 +57,12 @@ class ResearchAgents:
             f"# Previous Best (optional)\n{previous_best or '(none)'}\n\n"
             f"# Previous Judge Feedback (optional)\n{previous_judge or '(none)'}\n"
         )
+        print(
+            f"[AGENT] draft prompt prepared | round={round_index} "
+            f"prompt_chars={len(prompt)} memory_words={len(memory.split())}"
+        )
         return self.llm.generate(
+            agent_name="draft",
             system_prompt=self.draft_prompt,
             user_prompt=prompt,
             temperature=self.temperature,
@@ -70,7 +75,12 @@ class ResearchAgents:
             f"# Project Memory\n{memory}\n\n"
             f"# Draft Output\n{draft_output}\n"
         )
+        print(
+            f"[AGENT] review prompt prepared | prompt_chars={len(prompt)} "
+            f"memory_words={len(memory.split())}"
+        )
         return self.llm.generate(
+            agent_name="review",
             system_prompt=self.review_prompt,
             user_prompt=prompt,
             temperature=self.temperature,
@@ -91,7 +101,12 @@ class ResearchAgents:
             f"# Draft Output\n{draft_output}\n\n"
             f"# Review Feedback\n{review_output}\n"
         )
+        print(
+            f"[AGENT] revise prompt prepared | prompt_chars={len(prompt)} "
+            f"memory_words={len(memory.split())}"
+        )
         return self.llm.generate(
+            agent_name="revise",
             system_prompt=self.revise_prompt,
             user_prompt=prompt,
             temperature=self.temperature,
@@ -104,7 +119,12 @@ class ResearchAgents:
             f"# Project Memory\n{memory}\n\n"
             f"# Revised Output\n{revised_output}\n"
         )
+        print(
+            f"[AGENT] judge prompt prepared | prompt_chars={len(prompt)} "
+            f"memory_words={len(memory.split())}"
+        )
         return self.llm.generate(
+            agent_name="judge",
             system_prompt=self.judge_prompt,
             user_prompt=prompt,
             temperature=self.temperature,

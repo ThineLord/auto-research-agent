@@ -1,99 +1,79 @@
 # auto-research-agent
 
-Local-first iterative research agent pipeline for academic research using Ollama.
+一个本地优先（Ollama）的小型研究循环助手：`Draft -> Review -> Revise -> Judge`。  
+适合做学术研究规划草案、迭代改写与快速评分。
 
-## Features
+详细新手说明请先看：`docs/USER_GUIDE.md`。
 
-- Local LLM backend via Ollama.
-- Default model: `llama3.1:8b`.
-- Iterative loop: Draft -> Review -> Revise -> Judge.
-- Per-round artifacts saved as markdown logs.
-- Best judged output tracked and saved to `projects/pama/best_output.md`.
-- Simple Python codebase without LangChain, easy to extend.
+## 你只需要知道这几件事
 
-## Project Structure
+- 主要输入文件：`projects/pama/task.md`
+- 启动前先做一次快速检查：
+  - `python -m src.main --diagnostic`
+- 正常有界运行：
+  - `python -m src.main`
+- 默认本地模型：
+  - `llama3.1:8b`
 
-```text
-auto-research-agent/
-  README.md
-  .gitignore
-  config.yaml
-  requirements.txt
-  prompts/
-    draft.md
-    review.md
-    revise.md
-    judge.md
-  projects/
-    pama/
-      task.md
-      memory.md
-      best_output.md
-      runs/
-  src/
-    __init__.py
-    main.py
-    llm.py
-    agents.py
-    storage.py
-```
-
-## Prerequisites
-
-1. Python 3.10+ (recommended).
-2. [Ollama](https://ollama.com/) installed and running locally.
-3. Pull the default model:
-
-```bash
-ollama pull llama3.1:8b
-```
-
-## Setup
+## 快速开始
 
 ```bash
 cd auto-research-agent
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-## Run
-
-```bash
+ollama pull llama3.1:8b
+python -m src.main --diagnostic
 python -m src.main
 ```
 
-The program reads configuration from `config.yaml`, then runs iterative rounds:
+## 输入文件说明
 
-1. Draft
-2. Review
-3. Revise
-4. Judge
-5. Save logs
-6. Repeat until `max_rounds` or no score improvement
+- `projects/pama/task.md`：你的研究任务（必填，最小输入）
+- `<PROJECT_MEMORY_FILE>`：历史上下文记忆（可选，程序会自动维护）
+- `config.yaml`：运行参数（模型、轮数、超时等）
 
-## Outputs
+## 先看哪个输出
 
-- Round logs are saved under:
-  - `projects/pama/runs/<timestamp>/round_XX/`
-  - `01_draft.md`
-  - `02_review.md`
-  - `03_revised.md`
-  - `04_judge.md`
-- Best revised output is saved to:
-  - `projects/pama/best_output.md`
+先看：`projects/pama/best_output.md`  
+再看：`projects/pama/runs/<run_id>/round_xx/` 里的 4 个阶段文件。
 
-## Configuration
+## 常用命令
 
-Edit `config.yaml` to customize:
+- 基础诊断（1 轮、快速验证）
+  - `python -m src.main --diagnostic`
+- 正常有界运行（按 `max_rounds` 停止）
+  - `python -m src.main`
+- 会话模式（包含 objective/plan/report）
+  - `python -m src.main --session`
 
-- `model`: Ollama model name
-- `ollama_base_url`: Ollama endpoint
-- `max_rounds`: loop limit
-- `temperature`: sampling temperature
-- `project_name`: project folder under `projects/`
+## 关于“连续运行 / 安全停止 / 恢复”
 
-## Notes
+当前稳定版本 **尚未实现** `--continuous` 与 `--resume`。  
+目前可用策略：
 
-- Generated runs, virtual environments, `.env`, and PDFs are ignored by git.
-- To extend agents, update prompts in `prompts/` or add new Python modules in `src/`.
+- 使用 `python -m src.main` 的有界运行（由 `max_rounds` 控制）
+- 手动中断：`Ctrl+C`
+- 进度不会丢：每轮都会即时写入 `runs/round_xx` 文件
+
+## 哪些文件不要提交
+
+这些是运行生成物或本地私有文件，默认已被 `.gitignore` 忽略：
+
+- `projects/*/runs/`
+- `projects/*/best_output.md`
+- `projects/*/score_history.json`
+- `projects/*/research_state.json`
+- `projects/*/current_plan.md`
+- `projects/*/final_session_report.md`
+- `.env*`
+- `.venv/`
+
+## 推送到 GitHub（稳定版本交接）
+
+```bash
+git status
+git add .
+git commit -m "Stabilize runtime and improve user documentation"
+git push
+```

@@ -30,7 +30,7 @@ def write_text(path: Path, content: str) -> None:
 
 
 def make_run_root(project_dir: Path) -> Path:
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     run_root = project_dir / "runs" / timestamp
     run_root.mkdir(parents=True, exist_ok=True)
     return run_root
@@ -256,3 +256,59 @@ def get_memory_for_prompt(memory_path: Path) -> str:
     if not content:
         return ""
     return _tail_words(content, MAX_PROMPT_MEMORY_WORDS)
+
+
+def update_research_state(
+    *,
+    state_path: Path,
+    round_index: int,
+    best_score: float,
+    revised_output: str,
+    review_output: str,
+    judge_output: str,
+) -> Dict[str, Any]:
+    revised_lines = _collect_meaningful_lines(revised_output)
+    review_lines = _collect_meaningful_lines(review_output)
+    judge_lines = _collect_meaningful_lines(judge_output)
+
+    strongest_hypothesis = _pick_line(
+        revised_lines,
+        keywords=["hypothesis", "propose", "memory", "adapter", "privacy", "mechanism"],
+    )
+    biggest_blocker = _pick_line(
+        review_lines + judge_lines,
+        keywords=["blocker", "weakness", "risk", "missing", "unclear", "limitation"],
+    )
+    next_experiment = _pick_line(
+        revised_lines + review_lines + judge_lines,
+        keywords=["experiment", "ablation", "evaluate", "benchmark", "compare", "metric"],
+    )
+    open_question = _pick_line(
+        judge_lines + review_lines + revised_lines,
+        keywords=["question", "unknown", "uncertain", "assumption", "open"],
+    )
+
+    state = {
+        "round": round_index,
+        "current_strongest_hypothesis": _clip_text(
+            strongest_hypothesis
+            or "The current method can improve privacy-memory tradeoff but needs stronger validation."
+        ),
+        "current_biggest_blocker": _clip_text(
+            biggest_blocker
+            or "Baseline comparison and failure-mode analysis are still insufficient."
+        ),
+        "current_next_experiment": _clip_text(
+            next_experiment
+            or "Run one controlled baseline comparison with explicit privacy and utility metrics."
+        ),
+        "current_open_question": _clip_text(
+            open_question
+            or "Which privacy mechanism gives the best utility-retention under strict memory constraints?"
+        ),
+        "current_best_score": round(best_score, 2),
+    }
+
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    return state

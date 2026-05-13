@@ -28,5 +28,8 @@ dist/
 projects/*/runs/
 projects/*/best_output.md
 projects/*/score_history.json
+projects/*/research_state.json
+projects/*/current_plan.md
+projects/*/final_session_report.md
 projects/*/*.pdf
 *.pdf
