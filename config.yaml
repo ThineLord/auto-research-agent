@@ -1,8 +1,10 @@
-model: llama3.1:8b
+model:
+  provider: ollama
+  name: qwen3:8b
+  temperature: 0.3
+  timeout_seconds: 120
 ollama_base_url: http://localhost:11434
 project_name: pama
 max_rounds: 5
 stop_if_no_improvement_rounds: 2
-temperature: 0.4
 top_p: 0.9
-timeout_seconds: 120

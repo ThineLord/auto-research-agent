@@ -2,18 +2,21 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import streamlit as st
 import streamlit.components.v1 as components
+import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECTS_DIR = ROOT / "projects"
+CONFIG_PATH = ROOT / "config.yaml"
 
 
 def project_path(project_name: str) -> Path:
@@ -65,12 +68,15 @@ def is_pid_running(pid: int) -> bool:
     return True
 
 
-def process_meta_path(proj_path: Path) -> Path:
-    return proj_path / "ui_process.json"
+def run_meta_path(proj_path: Path) -> Path:
+    return proj_path / "ui_run_process.json"
 
 
-def get_active_process_meta(proj_path: Path) -> Dict[str, Any]:
-    meta_path = process_meta_path(proj_path)
+def model_job_meta_path(proj_path: Path) -> Path:
+    return proj_path / "ui_model_job_process.json"
+
+
+def get_active_meta(meta_path: Path) -> Dict[str, Any]:
     meta = read_json(meta_path)
     pid = int(meta.get("pid", 0)) if meta else 0
     if pid and is_pid_running(pid):
@@ -80,31 +86,88 @@ def get_active_process_meta(proj_path: Path) -> Dict[str, Any]:
     return {}
 
 
-def mark_process_started(proj_path: Path, pid: int, command: str) -> None:
-    write_json(
-        process_meta_path(proj_path),
-        {
-            "pid": pid,
-            "command": command,
-            "started_at": datetime.now().isoformat(),
-        },
-    )
-
-
-def clear_process_meta(proj_path: Path) -> None:
-    meta_path = process_meta_path(proj_path)
-    if meta_path.exists():
-        meta_path.unlink()
-
-
-def start_process(command: list[str], cwd: Path, log_path: Path, proj_path: Path) -> Optional[subprocess.Popen]:
-    active_meta = get_active_process_meta(proj_path)
-    if active_meta:
-        st.warning(
-            f"Another run is active (PID {active_meta.get('pid')}). "
-            "Please stop it safely or wait for completion."
+def query_ollama_models() -> tuple[List[Dict[str, str]], Optional[str]]:
+    try:
+        result = subprocess.run(
+            ["ollama", "list"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
         )
-        return None
+    except FileNotFoundError:
+        return [], "Ollama is not installed or not in PATH."
+    except subprocess.SubprocessError as exc:
+        return [], f"Failed to query Ollama: {exc}"
+
+    if result.returncode != 0:
+        err = result.stderr.strip() or result.stdout.strip() or "Unknown error from ollama list."
+        return [], f"Ollama is not available: {err}"
+
+    models: List[Dict[str, str]] = []
+    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    for line in lines[1:]:
+        parts = re.split(r"\s{2,}", line.strip())
+        if not parts:
+            continue
+        name = parts[0] if len(parts) > 0 else ""
+        model_id = parts[1] if len(parts) > 1 else ""
+        size = parts[2] if len(parts) > 2 else ""
+        modified = parts[3] if len(parts) > 3 else ""
+        models.append(
+            {
+                "name": name,
+                "id": model_id,
+                "size": size,
+                "modified": modified,
+            }
+        )
+    return models, None
+
+
+def load_default_model_name() -> str:
+    if not CONFIG_PATH.exists():
+        return "qwen3:8b"
+    try:
+        config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        return "qwen3:8b"
+    model_cfg = config.get("model", {})
+    if isinstance(model_cfg, dict):
+        return str(model_cfg.get("name", "qwen3:8b"))
+    if isinstance(model_cfg, str):
+        return model_cfg
+    return "qwen3:8b"
+
+
+def save_default_model_name(model_name: str) -> Optional[str]:
+    if not CONFIG_PATH.exists():
+        return f"config file not found: {CONFIG_PATH}"
+    try:
+        config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        return f"failed to parse config.yaml: {exc}"
+    model_cfg = config.get("model", {})
+    if not isinstance(model_cfg, dict):
+        model_cfg = {}
+    model_cfg.setdefault("provider", "ollama")
+    model_cfg["name"] = model_name
+    model_cfg.setdefault("temperature", 0.3)
+    model_cfg.setdefault("timeout_seconds", 120)
+    config["model"] = model_cfg
+    CONFIG_PATH.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    return None
+
+
+def start_background_process(
+    *,
+    command: List[str],
+    cwd: Path,
+    log_path: Path,
+    meta_path: Path,
+    kind: str,
+    extra: Optional[Dict[str, Any]] = None,
+) -> Optional[int]:
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_file = open(log_path, "a", encoding="utf-8")
@@ -115,31 +178,19 @@ def start_process(command: list[str], cwd: Path, log_path: Path, proj_path: Path
             stderr=subprocess.STDOUT,
             text=True,
         )
-        st.session_state["process"] = process
-        st.session_state["process_log_file"] = log_file
-        st.session_state["process_command"] = " ".join(command)
-        mark_process_started(proj_path, process.pid, " ".join(command))
-        return process
+        meta: Dict[str, Any] = {
+            "pid": process.pid,
+            "command": " ".join(command),
+            "kind": kind,
+            "started_at": datetime.now().isoformat(),
+        }
+        if extra:
+            meta.update(extra)
+        write_json(meta_path, meta)
+        return process.pid
     except Exception as exc:  # noqa: BLE001
-        st.error(f"Failed to start process: {exc}")
+        st.error(f"Failed to start {kind} process: {exc}")
         return None
-
-
-def ensure_process_state(proj_path: Path) -> None:
-    proc = st.session_state.get("process")
-    if proc is None:
-        get_active_process_meta(proj_path)
-        return
-    if proc.poll() is not None:
-        log_file = st.session_state.get("process_log_file")
-        if log_file:
-            try:
-                log_file.close()
-            except Exception:
-                pass
-        st.session_state["process"] = None
-        st.session_state["process_log_file"] = None
-        clear_process_meta(proj_path)
 
 
 def main() -> None:
@@ -154,15 +205,16 @@ def main() -> None:
         return
 
     proj_path = project_path(selected_project)
-    ensure_process_state(proj_path)
     st.write(f"Project path: `{proj_path}`")
 
     task_path = proj_path / "task.md"
     memory_path = proj_path / "memory.md"
     run_log_path = proj_path / "run.log"
+    model_job_log_path = proj_path / "model_ops.log"
     checkpoint_path = proj_path / "checkpoint.json"
     stop_signal_path = proj_path / "STOP_REQUESTED"
-    active_meta = get_active_process_meta(proj_path)
+    run_meta = get_active_meta(run_meta_path(proj_path))
+    model_job_meta = get_active_meta(model_job_meta_path(proj_path))
 
     col_input_left, col_input_right = st.columns(2)
     with col_input_left:
@@ -175,36 +227,172 @@ def main() -> None:
         st.success("task.md and memory.md saved.")
 
     st.subheader("C. Run controls")
-    proc = st.session_state.get("process")
-    session_running = proc is not None and proc.poll() is None
-    meta_running = bool(active_meta)
-    is_running = session_running or meta_running
-    if is_running:
-        command_display = (
-            st.session_state.get("process_command", "")
-            if session_running
-            else str(active_meta.get("command", "unknown command"))
+    run_active = bool(run_meta)
+    model_job_active = bool(model_job_meta)
+    blocked = run_active or model_job_active
+    if run_active:
+        st.info(f"Run active (PID {run_meta.get('pid')}): `{run_meta.get('command')}`")
+    if model_job_active:
+        st.warning(
+            f"Model job active (PID {model_job_meta.get('pid')}): `{model_job_meta.get('command')}`"
         )
-        pid_display = proc.pid if session_running else active_meta.get("pid", "N/A")
-        st.info(f"Running (PID {pid_display}): `{command_display}`")
+
+    models, models_error = query_ollama_models()
+    installed_model_names = [m["name"] for m in models]
+    default_model = load_default_model_name()
+    if "selected_model" not in st.session_state:
+        st.session_state["selected_model"] = default_model
+    if st.session_state["selected_model"] not in installed_model_names and installed_model_names:
+        st.session_state["selected_model"] = installed_model_names[0]
+
+    if models_error:
+        st.error(models_error)
+    st.write(f"Selected model: `{st.session_state.get('selected_model', default_model)}`")
 
     c1, c2, c3, c4, c5 = st.columns(5)
     with c1:
-        if st.button("Run Diagnostic", disabled=is_running):
-            start_process([sys.executable, "-m", "src.main", "--diagnostic"], ROOT, run_log_path, proj_path)
+        if st.button("Run Diagnostic", disabled=blocked or bool(models_error)):
+            model = st.session_state.get("selected_model", default_model)
+            pid = start_background_process(
+                command=[sys.executable, "-m", "src.main", "--diagnostic", "--model", model],
+                cwd=ROOT,
+                log_path=run_log_path,
+                meta_path=run_meta_path(proj_path),
+                kind="run",
+                extra={"model": model},
+            )
+            if pid:
+                st.success(f"Started diagnostic run with model `{model}` (PID {pid})")
     with c2:
-        if st.button("Run Normal", disabled=is_running):
-            start_process([sys.executable, "-m", "src.main"], ROOT, run_log_path, proj_path)
+        if st.button("Run Normal", disabled=blocked or bool(models_error)):
+            model = st.session_state.get("selected_model", default_model)
+            pid = start_background_process(
+                command=[sys.executable, "-m", "src.main", "--model", model],
+                cwd=ROOT,
+                log_path=run_log_path,
+                meta_path=run_meta_path(proj_path),
+                kind="run",
+                extra={"model": model},
+            )
+            if pid:
+                st.success(f"Started normal run with model `{model}` (PID {pid})")
     with c3:
-        if st.button("Run Continuous", disabled=is_running):
-            start_process([sys.executable, "-m", "src.main", "--continuous"], ROOT, run_log_path, proj_path)
+        if st.button("Run Continuous", disabled=blocked or bool(models_error)):
+            model = st.session_state.get("selected_model", default_model)
+            pid = start_background_process(
+                command=[sys.executable, "-m", "src.main", "--continuous", "--model", model],
+                cwd=ROOT,
+                log_path=run_log_path,
+                meta_path=run_meta_path(proj_path),
+                kind="run",
+                extra={"model": model},
+            )
+            if pid:
+                st.success(f"Started continuous run with model `{model}` (PID {pid})")
     with c4:
-        if st.button("Pause / Stop Safely"):
+        if st.button("Pause / Stop Safely", disabled=not run_active):
             write_text(stop_signal_path, "STOP_REQUESTED\n")
             st.warning(f"Stop signal created: `{stop_signal_path}`")
     with c5:
-        if st.button("Resume", disabled=is_running):
-            start_process([sys.executable, "-m", "src.main", "--resume"], ROOT, run_log_path, proj_path)
+        if st.button("Resume", disabled=blocked or bool(models_error)):
+            model = st.session_state.get("selected_model", default_model)
+            pid = start_background_process(
+                command=[sys.executable, "-m", "src.main", "--resume", "--model", model],
+                cwd=ROOT,
+                log_path=run_log_path,
+                meta_path=run_meta_path(proj_path),
+                kind="run",
+                extra={"model": model},
+            )
+            if pid:
+                st.success(f"Started resume run with model `{model}` (PID {pid})")
+
+    st.subheader("Model Management")
+    st.caption("Available to download: any valid Ollama model name.")
+    rec = {
+        "qwen3:8b": "default balanced model",
+        "qwen3:14b": "stronger, slower",
+        "deepseek-r1:8b": "reasoning-oriented experiment",
+        "llama3.1:8b": "stable fallback",
+    }
+    st.markdown("**Recommended models**")
+    for name, desc in rec.items():
+        installed_tag = " (installed)" if name in installed_model_names else ""
+        st.write(f"- `{name}` — {desc}{installed_tag}")
+
+    st.markdown("**Installed models**")
+    if models:
+        st.dataframe(
+            [{"name": m["name"], "size": m["size"], "modified": m["modified"]} for m in models],
+            use_container_width=True,
+        )
+    else:
+        st.caption("No installed model found.")
+
+    if installed_model_names:
+        selected_model = st.selectbox(
+            "Model selector",
+            installed_model_names,
+            index=installed_model_names.index(st.session_state["selected_model"])
+            if st.session_state["selected_model"] in installed_model_names
+            else 0,
+        )
+        st.session_state["selected_model"] = selected_model
+    else:
+        selected_model = st.text_input("Model selector (manual)", value=st.session_state["selected_model"])
+        st.session_state["selected_model"] = selected_model.strip()
+
+    if st.button("Save Selected Model as Default", disabled=bool(models_error)):
+        model_to_save = st.session_state.get("selected_model", "").strip()
+        if not model_to_save:
+            st.error("Model name is empty.")
+        else:
+            err = save_default_model_name(model_to_save)
+            if err:
+                st.error(err)
+            else:
+                st.success(f"Saved `{model_to_save}` to config.yaml (model.name).")
+
+    pull_model_name = st.text_input("Pull model by name", value="qwen3:8b")
+    if st.button("Pull Model", disabled=blocked):
+        pull_model_name = pull_model_name.strip()
+        if not pull_model_name:
+            st.error("Please enter a model name.")
+        else:
+            pid = start_background_process(
+                command=["ollama", "pull", pull_model_name],
+                cwd=ROOT,
+                log_path=model_job_log_path,
+                meta_path=model_job_meta_path(proj_path),
+                kind="model_pull",
+                extra={"model": pull_model_name},
+            )
+            if pid:
+                st.success(f"Started pulling model `{pull_model_name}` (PID {pid})")
+
+    delete_target = st.selectbox(
+        "Delete model (installed)",
+        installed_model_names if installed_model_names else ["(none)"],
+    )
+    confirm_delete = st.checkbox("I understand deletion cannot be undone.")
+    if st.button("Delete Selected Model", disabled=blocked or not installed_model_names):
+        if not confirm_delete:
+            st.error("Please confirm deletion first.")
+        elif run_active and delete_target == str(run_meta.get("model", "")):
+            st.error("Cannot delete the model used by the currently running task.")
+        elif delete_target == "(none)":
+            st.error("No deletable model selected.")
+        else:
+            pid = start_background_process(
+                command=["ollama", "rm", delete_target],
+                cwd=ROOT,
+                log_path=model_job_log_path,
+                meta_path=model_job_meta_path(proj_path),
+                kind="model_delete",
+                extra={"model": delete_target},
+            )
+            if pid:
+                st.success(f"Started deleting model `{delete_target}` (PID {pid})")
 
     st.subheader("D. Progress panel")
     checkpoint = {}
@@ -218,10 +406,13 @@ def main() -> None:
     st.write(f"stop reason: `{checkpoint.get('stop_reason', 'N/A')}`")
     st.write(f"can resume: `{checkpoint.get('can_resume', False)}`")
     st.write(f"stop signal present: `{stop_signal_path.exists()}`")
+    st.write(f"selected model: `{st.session_state.get('selected_model', default_model)}`")
 
     st.subheader("E. Live logs panel")
     auto_refresh = st.checkbox("Auto refresh logs every 2 seconds", value=True)
     st.code(tail_lines(run_log_path, max_lines=240) or "(no logs yet)", language="text")
+    st.caption("Model operation logs")
+    st.code(tail_lines(model_job_log_path, max_lines=120) or "(no model operation logs yet)", language="text")
     if auto_refresh:
         components.html(
             "<script>setTimeout(function(){window.location.reload();}, 2000);</script>",
