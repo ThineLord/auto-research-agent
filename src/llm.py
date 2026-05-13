@@ -40,9 +40,18 @@ class OllamaClient:
         }
 
         try:
-            response = requests.post(url, json=payload, timeout=self.timeout_seconds)
+            response = requests.post(
+                url,
+                json=payload,
+                timeout=(10, self.timeout_seconds),
+            )
             response.raise_for_status()
             data = response.json()
+        except requests.Timeout as exc:
+            raise RuntimeError(
+                "Ollama request timed out. "
+                f"Increase timeout_seconds or check model/server health at {self.base_url}."
+            ) from exc
         except requests.RequestException as exc:
             raise RuntimeError(
                 "Failed to call Ollama API. Ensure Ollama is running at "
