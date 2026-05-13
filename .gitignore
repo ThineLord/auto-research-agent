@@ -27,5 +27,6 @@ dist/
 *.log
 projects/*/runs/
 projects/*/best_output.md
+projects/*/score_history.json
 projects/*/*.pdf
 *.pdf

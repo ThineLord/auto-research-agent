@@ -3,9 +3,19 @@
 from __future__ import annotations
 
 import re
+import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, List, Optional
+
+AUTO_MEMORY_HEADER = "## Iteration Memory (auto-managed)"
+AUTO_MEMORY_NOTE = (
+    "This section is automatically updated each round. "
+    "It keeps concise, deduplicated research-state summaries."
+)
+ENTRY_LIMIT = 12
+MAX_MEMORY_WORDS = 2000
+MAX_PROMPT_MEMORY_WORDS = 1500
 
 
 def read_text(path: Path) -> str:
@@ -55,3 +65,194 @@ def parse_score(judge_text: str) -> Optional[float]:
     except ValueError:
         return None
     return max(0.0, min(100.0, score))
+
+
+def _normalize_line(line: str) -> str:
+    clean = line.strip()
+    clean = re.sub(r"^[#>\-\*\d\.\)\(\s]+", "", clean)
+    clean = re.sub(r"\s+", " ", clean)
+    return clean.strip(" :;-")
+
+
+def _dedupe_sentences(text: str) -> str:
+    parts = re.split(r"(?<=[.!?])\s+", text)
+    seen = set()
+    deduped: List[str] = []
+    for part in parts:
+        p = part.strip()
+        if not p:
+            continue
+        key = p.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(p)
+    if not deduped:
+        return ""
+    return " ".join(deduped)
+
+
+def _clip_text(text: str, max_chars: int = 180) -> str:
+    text = _dedupe_sentences(_normalize_line(text))
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 3].rstrip() + "..."
+
+
+def _collect_meaningful_lines(text: str) -> List[str]:
+    lines = []
+    for raw in text.splitlines():
+        line = _normalize_line(raw)
+        if not line:
+            continue
+        if len(line) < 12:
+            continue
+        if line.lower().startswith(("score:", "next_step:")):
+            continue
+        lines.append(line)
+    return lines
+
+
+def _pick_line(lines: List[str], keywords: List[str]) -> str:
+    for line in lines:
+        low = line.lower()
+        if any(keyword in low for keyword in keywords):
+            return line
+    return lines[0] if lines else ""
+
+
+def _parse_auto_entries(memory_text: str) -> List[Dict[str, str]]:
+    pattern = re.compile(
+        r"### Round (?P<round>\d+)\n"
+        r"- strongest idea: (?P<strongest>.*)\n"
+        r"- major criticism: (?P<criticism>.*)\n"
+        r"- unresolved problems: (?P<unresolved>.*)\n"
+        r"- best next action: (?P<next_action>.*)\n"
+        r"- current best score: (?P<best_score>.*)",
+        flags=re.MULTILINE,
+    )
+    return [match.groupdict() for match in pattern.finditer(memory_text)]
+
+
+def _build_auto_section(entries: List[Dict[str, str]]) -> str:
+    blocks = [AUTO_MEMORY_HEADER, "", AUTO_MEMORY_NOTE, ""]
+    for entry in entries:
+        block = (
+            f"### Round {entry['round']}\n"
+            f"- strongest idea: {entry['strongest']}\n"
+            f"- major criticism: {entry['criticism']}\n"
+            f"- unresolved problems: {entry['unresolved']}\n"
+            f"- best next action: {entry['next_action']}\n"
+            f"- current best score: {entry['best_score']}"
+        )
+        blocks.append(block)
+        blocks.append("")
+    return "\n".join(blocks).rstrip()
+
+
+def _word_count(text: str) -> int:
+    return len(text.split())
+
+
+def _tail_words(text: str, max_words: int) -> str:
+    words = text.split()
+    if len(words) <= max_words:
+        return text.strip()
+    return " ".join(words[-max_words:]).strip()
+
+
+def summarize_round_memory(
+    *,
+    revised_output: str,
+    review_output: str,
+    judge_output: str,
+    current_best_score: Optional[float],
+) -> Dict[str, str]:
+    revised_lines = _collect_meaningful_lines(revised_output)
+    review_lines = _collect_meaningful_lines(review_output)
+    judge_lines = _collect_meaningful_lines(judge_output)
+
+    strongest = _pick_line(
+        revised_lines,
+        keywords=["privacy", "memory", "adapter", "method", "novel", "architecture"],
+    )
+    major_criticism = _pick_line(
+        review_lines + judge_lines,
+        keywords=["weakness", "risk", "missing", "critic", "unclear", "blocker"],
+    )
+    unresolved = _pick_line(
+        judge_lines + review_lines,
+        keywords=["unresolved", "remaining", "blocker", "open", "risk", "limitation"],
+    )
+    next_action = _pick_line(
+        revised_lines + review_lines,
+        keywords=["tomorrow", "next", "implement", "evaluate", "ablation", "baseline", "run"],
+    )
+
+    return {
+        "strongest": _clip_text(strongest or "Method direction is forming but still under-specified."),
+        "criticism": _clip_text(major_criticism or "Key claims need clearer evidence and baselines."),
+        "unresolved": _clip_text(unresolved or "Evaluation coverage and failure-mode analysis remain incomplete."),
+        "next_action": _clip_text(next_action or "Define one baseline experiment and implement it end-to-end."),
+        "best_score": "N/A" if current_best_score is None else f"{current_best_score:.2f}",
+    }
+
+
+def update_project_memory(
+    *,
+    memory_path: Path,
+    round_index: int,
+    summary: Dict[str, str],
+) -> None:
+    existing = read_text(memory_path)
+    if AUTO_MEMORY_HEADER in existing:
+        manual_part = existing.split(AUTO_MEMORY_HEADER, 1)[0].rstrip()
+    else:
+        manual_part = existing.rstrip()
+
+    entries = _parse_auto_entries(existing)
+    new_entry = {
+        "round": f"{round_index:02d}",
+        "strongest": summary["strongest"],
+        "criticism": summary["criticism"],
+        "unresolved": summary["unresolved"],
+        "next_action": summary["next_action"],
+        "best_score": summary["best_score"],
+    }
+
+    if not entries or (
+        entries[-1].get("strongest") != new_entry["strongest"]
+        or entries[-1].get("criticism") != new_entry["criticism"]
+        or entries[-1].get("unresolved") != new_entry["unresolved"]
+        or entries[-1].get("next_action") != new_entry["next_action"]
+        or entries[-1].get("best_score") != new_entry["best_score"]
+    ):
+        entries.append(new_entry)
+    else:
+        entries[-1]["round"] = new_entry["round"]
+
+    entries = entries[-ENTRY_LIMIT:]
+    auto_section = _build_auto_section(entries)
+
+    combined = f"{manual_part}\n\n{auto_section}".strip()
+    if _word_count(combined) > MAX_MEMORY_WORDS:
+        manual_tail = _tail_words(manual_part, 500) if manual_part else ""
+        combined = f"{manual_tail}\n\n{auto_section}".strip()
+    if _word_count(combined) > MAX_MEMORY_WORDS:
+        combined = _tail_words(combined, MAX_MEMORY_WORDS)
+    combined = combined.strip() + "\n"
+    memory_path.parent.mkdir(parents=True, exist_ok=True)
+    memory_path.write_text(combined, encoding="utf-8")
+
+
+def write_score_history(path: Path, history: List[Dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(history, indent=2), encoding="utf-8")
+
+
+def get_memory_for_prompt(memory_path: Path) -> str:
+    """Read memory.md and return only the latest words for prompt usage."""
+    content = read_text(memory_path)
+    if not content:
+        return ""
+    return _tail_words(content, MAX_PROMPT_MEMORY_WORDS)
