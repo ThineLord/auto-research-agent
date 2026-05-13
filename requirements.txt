@@ -1,3 +1,4 @@
 requests
 pyyaml
 rich
+streamlit

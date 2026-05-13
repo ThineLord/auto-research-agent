@@ -312,3 +312,49 @@ def update_research_state(
     state_path.parent.mkdir(parents=True, exist_ok=True)
     state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
     return state
+
+
+def read_json_file(path: Path) -> Dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    if isinstance(data, dict):
+        return data
+    return {}
+
+
+def write_json_file(path: Path, data: Dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def append_log_line(log_path: Path, message: str) -> None:
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with log_path.open("a", encoding="utf-8") as f:
+        f.write(f"{ts} | {message}\n")
+
+
+def write_interrupted_report(
+    *,
+    report_path: Path,
+    last_completed_round: int,
+    last_successful_agent: str,
+    best_score: float,
+    best_output_path: Path,
+    resume_command: str,
+    stop_time: str,
+) -> None:
+    content = (
+        "# Interrupted Report\n\n"
+        f"- last completed round: {last_completed_round}\n"
+        f"- last successful agent: {last_successful_agent}\n"
+        f"- best score so far: {best_score:.2f}\n"
+        f"- best output path: {best_output_path}\n"
+        f"- safe resume command: `{resume_command}`\n"
+        f"- stop time: {stop_time}\n"
+    )
+    write_text(report_path, content)
