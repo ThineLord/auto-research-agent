@@ -6,6 +6,7 @@ import argparse
 import json
 import re
 import time
+from datetime import datetime
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -25,11 +26,15 @@ from .storage import (
     make_round_dir,
     make_run_root,
     parse_score,
+    read_json_file,
     read_text,
     save_round_outputs,
     summarize_round_memory,
     update_research_state,
     update_project_memory,
+    write_interrupted_report,
+    write_json_file,
+    append_log_line,
     write_score_history,
     write_text,
 )
@@ -40,6 +45,7 @@ STOP_OLLAMA_TIMEOUT = "OLLAMA_TIMEOUT"
 STOP_INVALID_SCORE = "INVALID_SCORE"
 STOP_EXCEPTION = "EXCEPTION"
 STOP_MANUAL_INTERRUPT = "MANUAL_INTERRUPT"
+STOP_USER_REQUESTED = "USER_STOP_REQUESTED"
 GLOBAL_MAX_RUNTIME_SECONDS = 600
 
 
@@ -82,18 +88,32 @@ def _run_agent_step(
     round_index: int,
     agent_name: str,
     call: Callable[[], str],
+    log_path: Optional[Path] = None,
+    mode: str = "normal",
 ) -> Tuple[str, Optional[str]]:
     depth = int(getattr(_run_agent_step, "_depth", 0))
     if depth > 0:
         raise RuntimeError("Recursive agent step detected; aborting for safety.")
     _run_agent_step._depth = depth + 1  # type: ignore[attr-defined]
     console.print(f"[Round {round_index}] Running {agent_name} agent...")
+    if log_path is not None:
+        append_log_line(log_path, f"mode={mode} | round={round_index} | agent={agent_name} | status=start")
     try:
         output = call()
         console.print(f"[Round {round_index}] {agent_name.capitalize()} finished.")
+        if log_path is not None:
+            append_log_line(
+                log_path,
+                f"mode={mode} | round={round_index} | agent={agent_name} | status=end",
+            )
         return output, None
     except RuntimeError as exc:
         console.print(f"[red][Round {round_index}] {agent_name} failed: {exc}[/red]")
+        if log_path is not None:
+            append_log_line(
+                log_path,
+                f"mode={mode} | round={round_index} | agent={agent_name} | status=error | error={exc}",
+            )
         return f"[{agent_name.upper()} ERROR] {exc}", str(exc)
     finally:
         _run_agent_step._depth = depth  # type: ignore[attr-defined]
@@ -106,6 +126,16 @@ def _shorten_text_by_words(text: str, max_words: int) -> str:
     return " ".join(words[:max_words])
 
 
+def _log(console: Console, log_path: Path, mode: str, message: str) -> None:
+    line = f"mode={mode} | {message}"
+    console.print(line)
+    append_log_line(log_path, line)
+
+
+def _stop_requested(stop_signal_path: Path) -> bool:
+    return stop_signal_path.exists()
+
+
 def run_iterative_rounds(
     *,
     console: Console,
@@ -113,8 +143,12 @@ def run_iterative_rounds(
     task_text: str,
     project_dir: Path,
     memory_path: Path,
+    mode: str,
     max_rounds: int,
     stop_if_no_improvement_rounds: int,
+    start_round: int = 1,
+    run_root_override: Optional[Path] = None,
+    initial_best_score: float = -1.0,
 ) -> Dict[str, Any]:
     # Termination guarantee:
     # 1) The only round loop is a bounded for-loop over [1..max_rounds].
@@ -122,16 +156,25 @@ def run_iterative_rounds(
     # 3) No retry loop exists for failed LLM requests.
     # 4) Additional early-stop conditions (timeout/no-improvement/errors) can only reduce runtime.
     started_at = time.monotonic()
-    run_root = make_run_root(project_dir)
-    console.print(f"[cyan]Run directory:[/cyan] {run_root}")
-    console.print(
-        f"[cyan]Safety limits:[/cyan] max_rounds={max_rounds}, "
-        f"no_improve_limit={stop_if_no_improvement_rounds}, "
-        f"global_runtime_limit={GLOBAL_MAX_RUNTIME_SECONDS}s"
+    run_root = run_root_override or make_run_root(project_dir)
+    log_path = project_dir / "run.log"
+    checkpoint_path = project_dir / "checkpoint.json"
+    stop_signal_path = project_dir / "STOP_REQUESTED"
+    best_output_path = project_dir / "best_output.md"
+    interrupted_report_path = project_dir / "interrupted_report.md"
+    run_id = run_root.name
+    _log(console, log_path, mode, f"run_start run_id={run_id} run_root={run_root}")
+    _log(
+        console,
+        log_path,
+        mode,
+        "safety "
+        f"max_rounds={max_rounds} no_improve_limit={stop_if_no_improvement_rounds} "
+        f"global_runtime_limit={GLOBAL_MAX_RUNTIME_SECONDS}s",
     )
 
-    best_score = -1.0
-    best_output = ""
+    best_score = initial_best_score
+    best_output = read_text(best_output_path)
     best_round: Optional[int] = None
     previous_judge = ""
     judge_history: List[str] = []
@@ -161,28 +204,52 @@ def run_iterative_rounds(
         )
 
     # round_index is strictly increasing and cannot be reset.
-    for round_index in range(1, max_rounds + 1):
+    for round_index in range(start_round, max_rounds + 1):
         elapsed_before_round = time.monotonic() - started_at
         if elapsed_before_round >= GLOBAL_MAX_RUNTIME_SECONDS:
             stop_reason = STOP_EXCEPTION
-            console.print(
-                "[red]Global runtime limit reached before starting next round.[/red]"
+            _log(
+                console,
+                log_path,
+                mode,
+                "global_runtime_limit_reached_before_round",
             )
             break
 
-        console.print(f"[Round {round_index}] Entering round.")
+        _log(console, log_path, mode, f"round_enter round={round_index}")
         console.rule(f"Round {round_index}")
         round_dir = make_round_dir(run_root, round_index)
+        draft_output = ""
+        review_output = ""
+        revised_output = ""
+        judge_output = ""
+
+        def _persist_round_outputs(stage: str) -> None:
+            save_round_outputs(
+                round_dir,
+                draft=draft_output,
+                review=review_output,
+                revised=revised_output,
+                judge=judge_output,
+            )
+            _log(console, log_path, mode, f"round_partial_saved round={round_index} stage={stage}")
+
         memory_text = get_memory_for_prompt(memory_path)
         memory_words = len(memory_text.split())
-        console.print(
-            f"[Round {round_index}] Memory loaded | words={memory_words} (limit=1500)"
+        _log(
+            console,
+            log_path,
+            mode,
+            f"memory_loaded round={round_index} words={memory_words} limit=1500",
         )
         if memory_words > 1500:
             memory_text = " ".join(memory_text.split()[-1500:])
-            console.print(
-                f"[yellow][Round {round_index}] Memory exceeded limit, truncated to 1500 words.[/yellow]"
-            )
+            _log(console, log_path, mode, f"memory_truncated round={round_index}")
+
+        if _stop_requested(stop_signal_path):
+            stop_reason = STOP_USER_REQUESTED
+            _log(console, log_path, mode, f"user_stop_requested_before_round round={round_index}")
+            break
 
         try:
             if time.monotonic() - started_at >= GLOBAL_MAX_RUNTIME_SECONDS:
@@ -194,20 +261,32 @@ def run_iterative_rounds(
                 revise_error = "global runtime limit reached"
                 judge_output = "SCORE: 0\n- Global runtime limit reached before agent call."
                 judge_error = "global runtime limit reached"
+                _log(console, log_path, mode, f"global_runtime_skip_all_agents round={round_index}")
             else:
-                _apply_dynamic_timeout()
-                draft_output, draft_error = _run_agent_step(
-                    console=console,
-                    round_index=round_index,
-                    agent_name="draft",
-                    call=lambda: agents.draft(
-                        task=task_text,
-                        memory=memory_text,
+                if _stop_requested(stop_signal_path):
+                    draft_output = "[DRAFT SKIPPED] user stop requested."
+                    draft_error = "user stop requested"
+                    _log(console, log_path, mode, f"user_stop_requested_before_draft round={round_index}")
+                else:
+                    _apply_dynamic_timeout()
+                    draft_output, draft_error = _run_agent_step(
+                        console=console,
                         round_index=round_index,
-                        previous_best=best_output,
-                        previous_judge=previous_judge,
-                    ),
-                )
+                        agent_name="draft",
+                        log_path=log_path,
+                        mode=mode,
+                        call=lambda: agents.draft(
+                            task=task_text,
+                            memory=memory_text,
+                            round_index=round_index,
+                            previous_best=best_output,
+                            previous_judge=previous_judge,
+                        ),
+                    )
+            if not draft_error and _stop_requested(stop_signal_path):
+                draft_error = "user stop requested after draft"
+                _log(console, log_path, mode, f"user_stop_requested_after_draft round={round_index}")
+            _persist_round_outputs("draft")
             if not draft_error:
                 last_successful_agent = "draft"
             if draft_error:
@@ -217,7 +296,11 @@ def run_iterative_rounds(
                     f"[yellow][Round {round_index}] Skipping review agent due to draft failure.[/yellow]"
                 )
             else:
-                if time.monotonic() - started_at >= GLOBAL_MAX_RUNTIME_SECONDS:
+                if _stop_requested(stop_signal_path):
+                    review_output = "[REVIEW SKIPPED] user stop requested."
+                    review_error = "user stop requested"
+                    _log(console, log_path, mode, f"user_stop_requested_before_review round={round_index}")
+                elif time.monotonic() - started_at >= GLOBAL_MAX_RUNTIME_SECONDS:
                     review_output = "[REVIEW SKIPPED] global runtime limit reached."
                     review_error = "global runtime limit reached"
                     console.print(
@@ -229,12 +312,18 @@ def run_iterative_rounds(
                         console=console,
                         round_index=round_index,
                         agent_name="review",
+                        log_path=log_path,
+                        mode=mode,
                         call=lambda: agents.review(
                             task=task_text,
                             memory=memory_text,
                             draft_output=draft_output,
                         ),
                     )
+                if not review_error and _stop_requested(stop_signal_path):
+                    review_error = "user stop requested after review"
+                    _log(console, log_path, mode, f"user_stop_requested_after_review round={round_index}")
+                _persist_round_outputs("review")
                 if not review_error:
                     last_successful_agent = "review"
 
@@ -245,7 +334,11 @@ def run_iterative_rounds(
                     f"[yellow][Round {round_index}] Skipping revise agent due to upstream failure.[/yellow]"
                 )
             else:
-                if time.monotonic() - started_at >= GLOBAL_MAX_RUNTIME_SECONDS:
+                if _stop_requested(stop_signal_path):
+                    revised_output = "[REVISE SKIPPED] user stop requested."
+                    revise_error = "user stop requested"
+                    _log(console, log_path, mode, f"user_stop_requested_before_revise round={round_index}")
+                elif time.monotonic() - started_at >= GLOBAL_MAX_RUNTIME_SECONDS:
                     revised_output = "[REVISE SKIPPED] global runtime limit reached."
                     revise_error = "global runtime limit reached"
                     console.print(
@@ -257,6 +350,8 @@ def run_iterative_rounds(
                         console=console,
                         round_index=round_index,
                         agent_name="revise",
+                        log_path=log_path,
+                        mode=mode,
                         call=lambda: agents.revise(
                             task=task_text,
                             memory=memory_text,
@@ -264,6 +359,10 @@ def run_iterative_rounds(
                             review_output=review_output,
                         ),
                     )
+                if not revise_error and _stop_requested(stop_signal_path):
+                    revise_error = "user stop requested after revise"
+                    _log(console, log_path, mode, f"user_stop_requested_after_revise round={round_index}")
+                _persist_round_outputs("revise")
                 if not revise_error:
                     last_successful_agent = "revise"
 
@@ -274,7 +373,11 @@ def run_iterative_rounds(
                     f"[yellow][Round {round_index}] Skipping judge agent due to revise failure (score=0).[/yellow]"
                 )
             else:
-                if time.monotonic() - started_at >= GLOBAL_MAX_RUNTIME_SECONDS:
+                if _stop_requested(stop_signal_path):
+                    judge_output = "SCORE: 0\n- Judge skipped because user stop was requested."
+                    judge_error = "user stop requested"
+                    _log(console, log_path, mode, f"user_stop_requested_before_judge round={round_index}")
+                elif time.monotonic() - started_at >= GLOBAL_MAX_RUNTIME_SECONDS:
                     judge_output = "SCORE: 0\n- Global runtime limit reached before judge call."
                     judge_error = "global runtime limit reached"
                     console.print(
@@ -286,6 +389,8 @@ def run_iterative_rounds(
                         console=console,
                         round_index=round_index,
                         agent_name="judge",
+                        log_path=log_path,
+                        mode=mode,
                         call=lambda: agents.judge(
                             task=task_text,
                             memory=memory_text,
@@ -294,13 +399,14 @@ def run_iterative_rounds(
                     )
                 if not judge_error:
                     last_successful_agent = "judge"
+            _persist_round_outputs("judge")
         except KeyboardInterrupt:
             stop_reason = STOP_MANUAL_INTERRUPT
-            console.print("[red]Manual interrupt received. Stopping gracefully.[/red]")
+            _log(console, log_path, mode, "manual_interrupt_caught")
             break
         except Exception as exc:  # noqa: BLE001
             stop_reason = STOP_EXCEPTION
-            console.print(f"[red]Unhandled exception in round {round_index}: {exc}[/red]")
+            _log(console, log_path, mode, f"exception round={round_index} error={exc}")
             break
 
         round_errors = [err for err in [draft_error, review_error, revise_error, judge_error] if err]
@@ -319,7 +425,7 @@ def run_iterative_rounds(
             revised=revised_output,
             judge=judge_output,
         )
-        console.print(f"[green]Saved round outputs:[/green] {round_dir}")
+        _log(console, log_path, mode, f"round_saved round={round_index} path={round_dir}")
         last_review_output = review_output
         last_revised_output = revised_output
         last_judge_output = judge_output
@@ -328,13 +434,14 @@ def run_iterative_rounds(
         if parsed_score is None:
             score = 0.0
             invalid_score_seen = True
-            console.print(
-                "[yellow]Judge score parsing failed; fallback score = 0.00 (INVALID_SCORE)[/yellow]"
-            )
+            _log(console, log_path, mode, f"score_parse_failed round={round_index} fallback=0")
         else:
             score = parsed_score
-        console.print(
-            f"[yellow]Score extraction:[/yellow] parsed={parsed_score is not None}, value={score:.2f}"
+        _log(
+            console,
+            log_path,
+            mode,
+            f"score_extracted round={round_index} parsed={parsed_score is not None} value={score:.2f}",
         )
         completed_rounds = round_index
 
@@ -343,7 +450,7 @@ def run_iterative_rounds(
             best_score = score
             best_round = round_index
             best_output = revised_output
-            write_text(project_dir / "best_output.md", best_output)
+            write_text(best_output_path, best_output)
             non_improve_streak = 0
             console.print(
                 f"[bold green]New best score:[/bold green] {best_score:.2f} -> updated best_output.md"
@@ -387,14 +494,31 @@ def run_iterative_rounds(
             review_output=review_output,
             judge_output=judge_output,
         )
-        console.print(f"[blue]Updated memory:[/blue] {memory_path}")
-        console.print(f"[blue]Updated research state:[/blue] {research_state_path}")
+        _log(console, log_path, mode, f"memory_updated round={round_index}")
+        _log(console, log_path, mode, f"research_state_updated round={round_index}")
+
+        checkpoint_data = {
+            "run_id": run_id,
+            "run_root": str(run_root),
+            "last_completed_round": round_index,
+            "last_successful_agent": last_successful_agent,
+            "best_score": round(best_score, 2),
+            "best_round_path": str(run_root / f"round_{best_round:02d}") if best_round else "",
+            "stop_reason": "",
+            "can_resume": True,
+            "updated_at": datetime.now().isoformat(),
+            "mode": mode,
+        }
+        write_json_file(checkpoint_path, checkpoint_data)
 
         elapsed_after_round = time.monotonic() - started_at
-        console.print(
-            f"[Round {round_index}] Stop-check | timeout={timeout_this_round} "
+        _log(
+            console,
+            log_path,
+            mode,
+            f"stop_check round={round_index} timeout={timeout_this_round} "
             f"repetitive={repetitive_judge} non_improve_streak={non_improve_streak} "
-            f"invalid_score={parsed_score is None} elapsed={elapsed_after_round:.2f}s"
+            f"invalid_score={parsed_score is None} elapsed={elapsed_after_round:.2f}s",
         )
 
         # Stop conditions:
@@ -404,30 +528,32 @@ def run_iterative_rounds(
         # - MAX_ROUNDS: for-loop exhausts naturally.
         if timeout_this_round:
             stop_reason = STOP_OLLAMA_TIMEOUT
-            console.print("[magenta]Stopping: OLLAMA_TIMEOUT.[/magenta]")
+            _log(console, log_path, mode, f"stop_reason={STOP_OLLAMA_TIMEOUT} round={round_index}")
             break
 
         if non_improve_streak >= stop_if_no_improvement_rounds:
             stop_reason = STOP_NO_IMPROVEMENT
-            console.print(
-                f"[magenta]Stopping: NO_IMPROVEMENT ({stop_if_no_improvement_rounds} rounds).[/magenta]"
-            )
+            _log(console, log_path, mode, f"stop_reason={STOP_NO_IMPROVEMENT} round={round_index}")
             break
 
         if elapsed_after_round >= GLOBAL_MAX_RUNTIME_SECONDS:
             stop_reason = STOP_EXCEPTION
-            console.print("[magenta]Stopping: global runtime limit reached.[/magenta]")
+            _log(console, log_path, mode, f"stop_reason={STOP_EXCEPTION} round={round_index}")
+            break
+
+        if _stop_requested(stop_signal_path):
+            stop_reason = STOP_USER_REQUESTED
+            _log(console, log_path, mode, f"stop_reason={STOP_USER_REQUESTED} round={round_index}")
             break
 
         previous_judge = judge_output
-        console.print(f"[Round {round_index}] Exiting round.")
+        _log(console, log_path, mode, f"round_exit round={round_index}")
     else:
         stop_reason = STOP_MAX_ROUNDS
 
     if stop_reason == STOP_MAX_ROUNDS and invalid_score_seen and completed_rounds == 1:
         stop_reason = STOP_INVALID_SCORE
 
-    best_output_path = project_dir / "best_output.md"
     best_round_text = "N/A" if best_round is None else str(best_round)
     best_score_text = "N/A" if best_score < 0 else f"{best_score:.2f}"
     best_output_path_text = str(best_output_path) if best_output_path.exists() else "N/A"
@@ -442,6 +568,40 @@ def run_iterative_rounds(
     console.print(f"[bold]Last successful agent:[/bold] {last_successful_agent}")
     console.print(f"[bold]Best output path:[/bold] {best_output_path_text}")
     console.print(f"[bold]Score history path:[/bold] {score_history_path}")
+    _log(
+        console,
+        log_path,
+        mode,
+        f"run_summary completed_rounds={completed_rounds} stop_reason={stop_reason} "
+        f"best_score={best_score_text} last_successful_agent={last_successful_agent}",
+    )
+
+    checkpoint_final = {
+        "run_id": run_id,
+        "run_root": str(run_root),
+        "last_completed_round": completed_rounds,
+        "last_successful_agent": last_successful_agent,
+        "best_score": round(best_score, 2),
+        "best_round_path": str(run_root / f"round_{best_round:02d}") if best_round else "",
+        "stop_reason": stop_reason,
+        "can_resume": stop_reason in {STOP_USER_REQUESTED, STOP_MANUAL_INTERRUPT},
+        "updated_at": datetime.now().isoformat(),
+        "mode": mode,
+    }
+    write_json_file(checkpoint_path, checkpoint_final)
+
+    if stop_reason in {STOP_USER_REQUESTED, STOP_MANUAL_INTERRUPT}:
+        write_interrupted_report(
+            report_path=interrupted_report_path,
+            last_completed_round=completed_rounds,
+            last_successful_agent=last_successful_agent,
+            best_score=max(0.0, best_score),
+            best_output_path=best_output_path,
+            resume_command="python -m src.main --resume",
+            stop_time=datetime.now().isoformat(),
+        )
+        if stop_signal_path.exists():
+            stop_signal_path.unlink()
 
     if best_output:
         console.print(f"[bold cyan]Best score:[/bold cyan] {best_score:.2f}")
@@ -477,11 +637,13 @@ def run_diagnostic_mode(
     project_dir: Path,
     memory_path: Path,
 ) -> None:
+    log_path = project_dir / "run.log"
     console.rule("Diagnostic Mode")
     console.print(
         "[cyan]Diagnostic constraints:[/cyan] one round only, short prompts, "
         "no memory update, no retries"
     )
+    _log(console, log_path, "diagnostic", "run_start")
 
     # Keep diagnostic mode fast: tighten timeout for each LLM call.
     llm.timeout_seconds = min(llm.timeout_seconds, 20)
@@ -524,15 +686,27 @@ def run_diagnostic_mode(
 
     def run_agent(agent_name: str, fn: Callable[[], str]) -> Tuple[str, Optional[str]]:
         console.print(f"[Round 1] Running {agent_name} agent...")
+        append_log_line(
+            log_path,
+            f"mode=diagnostic | round=1 | agent={agent_name} | status=start",
+        )
         started = time.monotonic()
         try:
             output = fn()
             error = None
             console.print(f"[Round 1] {agent_name.capitalize()} finished.")
+            append_log_line(
+                log_path,
+                f"mode=diagnostic | round=1 | agent={agent_name} | status=end",
+            )
         except RuntimeError as exc:
             output = f"[{agent_name.upper()} ERROR] {exc}"
             error = str(exc)
             console.print(f"[red][Round 1] {agent_name} failed: {exc}[/red]")
+            append_log_line(
+                log_path,
+                f"mode=diagnostic | round=1 | agent={agent_name} | status=error | error={exc}",
+            )
         elapsed = time.monotonic() - started
         timings[agent_name] = elapsed
         console.print(f"[Round 1] {agent_name} timing: {elapsed:.2f}s")
@@ -630,6 +804,7 @@ def run_diagnostic_mode(
         f"revise={bool(revise_error)} judge={bool(judge_error)}"
     )
     console.print("[bold green]Diagnostic mode complete (terminated after round 1).[/bold green]")
+    _log(console, log_path, "diagnostic", "run_end")
 
 
 def run_session_mode(
@@ -680,6 +855,7 @@ def run_session_mode(
         task_text=session_task,
         project_dir=project_dir,
         memory_path=memory_path,
+        mode="session",
         max_rounds=max_rounds,
         stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
     )
@@ -724,6 +900,16 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Run lightweight one-round diagnostic workflow.",
     )
+    parser.add_argument(
+        "--continuous",
+        action="store_true",
+        help="Run continuous round-by-round mode with safe stop support.",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume from projects/<project>/checkpoint.json.",
+    )
     return parser.parse_args()
 
 
@@ -763,6 +949,56 @@ def main() -> None:
     )
 
     try:
+        if args.resume:
+            checkpoint_path = project_dir / "checkpoint.json"
+            checkpoint = read_json_file(checkpoint_path)
+            if not checkpoint or not checkpoint.get("can_resume"):
+                console.print(
+                    "[red]Cannot resume: checkpoint.json missing or can_resume is false.[/red]"
+                )
+                return
+            run_root_str = str(checkpoint.get("run_root", "")).strip()
+            if not run_root_str:
+                console.print("[red]Cannot resume: checkpoint run_root is missing.[/red]")
+                return
+            run_root_path = Path(run_root_str)
+            if not run_root_path.exists():
+                console.print("[red]Cannot resume: checkpoint run_root does not exist.[/red]")
+                return
+            start_round = int(checkpoint.get("last_completed_round", 0)) + 1
+            initial_best_score = float(checkpoint.get("best_score", -1.0))
+            console.print(
+                f"[cyan]Resuming from checkpoint:[/cyan] start_round={start_round}, "
+                f"run_root={run_root_path}"
+            )
+            run_iterative_rounds(
+                console=console,
+                agents=agents,
+                task_text=task_text,
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="resume",
+                max_rounds=max(max_rounds, start_round),
+                stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
+                start_round=start_round,
+                run_root_override=run_root_path,
+                initial_best_score=initial_best_score,
+            )
+            return
+
+        if args.continuous:
+            run_iterative_rounds(
+                console=console,
+                agents=agents,
+                task_text=task_text,
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="continuous",
+                max_rounds=9999,
+                stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
+            )
+            return
+
         if args.diagnostic:
             run_diagnostic_mode(
                 console=console,
@@ -792,6 +1028,7 @@ def main() -> None:
             task_text=task_text,
             project_dir=project_dir,
             memory_path=memory_path,
+            mode="normal",
             max_rounds=max_rounds,
             stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
         )

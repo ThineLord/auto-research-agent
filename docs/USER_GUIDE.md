@@ -42,29 +42,35 @@ python -m src.main --diagnostic
 
 ## 连续运行用哪个命令
 
-当前稳定版本未提供 `--continuous`。  
-建议用有界模式多次运行：
-
 ```bash
-python -m src.main
+python -m src.main --continuous
 ```
 
-它会按 `config.yaml` 的 `max_rounds` 自动停止。
+连续模式会逐轮执行，并在每轮持续写入输出和检查点。
 
 ## 如何安全停止
 
-直接 `Ctrl+C`。  
-由于每轮都会立即写入 `runs/round_xx`，已完成轮次不会丢失。
+有两种方式：
+
+1. 终端按 `Ctrl+C`
+2. 在 Streamlit UI 里点击 `Pause / Stop Safely`（会创建 `STOP_REQUESTED`）
+
+程序会在安全点停止，并生成：
+
+- `projects/pama/checkpoint.json`
+- `projects/pama/interrupted_report.md`
 
 ## 如何恢复（resume）
 
-当前稳定版本未提供 `--resume`。  
-建议恢复方式：
+```bash
+python -m src.main --resume
+```
 
-1. 保留已有 `projects/pama/memory.md`
-2. 再次执行 `python -m src.main`
+恢复会读取 `projects/pama/checkpoint.json`：
 
-程序会基于当前 `task.md + memory.md` 继续推进。
+- 从 `last_completed_round + 1` 继续
+- 不覆盖已有 round 文件
+- 只有更高分时才更新 `best_output.md`
 
 ## 输出文件怎么读（先看哪个）
 

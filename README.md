@@ -46,15 +46,39 @@ python -m src.main
   - `python -m src.main`
 - 会话模式（包含 objective/plan/report）
   - `python -m src.main --session`
+- 连续运行
+  - `python -m src.main --continuous`
+- 从检查点恢复
+  - `python -m src.main --resume`
+- 启动本地图形界面
+  - `streamlit run ui/app.py`
+
+## Graphical UI
+
+- 启动：
+  - `streamlit run ui/app.py`
+- 输入任务：
+  - 在 UI 的 `task.md` 和 `memory.md` 文本框编辑，然后点击 `Save Input`
+- 开始运行：
+  - `Run Diagnostic` / `Run Normal` / `Run Continuous`
+- 安全停止：
+  - 点击 `Pause / Stop Safely`（创建 `STOP_REQUESTED`，后端在安全点退出）
+- 恢复：
+  - 点击 `Resume`（等价 `python -m src.main --resume`）
+- 看结果：
+  - 先看 `projects/pama/best_output.md`
+  - 再看 `projects/pama/runs/<run_id>/round_xx/`
+  - 实时状态看 `projects/pama/checkpoint.json`
+  - 实时日志看 `projects/pama/run.log`
 
 ## 关于“连续运行 / 安全停止 / 恢复”
 
-当前稳定版本 **尚未实现** `--continuous` 与 `--resume`。  
-目前可用策略：
-
-- 使用 `python -m src.main` 的有界运行（由 `max_rounds` 控制）
-- 手动中断：`Ctrl+C`
-- 进度不会丢：每轮都会即时写入 `runs/round_xx` 文件
+- 连续运行：`python -m src.main --continuous`
+- 安全停止：
+  - `Ctrl+C`
+  - 或创建 `projects/pama/STOP_REQUESTED`（UI 按钮会自动创建）
+- 恢复：`python -m src.main --resume`（读取 `projects/pama/checkpoint.json`）
+- 进度不会丢：每轮都会写入 `runs/round_xx`，并更新 checkpoint
 
 ## 哪些文件不要提交
 
@@ -66,6 +90,10 @@ python -m src.main
 - `projects/*/research_state.json`
 - `projects/*/current_plan.md`
 - `projects/*/final_session_report.md`
+- `projects/*/run.log`
+- `projects/*/checkpoint.json`
+- `projects/*/interrupted_report.md`
+- `projects/*/STOP_REQUESTED`
 - `.env*`
 - `.venv/`
 
@@ -74,6 +102,6 @@ python -m src.main
 ```bash
 git status
 git add .
-git commit -m "Stabilize runtime and improve user documentation"
+git commit -m "Add user guide and safe run controls"
 git push
 ```

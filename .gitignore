@@ -31,5 +31,9 @@ projects/*/score_history.json
 projects/*/research_state.json
 projects/*/current_plan.md
 projects/*/final_session_report.md
+projects/*/run.log
+projects/*/checkpoint.json
+projects/*/interrupted_report.md
+projects/*/STOP_REQUESTED
 projects/*/*.pdf
 *.pdf
