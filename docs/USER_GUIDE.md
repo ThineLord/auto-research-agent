@@ -20,21 +20,31 @@
 - `deepseek-r1:8b`：推理实验备选
 - `llama3.1:8b`：稳定回退模型（fallback）
 
+## 首次安装
+
+进入项目目录后运行：
+
+```bash
+make install-dev
+```
+
+这会用 `python3` 创建 `.venv`，并安装运行和测试所需依赖。
+
 命令行切换模型：
 
 ```bash
-python -m src.main --model qwen3:8b
-python -m src.main --model qwen3:14b
-python -m src.main --model deepseek-r1:8b
-python -m src.main --diagnostic --model llama3.1:8b
+make run ARGS="--model qwen3:8b"
+make run ARGS="--model qwen3:14b"
+make run ARGS="--model deepseek-r1:8b"
+make diagnostic ARGS="--model llama3.1:8b"
 ```
 
 在 UI 中切换模型：
 
 1. 推荐直接运行：`/Users/hanzhiyou/GitHub_Repository/auto-research-agent/scripts/start_ui.sh`
 2. 或手动进入唯一项目目录：`cd /Users/hanzhiyou/GitHub_Repository/auto-research-agent`
-3. 启动虚拟环境：`source .venv/bin/activate`
-4. 打开 `streamlit run ui/app.py`
+3. 安装依赖：`make install-dev`
+4. 打开 `make ui`
 5. 确认 UI 顶部的 `App root` 是 `/Users/hanzhiyou/GitHub_Repository/auto-research-agent`
 6. 在 `Model Management` 的下拉框选已安装模型
 7. 点击 `Run Diagnostic / Run Normal / Run Continuous / Resume`
@@ -89,7 +99,7 @@ ollama run qwen3:8b
 先跑诊断：
 
 ```bash
-python -m src.main --diagnostic
+make diagnostic
 ```
 
 确认本机模型、提示词和文件写入都正常，再跑正式模式。
@@ -97,7 +107,7 @@ python -m src.main --diagnostic
 ## 连续运行用哪个命令
 
 ```bash
-python -m src.main --continuous
+make continuous
 ```
 
 连续模式会逐轮执行，并在每轮持续写入输出和检查点。
@@ -117,7 +127,7 @@ python -m src.main --continuous
 ## 如何恢复（resume）
 
 ```bash
-python -m src.main --resume
+make resume
 ```
 
 恢复会读取 `projects/pama/checkpoint.json`：

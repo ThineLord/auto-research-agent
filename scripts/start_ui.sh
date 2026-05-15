@@ -6,11 +6,16 @@ ROOT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
 cd "${ROOT_DIR}"
 
-if [[ ! -x ".venv/bin/streamlit" ]]; then
-  echo "Streamlit is not installed in .venv."
-  echo "Run: python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
+if [[ ! -x ".venv/bin/python" ]]; then
+  echo "Virtual environment is not ready."
+  echo "Run: make install-dev"
   exit 1
 fi
 
-source .venv/bin/activate
-exec streamlit run ui/app.py
+if ! .venv/bin/python -c "import streamlit" >/dev/null 2>&1; then
+  echo "Streamlit is not installed in .venv."
+  echo "Run: make install-dev"
+  exit 1
+fi
+
+exec .venv/bin/python -m streamlit run ui/app.py
