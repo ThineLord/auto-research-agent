@@ -60,44 +60,7 @@ import src.main as main_module
 from src.cli import parse_args
 from src.constants import STOP_MAX_ROUNDS
 from src.runner import run_iterative_rounds
-
-
-class FakeLLM:
-    timeout_seconds = 300
-
-
-class FakeAgents:
-    def __init__(self) -> None:
-        self.llm = FakeLLM()
-        self.judge_scores = [50, 40]
-
-    def draft(
-        self,
-        *,
-        task: str,
-        memory: str,
-        round_index: int,
-        previous_best: str,
-        previous_judge: str,
-    ) -> str:
-        return f"Draft round {round_index}: {task[:20]} | previous={bool(previous_best)}"
-
-    def review(self, *, task: str, memory: str, draft_output: str) -> str:
-        return f"Review notes for {draft_output}"
-
-    def revise(
-        self,
-        *,
-        task: str,
-        memory: str,
-        draft_output: str,
-        review_output: str,
-    ) -> str:
-        return f"Revised output from {draft_output}"
-
-    def judge(self, *, task: str, memory: str, revised_output: str) -> str:
-        score = self.judge_scores.pop(0)
-        return f"SCORE: {score}\n- Judge feedback for score {score}."
+from tests.helpers import ConfigurableFakeAgents, make_project_fixture
 
 
 class RoundLoopTests(unittest.TestCase):
@@ -116,17 +79,14 @@ class RoundLoopTests(unittest.TestCase):
 
     def test_round_loop_writes_outputs_and_keeps_best_score(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            project_dir = Path(tmp) / "project"
-            project_dir.mkdir()
-            memory_path = project_dir / "memory.md"
-            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            fixture = make_project_fixture(Path(tmp))
 
             result = run_iterative_rounds(
                 console=Console(),
-                agents=FakeAgents(),
+                agents=ConfigurableFakeAgents(),
                 task_text="Design a privacy-aware memory adapter.",
-                project_dir=project_dir,
-                memory_path=memory_path,
+                project_dir=fixture.project_dir,
+                memory_path=fixture.memory_path,
                 mode="test",
                 model_name="fake-model",
                 max_rounds=2,
@@ -148,11 +108,11 @@ class RoundLoopTests(unittest.TestCase):
                 self.assertTrue((round_dir / "03_revised.md").exists())
                 self.assertTrue((round_dir / "04_judge.md").exists())
 
-            best_output = (project_dir / "best_output.md").read_text(encoding="utf-8")
+            best_output = (fixture.project_dir / "best_output.md").read_text(encoding="utf-8")
             self.assertIn("Draft round 1", best_output)
             self.assertNotIn("Draft round 2", best_output)
 
-            score_history = (project_dir / "score_history.json").read_text(encoding="utf-8")
+            score_history = (fixture.project_dir / "score_history.json").read_text(encoding="utf-8")
             self.assertIn('"score": 50.0', score_history)
             self.assertIn('"score": 40.0', score_history)
 
