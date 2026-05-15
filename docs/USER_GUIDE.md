@@ -31,10 +31,14 @@ python -m src.main --diagnostic --model llama3.1:8b
 
 在 UI 中切换模型：
 
-1. 打开 `streamlit run ui/app.py`
-2. 在 `Model Management` 的下拉框选已安装模型
-3. 点击 `Run Diagnostic / Run Normal / Run Continuous / Resume`
-4. UI 会自动传参：`--model <selected_model>`
+1. 推荐直接运行：`/Users/hanzhiyou/GitHub_Repository/auto-research-agent/scripts/start_ui.sh`
+2. 或手动进入唯一项目目录：`cd /Users/hanzhiyou/GitHub_Repository/auto-research-agent`
+3. 启动虚拟环境：`source .venv/bin/activate`
+4. 打开 `streamlit run ui/app.py`
+5. 确认 UI 顶部的 `App root` 是 `/Users/hanzhiyou/GitHub_Repository/auto-research-agent`
+6. 在 `Model Management` 的下拉框选已安装模型
+7. 点击 `Run Diagnostic / Run Normal / Run Continuous / Resume`
+8. UI 会自动传参：`--model <selected_model>`
 
 在 UI 中拉取模型：
 
