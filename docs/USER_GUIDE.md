@@ -39,6 +39,25 @@ make run ARGS="--model deepseek-r1:8b"
 make diagnostic ARGS="--model llama3.1:8b"
 ```
 
+## config.yaml 配置校验
+
+程序启动时会先检查 `config.yaml`。如果字段名写错、类型不对、数值超出范围、
+`ollama_base_url` 不是有效 HTTP/HTTPS 地址，或 `project_name` 不是简单项目文件夹名，
+会直接显示具体配置错误并停止。
+
+推荐继续使用当前嵌套格式：
+
+```yaml
+model:
+  provider: ollama
+  name: qwen3:8b
+  temperature: 0.3
+  timeout_seconds: 300
+```
+
+旧写法 `model: qwen3:8b` 仍可用；旧的顶层 `temperature` 和 `timeout_seconds`
+也仍可作为 fallback。若同一项同时出现在顶层和 `model:` 里，以 `model:` 里的值为准。
+
 在 UI 中切换模型：
 
 1. 推荐直接运行：`<PROJECT_ROOT>/scripts/start_ui.sh`

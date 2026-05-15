@@ -8,7 +8,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from src.config import (
-    load_default_model_name,
+    ConfigValidationError,
+    load_app_config,
     query_ollama_models,
     save_default_model_name,
 )
@@ -67,6 +68,11 @@ def main() -> None:
     st.set_page_config(page_title="Auto Research Agent", layout="wide")
     st.title("Auto Research Agent")
     render_runtime_location_check()
+    try:
+        app_config = load_app_config(CONFIG_PATH)
+    except (ConfigValidationError, FileNotFoundError) as exc:
+        st.error(f"Config error: {exc}")
+        st.stop()
 
     st.subheader("Quick Actions")
     quick_test_col, quick_status_col = st.columns([1, 3])
@@ -135,7 +141,7 @@ def main() -> None:
 
     models, models_error = query_ollama_models(timeout_seconds=15)
     installed_model_names = [m["name"] for m in models]
-    default_model = load_default_model_name(CONFIG_PATH)
+    default_model = app_config.model.name
     if "selected_model" not in st.session_state:
         st.session_state["selected_model"] = default_model
     if st.session_state["selected_model"] not in installed_model_names and installed_model_names:
