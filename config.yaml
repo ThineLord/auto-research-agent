@@ -2,9 +2,12 @@ model:
   provider: ollama
   name: qwen3:8b
   temperature: 0.3
-  timeout_seconds: 120
+  timeout_seconds: 300
 ollama_base_url: http://localhost:11434
 project_name: pama
 max_rounds: 5
 stop_if_no_improvement_rounds: 2
 top_p: 0.9
+runtime:
+  normal_max_runtime_seconds: 10800
+  continuous_max_runtime_seconds: 43200

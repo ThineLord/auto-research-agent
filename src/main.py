@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import time
@@ -47,7 +48,9 @@ STOP_INVALID_SCORE = "INVALID_SCORE"
 STOP_EXCEPTION = "EXCEPTION"
 STOP_MANUAL_INTERRUPT = "MANUAL_INTERRUPT"
 STOP_USER_REQUESTED = "USER_STOP_REQUESTED"
-GLOBAL_MAX_RUNTIME_SECONDS = 600
+DEFAULT_NORMAL_MAX_RUNTIME_SECONDS = 10800
+DEFAULT_CONTINUOUS_MAX_RUNTIME_SECONDS = 43200
+RUN_LOCK_FILENAME = "active_run.json"
 
 
 def load_config(config_path: Path) -> Dict[str, Any]:
@@ -167,6 +170,50 @@ def _stop_requested(stop_signal_path: Path) -> bool:
     return stop_signal_path.exists()
 
 
+def _is_pid_running(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def _acquire_run_lock(project_dir: Path, *, mode: str, model_name: str) -> Tuple[Optional[Path], Optional[str]]:
+    lock_path = project_dir / RUN_LOCK_FILENAME
+    if lock_path.exists():
+        lock_data = read_json_file(lock_path)
+        lock_pid = int(lock_data.get("pid", 0)) if lock_data else 0
+        if _is_pid_running(lock_pid):
+            lock_mode = str(lock_data.get("mode", "unknown"))
+            lock_model = str(lock_data.get("model", "unknown"))
+            lock_started = str(lock_data.get("started_at", "unknown"))
+            return (
+                None,
+                "Another run is already active. "
+                f"pid={lock_pid} mode={lock_mode} model={lock_model} started_at={lock_started}.",
+            )
+        lock_path.unlink(missing_ok=True)
+
+    write_json_file(
+        lock_path,
+        {
+            "pid": os.getpid(),
+            "mode": mode,
+            "model": model_name,
+            "started_at": datetime.now().isoformat(),
+        },
+    )
+    return lock_path, None
+
+
+def _release_run_lock(lock_path: Optional[Path]) -> None:
+    if lock_path is None:
+        return
+    lock_path.unlink(missing_ok=True)
+
+
 def run_iterative_rounds(
     *,
     console: Console,
@@ -178,6 +225,10 @@ def run_iterative_rounds(
     model_name: str,
     max_rounds: int,
     stop_if_no_improvement_rounds: int,
+    global_max_runtime_seconds: int,
+    per_agent_timeout_seconds: int,
+    disable_no_improvement_stop: bool = False,
+    disable_timeout_stop: bool = False,
     start_round: int = 1,
     run_root_override: Optional[Path] = None,
     initial_best_score: float = -1.0,
@@ -207,7 +258,7 @@ def run_iterative_rounds(
         mode,
         "safety "
         f"max_rounds={max_rounds} no_improve_limit={stop_if_no_improvement_rounds} "
-        f"global_runtime_limit={GLOBAL_MAX_RUNTIME_SECONDS}s",
+        f"global_runtime_limit={global_max_runtime_seconds}s",
     )
 
     best_score = initial_best_score
@@ -229,12 +280,12 @@ def run_iterative_rounds(
     timeout_seen = False
 
     def _remaining_runtime_seconds() -> int:
-        remaining = GLOBAL_MAX_RUNTIME_SECONDS - (time.monotonic() - started_at)
+        remaining = global_max_runtime_seconds - (time.monotonic() - started_at)
         return max(0, int(remaining))
 
     def _apply_dynamic_timeout() -> None:
         remaining = _remaining_runtime_seconds()
-        agents.llm.timeout_seconds = max(1, min(120, remaining))
+        agents.llm.timeout_seconds = max(1, min(per_agent_timeout_seconds, remaining))
         console.print(
             f"[debug] Applied per-agent timeout={agents.llm.timeout_seconds}s "
             f"(remaining_global_runtime={remaining}s)"
@@ -243,7 +294,7 @@ def run_iterative_rounds(
     # round_index is strictly increasing and cannot be reset.
     for round_index in range(start_round, max_rounds + 1):
         elapsed_before_round = time.monotonic() - started_at
-        if elapsed_before_round >= GLOBAL_MAX_RUNTIME_SECONDS:
+        if elapsed_before_round >= global_max_runtime_seconds:
             stop_reason = STOP_EXCEPTION
             _log(
                 console,
@@ -289,7 +340,7 @@ def run_iterative_rounds(
             break
 
         try:
-            if time.monotonic() - started_at >= GLOBAL_MAX_RUNTIME_SECONDS:
+            if time.monotonic() - started_at >= global_max_runtime_seconds:
                 draft_output = "[DRAFT SKIPPED] global runtime limit reached."
                 draft_error = "global runtime limit reached"
                 review_output = "[REVIEW SKIPPED] global runtime limit reached."
@@ -337,7 +388,7 @@ def run_iterative_rounds(
                     review_output = "[REVIEW SKIPPED] user stop requested."
                     review_error = "user stop requested"
                     _log(console, log_path, mode, f"user_stop_requested_before_review round={round_index}")
-                elif time.monotonic() - started_at >= GLOBAL_MAX_RUNTIME_SECONDS:
+                elif time.monotonic() - started_at >= global_max_runtime_seconds:
                     review_output = "[REVIEW SKIPPED] global runtime limit reached."
                     review_error = "global runtime limit reached"
                     console.print(
@@ -375,7 +426,7 @@ def run_iterative_rounds(
                     revised_output = "[REVISE SKIPPED] user stop requested."
                     revise_error = "user stop requested"
                     _log(console, log_path, mode, f"user_stop_requested_before_revise round={round_index}")
-                elif time.monotonic() - started_at >= GLOBAL_MAX_RUNTIME_SECONDS:
+                elif time.monotonic() - started_at >= global_max_runtime_seconds:
                     revised_output = "[REVISE SKIPPED] global runtime limit reached."
                     revise_error = "global runtime limit reached"
                     console.print(
@@ -414,7 +465,7 @@ def run_iterative_rounds(
                     judge_output = "SCORE: 0\n- Judge skipped because user stop was requested."
                     judge_error = "user stop requested"
                     _log(console, log_path, mode, f"user_stop_requested_before_judge round={round_index}")
-                elif time.monotonic() - started_at >= GLOBAL_MAX_RUNTIME_SECONDS:
+                elif time.monotonic() - started_at >= global_max_runtime_seconds:
                     judge_output = "SCORE: 0\n- Global runtime limit reached before judge call."
                     judge_error = "global runtime limit reached"
                     console.print(
@@ -565,17 +616,17 @@ def run_iterative_rounds(
         # - NO_IMPROVEMENT: score does not improve for configured rounds.
         # - EXCEPTION: global runtime reached or unhandled exception.
         # - MAX_ROUNDS: for-loop exhausts naturally.
-        if timeout_this_round:
+        if timeout_this_round and not disable_timeout_stop:
             stop_reason = STOP_OLLAMA_TIMEOUT
             _log(console, log_path, mode, f"stop_reason={STOP_OLLAMA_TIMEOUT} round={round_index}")
             break
 
-        if non_improve_streak >= stop_if_no_improvement_rounds:
+        if not disable_no_improvement_stop and non_improve_streak >= stop_if_no_improvement_rounds:
             stop_reason = STOP_NO_IMPROVEMENT
             _log(console, log_path, mode, f"stop_reason={STOP_NO_IMPROVEMENT} round={round_index}")
             break
 
-        if elapsed_after_round >= GLOBAL_MAX_RUNTIME_SECONDS:
+        if elapsed_after_round >= global_max_runtime_seconds:
             stop_reason = STOP_EXCEPTION
             _log(console, log_path, mode, f"stop_reason={STOP_EXCEPTION} round={round_index}")
             break
@@ -686,8 +737,8 @@ def run_diagnostic_mode(
     )
     _log(console, log_path, "diagnostic", f"run_start model={model_name}")
 
-    # Keep diagnostic mode fast: tighten timeout for each LLM call.
-    llm.timeout_seconds = min(llm.timeout_seconds, 20)
+    # Allow slower local machines/model warm-up while keeping a sane upper bound.
+    llm.timeout_seconds = min(llm.timeout_seconds, 300)
 
     diagnostic_agents = ResearchAgents(
         llm=llm,
@@ -897,6 +948,8 @@ def run_session_mode(
     model_name: str,
     max_rounds: int,
     stop_if_no_improvement_rounds: int,
+    global_max_runtime_seconds: int,
+    per_agent_timeout_seconds: int,
 ) -> None:
     console.rule("Research Session Mode")
     memory_for_prompt = get_memory_for_prompt(memory_path)
@@ -939,6 +992,8 @@ def run_session_mode(
         model_name=model_name,
         max_rounds=max_rounds,
         stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
+        global_max_runtime_seconds=global_max_runtime_seconds,
+        per_agent_timeout_seconds=per_agent_timeout_seconds,
     )
 
     research_state_path = project_dir / "research_state.json"
@@ -1010,20 +1065,36 @@ def main() -> None:
     if isinstance(model_cfg, dict):
         config_model_name = str(model_cfg.get("name", "qwen3:8b"))
         config_temperature = float(model_cfg.get("temperature", config.get("temperature", 0.4)))
-        config_timeout = int(model_cfg.get("timeout_seconds", config.get("timeout_seconds", 120)))
+        config_timeout = int(model_cfg.get("timeout_seconds", config.get("timeout_seconds", 300)))
     else:
         config_model_name = str(model_cfg) if model_cfg else "qwen3:8b"
         config_temperature = float(config.get("temperature", 0.4))
-        config_timeout = int(config.get("timeout_seconds", 120))
+        config_timeout = int(config.get("timeout_seconds", 300))
 
     model_name = args.model or config_model_name
     base_url = config.get("ollama_base_url", "http://localhost:11434")
     project_name = config.get("project_name", "pama")
     max_rounds = int(config.get("max_rounds", 5))
     stop_if_no_improvement_rounds = int(config.get("stop_if_no_improvement_rounds", 2))
+    runtime_cfg = config.get("runtime", {})
+    if not isinstance(runtime_cfg, dict):
+        runtime_cfg = {}
+    normal_max_runtime_seconds = max(
+        60,
+        int(runtime_cfg.get("normal_max_runtime_seconds", DEFAULT_NORMAL_MAX_RUNTIME_SECONDS)),
+    )
+    continuous_max_runtime_seconds = max(
+        normal_max_runtime_seconds,
+        int(
+            runtime_cfg.get(
+                "continuous_max_runtime_seconds",
+                DEFAULT_CONTINUOUS_MAX_RUNTIME_SECONDS,
+            )
+        ),
+    )
     temperature = float(config_temperature)
     top_p = float(config.get("top_p", 0.9))
-    timeout_seconds = min(int(config_timeout), 120)
+    timeout_seconds = max(1, min(int(config_timeout), 300))
 
     project_dir = root / "projects" / project_name
     memory_path = project_dir / "memory.md"
@@ -1047,6 +1118,28 @@ def main() -> None:
         return
 
     console.print(f"[bold cyan]Using model: {model_name}[/bold cyan]")
+
+    requested_mode = "normal"
+    if args.continuous:
+        requested_mode = "continuous"
+    elif args.diagnostic:
+        requested_mode = "diagnostic"
+    elif args.session:
+        requested_mode = "session"
+    elif args.resume:
+        requested_mode = "resume"
+
+    run_lock_path, lock_error = _acquire_run_lock(
+        project_dir,
+        mode=requested_mode,
+        model_name=model_name,
+    )
+    if lock_error:
+        console.print(f"[red]{lock_error}[/red]")
+        console.print(
+            f"[yellow]If this is stale, remove {project_dir / RUN_LOCK_FILENAME} and retry.[/yellow]"
+        )
+        return
 
     llm = OllamaClient(
         base_url=base_url,
@@ -1093,6 +1186,8 @@ def main() -> None:
                 model_name=model_name,
                 max_rounds=max(max_rounds, start_round),
                 stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
+                global_max_runtime_seconds=normal_max_runtime_seconds,
+                per_agent_timeout_seconds=timeout_seconds,
                 start_round=start_round,
                 run_root_override=run_root_path,
                 initial_best_score=initial_best_score,
@@ -1110,6 +1205,10 @@ def main() -> None:
                 model_name=model_name,
                 max_rounds=9999,
                 stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
+                global_max_runtime_seconds=continuous_max_runtime_seconds,
+                per_agent_timeout_seconds=timeout_seconds,
+                disable_no_improvement_stop=True,
+                disable_timeout_stop=True,
             )
             return
 
@@ -1135,6 +1234,8 @@ def main() -> None:
                 model_name=model_name,
                 max_rounds=max_rounds,
                 stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
+                global_max_runtime_seconds=normal_max_runtime_seconds,
+                per_agent_timeout_seconds=timeout_seconds,
             )
             return
 
@@ -1148,9 +1249,13 @@ def main() -> None:
             model_name=model_name,
             max_rounds=max_rounds,
             stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
+            global_max_runtime_seconds=normal_max_runtime_seconds,
+            per_agent_timeout_seconds=timeout_seconds,
         )
     except KeyboardInterrupt:
         console.print("[red]Manual interrupt detected in main loop. Stop reason: MANUAL_INTERRUPT[/red]")
+    finally:
+        _release_run_lock(run_lock_path)
 
 
 if __name__ == "__main__":

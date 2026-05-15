@@ -153,7 +153,7 @@ def save_default_model_name(model_name: str) -> Optional[str]:
     model_cfg.setdefault("provider", "ollama")
     model_cfg["name"] = model_name
     model_cfg.setdefault("temperature", 0.3)
-    model_cfg.setdefault("timeout_seconds", 120)
+    model_cfg.setdefault("timeout_seconds", 300)
     config["model"] = model_cfg
     CONFIG_PATH.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
     return None
