@@ -40,7 +40,9 @@ def is_pid_running(pid: int) -> bool:
     return True
 
 
-def acquire_run_lock(project_dir: Path, *, mode: str, model_name: str) -> Tuple[Optional[Path], Optional[str]]:
+def acquire_run_lock(
+    project_dir: Path, *, mode: str, model_name: str
+) -> Tuple[Optional[Path], Optional[str]]:
     lock_path = project_dir / RUN_LOCK_FILENAME
     if lock_path.exists():
         lock_data = read_json_file(lock_path)

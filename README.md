@@ -61,6 +61,12 @@ make diagnostic ARGS="--model llama3.1:8b"
 
 ## 常用命令
 
+- 安装开发与 CI 检查工具
+  - `make install-dev`
+- 本地完整检查（格式、lint、导入、测试）
+  - `make check`
+- 自动格式化 Python 代码
+  - `make format`
 - 基础诊断（1 轮、快速验证）
   - `make diagnostic`
 - 正常有界运行（按 `max_rounds` 停止）
@@ -81,6 +87,18 @@ make diagnostic ARGS="--model llama3.1:8b"
 .venv/bin/python -m src.main --diagnostic
 .venv/bin/auto-research-agent --diagnostic
 ```
+
+## CI / 开发检查
+
+GitHub Actions 会在推送到 `master`、`codex/**` 分支以及提交到 `master` 的 PR 时运行。
+CI 使用 Python 3.10 和 3.13，执行和本地完整检查相同的步骤：
+
+```bash
+make check
+```
+
+这个命令会检查 Ruff 格式、Ruff lint、基础导入安全和测试套件。CI 不会启动 Ollama
+或运行需要本地模型的研究流程。
 
 ## Graphical UI
 
