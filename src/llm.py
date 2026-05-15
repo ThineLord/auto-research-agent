@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import requests
 
@@ -27,6 +27,7 @@ class OllamaClient:
         user_prompt: str,
         temperature: float = 0.4,
         top_p: float = 0.9,
+        response_format: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Generate a response from Ollama chat API."""
         url = f"{self.base_url.rstrip('/')}/api/chat"
@@ -47,6 +48,8 @@ class OllamaClient:
                 "top_p": top_p,
             },
         }
+        if response_format is not None:
+            payload["format"] = response_format
 
         started = time.monotonic()
         logger.info(
@@ -57,6 +60,7 @@ class OllamaClient:
                 "system_chars": len(system_prompt or ""),
                 "user_chars": len(user_prompt),
                 "timeout_seconds": self.timeout_seconds,
+                "structured_response": response_format is not None,
             },
         )
         try:

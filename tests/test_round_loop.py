@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import types
 import unittest
@@ -97,7 +98,21 @@ class FakeAgents:
 
     def judge(self, *, task: str, memory: str, revised_output: str) -> str:
         score = self.judge_scores.pop(0)
-        return f"SCORE: {score}\n- Judge feedback for score {score}."
+        return json.dumps(
+            {
+                "score": score,
+                "rubric": {
+                    "novelty_and_research_value": 10,
+                    "technical_clarity_and_correctness": 10,
+                    "feasibility_and_implementation_realism": 10,
+                    "evaluation_design_quality": 10,
+                    "tomorrow_actionability": 10,
+                },
+                "reasons": [f"Judge feedback for score {score}."],
+                "blockers": ["Needs one more validation pass."],
+                "next_step": "CONTINUE",
+            }
+        )
 
 
 class RoundLoopTests(unittest.TestCase):
