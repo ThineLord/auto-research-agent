@@ -81,8 +81,7 @@ def render_runtime_location_check() -> None:
     )
     st.code(
         f"cd {CANONICAL_ROOT}\n"
-        "source .venv/bin/activate\n"
-        "streamlit run ui/app.py",
+        "make ui",
         language="bash",
     )
 
@@ -227,10 +226,8 @@ def run_project_tests() -> Dict[str, Any]:
     command = [
         sys.executable,
         "-m",
-        "unittest",
-        "tests.test_storage",
-        "tests.test_round_loop",
-        "-v",
+        "pytest",
+        "-q",
     ]
     try:
         result = subprocess.run(
@@ -397,7 +394,7 @@ def main() -> None:
             st.session_state["test_result"] = run_project_tests()
 
     st.subheader("Project Tests")
-    st.caption("Run the local automated tests I added for storage helpers and the no-Ollama round loop.")
+    st.caption("Run the local automated tests without starting Ollama.")
     test_col_left, test_col_right = st.columns([1, 3])
     with test_col_left:
         if st.button("Run Tests", disabled=run_active, key="run_tests_panel"):
