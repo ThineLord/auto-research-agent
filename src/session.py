@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
-from typing import Dict
+from typing import Any, Dict
 
 from rich.console import Console
 
+from .agents import ResearchAgents
 from .llm import OllamaClient
-from .storage import write_text
+from .runner import run_iterative_rounds
+from .storage import get_memory_for_prompt, write_text
 
 
 def _clip_words(text: str, max_words: int) -> str:
@@ -178,3 +181,90 @@ def generate_final_session_report(
         report = fallback
     write_text(output_path, report)
     return report
+
+
+def run_session_mode(
+    *,
+    console: Console,
+    llm: OllamaClient,
+    agents: ResearchAgents,
+    task_text: str,
+    project_dir: Path,
+    memory_path: Path,
+    model_name: str,
+    max_rounds: int,
+    stop_if_no_improvement_rounds: int,
+    global_max_runtime_seconds: int,
+    per_agent_timeout_seconds: int,
+) -> None:
+    console.rule("Research Session Mode")
+    memory_for_prompt = get_memory_for_prompt(memory_path)
+
+    objective = generate_focus_objective(
+        llm=llm,
+        task_text=task_text,
+        memory_text=memory_for_prompt,
+        console=console,
+    )
+    console.print(f"[bold cyan]Session focus objective:[/bold cyan] {objective}")
+
+    current_plan_path = project_dir / "current_plan.md"
+    plan_text = generate_current_plan(
+        llm=llm,
+        objective=objective,
+        task_text=task_text,
+        memory_text=memory_for_prompt,
+        output_path=current_plan_path,
+        console=console,
+    )
+    console.print(f"[green]Saved current plan:[/green] {current_plan_path}")
+
+    session_task = (
+        f"{task_text}\n\n"
+        "## Session Focus Mode\n"
+        f"Focus objective: {objective}\n"
+        "Important: stay on this single narrow subproblem for this session.\n\n"
+        "## Session Plan\n"
+        f"{plan_text}\n"
+    )
+
+    result = run_iterative_rounds(
+        console=console,
+        agents=agents,
+        task_text=session_task,
+        project_dir=project_dir,
+        memory_path=memory_path,
+        mode="session",
+        model_name=model_name,
+        max_rounds=max_rounds,
+        stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
+        global_max_runtime_seconds=global_max_runtime_seconds,
+        per_agent_timeout_seconds=per_agent_timeout_seconds,
+    )
+
+    research_state_path = project_dir / "research_state.json"
+    research_state: Dict[str, Any] = {}
+    if research_state_path.exists():
+        try:
+            research_state = json.loads(research_state_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            research_state = {}
+
+    final_report_path = project_dir / "final_session_report.md"
+    report_text = generate_final_session_report(
+        llm=llm,
+        objective=objective,
+        plan_text=plan_text,
+        best_output=result["best_output"] or result["last_revised_output"],
+        research_state=research_state,
+        memory_text=get_memory_for_prompt(memory_path),
+        output_path=final_report_path,
+        console=console,
+    )
+    console.print(f"[green]Saved final session report:[/green] {final_report_path}")
+
+    if not report_text.strip():
+        write_text(
+            final_report_path,
+            "# Final Session Report\n\nNo content generated. Please rerun the session.",
+        )
