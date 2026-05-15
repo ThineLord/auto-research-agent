@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -17,6 +18,12 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 PROJECTS_DIR = ROOT / "projects"
 CONFIG_PATH = ROOT / "config.yaml"
+CANONICAL_ROOT = Path(
+    os.environ.get(
+        "AUTO_RESEARCH_AGENT_ROOT",
+        str(Path.home() / "GitHub_Repository" / "auto-research-agent"),
+    )
+).resolve()
 
 
 def project_path(project_name: str) -> Path:
@@ -56,6 +63,28 @@ def read_json(path: Path) -> Dict[str, Any]:
 def write_json(path: Path, data: Dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def is_canonical_root() -> bool:
+    return ROOT.resolve() == CANONICAL_ROOT
+
+
+def render_runtime_location_check() -> None:
+    st.caption(f"App root: `{ROOT}`")
+    if is_canonical_root():
+        st.success("Running from the canonical project folder.")
+        return
+
+    st.error(
+        "This Streamlit app is not running from the canonical project folder. "
+        "Stop this server and restart Streamlit from the path below."
+    )
+    st.code(
+        f"cd {CANONICAL_ROOT}\n"
+        "source .venv/bin/activate\n"
+        "streamlit run ui/app.py",
+        language="bash",
+    )
 
 
 def is_pid_running(pid: int) -> bool:
@@ -193,9 +222,66 @@ def start_background_process(
         return None
 
 
+def run_project_tests() -> Dict[str, Any]:
+    started = time.monotonic()
+    command = [
+        sys.executable,
+        "-m",
+        "unittest",
+        "tests.test_storage",
+        "tests.test_round_loop",
+        "-v",
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        elapsed = time.monotonic() - started
+        output = "\n".join(part for part in [exc.stdout or "", exc.stderr or ""] if part)
+        return {
+            "ok": False,
+            "returncode": None,
+            "elapsed": elapsed,
+            "command": " ".join(command),
+            "output": output or "Test run timed out after 120 seconds.",
+        }
+
+    elapsed = time.monotonic() - started
+    output = "\n".join(part for part in [result.stdout, result.stderr] if part.strip())
+    return {
+        "ok": result.returncode == 0,
+        "returncode": result.returncode,
+        "elapsed": elapsed,
+        "command": " ".join(command),
+        "output": output.strip() or "(no test output)",
+    }
+
+
 def main() -> None:
     st.set_page_config(page_title="Auto Research Agent", layout="wide")
     st.title("Auto Research Agent")
+    render_runtime_location_check()
+
+    st.subheader("Quick Actions")
+    quick_test_col, quick_status_col = st.columns([1, 3])
+    with quick_test_col:
+        if st.button("Run Tests", key="run_tests_quick"):
+            st.session_state["test_result"] = run_project_tests()
+    with quick_status_col:
+        quick_test_result = st.session_state.get("test_result")
+        if quick_test_result:
+            if quick_test_result["ok"]:
+                st.success(f"Tests passed in {quick_test_result['elapsed']:.2f}s")
+            else:
+                st.error(f"Tests failed in {quick_test_result['elapsed']:.2f}s")
+        else:
+            st.info("Click Run Tests to check the project without running Ollama.")
 
     projects = sorted([p.name for p in PROJECTS_DIR.iterdir() if p.is_dir()]) if PROJECTS_DIR.exists() else []
     default_index = projects.index("pama") if "pama" in projects else 0
@@ -249,7 +335,7 @@ def main() -> None:
         st.error(models_error)
     st.write(f"Selected model: `{st.session_state.get('selected_model', default_model)}`")
 
-    c1, c2, c3, c4, c5 = st.columns(5)
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
     with c1:
         if st.button("Run Diagnostic", disabled=blocked or bool(models_error)):
             model = st.session_state.get("selected_model", default_model)
@@ -306,6 +392,35 @@ def main() -> None:
             )
             if pid:
                 st.success(f"Started resume run with model `{model}` (PID {pid})")
+    with c6:
+        if st.button("Run Tests", disabled=run_active, key="run_tests_top"):
+            st.session_state["test_result"] = run_project_tests()
+
+    st.subheader("Project Tests")
+    st.caption("Run the local automated tests I added for storage helpers and the no-Ollama round loop.")
+    test_col_left, test_col_right = st.columns([1, 3])
+    with test_col_left:
+        if st.button("Run Tests", disabled=run_active, key="run_tests_panel"):
+            st.session_state["test_result"] = run_project_tests()
+    with test_col_right:
+        last_test = st.session_state.get("test_result")
+        if last_test:
+            if last_test["ok"]:
+                st.success(
+                    f"Tests passed in {last_test['elapsed']:.2f}s "
+                    f"using `{last_test['command']}`"
+                )
+            else:
+                returncode = last_test["returncode"]
+                st.error(
+                    f"Tests failed in {last_test['elapsed']:.2f}s "
+                    f"(return code: {returncode})"
+                )
+        else:
+            st.info("No test run yet.")
+    if st.session_state.get("test_result"):
+        with st.expander("Test output", expanded=True):
+            st.code(st.session_state["test_result"]["output"], language="text")
 
     st.subheader("Model Management")
     st.caption("Available to download: any valid Ollama model name.")
