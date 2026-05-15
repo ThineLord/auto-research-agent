@@ -9,7 +9,9 @@ from src.storage import (
     get_memory_for_prompt,
     parse_score,
     read_json_file,
+    summarize_round_memory,
     update_project_memory,
+    update_research_state,
     write_interrupted_report,
     write_json_file,
 )
@@ -86,6 +88,36 @@ class StorageTests(unittest.TestCase):
             self.assertEqual(len(prompt_memory.split()), 1500)
             self.assertTrue(prompt_memory.startswith("word105 "))
             self.assertTrue(prompt_memory.endswith("word1604"))
+
+    def test_custom_topic_keywords_guide_memory_and_state_extraction(self) -> None:
+        summary = summarize_round_memory(
+            revised_output=(
+                "A plain opening sentence without configured cues.\n"
+                "Graph signal fusion is the strongest route for this benchmark."
+            ),
+            review_output="The retrieval baseline remains under-specified.",
+            judge_output="The graph ablation is the main unresolved blocker.",
+            current_best_score=81.0,
+            topic_keywords=["graph"],
+        )
+
+        self.assertIn("Graph signal fusion", summary["strongest"])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            state = update_research_state(
+                state_path=Path(tmp) / "research_state.json",
+                round_index=1,
+                best_score=81.0,
+                revised_output=(
+                    "A plain opening sentence without configured cues.\n"
+                    "Graph signal fusion is the strongest route for this benchmark."
+                ),
+                review_output="The retrieval baseline remains under-specified.",
+                judge_output="The graph ablation is the main unresolved blocker.",
+                topic_keywords=["graph"],
+            )
+
+        self.assertIn("Graph signal fusion", state["current_strongest_hypothesis"])
 
     def test_write_interrupted_report_records_resume_details(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

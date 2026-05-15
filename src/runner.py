@@ -7,7 +7,7 @@ import time
 from datetime import datetime
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from rich.console import Console
 
@@ -124,6 +124,7 @@ def run_iterative_rounds(
     start_round: int = 1,
     run_root_override: Optional[Path] = None,
     initial_best_score: float = -1.0,
+    topic_keywords: Optional[Sequence[str]] = None,
 ) -> Dict[str, Any]:
     # Termination guarantee:
     # 1) The only round loop is a bounded for-loop over [1..max_rounds].
@@ -495,6 +496,7 @@ def run_iterative_rounds(
             review_output=review_output,
             judge_output=judge_output,
             current_best_score=best_score,
+            topic_keywords=topic_keywords,
         )
         update_project_memory(
             memory_path=memory_path,
@@ -508,6 +510,7 @@ def run_iterative_rounds(
             revised_output=revised_output,
             review_output=review_output,
             judge_output=judge_output,
+            topic_keywords=topic_keywords,
         )
         _log(console, log_path, mode, f"memory_updated round={round_index}")
         _log(console, log_path, mode, f"research_state_updated round={round_index}")

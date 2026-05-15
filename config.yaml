@@ -5,6 +5,15 @@ model:
   timeout_seconds: 300
 ollama_base_url: http://localhost:11434
 project_name: pama
+topic:
+  title: Privacy-Aware Memory Adapter (PAMA) for Personal AI Agents
+  description: Research planning for privacy-aware memory adaptation in personal AI agents.
+  keywords:
+    - privacy
+    - memory
+    - adapter
+    - evaluation
+    - baseline
 max_rounds: 5
 stop_if_no_improvement_rounds: 2
 top_p: 0.9

@@ -6,7 +6,7 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from .judge_output import parse_judge_score
 
@@ -18,6 +18,16 @@ AUTO_MEMORY_NOTE = (
 ENTRY_LIMIT = 12
 MAX_MEMORY_WORDS = 2000
 MAX_PROMPT_MEMORY_WORDS = 1500
+DEFAULT_RESEARCH_KEYWORDS = [
+    "research",
+    "method",
+    "design",
+    "architecture",
+    "evaluation",
+    "baseline",
+    "implementation",
+    "experiment",
+]
 
 
 def read_text(path: Path) -> str:
@@ -136,6 +146,19 @@ def _pick_line(lines: List[str], keywords: List[str]) -> str:
     return lines[0] if lines else ""
 
 
+def _merge_keywords(*keyword_groups: Sequence[str]) -> List[str]:
+    keywords: List[str] = []
+    seen = set()
+    for group in keyword_groups:
+        for keyword in group:
+            normalized = keyword.strip().lower()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            keywords.append(normalized)
+    return keywords
+
+
 def _parse_auto_entries(memory_text: str) -> List[Dict[str, str]]:
     pattern = re.compile(
         r"### Round (?P<round>\d+)\n"
@@ -182,14 +205,16 @@ def summarize_round_memory(
     review_output: str,
     judge_output: str,
     current_best_score: Optional[float],
+    topic_keywords: Optional[Sequence[str]] = None,
 ) -> Dict[str, str]:
     revised_lines = _collect_meaningful_lines(revised_output)
     review_lines = _collect_meaningful_lines(review_output)
     judge_lines = _collect_meaningful_lines(judge_output)
+    research_keywords = _merge_keywords(topic_keywords or [], DEFAULT_RESEARCH_KEYWORDS)
 
     strongest = _pick_line(
         revised_lines,
-        keywords=["privacy", "memory", "adapter", "method", "novel", "architecture"],
+        keywords=research_keywords,
     )
     major_criticism = _pick_line(
         review_lines + judge_lines,
@@ -289,14 +314,20 @@ def update_research_state(
     revised_output: str,
     review_output: str,
     judge_output: str,
+    topic_keywords: Optional[Sequence[str]] = None,
 ) -> Dict[str, Any]:
     revised_lines = _collect_meaningful_lines(revised_output)
     review_lines = _collect_meaningful_lines(review_output)
     judge_lines = _collect_meaningful_lines(judge_output)
+    research_keywords = _merge_keywords(
+        topic_keywords or [],
+        ["hypothesis", "propose", "mechanism"],
+        DEFAULT_RESEARCH_KEYWORDS,
+    )
 
     strongest_hypothesis = _pick_line(
         revised_lines,
-        keywords=["hypothesis", "propose", "memory", "adapter", "privacy", "mechanism"],
+        keywords=research_keywords,
     )
     biggest_blocker = _pick_line(
         review_lines + judge_lines,
@@ -315,7 +346,7 @@ def update_research_state(
         "round": round_index,
         "current_strongest_hypothesis": _clip_text(
             strongest_hypothesis
-            or "The current method can improve privacy-memory tradeoff but needs stronger validation."
+            or "The current method direction is promising but needs stronger validation."
         ),
         "current_biggest_blocker": _clip_text(
             biggest_blocker
@@ -323,11 +354,11 @@ def update_research_state(
         ),
         "current_next_experiment": _clip_text(
             next_experiment
-            or "Run one controlled baseline comparison with explicit privacy and utility metrics."
+            or "Run one controlled baseline comparison with explicit success metrics."
         ),
         "current_open_question": _clip_text(
             open_question
-            or "Which privacy mechanism gives the best utility-retention under strict memory constraints?"
+            or "Which mechanism gives the best tradeoff under the project constraints?"
         ),
         "current_best_score": round(best_score, 2),
     }

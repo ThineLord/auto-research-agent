@@ -22,7 +22,18 @@ DEFAULT_MODEL_NAME = "qwen3:8b"
 DEFAULT_MODEL_TEMPERATURE = 0.4
 DEFAULT_MODEL_TIMEOUT_SECONDS = 300
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
-DEFAULT_PROJECT_NAME = "pama"
+DEFAULT_PROJECT_NAME = "default"
+DEFAULT_TOPIC_TITLE = "Configured Research Topic"
+DEFAULT_TOPIC_DESCRIPTION = (
+    "Use the project task file as the source of truth for this research topic."
+)
+DEFAULT_TOPIC_KEYWORDS = (
+    "research",
+    "method",
+    "evaluation",
+    "implementation",
+    "baseline",
+)
 DEFAULT_MAX_ROUNDS = 5
 DEFAULT_STOP_IF_NO_IMPROVEMENT_ROUNDS = 2
 DEFAULT_TOP_P = 0.9
@@ -50,10 +61,18 @@ class RuntimeConfig:
 
 
 @dataclass(frozen=True)
+class TopicConfig:
+    title: str = DEFAULT_TOPIC_TITLE
+    description: str = DEFAULT_TOPIC_DESCRIPTION
+    keywords: Tuple[str, ...] = DEFAULT_TOPIC_KEYWORDS
+
+
+@dataclass(frozen=True)
 class AppConfig:
     model: ModelConfig = field(default_factory=ModelConfig)
     ollama_base_url: str = DEFAULT_OLLAMA_BASE_URL
     project_name: str = DEFAULT_PROJECT_NAME
+    topic: TopicConfig = field(default_factory=TopicConfig)
     max_rounds: int = DEFAULT_MAX_ROUNDS
     stop_if_no_improvement_rounds: int = DEFAULT_STOP_IF_NO_IMPROVEMENT_ROUNDS
     top_p: float = DEFAULT_TOP_P
@@ -69,6 +88,11 @@ class AppConfig:
             },
             "ollama_base_url": self.ollama_base_url,
             "project_name": self.project_name,
+            "topic": {
+                "title": self.topic.title,
+                "description": self.topic.description,
+                "keywords": list(self.topic.keywords),
+            },
             "max_rounds": self.max_rounds,
             "stop_if_no_improvement_rounds": self.stop_if_no_improvement_rounds,
             "top_p": self.top_p,
@@ -230,6 +254,51 @@ def _validate_model_config(config: Mapping[str, Any]) -> ModelConfig:
     )
 
 
+def _validate_topic_keywords(value: Any) -> Tuple[str, ...]:
+    if not isinstance(value, list):
+        raise ConfigValidationError("config.topic.keywords: must be a list of non-empty strings")
+    if not value:
+        raise ConfigValidationError("config.topic.keywords: must contain at least one keyword")
+
+    keywords: list[str] = []
+    seen = set()
+    for index, item in enumerate(value):
+        keyword = _validate_non_empty_string(item, f"config.topic.keywords[{index}]")
+        key = keyword.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        keywords.append(keyword)
+    return tuple(keywords)
+
+
+def _validate_topic_config(config: Mapping[str, Any]) -> TopicConfig:
+    raw_topic = config.get("topic", {})
+    if raw_topic is None:
+        raw_topic = {}
+    if not isinstance(raw_topic, Mapping):
+        raise ConfigValidationError("config.topic: must be a mapping")
+    _validate_mapping_keys(
+        "config.topic",
+        raw_topic,
+        {"title", "description", "keywords"},
+    )
+
+    return TopicConfig(
+        title=_validate_non_empty_string(
+            raw_topic.get("title", DEFAULT_TOPIC_TITLE),
+            "config.topic.title",
+        ),
+        description=_validate_non_empty_string(
+            raw_topic.get("description", DEFAULT_TOPIC_DESCRIPTION),
+            "config.topic.description",
+        ),
+        keywords=_validate_topic_keywords(
+            raw_topic.get("keywords", list(DEFAULT_TOPIC_KEYWORDS)),
+        ),
+    )
+
+
 def _validate_runtime_config(config: Mapping[str, Any]) -> RuntimeConfig:
     raw_runtime = config.get("runtime", {})
     if not isinstance(raw_runtime, Mapping):
@@ -267,6 +336,7 @@ def _build_app_config(raw_config: Mapping[str, Any]) -> AppConfig:
             "model",
             "ollama_base_url",
             "project_name",
+            "topic",
             "max_rounds",
             "stop_if_no_improvement_rounds",
             "top_p",
@@ -282,6 +352,7 @@ def _build_app_config(raw_config: Mapping[str, Any]) -> AppConfig:
             raw_config.get("ollama_base_url", DEFAULT_OLLAMA_BASE_URL)
         ),
         project_name=_validate_project_name(raw_config.get("project_name", DEFAULT_PROJECT_NAME)),
+        topic=_validate_topic_config(raw_config),
         max_rounds=_validate_int(
             raw_config.get("max_rounds", DEFAULT_MAX_ROUNDS),
             "config.max_rounds",
@@ -327,6 +398,11 @@ def resolve_runtime_limits(config: ConfigInput) -> Tuple[int, int]:
     else:
         runtime = _build_app_config(config).runtime
     return runtime.normal_max_runtime_seconds, runtime.continuous_max_runtime_seconds
+
+
+def format_topic_context(topic: TopicConfig) -> str:
+    keywords = ", ".join(topic.keywords)
+    return f"Title: {topic.title}\nDescription: {topic.description}\nKeywords: {keywords}"
 
 
 def parse_ollama_list_output(output: str) -> List[Dict[str, str]]:

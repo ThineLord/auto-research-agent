@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Sequence
 
 from rich.console import Console
 
@@ -23,6 +24,7 @@ def run_resume_mode(
     stop_if_no_improvement_rounds: int,
     global_max_runtime_seconds: int,
     per_agent_timeout_seconds: int,
+    topic_keywords: Sequence[str] = (),
 ) -> None:
     checkpoint_path = project_dir / "checkpoint.json"
     checkpoint = read_json_file(checkpoint_path)
@@ -58,4 +60,5 @@ def run_resume_mode(
         start_round=start_round,
         run_root_override=run_root_path,
         initial_best_score=initial_best_score,
+        topic_keywords=topic_keywords,
     )

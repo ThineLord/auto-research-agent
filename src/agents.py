@@ -25,6 +25,7 @@ class ResearchAgents:
     judge_prompt: str
     temperature: float
     top_p: float
+    topic_context: str = ""
 
     @classmethod
     def from_prompt_dir(
@@ -34,6 +35,7 @@ class ResearchAgents:
         prompt_dir: Path,
         temperature: float,
         top_p: float,
+        topic_context: str = "",
     ) -> "ResearchAgents":
         return cls(
             llm=llm,
@@ -43,7 +45,13 @@ class ResearchAgents:
             judge_prompt=_read_prompt(prompt_dir / "judge.md"),
             temperature=temperature,
             top_p=top_p,
+            topic_context=topic_context,
         )
+
+    def _topic_section(self) -> str:
+        if not self.topic_context.strip():
+            return "# Topic Context\nUse the research task as the source of truth.\n\n"
+        return f"# Topic Context\n{self.topic_context.strip()}\n\n"
 
     def draft(
         self,
@@ -55,7 +63,7 @@ class ResearchAgents:
         previous_judge: str,
     ) -> str:
         prompt = (
-            f"# Round\n{round_index}\n\n"
+            self._topic_section() + f"# Round\n{round_index}\n\n"
             f"# Research Task\n{task}\n\n"
             f"# Project Memory\n{memory}\n\n"
             f"# Previous Best (optional)\n{previous_best or '(none)'}\n\n"
@@ -81,7 +89,7 @@ class ResearchAgents:
 
     def review(self, *, task: str, memory: str, draft_output: str) -> str:
         prompt = (
-            f"# Research Task\n{task}\n\n"
+            self._topic_section() + f"# Research Task\n{task}\n\n"
             f"# Project Memory\n{memory}\n\n"
             f"# Draft Output\n{draft_output}\n"
         )
@@ -111,7 +119,7 @@ class ResearchAgents:
         review_output: str,
     ) -> str:
         prompt = (
-            f"# Research Task\n{task}\n\n"
+            self._topic_section() + f"# Research Task\n{task}\n\n"
             f"# Project Memory\n{memory}\n\n"
             f"# Draft Output\n{draft_output}\n\n"
             f"# Review Feedback\n{review_output}\n"
@@ -135,7 +143,7 @@ class ResearchAgents:
 
     def judge(self, *, task: str, memory: str, revised_output: str) -> str:
         prompt = (
-            f"# Research Task\n{task}\n\n"
+            self._topic_section() + f"# Research Task\n{task}\n\n"
             f"# Project Memory\n{memory}\n\n"
             f"# Revised Output\n{revised_output}\n"
         )

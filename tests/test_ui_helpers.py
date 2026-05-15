@@ -202,6 +202,90 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertIs(ui_app.read_json_file, read_json_file)
         self.assertIs(ui_app.run_project_tests, run_project_tests)
 
+    def test_ui_progress_resume_and_output_helpers(self) -> None:
+        import ui.app as ui_app
+
+        log_text = (
+            "2026-05-15 12:00:00 | mode=normal | round_enter round=2\n"
+            "2026-05-15 12:00:01 | mode=normal | round=2 | agent=review | status=start\n"
+        )
+        progress = ui_app.infer_running_stage(
+            log_text=log_text,
+            checkpoint={
+                "last_completed_round": 1,
+                "mode": "normal",
+                "model": "qwen3:8b",
+                "best_score": 71,
+            },
+            run_meta={"pid": 123, "mode": "normal", "model": "qwen3:8b"},
+        )
+
+        self.assertTrue(progress["run_active"])
+        self.assertEqual(progress["stage"], "review")
+        self.assertEqual(progress["round"], 2)
+
+        resume = ui_app.describe_resume_state(
+            checkpoint={"can_resume": True, "last_completed_round": 2, "model": "qwen3:8b"},
+            run_active=False,
+            selected_model="llama3.1:8b",
+        )
+
+        self.assertTrue(resume["can_resume"])
+        self.assertIn("round 3", resume["message"])
+        self.assertIn("Checkpoint model", resume["message"])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            run_root = project_dir / "runs" / "run1"
+            round_dir = run_root / "round_02"
+            round_dir.mkdir(parents=True)
+            (project_dir / "checkpoint.json").write_text("{}", encoding="utf-8")
+            (round_dir / "04_judge.md").write_text("judge", encoding="utf-8")
+
+            catalog = ui_app.build_output_catalog(
+                project_dir,
+                {"run_root": str(run_root), "last_completed_round": 2},
+            )
+
+        labels = [item["label"] for item in catalog]
+        self.assertIn("Checkpoint", labels)
+        self.assertIn("Latest round judge", labels)
+        judge_item = next(item for item in catalog if item["label"] == "Latest round judge")
+        self.assertTrue(judge_item["exists"])
+        self.assertEqual(judge_item["kind"], "markdown")
+
+    def test_fast_model_health_check_uses_api_and_selected_model_presence(self) -> None:
+        import ui.app as ui_app
+
+        response = SimpleNamespace(
+            raise_for_status=lambda: None,
+            json=lambda: {"models": [{"name": "qwen3:8b"}]},
+        )
+
+        with patch.object(ui_app.requests, "get", return_value=response) as get:
+            health = ui_app.check_model_health(
+                base_url="http://localhost:11434",
+                selected_model="qwen3:8b",
+                installed_model_names=[],
+            )
+
+        self.assertTrue(health["ok"])
+        self.assertTrue(health["api_ok"])
+        self.assertTrue(health["model_ok"])
+        self.assertEqual(get.call_args.args[0], "http://localhost:11434/api/tags")
+
+        with patch.object(ui_app.requests, "get", return_value=response):
+            health = ui_app.check_model_health(
+                base_url="http://localhost:11434",
+                selected_model="missing:latest",
+                installed_model_names=[],
+            )
+
+        self.assertFalse(health["ok"])
+        self.assertTrue(health["api_ok"])
+        self.assertFalse(health["model_ok"])
+        self.assertIn("not installed", health["message"])
+
 
 if __name__ == "__main__":
     unittest.main()

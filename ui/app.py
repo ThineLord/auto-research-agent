@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import json
 import os
+import re
 import sys
 from pathlib import Path
+from typing import Any, Sequence
 
+import requests
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -31,6 +35,220 @@ CANONICAL_ROOT = Path(
         str(Path.home() / "GitHub_Repository" / "auto-research-agent"),
     )
 ).resolve()
+
+AGENT_LOG_RE = re.compile(
+    r"round=(?P<round>\d+)\s+\|\s+agent=(?P<agent>\w+)\s+\|\s+status=(?P<status>\w+)"
+)
+ROUND_ENTER_RE = re.compile(r"round_enter round=(?P<round>\d+)")
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def check_model_health(
+    *,
+    base_url: str,
+    selected_model: str,
+    installed_model_names: Sequence[str],
+    timeout_seconds: int = 5,
+) -> dict[str, Any]:
+    model_name = selected_model.strip()
+    if not model_name:
+        return {
+            "ok": False,
+            "api_ok": False,
+            "model_ok": False,
+            "message": "No model selected.",
+        }
+
+    url = f"{base_url.rstrip('/')}/api/tags"
+    try:
+        response = requests.get(url, timeout=timeout_seconds)
+        response.raise_for_status()
+        payload = response.json()
+    except requests.Timeout:
+        return {
+            "ok": False,
+            "api_ok": False,
+            "model_ok": False,
+            "message": f"Ollama API timed out at {base_url}.",
+        }
+    except (requests.RequestException, ValueError) as exc:
+        return {
+            "ok": False,
+            "api_ok": False,
+            "model_ok": False,
+            "message": f"Ollama API is not healthy at {base_url}: {exc}",
+        }
+
+    api_models = [
+        str(model.get("name", "")).strip()
+        for model in payload.get("models", [])
+        if isinstance(model, dict)
+    ]
+    available_models = {name for name in installed_model_names if name} | {
+        name for name in api_models if name
+    }
+    model_ok = model_name in available_models
+    if not model_ok:
+        return {
+            "ok": False,
+            "api_ok": True,
+            "model_ok": False,
+            "message": f"Ollama is reachable, but `{model_name}` is not installed.",
+        }
+    return {
+        "ok": True,
+        "api_ok": True,
+        "model_ok": True,
+        "message": f"Ollama is reachable and `{model_name}` is installed.",
+    }
+
+
+def infer_running_stage(
+    *,
+    log_text: str,
+    checkpoint: dict[str, Any],
+    run_meta: dict[str, Any],
+) -> dict[str, Any]:
+    run_active = bool(run_meta)
+    latest_round = _safe_int(checkpoint.get("last_completed_round"))
+    stage = "Idle"
+    stage_status = "idle"
+
+    for line in reversed(log_text.splitlines()):
+        agent_match = AGENT_LOG_RE.search(line)
+        if agent_match:
+            latest_round = _safe_int(agent_match.group("round"), latest_round)
+            agent = agent_match.group("agent")
+            status = agent_match.group("status")
+            if status == "start":
+                stage = agent
+                stage_status = "running"
+            elif run_active:
+                stage = f"after {agent}"
+                stage_status = status
+            else:
+                stage = "Idle"
+                stage_status = status
+            break
+        round_match = ROUND_ENTER_RE.search(line)
+        if round_match:
+            latest_round = _safe_int(round_match.group("round"), latest_round)
+            if run_active:
+                stage = "starting round"
+                stage_status = "running"
+            break
+
+    if run_active and stage == "Idle":
+        stage = "starting"
+        stage_status = "running"
+
+    return {
+        "run_active": run_active,
+        "pid": run_meta.get("pid", "N/A") if run_active else "N/A",
+        "mode": run_meta.get("mode") or checkpoint.get("mode", "N/A"),
+        "model": run_meta.get("model") or checkpoint.get("model", "N/A"),
+        "round": latest_round or "N/A",
+        "stage": stage,
+        "stage_status": stage_status,
+        "last_successful_agent": checkpoint.get("last_successful_agent", "N/A"),
+        "best_score": checkpoint.get("best_score", "N/A"),
+        "stop_reason": checkpoint.get("stop_reason", "N/A"),
+        "can_resume": bool(checkpoint.get("can_resume", False)),
+    }
+
+
+def describe_resume_state(
+    *,
+    checkpoint: dict[str, Any],
+    run_active: bool,
+    selected_model: str,
+) -> dict[str, Any]:
+    if not checkpoint:
+        return {
+            "can_resume": False,
+            "level": "info",
+            "message": "No checkpoint exists yet. Run a workflow before resuming.",
+        }
+    if run_active:
+        return {
+            "can_resume": False,
+            "level": "warning",
+            "message": "A run is active. Resume is blocked until the current run exits.",
+        }
+
+    checkpoint_model = str(checkpoint.get("model", "")).strip()
+    selected_model = selected_model.strip()
+    model_note = ""
+    if checkpoint_model and selected_model and checkpoint_model != selected_model:
+        model_note = (
+            f" Checkpoint model was `{checkpoint_model}`; selected model is `{selected_model}`."
+        )
+
+    if checkpoint.get("can_resume"):
+        next_round = _safe_int(checkpoint.get("last_completed_round")) + 1
+        return {
+            "can_resume": True,
+            "level": "success",
+            "message": f"Resume available from round {next_round}.{model_note}",
+        }
+
+    stop_reason = checkpoint.get("stop_reason", "unknown")
+    return {
+        "can_resume": False,
+        "level": "info",
+        "message": f"Resume is unavailable. Last stop reason: `{stop_reason}`.{model_note}",
+    }
+
+
+def detect_output_kind(path: Path) -> str:
+    if path.suffix == ".json":
+        return "json"
+    if path.suffix == ".log":
+        return "log"
+    if path.suffix in {".md", ".markdown"}:
+        return "markdown"
+    return "text"
+
+
+def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[dict[str, Any]]:
+    catalog = [
+        {"label": "Best output", "path": project_dir / "best_output.md"},
+        {"label": "Final session report", "path": project_dir / "final_session_report.md"},
+        {"label": "Interrupted report", "path": project_dir / "interrupted_report.md"},
+        {"label": "Checkpoint", "path": project_dir / "checkpoint.json"},
+        {"label": "Score history", "path": project_dir / "score_history.json"},
+        {"label": "Run log", "path": project_dir / "run.log"},
+        {"label": "Model operation log", "path": project_dir / "model_ops.log"},
+    ]
+
+    run_root = Path(str(checkpoint.get("run_root", "")))
+    round_index = _safe_int(checkpoint.get("last_completed_round"))
+    if round_index > 0 and run_root.exists():
+        round_dir = run_root / f"round_{round_index:02d}"
+        catalog.extend(
+            [
+                {"label": "Latest round draft", "path": round_dir / "01_draft.md"},
+                {"label": "Latest round review", "path": round_dir / "02_review.md"},
+                {"label": "Latest round revised", "path": round_dir / "03_revised.md"},
+                {"label": "Latest round judge", "path": round_dir / "04_judge.md"},
+            ]
+        )
+
+    return [
+        {
+            "label": item["label"],
+            "path": item["path"],
+            "kind": detect_output_kind(item["path"]),
+            "exists": item["path"].exists(),
+        }
+        for item in catalog
+    ]
 
 
 def project_path(project_name: str) -> Path:
@@ -94,7 +312,9 @@ def main() -> None:
         if PROJECTS_DIR.exists()
         else []
     )
-    default_index = projects.index("pama") if "pama" in projects else 0
+    default_index = (
+        projects.index(app_config.project_name) if app_config.project_name in projects else 0
+    )
     selected_project = st.selectbox(
         "A. Project selector", projects, index=default_index if projects else None
     )
@@ -113,6 +333,7 @@ def main() -> None:
     stop_signal_path = proj_path / "STOP_REQUESTED"
     run_meta = get_active_process_meta(run_meta_path(proj_path))
     model_job_meta = get_active_process_meta(model_job_meta_path(proj_path))
+    checkpoint = read_json_file(checkpoint_path) if checkpoint_path.exists() else {}
 
     col_input_left, col_input_right = st.columns(2)
     with col_input_left:
@@ -161,7 +382,7 @@ def main() -> None:
                 log_path=run_log_path,
                 meta_path=run_meta_path(proj_path),
                 kind="run",
-                extra={"model": model},
+                extra={"model": model, "mode": "diagnostic"},
             )
             render_process_result(
                 result,
@@ -176,7 +397,7 @@ def main() -> None:
                 log_path=run_log_path,
                 meta_path=run_meta_path(proj_path),
                 kind="run",
-                extra={"model": model},
+                extra={"model": model, "mode": "normal"},
             )
             render_process_result(
                 result,
@@ -191,7 +412,7 @@ def main() -> None:
                 log_path=run_log_path,
                 meta_path=run_meta_path(proj_path),
                 kind="run",
-                extra={"model": model},
+                extra={"model": model, "mode": "continuous"},
             )
             render_process_result(
                 result,
@@ -201,8 +422,16 @@ def main() -> None:
         if st.button("Pause / Stop Safely", disabled=not run_active):
             write_file_text(stop_signal_path, "STOP_REQUESTED\n")
             st.warning(f"Stop signal created: `{stop_signal_path}`")
+    resume_state = describe_resume_state(
+        checkpoint=checkpoint,
+        run_active=run_active,
+        selected_model=st.session_state.get("selected_model", default_model),
+    )
     with c5:
-        if st.button("Resume", disabled=blocked or bool(models_error)):
+        if st.button(
+            "Resume",
+            disabled=blocked or bool(models_error) or not resume_state["can_resume"],
+        ):
             model = st.session_state.get("selected_model", default_model)
             result = start_background_process(
                 command=[sys.executable, "-m", "src.main", "--resume", "--model", model],
@@ -210,7 +439,7 @@ def main() -> None:
                 log_path=run_log_path,
                 meta_path=run_meta_path(proj_path),
                 kind="run",
-                extra={"model": model},
+                extra={"model": model, "mode": "resume"},
             )
             render_process_result(
                 result,
@@ -219,6 +448,13 @@ def main() -> None:
     with c6:
         if st.button("Run Tests", disabled=run_active, key="run_tests_top"):
             st.session_state["test_result"] = run_project_tests(ROOT)
+
+    if resume_state["level"] == "success":
+        st.success(resume_state["message"])
+    elif resume_state["level"] == "warning":
+        st.warning(resume_state["message"])
+    else:
+        st.info(resume_state["message"])
 
     st.subheader("Project Tests")
     st.caption("Run the local automated tests without starting Ollama.")
@@ -279,6 +515,24 @@ def main() -> None:
         )
         st.session_state["selected_model"] = selected_model.strip()
 
+    health_col, health_result_col = st.columns([1, 3])
+    with health_col:
+        if st.button("Check Model Health"):
+            st.session_state["model_health"] = check_model_health(
+                base_url=app_config.ollama_base_url,
+                selected_model=st.session_state.get("selected_model", ""),
+                installed_model_names=installed_model_names,
+            )
+    with health_result_col:
+        model_health = st.session_state.get("model_health")
+        if model_health:
+            if model_health["ok"]:
+                st.success(model_health["message"])
+            else:
+                st.error(model_health["message"])
+        else:
+            st.info("Run a fast health check before starting long workflows.")
+
     if st.button("Save Selected Model as Default", disabled=bool(models_error)):
         model_to_save = st.session_state.get("selected_model", "").strip()
         if not model_to_save:
@@ -336,22 +590,27 @@ def main() -> None:
             )
 
     st.subheader("D. Progress panel")
-    checkpoint = {}
-    if checkpoint_path.exists():
-        checkpoint = read_json_file(checkpoint_path)
-    st.write(f"current mode: `{checkpoint.get('mode', 'N/A')}`")
-    st.write(f"current round: `{checkpoint.get('last_completed_round', 'N/A')}`")
-    st.write(f"current agent: `{checkpoint.get('last_successful_agent', 'N/A')}`")
-    st.write(f"last successful agent: `{checkpoint.get('last_successful_agent', 'N/A')}`")
-    st.write(f"best score: `{checkpoint.get('best_score', 'N/A')}`")
-    st.write(f"stop reason: `{checkpoint.get('stop_reason', 'N/A')}`")
-    st.write(f"can resume: `{checkpoint.get('can_resume', False)}`")
-    st.write(f"stop signal present: `{stop_signal_path.exists()}`")
-    st.write(f"selected model: `{st.session_state.get('selected_model', default_model)}`")
+    run_log_text = tail_file_lines(run_log_path, max_lines=240)
+    progress = infer_running_stage(
+        log_text=run_log_text,
+        checkpoint=checkpoint,
+        run_meta=run_meta,
+    )
+    p1, p2, p3, p4 = st.columns(4)
+    p1.metric("Mode", str(progress["mode"]))
+    p2.metric("Round", str(progress["round"]))
+    p3.metric("Stage", str(progress["stage"]))
+    p4.metric("Best score", str(progress["best_score"]))
+    st.write(f"PID: `{progress['pid']}`")
+    st.write(f"Model: `{progress['model']}`")
+    st.write(f"Last successful agent: `{progress['last_successful_agent']}`")
+    st.write(f"Stop reason: `{progress['stop_reason']}`")
+    st.write(f"Stop signal present: `{stop_signal_path.exists()}`")
+    st.write(f"Selected model: `{st.session_state.get('selected_model', default_model)}`")
 
     st.subheader("E. Live logs panel")
     auto_refresh = st.checkbox("Auto refresh logs every 2 seconds", value=True)
-    st.code(tail_file_lines(run_log_path, max_lines=240) or "(no logs yet)", language="text")
+    st.code(run_log_text or "(no logs yet)", language="text")
     st.caption("Model operation logs")
     st.code(
         tail_file_lines(model_job_log_path, max_lines=120) or "(no model operation logs yet)",
@@ -363,23 +622,33 @@ def main() -> None:
             height=0,
         )
 
-    st.subheader("F. Output panel")
-    output_files = [
-        proj_path / "best_output.md",
-        proj_path / "final_session_report.md",
-        proj_path / "interrupted_report.md",
-        proj_path / "checkpoint.json",
-        proj_path / "score_history.json",
-    ]
-    for output in output_files:
-        st.write(f"- `{output}`")
-        if output.exists():
-            preview = read_file_text(output)[:1200]
-            st.text_area(
-                f"Preview: {output.name}", value=preview, height=120, key=f"preview_{output.name}"
-            )
+    st.subheader("F. Output browser")
+    output_catalog = build_output_catalog(proj_path, checkpoint)
+    selected_output_index = st.selectbox(
+        "Output file",
+        range(len(output_catalog)),
+        format_func=lambda idx: (
+            output_catalog[idx]["label"]
+            if output_catalog[idx]["exists"]
+            else f"{output_catalog[idx]['label']} (not generated)"
+        ),
+    )
+    selected_output = output_catalog[selected_output_index]
+    selected_path = selected_output["path"]
+    st.caption(str(selected_path))
+    if not selected_output["exists"]:
+        st.info("This output has not been generated yet.")
+    else:
+        content = read_file_text(selected_path)
+        if selected_output["kind"] == "json":
+            try:
+                st.json(json.loads(content))
+            except json.JSONDecodeError:
+                st.code(content, language="text")
+        elif selected_output["kind"] == "markdown":
+            st.markdown(content or "_Empty file._")
         else:
-            st.caption("Not generated yet.")
+            st.code(content or "(empty file)", language="text")
 
 
 if __name__ == "__main__":

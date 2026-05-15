@@ -33,6 +33,7 @@ def run_diagnostic_mode(
     project_dir: Path,
     memory_path: Path,
     model_name: str,
+    topic_context: str = "",
 ) -> None:
     log_path = project_dir / "run.log"
     console.rule("Diagnostic Mode")
@@ -63,6 +64,7 @@ def run_diagnostic_mode(
         ),
         temperature=0.2,
         top_p=0.8,
+        topic_context=topic_context,
     )
 
     run_root = make_run_root(project_dir)

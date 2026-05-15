@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Sequence
 
 from rich.console import Console
 
@@ -43,18 +43,21 @@ def generate_focus_objective(
     task_text: str,
     memory_text: str,
     console: Console,
+    topic_context: str = "",
+    topic_title: str = "the configured research topic",
 ) -> str:
     system_prompt = (
         "You are a research planner. Output one narrow, concrete subproblem only. "
         "Avoid broad discussion. Prefer measurable engineering scope."
     )
+    topic_block = topic_context.strip() or f"Title: {topic_title}"
     user_prompt = (
-        "Topic context: Privacy-Aware Memory Adapter (PAMA) for Personal AI Agents.\n\n"
+        f"Topic context:\n{topic_block}\n\n"
         "Given task and memory, generate exactly one focused objective for tonight.\n"
         "Output only one line, no bullet list.\n\n"
         f"Task:\n{task_text}\n\nMemory:\n{memory_text}"
     )
-    fallback = "Design evaluation metrics for privacy-utility tradeoff in PAMA memory adaptation."
+    fallback = f"Define one focused implementation or evaluation objective for {topic_title}."
     raw = _safe_generate(
         llm=llm,
         system_prompt=system_prompt,
@@ -77,12 +80,15 @@ def generate_current_plan(
     memory_text: str,
     output_path: Path,
     console: Console,
+    topic_context: str = "",
+    topic_title: str = "the configured research topic",
 ) -> str:
     system_prompt = (
         "You are a technical planning assistant. Produce a concise implementation-oriented plan."
     )
     user_prompt = (
         "Build a plan for a single-session research sprint.\n"
+        f"Topic context:\n{topic_context.strip() or f'Title: {topic_title}'}\n\n"
         "Must include:\n"
         "- main objective\n"
         "- subproblems\n"
@@ -94,17 +100,17 @@ def generate_current_plan(
         "## Main Objective\n"
         f"- {objective}\n\n"
         "## Subproblems\n"
-        "- Define metric formulas for privacy and utility.\n"
+        f"- Define the most important success criteria for {topic_title}.\n"
         "- Identify baseline methods for comparison.\n"
         "- Specify one minimal evaluation protocol.\n\n"
         "## Dependencies\n"
-        "- Existing PAMA design notes.\n"
-        "- Access to one benchmark task and logs.\n"
-        "- Metric computation script scaffold.\n\n"
+        "- Existing project task notes.\n"
+        "- Access to relevant sample inputs, logs, or benchmark cases.\n"
+        "- A small implementation or evaluation scaffold.\n\n"
         "## Measurable Outputs\n"
-        "- A metric spec table (privacy, utility, tradeoff).\n"
+        "- A metric or acceptance-criteria table.\n"
         "- A baseline comparison checklist.\n"
-        "- One runnable evaluation script stub.\n"
+        "- One concrete next artifact for implementation or evaluation.\n"
     )
     plan = _safe_generate(
         llm=llm,
@@ -130,6 +136,8 @@ def generate_final_session_report(
     memory_text: str,
     output_path: Path,
     console: Console,
+    topic_context: str = "",
+    topic_title: str = "the configured research topic",
 ) -> str:
     system_prompt = (
         "You are generating a concise morning report for an academic research session. "
@@ -137,6 +145,7 @@ def generate_final_session_report(
     )
     user_prompt = (
         "Generate a report with exact sections:\n"
+        f"Topic context:\n{topic_context.strip() or f'Title: {topic_title}'}\n\n"
         "- best research direction found\n"
         "- strongest criticism\n"
         "- unresolved risks\n"
@@ -156,19 +165,19 @@ def generate_final_session_report(
         "## strongest criticism\n"
         f"- {research_state.get('current_biggest_blocker', 'Baseline quality is still weak.')}\n\n"
         "## unresolved risks\n"
-        "- Evaluation setting may not reflect real personal-agent privacy constraints.\n"
-        "- Privacy metric sensitivity might be unstable across tasks.\n\n"
+        f"- The evaluation setting may not capture the practical constraints of {topic_title}.\n"
+        "- Success criteria may still be unstable across representative tasks.\n\n"
         "## concrete implementation ideas\n"
-        f"- {research_state.get('current_next_experiment', 'Implement one baseline experiment.')}\n"
-        "- Add a script to compute privacy-utility tradeoff curves.\n"
-        "- Create a reproducible ablation template.\n\n"
+        f"- {research_state.get('current_next_experiment', 'Implement one baseline experiment or prototype slice.')}\n"
+        "- Add a small script or checklist to measure the selected success criteria.\n"
+        "- Create a reproducible comparison template.\n\n"
         "## recommended papers/topics to investigate\n"
-        "- Privacy-utility tradeoff metrics for ML systems.\n"
-        "- Memory editing and retrieval control in personal agents.\n"
-        "- Differential privacy and constrained adaptation methods.\n\n"
+        f"- Prior work directly related to {topic_title}.\n"
+        "- Baseline methods and evaluation protocols for the selected task type.\n"
+        "- Failure modes and mitigation strategies for the proposed approach.\n\n"
         "## tomorrow's top 3 actions\n"
         "1. Finalize metric definitions and thresholds.\n"
-        "2. Run one baseline-vs-PAMA comparison.\n"
+        "2. Run one baseline comparison or prototype check.\n"
         "3. Document failure cases and next ablation.\n"
     )
     report = _safe_generate(
@@ -198,6 +207,9 @@ def run_session_mode(
     stop_if_no_improvement_rounds: int,
     global_max_runtime_seconds: int,
     per_agent_timeout_seconds: int,
+    topic_context: str = "",
+    topic_title: str = "the configured research topic",
+    topic_keywords: Sequence[str] = (),
 ) -> None:
     console.rule("Research Session Mode")
     memory_for_prompt = get_memory_for_prompt(memory_path)
@@ -207,6 +219,8 @@ def run_session_mode(
         task_text=task_text,
         memory_text=memory_for_prompt,
         console=console,
+        topic_context=topic_context,
+        topic_title=topic_title,
     )
     console.print(f"[bold cyan]Session focus objective:[/bold cyan] {objective}")
 
@@ -218,6 +232,8 @@ def run_session_mode(
         memory_text=memory_for_prompt,
         output_path=current_plan_path,
         console=console,
+        topic_context=topic_context,
+        topic_title=topic_title,
     )
     console.print(f"[green]Saved current plan:[/green] {current_plan_path}")
 
@@ -242,6 +258,7 @@ def run_session_mode(
         stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
         global_max_runtime_seconds=global_max_runtime_seconds,
         per_agent_timeout_seconds=per_agent_timeout_seconds,
+        topic_keywords=topic_keywords,
     )
 
     research_state_path = project_dir / "research_state.json"
@@ -262,6 +279,8 @@ def run_session_mode(
         memory_text=get_memory_for_prompt(memory_path),
         output_path=final_report_path,
         console=console,
+        topic_context=topic_context,
+        topic_title=topic_title,
     )
     console.print(f"[green]Saved final session report:[/green] {final_report_path}")
 

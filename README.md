@@ -4,6 +4,7 @@
 适合做学术研究规划草案、迭代改写与快速评分。
 
 详细新手说明请先看：`docs/USER_GUIDE.md`。
+开发、测试和架构说明请看：`docs/DEVELOPER_GUIDE.md`。
 
 ## 你只需要知道这几件事
 
@@ -44,6 +45,10 @@ make run
 URL 或无效项目名会直接报出具体字段，避免运行到一半才失败。当前推荐格式是嵌套的
 `model:` 配置；兼容旧格式 `model: qwen3:8b`，也兼容旧的顶层 `temperature` 和
 `timeout_seconds`，但嵌套 `model:` 里的值会优先生效。
+
+`topic:` 配置决定通用提示词收到的项目主题上下文。当前仓库里的 `projects/pama` 是示例
+项目；如果换成新研究方向，请新建 `projects/<name>/`，修改 `project_name`，并同步更新
+`topic.title`、`topic.description` 和 `topic.keywords`。
 
 ## 模型建议（Ollama）
 
