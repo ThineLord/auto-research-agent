@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -9,6 +10,7 @@ from typing import Optional
 import requests
 
 MAX_PROMPT_CHARS = 32000
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -47,9 +49,15 @@ class OllamaClient:
         }
 
         started = time.monotonic()
-        print(
-            f"[LLM] {agent_name} request start | system_chars={len(system_prompt or '')} "
-            f"user_chars={len(user_prompt)} timeout={self.timeout_seconds}s"
+        logger.info(
+            "llm_request_start",
+            extra={
+                "event": "llm_request_start",
+                "agent_name": agent_name,
+                "system_chars": len(system_prompt or ""),
+                "user_chars": len(user_prompt),
+                "timeout_seconds": self.timeout_seconds,
+            },
         )
         try:
             response = requests.post(
@@ -72,7 +80,13 @@ class OllamaClient:
 
         elapsed = time.monotonic() - started
         content = data.get("message", {}).get("content", "").strip()
-        print(
-            f"[LLM] {agent_name} request end | response_chars={len(content)} elapsed={elapsed:.2f}s"
+        logger.info(
+            "llm_request_end",
+            extra={
+                "event": "llm_request_end",
+                "agent_name": agent_name,
+                "response_chars": len(content),
+                "elapsed_seconds": round(elapsed, 3),
+            },
         )
         return content
