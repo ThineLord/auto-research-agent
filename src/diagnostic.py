@@ -58,7 +58,8 @@ def run_diagnostic_mode(
             "Revise the draft using review feedback. Return concise implementation-oriented output."
         ),
         judge_prompt=(
-            "Score the revised output quickly. Output format: SCORE: <0-100> then 3 bullets."
+            "Score the revised output quickly. Return JSON only with keys: "
+            "score, rubric, reasons, blockers, next_step."
         ),
         temperature=0.2,
         top_p=0.8,

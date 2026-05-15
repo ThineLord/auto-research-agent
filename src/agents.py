@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from .judge_output import JUDGE_OUTPUT_SCHEMA
 from .llm import OllamaClient
 
 logger = logging.getLogger(__name__)
@@ -153,4 +154,5 @@ class ResearchAgents:
             user_prompt=prompt,
             temperature=self.temperature,
             top_p=self.top_p,
+            response_format=JUDGE_OUTPUT_SCHEMA,
         )
