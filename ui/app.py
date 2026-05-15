@@ -9,7 +9,6 @@ from typing import Any, Sequence
 
 import requests
 import streamlit as st
-import streamlit.components.v1 as components
 
 from src.config import (
     ConfigValidationError,
@@ -251,6 +250,10 @@ def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[
     ]
 
 
+def live_refresh_interval(auto_refresh: bool) -> str | None:
+    return "2s" if auto_refresh else None
+
+
 def project_path(project_name: str) -> Path:
     return PROJECTS_DIR / project_name
 
@@ -280,6 +283,45 @@ def render_process_result(result, success_message: str) -> None:
         st.error(result.error)
     elif result.pid:
         st.success(success_message.format(pid=result.pid))
+
+
+def render_live_progress_and_logs(
+    *,
+    proj_path: Path,
+    run_log_path: Path,
+    model_job_log_path: Path,
+    checkpoint_path: Path,
+    stop_signal_path: Path,
+    default_model: str,
+) -> None:
+    run_meta = get_active_process_meta(run_meta_path(proj_path))
+    checkpoint = read_json_file(checkpoint_path) if checkpoint_path.exists() else {}
+    run_log_text = tail_file_lines(run_log_path, max_lines=240)
+
+    progress = infer_running_stage(
+        log_text=run_log_text,
+        checkpoint=checkpoint,
+        run_meta=run_meta,
+    )
+    p1, p2, p3, p4 = st.columns(4)
+    p1.metric("Mode", str(progress["mode"]))
+    p2.metric("Round", str(progress["round"]))
+    p3.metric("Stage", str(progress["stage"]))
+    p4.metric("Best score", str(progress["best_score"]))
+    st.write(f"PID: `{progress['pid']}`")
+    st.write(f"Model: `{progress['model']}`")
+    st.write(f"Last successful agent: `{progress['last_successful_agent']}`")
+    st.write(f"Stop reason: `{progress['stop_reason']}`")
+    st.write(f"Stop signal present: `{stop_signal_path.exists()}`")
+    st.write(f"Selected model: `{st.session_state.get('selected_model', default_model)}`")
+
+    st.subheader("E. Live logs panel")
+    st.code(run_log_text or "(no logs yet)", language="text")
+    st.caption("Model operation logs")
+    st.code(
+        tail_file_lines(model_job_log_path, max_lines=120) or "(no model operation logs yet)",
+        language="text",
+    )
 
 
 def main() -> None:
@@ -590,37 +632,22 @@ def main() -> None:
             )
 
     st.subheader("D. Progress panel")
-    run_log_text = tail_file_lines(run_log_path, max_lines=240)
-    progress = infer_running_stage(
-        log_text=run_log_text,
-        checkpoint=checkpoint,
-        run_meta=run_meta,
+    auto_refresh = st.checkbox(
+        "Auto refresh logs every 2 seconds",
+        value=True,
+        key="auto_refresh_logs",
     )
-    p1, p2, p3, p4 = st.columns(4)
-    p1.metric("Mode", str(progress["mode"]))
-    p2.metric("Round", str(progress["round"]))
-    p3.metric("Stage", str(progress["stage"]))
-    p4.metric("Best score", str(progress["best_score"]))
-    st.write(f"PID: `{progress['pid']}`")
-    st.write(f"Model: `{progress['model']}`")
-    st.write(f"Last successful agent: `{progress['last_successful_agent']}`")
-    st.write(f"Stop reason: `{progress['stop_reason']}`")
-    st.write(f"Stop signal present: `{stop_signal_path.exists()}`")
-    st.write(f"Selected model: `{st.session_state.get('selected_model', default_model)}`")
-
-    st.subheader("E. Live logs panel")
-    auto_refresh = st.checkbox("Auto refresh logs every 2 seconds", value=True)
-    st.code(run_log_text or "(no logs yet)", language="text")
-    st.caption("Model operation logs")
-    st.code(
-        tail_file_lines(model_job_log_path, max_lines=120) or "(no model operation logs yet)",
-        language="text",
+    live_panel = st.fragment(run_every=live_refresh_interval(auto_refresh))(
+        render_live_progress_and_logs
     )
-    if auto_refresh:
-        components.html(
-            "<script>setTimeout(function(){window.location.reload();}, 2000);</script>",
-            height=0,
-        )
+    live_panel(
+        proj_path=proj_path,
+        run_log_path=run_log_path,
+        model_job_log_path=model_job_log_path,
+        checkpoint_path=checkpoint_path,
+        stop_signal_path=stop_signal_path,
+        default_model=default_model,
+    )
 
     st.subheader("F. Output browser")
     output_catalog = build_output_catalog(proj_path, checkpoint)

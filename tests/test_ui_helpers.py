@@ -223,6 +223,8 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertTrue(progress["run_active"])
         self.assertEqual(progress["stage"], "review")
         self.assertEqual(progress["round"], 2)
+        self.assertEqual(ui_app.live_refresh_interval(True), "2s")
+        self.assertIsNone(ui_app.live_refresh_interval(False))
 
         resume = ui_app.describe_resume_state(
             checkpoint={"can_resume": True, "last_completed_round": 2, "model": "qwen3:8b"},
