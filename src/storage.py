@@ -29,6 +29,26 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content.strip() + "\n", encoding="utf-8")
 
 
+def read_file_text(path: Path) -> str:
+    """Read a text file exactly as stored, returning an empty string if missing."""
+    if not path.exists():
+        return ""
+    return path.read_text(encoding="utf-8")
+
+
+def write_file_text(path: Path, content: str) -> None:
+    """Write text exactly as provided, creating parent directories as needed."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
+def tail_file_lines(path: Path, max_lines: int = 200) -> str:
+    if not path.exists():
+        return ""
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    return "\n".join(lines[-max_lines:])
+
+
 def make_run_root(project_dir: Path) -> Path:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     run_root = project_dir / "runs" / timestamp
