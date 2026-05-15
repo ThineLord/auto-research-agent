@@ -20,7 +20,7 @@
 ## 快速开始
 
 ```bash
-cd auto-research-agent
+cd <PROJECT_ROOT>
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -74,12 +74,19 @@ python -m src.main --diagnostic --model llama3.1:8b
 - 从检查点恢复
   - `python -m src.main --resume`
 - 启动本地图形界面
-  - `streamlit run ui/app.py`
+  - `cd <PROJECT_ROOT> && source .venv/bin/activate && streamlit run ui/app.py`
+  - 或使用固定路径启动脚本：`<PROJECT_ROOT>/scripts/start_ui.sh`
 
 ## Graphical UI
 
 - 启动：
+  - `cd <PROJECT_ROOT>`
+  - `source .venv/bin/activate`
   - `streamlit run ui/app.py`
+  - 或直接运行：`<PROJECT_ROOT>/scripts/start_ui.sh`
+- 路径检查：
+  - UI 顶部会显示 `App root`
+  - 正确路径应为 `<PROJECT_ROOT>`
 - 选择模型：
   - 在 `Model Management` 里从已安装模型下拉框选择（运行按钮会带上 `--model <name>`）
 - 拉取模型：
@@ -92,6 +99,9 @@ python -m src.main --diagnostic --model llama3.1:8b
 - 开始运行：
   - `Run Diagnostic` / `Run Normal` / `Run Continuous`
   - UI 会把当前模型自动传给后端（`--model <selected_model>`）
+- 运行项目测试：
+  - 在 `Project Tests` 里点击 `Run Tests`
+  - 会执行 `python -m unittest tests.test_storage tests.test_round_loop -v`，并在页面显示通过/失败和完整输出
 - 安全停止：
   - 点击 `Pause / Stop Safely`（创建 `STOP_REQUESTED`，后端在安全点退出）
 - 恢复：
