@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from .judge_output import JUDGE_OUTPUT_SCHEMA
 from .llm import OllamaClient
+
+logger = logging.getLogger(__name__)
 
 
 def _read_prompt(path: Path) -> str:
@@ -57,9 +61,15 @@ class ResearchAgents:
             f"# Previous Best (optional)\n{previous_best or '(none)'}\n\n"
             f"# Previous Judge Feedback (optional)\n{previous_judge or '(none)'}\n"
         )
-        print(
-            f"[AGENT] draft prompt prepared | round={round_index} "
-            f"prompt_chars={len(prompt)} memory_words={len(memory.split())}"
+        logger.info(
+            "agent_prompt_prepared",
+            extra={
+                "event": "agent_prompt_prepared",
+                "agent_name": "draft",
+                "round": round_index,
+                "prompt_chars": len(prompt),
+                "memory_words": len(memory.split()),
+            },
         )
         return self.llm.generate(
             agent_name="draft",
@@ -75,9 +85,14 @@ class ResearchAgents:
             f"# Project Memory\n{memory}\n\n"
             f"# Draft Output\n{draft_output}\n"
         )
-        print(
-            f"[AGENT] review prompt prepared | prompt_chars={len(prompt)} "
-            f"memory_words={len(memory.split())}"
+        logger.info(
+            "agent_prompt_prepared",
+            extra={
+                "event": "agent_prompt_prepared",
+                "agent_name": "review",
+                "prompt_chars": len(prompt),
+                "memory_words": len(memory.split()),
+            },
         )
         return self.llm.generate(
             agent_name="review",
@@ -101,9 +116,14 @@ class ResearchAgents:
             f"# Draft Output\n{draft_output}\n\n"
             f"# Review Feedback\n{review_output}\n"
         )
-        print(
-            f"[AGENT] revise prompt prepared | prompt_chars={len(prompt)} "
-            f"memory_words={len(memory.split())}"
+        logger.info(
+            "agent_prompt_prepared",
+            extra={
+                "event": "agent_prompt_prepared",
+                "agent_name": "revise",
+                "prompt_chars": len(prompt),
+                "memory_words": len(memory.split()),
+            },
         )
         return self.llm.generate(
             agent_name="revise",
@@ -119,9 +139,14 @@ class ResearchAgents:
             f"# Project Memory\n{memory}\n\n"
             f"# Revised Output\n{revised_output}\n"
         )
-        print(
-            f"[AGENT] judge prompt prepared | prompt_chars={len(prompt)} "
-            f"memory_words={len(memory.split())}"
+        logger.info(
+            "agent_prompt_prepared",
+            extra={
+                "event": "agent_prompt_prepared",
+                "agent_name": "judge",
+                "prompt_chars": len(prompt),
+                "memory_words": len(memory.split()),
+            },
         )
         return self.llm.generate(
             agent_name="judge",
@@ -129,4 +154,5 @@ class ResearchAgents:
             user_prompt=prompt,
             temperature=self.temperature,
             top_p=self.top_p,
+            response_format=JUDGE_OUTPUT_SCHEMA,
         )

@@ -16,11 +16,24 @@ from src.storage import (
 
 
 class StorageTests(unittest.TestCase):
-    def test_parse_score_accepts_case_and_clamps_range(self) -> None:
+    def test_parse_score_accepts_legacy_score_lines_and_clamps_range(self) -> None:
         self.assertEqual(parse_score("SCORE: 88.5\nGood direction."), 88.5)
         self.assertEqual(parse_score("score: 120"), 100.0)
         self.assertEqual(parse_score("SCORE: 0"), 0.0)
         self.assertIsNone(parse_score("No score here."))
+
+    def test_parse_score_accepts_json_score_outputs(self) -> None:
+        self.assertEqual(parse_score('{"score": 88.5, "next_step": "CONTINUE"}'), 88.5)
+        self.assertEqual(parse_score('```json\n{"score": 72}\n```'), 72.0)
+        self.assertEqual(parse_score('Result:\n{"score": "63.25"}\nDone.'), 63.25)
+        self.assertEqual(parse_score('{"score": 120}'), 100.0)
+
+    def test_parse_score_rejects_invalid_json_scores(self) -> None:
+        self.assertIsNone(parse_score('{"next_step": "CONTINUE"}'))
+        self.assertIsNone(parse_score('{"score": true}'))
+        self.assertIsNone(parse_score('{"score": "not numeric"}'))
+        self.assertIsNone(parse_score('{"score": NaN}'))
+        self.assertIsNone(parse_score("[88]"))
 
     def test_json_helpers_return_empty_dict_for_missing_or_invalid_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

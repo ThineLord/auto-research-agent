@@ -19,6 +19,7 @@ from .config import (
 from .constants import RUN_LOCK_FILENAME
 from .diagnostic import run_diagnostic_mode
 from .llm import OllamaClient
+from .logging_config import configure_logging
 from .resume import run_resume_mode
 from .runner import run_iterative_rounds
 from .runtime import acquire_run_lock, release_run_lock
@@ -59,6 +60,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    configure_logging()
     console = Console()
     root = Path(__file__).resolve().parent.parent
     try:

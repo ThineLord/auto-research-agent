@@ -8,6 +8,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from .judge_output import parse_judge_score
+
 AUTO_MEMORY_HEADER = "## Iteration Memory (auto-managed)"
 AUTO_MEMORY_NOTE = (
     "This section is automatically updated each round. "
@@ -77,14 +79,7 @@ def save_round_outputs(
 
 
 def parse_score(judge_text: str) -> Optional[float]:
-    match = re.search(r"SCORE:\s*([0-9]+(?:\.[0-9]+)?)", judge_text, flags=re.IGNORECASE)
-    if not match:
-        return None
-    try:
-        score = float(match.group(1))
-    except ValueError:
-        return None
-    return max(0.0, min(100.0, score))
+    return parse_judge_score(judge_text)
 
 
 def _normalize_line(line: str) -> str:
