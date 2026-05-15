@@ -9,9 +9,9 @@
 
 - 主要输入文件：`projects/pama/task.md`
 - 启动前先做一次快速检查：
-  - `python -m src.main --diagnostic`
+  - `make diagnostic`
 - 正常有界运行：
-  - `python -m src.main`
+  - `make run`
 - 推荐默认模型：
   - `qwen3:8b`
 - 稳定回退模型：
@@ -21,17 +21,15 @@
 
 ```bash
 cd <PROJECT_ROOT>
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+make install-dev
 ollama pull qwen3:8b
 # 可选强化模型
 ollama pull qwen3:14b
 ollama pull deepseek-r1:8b
 # 保留稳定回退
 ollama pull llama3.1:8b
-python -m src.main --diagnostic
-python -m src.main
+make diagnostic
+make run
 ```
 
 ## 输入文件说明
@@ -50,10 +48,10 @@ python -m src.main
 模型切换（CLI 覆盖）示例：
 
 ```bash
-python -m src.main --model qwen3:8b
-python -m src.main --model qwen3:14b
-python -m src.main --model deepseek-r1:8b
-python -m src.main --diagnostic --model llama3.1:8b
+make run ARGS="--model qwen3:8b"
+make run ARGS="--model qwen3:14b"
+make run ARGS="--model deepseek-r1:8b"
+make diagnostic ARGS="--model llama3.1:8b"
 ```
 
 ## 先看哪个输出
@@ -64,25 +62,31 @@ python -m src.main --diagnostic --model llama3.1:8b
 ## 常用命令
 
 - 基础诊断（1 轮、快速验证）
-  - `python -m src.main --diagnostic`
+  - `make diagnostic`
 - 正常有界运行（按 `max_rounds` 停止）
-  - `python -m src.main`
+  - `make run`
 - 会话模式（包含 objective/plan/report）
-  - `python -m src.main --session`
+  - `make session`
 - 连续运行
-  - `python -m src.main --continuous`
+  - `make continuous`
 - 从检查点恢复
-  - `python -m src.main --resume`
+  - `make resume`
 - 启动本地图形界面
-  - `cd <PROJECT_ROOT> && source .venv/bin/activate && streamlit run ui/app.py`
+  - `cd <PROJECT_ROOT> && make ui`
   - 或使用固定路径启动脚本：`<PROJECT_ROOT>/scripts/start_ui.sh`
+
+直接调用入口也可以使用：
+
+```bash
+.venv/bin/python -m src.main --diagnostic
+.venv/bin/auto-research-agent --diagnostic
+```
 
 ## Graphical UI
 
 - 启动：
   - `cd <PROJECT_ROOT>`
-  - `source .venv/bin/activate`
-  - `streamlit run ui/app.py`
+  - `make ui`
   - 或直接运行：`<PROJECT_ROOT>/scripts/start_ui.sh`
 - 路径检查：
   - UI 顶部会显示 `App root`
@@ -101,11 +105,11 @@ python -m src.main --diagnostic --model llama3.1:8b
   - UI 会把当前模型自动传给后端（`--model <selected_model>`）
 - 运行项目测试：
   - 在 `Project Tests` 里点击 `Run Tests`
-  - 会执行 `python -m unittest tests.test_storage tests.test_round_loop -v`，并在页面显示通过/失败和完整输出
+  - 会执行当前环境的 `pytest -q`，并在页面显示通过/失败和完整输出
 - 安全停止：
   - 点击 `Pause / Stop Safely`（创建 `STOP_REQUESTED`，后端在安全点退出）
 - 恢复：
-  - 点击 `Resume`（等价 `python -m src.main --resume`）
+  - 点击 `Resume`（等价 `.venv/bin/python -m src.main --resume`）
 - 看结果：
   - 先看 `projects/pama/best_output.md`
   - 再看 `projects/pama/runs/<run_id>/round_xx/`
@@ -126,11 +130,11 @@ python -m src.main --diagnostic --model llama3.1:8b
 
 ## 关于“连续运行 / 安全停止 / 恢复”
 
-- 连续运行：`python -m src.main --continuous`
+- 连续运行：`make continuous`
 - 安全停止：
   - `Ctrl+C`
   - 或创建 `projects/pama/STOP_REQUESTED`（UI 按钮会自动创建）
-- 恢复：`python -m src.main --resume`（读取 `projects/pama/checkpoint.json`）
+- 恢复：`make resume`（读取 `projects/pama/checkpoint.json`）
 - 进度不会丢：每轮都会写入 `runs/round_xx`，并更新 checkpoint
 
 ## 哪些文件不要提交

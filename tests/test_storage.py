@@ -86,7 +86,7 @@ class StorageTests(unittest.TestCase):
                 last_successful_agent="revise",
                 best_score=72.25,
                 best_output_path=best_output_path,
-                resume_command="python -m src.main --resume",
+                resume_command=".venv/bin/python -m src.main --resume",
                 stop_time="2026-05-15T12:00:00",
             )
 
@@ -94,7 +94,7 @@ class StorageTests(unittest.TestCase):
             self.assertIn("last completed round: 3", content)
             self.assertIn("last successful agent: revise", content)
             self.assertIn("best score so far: 72.25", content)
-            self.assertIn("python -m src.main --resume", content)
+            self.assertIn(".venv/bin/python -m src.main --resume", content)
 
 
 if __name__ == "__main__":

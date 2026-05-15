@@ -578,7 +578,7 @@ def run_iterative_rounds(
             last_successful_agent=last_successful_agent,
             best_score=max(0.0, best_score),
             best_output_path=best_output_path,
-            resume_command="python -m src.main --resume",
+            resume_command=".venv/bin/python -m src.main --resume",
             stop_time=datetime.now().isoformat(),
         )
         if stop_signal_path.exists():
