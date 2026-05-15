@@ -205,6 +205,8 @@ def main() -> None:
             per_agent_timeout_seconds=timeout_seconds,
         )
     except KeyboardInterrupt:
-        console.print("[red]Manual interrupt detected in main loop. Stop reason: MANUAL_INTERRUPT[/red]")
+        console.print(
+            "[red]Manual interrupt detected in main loop. Stop reason: MANUAL_INTERRUPT[/red]"
+        )
     finally:
         release_run_lock(run_lock_path)

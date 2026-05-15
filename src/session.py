@@ -63,7 +63,9 @@ def generate_focus_objective(
         console=console,
         label="Session objective",
     )
-    first_line = next((line.strip("- ").strip() for line in raw.splitlines() if line.strip()), fallback)
+    first_line = next(
+        (line.strip("- ").strip() for line in raw.splitlines() if line.strip()), fallback
+    )
     return _clip_words(first_line, 20)
 
 

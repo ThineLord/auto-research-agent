@@ -27,9 +27,7 @@ def run_resume_mode(
     checkpoint_path = project_dir / "checkpoint.json"
     checkpoint = read_json_file(checkpoint_path)
     if not checkpoint or not checkpoint.get("can_resume"):
-        console.print(
-            "[red]Cannot resume: checkpoint.json missing or can_resume is false.[/red]"
-        )
+        console.print("[red]Cannot resume: checkpoint.json missing or can_resume is false.[/red]")
         return
     run_root_str = str(checkpoint.get("run_root", "")).strip()
     if not run_root_str:
