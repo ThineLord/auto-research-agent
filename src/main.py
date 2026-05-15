@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 from .cli import main, parse_args
-from .config import list_installed_ollama_models, load_config
+from .config import (
+    ConfigValidationError,
+    list_installed_ollama_models,
+    load_app_config,
+    load_config,
+)
 from .constants import (
     DEFAULT_CONTINUOUS_MAX_RUNTIME_SECONDS,
     DEFAULT_NORMAL_MAX_RUNTIME_SECONDS,
@@ -31,7 +36,9 @@ __all__ = [
     "STOP_NO_IMPROVEMENT",
     "STOP_OLLAMA_TIMEOUT",
     "STOP_USER_REQUESTED",
+    "ConfigValidationError",
     "list_installed_ollama_models",
+    "load_app_config",
     "load_config",
     "main",
     "parse_args",

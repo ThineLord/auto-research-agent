@@ -10,8 +10,9 @@ from rich.console import Console
 
 from .agents import ResearchAgents
 from .config import (
+    ConfigValidationError,
     list_installed_ollama_models,
-    load_config,
+    load_app_config,
     resolve_model_settings,
     resolve_runtime_limits,
 )
@@ -60,18 +61,22 @@ def main() -> None:
     args = parse_args()
     console = Console()
     root = Path(__file__).resolve().parent.parent
-    config = load_config(root / "config.yaml")
+    try:
+        config = load_app_config(root / "config.yaml")
+    except (ConfigValidationError, FileNotFoundError) as exc:
+        console.print(f"[red]Config error: {exc}[/red]")
+        return
 
     config_model_name, config_temperature, config_timeout = resolve_model_settings(config)
     model_name = args.model or config_model_name
-    base_url = config.get("ollama_base_url", "http://localhost:11434")
-    project_name = config.get("project_name", "pama")
-    max_rounds = int(config.get("max_rounds", 5))
-    stop_if_no_improvement_rounds = int(config.get("stop_if_no_improvement_rounds", 2))
+    base_url = config.ollama_base_url
+    project_name = config.project_name
+    max_rounds = config.max_rounds
+    stop_if_no_improvement_rounds = config.stop_if_no_improvement_rounds
     normal_max_runtime_seconds, continuous_max_runtime_seconds = resolve_runtime_limits(config)
-    temperature = float(config_temperature)
-    top_p = float(config.get("top_p", 0.9))
-    timeout_seconds = max(1, min(int(config_timeout), 300))
+    temperature = config_temperature
+    top_p = config.top_p
+    timeout_seconds = config_timeout
 
     project_dir = root / "projects" / project_name
     memory_path = project_dir / "memory.md"

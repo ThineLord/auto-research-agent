@@ -38,6 +38,13 @@ make run
 - `projects/pama/memory.md`：历史上下文记忆（可选，程序会自动维护）
 - `config.yaml`：运行参数（模型、轮数、超时等）
 
+## 配置安全检查
+
+启动 CLI 或 UI 时会先校验 `config.yaml`。未知字段、错误类型、超出范围的数值、无效
+URL 或无效项目名会直接报出具体字段，避免运行到一半才失败。当前推荐格式是嵌套的
+`model:` 配置；兼容旧格式 `model: qwen3:8b`，也兼容旧的顶层 `temperature` 和
+`timeout_seconds`，但嵌套 `model:` 里的值会优先生效。
+
 ## 模型建议（Ollama）
 
 - `qwen3:8b`：推荐默认模型（当前默认值），速度和质量平衡
