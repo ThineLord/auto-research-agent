@@ -14,7 +14,6 @@ import streamlit as st
 import streamlit.components.v1 as components
 import yaml
 
-
 ROOT = Path(__file__).resolve().parents[1]
 PROJECTS_DIR = ROOT / "projects"
 CONFIG_PATH = ROOT / "config.yaml"
@@ -80,8 +79,7 @@ def render_runtime_location_check() -> None:
         "Stop this server and restart Streamlit from the path below."
     )
     st.code(
-        f"cd {CANONICAL_ROOT}\n"
-        "make ui",
+        f"cd {CANONICAL_ROOT}\nmake ui",
         language="bash",
     )
 
@@ -280,9 +278,15 @@ def main() -> None:
         else:
             st.info("Click Run Tests to check the project without running Ollama.")
 
-    projects = sorted([p.name for p in PROJECTS_DIR.iterdir() if p.is_dir()]) if PROJECTS_DIR.exists() else []
+    projects = (
+        sorted([p.name for p in PROJECTS_DIR.iterdir() if p.is_dir()])
+        if PROJECTS_DIR.exists()
+        else []
+    )
     default_index = projects.index("pama") if "pama" in projects else 0
-    selected_project = st.selectbox("A. Project selector", projects, index=default_index if projects else None)
+    selected_project = st.selectbox(
+        "A. Project selector", projects, index=default_index if projects else None
+    )
     if not selected_project:
         st.warning("No project found under projects/.")
         return
@@ -301,9 +305,13 @@ def main() -> None:
 
     col_input_left, col_input_right = st.columns(2)
     with col_input_left:
-        task_text = st.text_area("B. Input editor - task.md", value=read_text(task_path), height=260)
+        task_text = st.text_area(
+            "B. Input editor - task.md", value=read_text(task_path), height=260
+        )
     with col_input_right:
-        memory_text = st.text_area("B. Input editor - memory.md", value=read_text(memory_path), height=260)
+        memory_text = st.text_area(
+            "B. Input editor - memory.md", value=read_text(memory_path), height=260
+        )
     if st.button("Save Input"):
         write_text(task_path, task_text)
         write_text(memory_path, memory_text)
@@ -404,15 +412,11 @@ def main() -> None:
         if last_test:
             if last_test["ok"]:
                 st.success(
-                    f"Tests passed in {last_test['elapsed']:.2f}s "
-                    f"using `{last_test['command']}`"
+                    f"Tests passed in {last_test['elapsed']:.2f}s using `{last_test['command']}`"
                 )
             else:
                 returncode = last_test["returncode"]
-                st.error(
-                    f"Tests failed in {last_test['elapsed']:.2f}s "
-                    f"(return code: {returncode})"
-                )
+                st.error(f"Tests failed in {last_test['elapsed']:.2f}s (return code: {returncode})")
         else:
             st.info("No test run yet.")
     if st.session_state.get("test_result"):
@@ -451,7 +455,9 @@ def main() -> None:
         )
         st.session_state["selected_model"] = selected_model
     else:
-        selected_model = st.text_input("Model selector (manual)", value=st.session_state["selected_model"])
+        selected_model = st.text_input(
+            "Model selector (manual)", value=st.session_state["selected_model"]
+        )
         st.session_state["selected_model"] = selected_model.strip()
 
     if st.button("Save Selected Model as Default", disabled=bool(models_error)):
@@ -524,7 +530,10 @@ def main() -> None:
     auto_refresh = st.checkbox("Auto refresh logs every 2 seconds", value=True)
     st.code(tail_lines(run_log_path, max_lines=240) or "(no logs yet)", language="text")
     st.caption("Model operation logs")
-    st.code(tail_lines(model_job_log_path, max_lines=120) or "(no model operation logs yet)", language="text")
+    st.code(
+        tail_lines(model_job_log_path, max_lines=120) or "(no model operation logs yet)",
+        language="text",
+    )
     if auto_refresh:
         components.html(
             "<script>setTimeout(function(){window.location.reload();}, 2000);</script>",
@@ -543,7 +552,9 @@ def main() -> None:
         st.write(f"- `{output}`")
         if output.exists():
             preview = read_text(output)[:1200]
-            st.text_area(f"Preview: {output.name}", value=preview, height=120, key=f"preview_{output.name}")
+            st.text_area(
+                f"Preview: {output.name}", value=preview, height=120, key=f"preview_{output.name}"
+            )
         else:
             st.caption("Not generated yet.")
 

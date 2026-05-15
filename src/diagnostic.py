@@ -14,6 +14,7 @@ from .llm import OllamaClient
 from .runtime import log_run as _log
 from .runtime import shorten_text_by_words as _shorten_text_by_words
 from .storage import (
+    append_log_line,
     get_memory_for_prompt,
     make_round_dir,
     make_run_root,
@@ -22,7 +23,6 @@ from .storage import (
     write_json_file,
     write_score_history,
 )
-from .storage import append_log_line
 
 
 def run_diagnostic_mode(
@@ -52,16 +52,13 @@ def run_diagnostic_mode(
             "Max 6 bullets. Focus only on one concrete subproblem."
         ),
         review_prompt=(
-            "Critique only the most critical issues. "
-            "Max 5 bullets with actionable fixes."
+            "Critique only the most critical issues. Max 5 bullets with actionable fixes."
         ),
         revise_prompt=(
-            "Revise the draft using review feedback. "
-            "Return concise implementation-oriented output."
+            "Revise the draft using review feedback. Return concise implementation-oriented output."
         ),
         judge_prompt=(
-            "Score the revised output quickly. "
-            "Output format: SCORE: <0-100> then 3 bullets."
+            "Score the revised output quickly. Output format: SCORE: <0-100> then 3 bullets."
         ),
         temperature=0.2,
         top_p=0.8,
