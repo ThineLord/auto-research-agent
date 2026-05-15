@@ -56,7 +56,10 @@ if find_spec("yaml") is None:
 
     sys.modules["yaml"] = yaml_module
 
-from src.main import STOP_MAX_ROUNDS, run_iterative_rounds
+import src.main as main_module
+from src.cli import parse_args
+from src.constants import STOP_MAX_ROUNDS
+from src.runner import run_iterative_rounds
 
 
 class FakeLLM:
@@ -98,6 +101,19 @@ class FakeAgents:
 
 
 class RoundLoopTests(unittest.TestCase):
+    def test_main_reexports_backward_compatible_api(self) -> None:
+        self.assertIs(main_module.run_iterative_rounds, run_iterative_rounds)
+        self.assertEqual(main_module.STOP_MAX_ROUNDS, STOP_MAX_ROUNDS)
+        self.assertTrue(callable(main_module.parse_args))
+        self.assertTrue(callable(main_module.run_diagnostic_mode))
+        self.assertTrue(callable(main_module.run_session_mode))
+
+    def test_parse_args_accepts_mode_and_model_flags(self) -> None:
+        args = parse_args(["--diagnostic", "--model", "llama3.1:8b"])
+
+        self.assertTrue(args.diagnostic)
+        self.assertEqual(args.model, "llama3.1:8b")
+
     def test_round_loop_writes_outputs_and_keeps_best_score(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_dir = Path(tmp) / "project"
