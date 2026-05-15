@@ -11,6 +11,7 @@ from rich.console import Console
 from .agents import ResearchAgents
 from .config import (
     ConfigValidationError,
+    format_topic_context,
     list_installed_ollama_models,
     load_app_config,
     resolve_model_settings,
@@ -79,6 +80,8 @@ def main() -> None:
     temperature = config_temperature
     top_p = config.top_p
     timeout_seconds = config_timeout
+    topic_context = format_topic_context(config.topic)
+    topic_keywords = config.topic.keywords
 
     project_dir = root / "projects" / project_name
     memory_path = project_dir / "memory.md"
@@ -135,6 +138,7 @@ def main() -> None:
         prompt_dir=prompts_dir,
         temperature=temperature,
         top_p=top_p,
+        topic_context=topic_context,
     )
 
     try:
@@ -150,6 +154,7 @@ def main() -> None:
                 stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
                 global_max_runtime_seconds=normal_max_runtime_seconds,
                 per_agent_timeout_seconds=timeout_seconds,
+                topic_keywords=topic_keywords,
             )
             return
 
@@ -168,6 +173,7 @@ def main() -> None:
                 per_agent_timeout_seconds=timeout_seconds,
                 disable_no_improvement_stop=True,
                 disable_timeout_stop=True,
+                topic_keywords=topic_keywords,
             )
             return
 
@@ -179,6 +185,7 @@ def main() -> None:
                 project_dir=project_dir,
                 memory_path=memory_path,
                 model_name=model_name,
+                topic_context=topic_context,
             )
             return
 
@@ -195,6 +202,9 @@ def main() -> None:
                 stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
                 global_max_runtime_seconds=normal_max_runtime_seconds,
                 per_agent_timeout_seconds=timeout_seconds,
+                topic_context=topic_context,
+                topic_title=config.topic.title,
+                topic_keywords=topic_keywords,
             )
             return
 
@@ -210,6 +220,7 @@ def main() -> None:
             stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
             global_max_runtime_seconds=normal_max_runtime_seconds,
             per_agent_timeout_seconds=timeout_seconds,
+            topic_keywords=topic_keywords,
         )
     except KeyboardInterrupt:
         console.print(

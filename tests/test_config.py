@@ -8,6 +8,7 @@ import yaml
 
 from src.config import (
     ConfigValidationError,
+    format_topic_context,
     load_app_config,
     load_config,
     load_default_model_name,
@@ -33,10 +34,14 @@ class ConfigValidationTests(unittest.TestCase):
         self.assertEqual(config.model.provider, "ollama")
         self.assertEqual(config.model.name, "qwen3:8b")
         self.assertEqual(config.project_name, "pama")
+        self.assertIn("Privacy-Aware Memory Adapter", config.topic.title)
+        self.assertIn("privacy", config.topic.keywords)
         self.assertGreaterEqual(config.runtime.normal_max_runtime_seconds, 60)
 
         normalized = load_config(ROOT / "config.yaml")
         self.assertEqual(normalized["model"]["name"], config.model.name)
+        self.assertEqual(normalized["topic"]["title"], config.topic.title)
+        self.assertEqual(normalized["topic"]["keywords"], list(config.topic.keywords))
         self.assertNotIn("temperature", normalized)
         self.assertEqual(
             resolve_model_settings(config),
@@ -70,6 +75,34 @@ runtime:
         self.assertEqual(resolve_model_settings(config.as_dict()), ("llama3.1:8b", 0.7, 120))
         self.assertEqual(resolve_runtime_limits(config), (120, 240))
 
+    def test_topic_defaults_are_generic_when_not_configured(self) -> None:
+        config_path = self.write_config("model:\n  name: qwen3:8b\n")
+
+        config = load_app_config(config_path)
+
+        self.assertEqual(config.project_name, "default")
+        self.assertEqual(config.topic.title, "Configured Research Topic")
+        self.assertIn("evaluation", config.topic.keywords)
+        self.assertIn("Configured Research Topic", format_topic_context(config.topic))
+
+    def test_topic_config_validates_and_deduplicates_keywords(self) -> None:
+        config_path = self.write_config(
+            """
+topic:
+  title: Graph Retrieval Evaluation
+  description: Planning repeatable graph retrieval experiments.
+  keywords:
+    - graph
+    - retrieval
+    - Graph
+"""
+        )
+
+        config = load_app_config(config_path)
+
+        self.assertEqual(config.topic.title, "Graph Retrieval Evaluation")
+        self.assertEqual(config.topic.keywords, ("graph", "retrieval"))
+
     def test_nested_model_settings_take_precedence_over_legacy_top_level_values(self) -> None:
         config_path = self.write_config(
             """
@@ -99,6 +132,7 @@ timeout_seconds: 20
         cases = [
             ("unexpected: true\n", "config: unknown key"),
             ("model:\n  name: qwen3:8b\n  extra: true\n", "config.model: unknown key"),
+            ("topic:\n  title: Demo\n  extra: true\n", "config.topic: unknown key"),
             (
                 "runtime:\n  normal_max_runtime_seconds: 120\n  extra: true\n",
                 "config.runtime: unknown key",
@@ -130,6 +164,10 @@ timeout_seconds: 20
             ("model:\n  provider: openai\n", "config.model.provider"),
             ("model:\n  name: '   '\n", "config.model.name"),
             ("project_name: ../pama\n", "config.project_name"),
+            ("topic: demo\n", "config.topic"),
+            ("topic:\n  title: ' '\n", "config.topic.title"),
+            ("topic:\n  keywords: []\n", "config.topic.keywords"),
+            ("topic:\n  keywords: graph\n", "config.topic.keywords"),
             ("ollama_base_url: localhost:11434\n", "config.ollama_base_url"),
             ("runtime:\n  normal_max_runtime_seconds: 59\n", "normal_max_runtime_seconds"),
             (

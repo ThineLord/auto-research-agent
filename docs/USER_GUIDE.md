@@ -53,10 +53,20 @@ model:
   name: qwen3:8b
   temperature: 0.3
   timeout_seconds: 300
+topic:
+  title: Privacy-Aware Memory Adapter (PAMA) for Personal AI Agents
+  description: Research planning for privacy-aware memory adaptation in personal AI agents.
+  keywords:
+    - privacy
+    - memory
+    - adapter
+    - evaluation
+    - baseline
 ```
 
 旧写法 `model: qwen3:8b` 仍可用；旧的顶层 `temperature` 和 `timeout_seconds`
 也仍可作为 fallback。若同一项同时出现在顶层和 `model:` 里，以 `model:` 里的值为准。
+`topic:` 会传给 Draft / Review / Revise / Judge，让同一套提示词可以服务不同项目。
 
 在 UI 中切换模型：
 
@@ -101,6 +111,9 @@ ollama run qwen3:8b
 核心输入写在：`projects/pama/task.md`
 
 可选补充写在：`<PROJECT_MEMORY_FILE>`
+
+当前 `projects/pama` 是仓库自带示例项目。如果要换主题，可以新建 `projects/<name>/`，
+然后在 `config.yaml` 里同步修改 `project_name` 和 `topic:`。
 
 - `task.md`：你本次希望研究/回答的问题（必须有内容）
 - `memory.md`：历史上下文、限制、已知结论（可空，程序会自动更新）
