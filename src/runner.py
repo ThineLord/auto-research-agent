@@ -82,7 +82,9 @@ def _run_agent_step(
     _run_agent_step._depth = depth + 1  # type: ignore[attr-defined]
     console.print(f"[Round {round_index}] Running {agent_name} agent...")
     if log_path is not None:
-        append_log_line(log_path, f"mode={mode} | round={round_index} | agent={agent_name} | status=start")
+        append_log_line(
+            log_path, f"mode={mode} | round={round_index} | agent={agent_name} | status=start"
+        )
     try:
         output = call()
         console.print(f"[Round {round_index}] {agent_name.capitalize()} finished.")
@@ -244,7 +246,12 @@ def run_iterative_rounds(
                 if _stop_requested(stop_signal_path):
                     draft_output = "[DRAFT SKIPPED] user stop requested."
                     draft_error = "user stop requested"
-                    _log(console, log_path, mode, f"user_stop_requested_before_draft round={round_index}")
+                    _log(
+                        console,
+                        log_path,
+                        mode,
+                        f"user_stop_requested_before_draft round={round_index}",
+                    )
                 else:
                     _apply_dynamic_timeout()
                     draft_output, draft_error = _run_agent_step(
@@ -263,7 +270,9 @@ def run_iterative_rounds(
                     )
             if not draft_error and _stop_requested(stop_signal_path):
                 draft_error = "user stop requested after draft"
-                _log(console, log_path, mode, f"user_stop_requested_after_draft round={round_index}")
+                _log(
+                    console, log_path, mode, f"user_stop_requested_after_draft round={round_index}"
+                )
             _persist_round_outputs("draft")
             if not draft_error:
                 last_successful_agent = "draft"
@@ -277,7 +286,12 @@ def run_iterative_rounds(
                 if _stop_requested(stop_signal_path):
                     review_output = "[REVIEW SKIPPED] user stop requested."
                     review_error = "user stop requested"
-                    _log(console, log_path, mode, f"user_stop_requested_before_review round={round_index}")
+                    _log(
+                        console,
+                        log_path,
+                        mode,
+                        f"user_stop_requested_before_review round={round_index}",
+                    )
                 elif time.monotonic() - started_at >= global_max_runtime_seconds:
                     review_output = "[REVIEW SKIPPED] global runtime limit reached."
                     review_error = "global runtime limit reached"
@@ -300,7 +314,12 @@ def run_iterative_rounds(
                     )
                 if not review_error and _stop_requested(stop_signal_path):
                     review_error = "user stop requested after review"
-                    _log(console, log_path, mode, f"user_stop_requested_after_review round={round_index}")
+                    _log(
+                        console,
+                        log_path,
+                        mode,
+                        f"user_stop_requested_after_review round={round_index}",
+                    )
                 _persist_round_outputs("review")
                 if not review_error:
                     last_successful_agent = "review"
@@ -315,7 +334,12 @@ def run_iterative_rounds(
                 if _stop_requested(stop_signal_path):
                     revised_output = "[REVISE SKIPPED] user stop requested."
                     revise_error = "user stop requested"
-                    _log(console, log_path, mode, f"user_stop_requested_before_revise round={round_index}")
+                    _log(
+                        console,
+                        log_path,
+                        mode,
+                        f"user_stop_requested_before_revise round={round_index}",
+                    )
                 elif time.monotonic() - started_at >= global_max_runtime_seconds:
                     revised_output = "[REVISE SKIPPED] global runtime limit reached."
                     revise_error = "global runtime limit reached"
@@ -339,7 +363,12 @@ def run_iterative_rounds(
                     )
                 if not revise_error and _stop_requested(stop_signal_path):
                     revise_error = "user stop requested after revise"
-                    _log(console, log_path, mode, f"user_stop_requested_after_revise round={round_index}")
+                    _log(
+                        console,
+                        log_path,
+                        mode,
+                        f"user_stop_requested_after_revise round={round_index}",
+                    )
                 _persist_round_outputs("revise")
                 if not revise_error:
                     last_successful_agent = "revise"
@@ -354,7 +383,12 @@ def run_iterative_rounds(
                 if _stop_requested(stop_signal_path):
                     judge_output = "SCORE: 0\n- Judge skipped because user stop was requested."
                     judge_error = "user stop requested"
-                    _log(console, log_path, mode, f"user_stop_requested_before_judge round={round_index}")
+                    _log(
+                        console,
+                        log_path,
+                        mode,
+                        f"user_stop_requested_before_judge round={round_index}",
+                    )
                 elif time.monotonic() - started_at >= global_max_runtime_seconds:
                     judge_output = "SCORE: 0\n- Global runtime limit reached before judge call."
                     judge_error = "global runtime limit reached"
@@ -387,7 +421,9 @@ def run_iterative_rounds(
             _log(console, log_path, mode, f"exception round={round_index} error={exc}")
             break
 
-        round_errors = [err for err in [draft_error, review_error, revise_error, judge_error] if err]
+        round_errors = [
+            err for err in [draft_error, review_error, revise_error, judge_error] if err
+        ]
         if round_errors:
             console.print(
                 f"[yellow][Round {round_index}] Agent errors detected: {len(round_errors)}[/yellow]"

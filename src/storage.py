@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import re
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -190,10 +190,18 @@ def summarize_round_memory(
     )
 
     return {
-        "strongest": _clip_text(strongest or "Method direction is forming but still under-specified."),
-        "criticism": _clip_text(major_criticism or "Key claims need clearer evidence and baselines."),
-        "unresolved": _clip_text(unresolved or "Evaluation coverage and failure-mode analysis remain incomplete."),
-        "next_action": _clip_text(next_action or "Define one baseline experiment and implement it end-to-end."),
+        "strongest": _clip_text(
+            strongest or "Method direction is forming but still under-specified."
+        ),
+        "criticism": _clip_text(
+            major_criticism or "Key claims need clearer evidence and baselines."
+        ),
+        "unresolved": _clip_text(
+            unresolved or "Evaluation coverage and failure-mode analysis remain incomplete."
+        ),
+        "next_action": _clip_text(
+            next_action or "Define one baseline experiment and implement it end-to-end."
+        ),
         "best_score": "N/A" if current_best_score is None else f"{current_best_score:.2f}",
     }
 

@@ -9,14 +9,19 @@ DEV_STAMP := $(VENV)/.install-dev.stamp
 
 .DEFAULT_GOAL := help
 
-.PHONY: help venv install install-dev test run diagnostic continuous resume session ui
+.PHONY: help venv install install-dev format format-check lint import-check test check ci run diagnostic continuous resume session ui
 
 help:
 	@printf "%s\n" \
 		"Available commands:" \
 		"  make install       Create .venv and install the app" \
 		"  make install-dev   Create .venv and install app + test tools" \
+		"  make format        Format Python code with Ruff" \
+		"  make format-check  Verify Python formatting" \
+		"  make lint          Run Ruff lint checks" \
+		"  make import-check  Import all project modules" \
 		"  make test          Run the automated test suite" \
+		"  make check         Run formatting, lint, imports, and tests" \
 		"  make run           Run the normal research workflow" \
 		"  make diagnostic    Run the diagnostic workflow" \
 		"  make continuous    Run continuous mode" \
@@ -45,8 +50,25 @@ install: $(INSTALL_STAMP)
 
 install-dev: $(DEV_STAMP)
 
+format: install-dev
+	$(VENV_PYTHON) -m ruff check --fix --select I src tests ui scripts
+	$(VENV_PYTHON) -m ruff format src tests ui scripts
+
+format-check: install-dev
+	$(VENV_PYTHON) -m ruff format --check src tests ui scripts
+
+lint: install-dev
+	$(VENV_PYTHON) -m ruff check src tests ui scripts
+
+import-check: install-dev
+	$(VENV_PYTHON) scripts/import_check.py
+
 test: install-dev
 	$(VENV_PYTHON) -m pytest -q
+
+check: format-check lint import-check test
+
+ci: check
 
 run: install
 	$(VENV_PYTHON) -m src.main $(ARGS)
