@@ -151,8 +151,14 @@ make check
   - `make ui`
   - 或直接运行：`scripts/start_ui.sh`
 - 路径检查：
-  - UI 顶部会显示 `App root`
+  - UI 侧边栏会显示 `App root`
   - 正确路径应为当前仓库根目录
+- 界面语言：
+  - 在侧边栏 `Language` 选择 `English` 或 `中文`
+  - 语言选择会保存在当前 Streamlit 会话中，不会改动 `config.yaml`
+- 显示主题：
+  - 在侧边栏 `Theme` 选择 `Day Mode` 或 `Dark Mode`
+  - 主题会覆盖主界面、侧边栏、按钮、输入框、日志、代码块和状态提示
 - 选择模型：
   - 在 `Model Management` 里从已安装模型下拉框选择（运行按钮会带上 `--model <name>`）
 - 拉取模型：

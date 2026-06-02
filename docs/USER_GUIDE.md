@@ -73,25 +73,30 @@ topic:
 在 UI 中切换模型：
 
 1. 进入项目目录：`cd auto-research-agent`
-2. 推荐直接运行：`scripts/start_ui.sh`
-3. 安装依赖：`make install-dev`
-4. 打开 `make ui`
-5. 确认 UI 顶部的 `App root` 是当前仓库根目录
-6. 在 `Model Management` 的下拉框选已安装模型
-7. 点击 `Run Diagnostic / Run Normal / Run Continuous / Resume`
-8. UI 会自动传参：`--model <selected_model>`
+2. 第一次使用先安装依赖：`make install-dev`
+3. 启动图形界面：`make ui`
+4. 也可以直接运行项目脚本：`scripts/start_ui.sh`
+5. 在侧边栏确认 `App root` 是当前仓库根目录
+6. 在侧边栏 `Language` 选择 `English` 或 `中文`
+7. 在侧边栏 `Theme` 选择 `Day Mode` 或 `Dark Mode`
+8. 在 `Model Management` 的下拉框选已安装模型
+9. 点击 `Run Diagnostic / Run Normal / Run Continuous / Resume`
+10. UI 会自动传参：`--model <selected_model>`
+
+语言和主题只保存在当前 Streamlit 会话里，不会改写 `config.yaml`。中文界面会保留
+Ollama、模型名、命令和文件路径等技术标识，方便按错误提示继续操作。
 
 在 UI 中拉取模型：
 
-1. 在 `Pull model by name` 输入模型名
-2. 点击 `Pull Model`
-3. 在 `Model operation logs` 查看拉取进度
+1. 在 `Pull model by name` / `按名称拉取模型` 输入模型名
+2. 点击 `Pull Model` / `拉取模型`
+3. 在 `Model operation logs` / `模型操作日志` 查看拉取进度
 
 在 UI 中删除模型：
 
 1. 在删除下拉框选已安装模型
 2. 勾选确认框
-3. 点击 `Delete Selected Model`
+3. 点击 `Delete Selected Model` / `删除选中模型`
 4. 若模型正在被当前运行使用，UI 会阻止删除
 
 常见模型相关错误：
