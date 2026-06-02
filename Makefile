@@ -9,11 +9,12 @@ DEV_STAMP := $(VENV)/.install-dev.stamp
 
 .DEFAULT_GOAL := help
 
-.PHONY: help venv install install-dev format format-check lint import-check test check ci run diagnostic continuous resume session ui
+.PHONY: help bootstrap venv install install-dev format format-check lint import-check test check ci run diagnostic continuous resume session ui
 
 help:
 	@printf "%s\n" \
 		"Available commands:" \
+		"  make bootstrap     Prepare a new checkout and run a diagnostic smoke test" \
 		"  make install       Create .venv and install the app" \
 		"  make install-dev   Create .venv and install app + test tools" \
 		"  make format        Format Python code with Ruff" \
@@ -32,6 +33,9 @@ help:
 		"Run make install-dev once on a new checkout before testing or running." \
 		"Pass extra CLI flags with ARGS, for example:" \
 		"  make diagnostic ARGS=\"--model qwen3:8b\""
+
+bootstrap:
+	./scripts/bootstrap.sh
 
 $(VENV_PYTHON):
 	$(PYTHON) -m venv $(VENV)

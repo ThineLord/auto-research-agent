@@ -35,6 +35,29 @@ make diagnostic
 make run
 ```
 
+## Friend Quickstart / 朋友快速开始
+
+新朋友拿到仓库后，优先跑一条命令：
+
+```bash
+git clone <repo-url>
+cd auto-research-agent
+make bootstrap
+```
+
+`make bootstrap` 会检查 `python3`、`make` 和 `ollama`，在缺少本地配置时复制
+`config.example.yaml` 到 `config.yaml`，创建 `.venv`，安装依赖，检查推荐模型
+`qwen3:8b`，然后跑一次 `make diagnostic`。
+
+如果还没下载推荐模型，先执行：
+
+```bash
+ollama pull qwen3:8b
+make bootstrap
+```
+
+已有 `config.yaml` 不会被覆盖。脚本会从当前仓库位置自动推断路径，不依赖任何个人本机目录。
+
 ## 输入文件说明
 
 - `projects/pama/task.md`：你的研究任务（必填，最小输入）
