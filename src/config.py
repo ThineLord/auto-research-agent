@@ -22,7 +22,7 @@ DEFAULT_MODEL_NAME = "qwen3:8b"
 DEFAULT_MODEL_TEMPERATURE = 0.4
 DEFAULT_MODEL_TIMEOUT_SECONDS = 300
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
-DEFAULT_PROJECT_NAME = "default"
+DEFAULT_PROJECT_NAME = "example"
 DEFAULT_TOPIC_TITLE = "Configured Research Topic"
 DEFAULT_TOPIC_DESCRIPTION = (
     "Use the project task file as the source of truth for this research topic."

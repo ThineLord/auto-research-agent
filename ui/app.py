@@ -30,6 +30,8 @@ from ui.theme import DEFAULT_THEME, THEME_LABEL_KEYS, build_theme_css, normalize
 ROOT = Path(__file__).resolve().parents[1]
 PROJECTS_DIR = ROOT / "projects"
 CONFIG_PATH = ROOT / "config.yaml"
+CONFIG_EXAMPLE_PATH = ROOT / "config.example.yaml"
+PUBLIC_SAFE_PROJECT_NAME = "example"
 CANONICAL_ROOT = Path(
     os.environ.get(
         "AUTO_RESEARCH_AGENT_ROOT",
@@ -42,6 +44,44 @@ AGENT_LOG_RE = re.compile(
 )
 ROUND_ENTER_RE = re.compile(r"round_enter round=(?P<round>\d+)")
 DELETE_NONE = "__none__"
+
+
+def relative_repo_path(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(ROOT).as_posix()
+    except ValueError:
+        return f"<repo>/{path.name}"
+
+
+def project_display_path(project_dir: Path) -> str:
+    return relative_repo_path(project_dir)
+
+
+def output_display_path(path: Path) -> str:
+    return relative_repo_path(path)
+
+
+def load_ui_config() -> tuple[Any, bool]:
+    try:
+        return load_app_config(CONFIG_PATH), False
+    except FileNotFoundError:
+        return load_app_config(CONFIG_EXAMPLE_PATH), True
+
+
+def default_project_index(projects: list[str], configured_project_name: str) -> int:
+    if not projects:
+        return 0
+    if PUBLIC_SAFE_PROJECT_NAME in projects:
+        return projects.index(PUBLIC_SAFE_PROJECT_NAME)
+    if configured_project_name in projects:
+        return projects.index(configured_project_name)
+    return 0
+
+
+def input_text_or_placeholder(path: Path, placeholder_key: str) -> str:
+    if path.exists():
+        return read_file_text(path)
+    return t(placeholder_key)
 
 
 def current_language() -> str:
@@ -410,16 +450,16 @@ def is_canonical_root() -> bool:
 
 def render_runtime_location_check() -> None:
     st.sidebar.caption(t("app_root_label"))
-    st.sidebar.code(str(ROOT), language="text")
+    st.sidebar.code("<repo>", language="text")
     if is_canonical_root():
         st.sidebar.success(t("canonical_root_success"))
-        return
-
-    st.error(t("canonical_root_error"))
-    st.code(
-        f"cd {CANONICAL_ROOT}\nmake ui",
-        language="bash",
-    )
+    else:
+        st.error(t("canonical_root_error"))
+    with st.sidebar.expander(t("advanced_paths")):
+        st.caption(t("current_root_path"))
+        st.code(str(ROOT), language="text")
+        st.caption(t("canonical_root_path"))
+        st.code(str(CANONICAL_ROOT), language="text")
 
 
 def render_process_result(result, success_key: str, **kwargs: Any) -> None:
@@ -476,10 +516,12 @@ def main() -> None:
     st.title(t("app_title"))
     render_runtime_location_check()
     try:
-        app_config = load_app_config(CONFIG_PATH)
-    except (ConfigValidationError, FileNotFoundError) as exc:
+        app_config, using_example_config = load_ui_config()
+    except ConfigValidationError as exc:
         st.error(t("config_error", error=exc))
         st.stop()
+    if using_example_config:
+        st.info(t("using_example_config"))
 
     st.subheader(t("quick_actions"))
     quick_test_col, quick_status_col = st.columns([1, 3])
@@ -501,18 +543,26 @@ def main() -> None:
         if PROJECTS_DIR.exists()
         else []
     )
-    default_index = (
-        projects.index(app_config.project_name) if app_config.project_name in projects else 0
-    )
+    default_index = default_project_index(projects, app_config.project_name)
     selected_project = st.selectbox(
         t("project_selector"), projects, index=default_index if projects else None
     )
     if not selected_project:
         st.warning(t("no_project_found"))
         return
+    if app_config.project_name and app_config.project_name not in projects:
+        st.warning(t("configured_project_missing", project=app_config.project_name))
+    elif selected_project != app_config.project_name and app_config.project_name in projects:
+        st.info(
+            t(
+                "using_public_safe_project",
+                selected=selected_project,
+                configured=app_config.project_name,
+            )
+        )
 
     proj_path = project_path(selected_project)
-    st.write(t("project_path", path=proj_path))
+    st.write(t("project_path", path=project_display_path(proj_path)))
 
     task_path = proj_path / "task.md"
     memory_path = proj_path / "memory.md"
@@ -527,12 +577,20 @@ def main() -> None:
     col_input_left, col_input_right = st.columns(2)
     with col_input_left:
         task_text = st.text_area(
-            t("input_editor_task"), value=read_file_text(task_path), height=260
+            t("input_editor_task"),
+            value=input_text_or_placeholder(task_path, "task_placeholder"),
+            height=260,
         )
+        if not task_path.exists():
+            st.caption(t("task_missing_help"))
     with col_input_right:
         memory_text = st.text_area(
-            t("input_editor_memory"), value=read_file_text(memory_path), height=260
+            t("input_editor_memory"),
+            value=input_text_or_placeholder(memory_path, "memory_placeholder"),
+            height=260,
         )
+        if not memory_path.exists():
+            st.caption(t("memory_optional_help"))
     if st.button(t("save_input")):
         write_file_text(task_path, task_text)
         write_file_text(memory_path, memory_text)
@@ -709,7 +767,7 @@ def main() -> None:
                 }
                 for m in models
             ],
-            use_container_width=True,
+            width="stretch",
         )
     else:
         st.caption(t("no_installed_model"))
@@ -837,7 +895,7 @@ def main() -> None:
     )
     selected_output = output_catalog[selected_output_index]
     selected_path = selected_output["path"]
-    st.caption(str(selected_path))
+    st.caption(output_display_path(selected_path))
     if not selected_output["exists"]:
         st.info(t("output_not_generated"))
     else:

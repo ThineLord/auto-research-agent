@@ -70,6 +70,13 @@ projects/*/*.pdf
 *.tar.gz
 *.zip
 
+# Keep only the public-safe example project tracked by default.
+projects/*
+!projects/example/
+!projects/example/README.md
+!projects/example/task.md
+!projects/example/memory.example.md
+
 # Local/generated reports; keep the public cleanup report trackable.
 docs/reports/*
 !docs/reports/privacy_cleanup_report.md

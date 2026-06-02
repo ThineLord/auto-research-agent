@@ -13,7 +13,7 @@ Auto Research Agent 是一个本地优先的研究计划迭代助手：读取 `p
 - 基于 Ollama 的本地模型调用，示例配置默认模型是 `qwen3:8b`。
 - 四阶段研究循环：draft、review、revise、judge。
 - 一轮诊断模式、普通有界模式、连续模式、session 模式、resume 模式。
-- 每轮输出落盘到 `projects/pama/runs/<run_id>/round_xx/`。
+- 每轮输出落盘到 `projects/example/runs/<run_id>/round_xx/`。
 - `checkpoint.json`、`score_history.json`、`research_state.json`、`best_output.md` 等运行状态文件。
 - Streamlit UI：编辑输入、启动运行、暂停、恢复、模型管理、测试按钮、进度日志、输出浏览。
 
@@ -27,7 +27,7 @@ Auto Research Agent 是一个本地优先的研究计划迭代助手：读取 `p
 ## 3. 我现在可以做什么
 
 - 跑一个不调用模型的最小单元测试，确认核心循环写文件逻辑还活着。
-- 查看已有输出：先读 `projects/pama/best_output.md`，再看对应 run 目录里的 round 文件。
+- 查看已有输出：先读 `projects/example/best_output.md`，再看对应 run 目录里的 round 文件。
 - 打开 Streamlit UI，查看 checkpoint、score history、run log、最新 round 文件。
 - 修改 `projects/<project>/task.md` 和 `projects/<project>/memory.md`，然后从 UI 或 CLI 启动新 run。
 - 用 `make resume` 从已有 checkpoint 继续，但这会调用本地 Ollama 模型。
@@ -123,7 +123,7 @@ make continuous
 make resume
 ```
 
-读取 `projects/pama/checkpoint.json` 继续；会调用 Ollama。
+读取 `projects/example/checkpoint.json` 继续；会调用 Ollama。
 
 ```bash
 make ui
@@ -146,7 +146,7 @@ Ctrl+C
 停止当前终端里的 CLI 或 Streamlit 服务。
 
 ```bash
-touch projects/pama/STOP_REQUESTED
+touch projects/example/STOP_REQUESTED
 ```
 
 请求研究循环在安全点停止；UI 的 `Pause / Stop Safely` 按钮也是创建这个文件。
@@ -155,19 +155,19 @@ touch projects/pama/STOP_REQUESTED
 
 当前项目没有顶层 `outputs/` 目录，也没有顶层 `runs/` 目录。实际输出集中在：
 
-- `projects/pama/runs/<run_id>/round_xx/01_draft.md`：每轮 draft。
-- `projects/pama/runs/<run_id>/round_xx/02_review.md`：每轮 review。
-- `projects/pama/runs/<run_id>/round_xx/03_revised.md`：每轮 revise 后的版本。
-- `projects/pama/runs/<run_id>/round_xx/04_judge.md`：每轮 judge 输出。
-- `projects/pama/best_output.md`：目前最高 judge 分数对应的 revised 输出。
-- `projects/pama/score_history.json`：每轮分数、是否提升、是否超时、是否重复、错误等。
-- `projects/pama/research_state.json`：当前 strongest hypothesis、biggest blocker、next experiment、open question。
-- `projects/pama/checkpoint.json`：resume 所需状态。
-- `projects/pama/run.log`：运行日志和 agent 调用时间。
-- `projects/pama/interrupted_report.md`：安全停止或中断后的恢复说明。
-- `projects/pama/current_plan.md`：session 模式生成的计划。
-- `projects/pama/final_session_report.md`：session 模式最终报告。
-- `projects/pama/model_ops.log`：UI 拉取或删除模型时的日志。
+- `projects/example/runs/<run_id>/round_xx/01_draft.md`：每轮 draft。
+- `projects/example/runs/<run_id>/round_xx/02_review.md`：每轮 review。
+- `projects/example/runs/<run_id>/round_xx/03_revised.md`：每轮 revise 后的版本。
+- `projects/example/runs/<run_id>/round_xx/04_judge.md`：每轮 judge 输出。
+- `projects/example/best_output.md`：目前最高 judge 分数对应的 revised 输出。
+- `projects/example/score_history.json`：每轮分数、是否提升、是否超时、是否重复、错误等。
+- `projects/example/research_state.json`：当前 strongest hypothesis、biggest blocker、next experiment、open question。
+- `projects/example/checkpoint.json`：resume 所需状态。
+- `projects/example/run.log`：运行日志和 agent 调用时间。
+- `projects/example/interrupted_report.md`：安全停止或中断后的恢复说明。
+- `projects/example/current_plan.md`：session 模式生成的计划。
+- `projects/example/final_session_report.md`：session 模式最终报告。
+- `projects/example/model_ops.log`：UI 拉取或删除模型时的日志。
 
 建议之后统一方案：
 
@@ -267,7 +267,7 @@ touch projects/pama/STOP_REQUESTED
 - `pyproject.toml`：Python 包配置和依赖。
 - `requirements.txt`：兼容旧安装方式，指向 `-e .[dev]`。
 - `prompts/`：四个 agent 的系统提示词。
-- `projects/pama/`：示例 PAMA 项目的输入和模板；运行输出和状态文件不提交。
+- `projects/example/`：公开安全的示例项目输入和模板；运行输出和状态文件不提交。
 - `scripts/`：辅助脚本，目前有 import check 和 UI 启动脚本。
 - `src/`：核心运行代码。
 - `tests/`：单元测试和 smoke test。

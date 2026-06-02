@@ -4,16 +4,16 @@ model:
   temperature: 0.3
   timeout_seconds: 300
 ollama_base_url: http://localhost:11434
-project_name: pama
+project_name: example
 topic:
-  title: Privacy-Aware Memory Adapter (PAMA) for Personal AI Agents
-  description: Research planning for privacy-aware memory adaptation in personal AI agents.
+  title: Example Research Planning Task
+  description: A public-safe starter project for learning the local research workflow.
   keywords:
-    - privacy
-    - memory
-    - adapter
+    - research
+    - planning
+    - methods
     - evaluation
-    - baseline
+    - risks
 max_rounds: 5
 stop_if_no_improvement_rounds: 2
 top_p: 0.9

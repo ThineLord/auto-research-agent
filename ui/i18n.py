@@ -17,10 +17,17 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "theme_day": "Day Mode",
         "theme_dark": "Dark Mode",
         "app_root_label": "App root",
+        "advanced_paths": "Advanced paths",
+        "current_root_path": "Current root",
+        "canonical_root_path": "Canonical root",
         "canonical_root_success": "Running from the canonical project folder.",
         "canonical_root_error": (
             "This Streamlit app is not running from the canonical project folder. "
             "Stop this server and restart Streamlit from the path below."
+        ),
+        "using_example_config": (
+            "config.yaml was not found. The UI is using config.example.yaml and the "
+            "public-safe example project."
         ),
         "config_error": "Config error: {error}",
         "quick_actions": "Quick Actions",
@@ -30,9 +37,44 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "quick_tests_help": "Click Run Tests to check the project without running Ollama.",
         "project_selector": "A. Project selector",
         "no_project_found": "No project found under projects/.",
-        "project_path": "Project path: `{path}`",
+        "configured_project_missing": (
+            "Configured project `{project}` was not found. Choose an existing project or create "
+            "`projects/{project}/task.md`."
+        ),
+        "using_public_safe_project": (
+            "Showing public-safe project `{selected}` by default. You can select another "
+            "project manually."
+        ),
+        "project_path": "Project path (relative): `{path}`",
         "input_editor_task": "B. Input editor - task.md",
         "input_editor_memory": "B. Input editor - memory.md",
+        "task_placeholder": (
+            "# New Research Task\n\n"
+            "Use this file to describe the question you want the agent to work on.\n\n"
+            "## Goal\n\n"
+            "Write a short research plan about a topic of your choice.\n\n"
+            "## Background\n\n"
+            "Add key context, assumptions, and constraints.\n\n"
+            "## Requirements\n\n"
+            "- Draft a clear problem statement.\n"
+            "- Propose 2-3 possible approaches.\n"
+            "- List evaluation criteria.\n"
+            "- Identify risks or open questions.\n"
+        ),
+        "memory_placeholder": (
+            "# Optional Project Memory\n\n"
+            "Use this optional file for stable context that should be available in every run.\n\n"
+            "Examples:\n"
+            "- Domain constraints\n"
+            "- Citation conventions\n"
+            "- Preferred output structure\n"
+            "- Known assumptions\n\n"
+            "Leave this as a placeholder or replace it with your own notes before saving."
+        ),
+        "task_missing_help": "task.md does not exist yet. Saving will create it for this project.",
+        "memory_optional_help": (
+            "memory.md is optional and ignored by Git. Saving will create a local memory file."
+        ),
         "save_input": "Save Input",
         "input_saved": "task.md and memory.md saved.",
         "run_controls": "C. Run controls",
@@ -151,9 +193,15 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "theme_day": "Day Mode（日间模式）",
         "theme_dark": "Dark Mode（深色模式）",
         "app_root_label": "应用根目录",
+        "advanced_paths": "高级路径",
+        "current_root_path": "当前根目录",
+        "canonical_root_path": "标准根目录",
         "canonical_root_success": "当前正在从标准项目目录运行。",
         "canonical_root_error": (
             "这个 Streamlit 应用没有从标准项目目录启动。请停止当前服务，再从下面的路径重新启动。"
+        ),
+        "using_example_config": (
+            "没有找到 config.yaml。UI 正在使用 config.example.yaml，并默认打开安全示例项目。"
         ),
         "config_error": "配置错误：{error}",
         "quick_actions": "快捷操作",
@@ -163,9 +211,40 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "quick_tests_help": "点击“运行测试”，可在不启动 Ollama 的情况下检查项目。",
         "project_selector": "A. 选择项目",
         "no_project_found": "projects/ 目录下没有找到项目。",
-        "project_path": "项目路径：`{path}`",
+        "configured_project_missing": (
+            "配置中的项目 `{project}` 不存在。请选择已有项目，或创建 `projects/{project}/task.md`。"
+        ),
+        "using_public_safe_project": (
+            "默认显示安全示例项目 `{selected}`。你仍然可以手动选择其他项目。"
+        ),
+        "project_path": "项目路径（相对路径）：`{path}`",
         "input_editor_task": "B. 输入编辑器 - task.md",
         "input_editor_memory": "B. 输入编辑器 - memory.md",
+        "task_placeholder": (
+            "# 新研究任务\n\n"
+            "在这里描述你希望 agent 研究或规划的问题。\n\n"
+            "## 目标\n\n"
+            "围绕你选择的主题，写一个简短研究计划。\n\n"
+            "## 背景\n\n"
+            "补充关键上下文、假设和限制。\n\n"
+            "## 要求\n\n"
+            "- 写出清晰的问题陈述。\n"
+            "- 提出 2-3 个可能方案。\n"
+            "- 列出评估标准。\n"
+            "- 识别风险或未解决问题。\n"
+        ),
+        "memory_placeholder": (
+            "# 可选项目记忆\n\n"
+            "这里可以写每次运行都应该知道的稳定上下文。\n\n"
+            "示例：\n"
+            "- 领域限制\n"
+            "- 引用格式\n"
+            "- 偏好的输出结构\n"
+            "- 已知假设\n\n"
+            "如果暂时不需要，可以保留占位内容；点击保存后才会创建本地 memory.md。"
+        ),
+        "task_missing_help": "task.md 还不存在。点击保存后会为当前项目创建它。",
+        "memory_optional_help": "memory.md 是可选文件，并且会被 Git 忽略。点击保存后才会创建本地记忆文件。",
         "save_input": "保存输入",
         "input_saved": "task.md 和 memory.md 已保存。",
         "run_controls": "C. 运行控制",

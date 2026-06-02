@@ -56,14 +56,14 @@ model:
   temperature: 0.3
   timeout_seconds: 300
 topic:
-  title: Privacy-Aware Memory Adapter (PAMA) for Personal AI Agents
-  description: Research planning for privacy-aware memory adaptation in personal AI agents.
+  title: Example Research Planning Task
+  description: A public-safe starter project for learning the local research workflow.
   keywords:
-    - privacy
-    - memory
-    - adapter
+    - research
+    - planning
+    - methods
     - evaluation
-    - baseline
+    - risks
 ```
 
 旧写法 `model: qwen3:8b` 仍可用；旧的顶层 `temperature` 和 `timeout_seconds`
@@ -79,9 +79,11 @@ topic:
 5. 在侧边栏确认 `App root` 是当前仓库根目录
 6. 在侧边栏 `Language` 选择 `English` 或 `中文`
 7. 在侧边栏 `Theme` 选择 `Day Mode` 或 `Dark Mode`
-8. 在 `Model Management` 的下拉框选已安装模型
-9. 点击 `Run Diagnostic / Run Normal / Run Continuous / Resume`
-10. UI 会自动传参：`--model <selected_model>`
+8. 项目选择器默认显示公开安全的 `example` 项目；如需运行自己的项目，再手动选择
+   `projects/<name>/`
+9. 在 `Model Management` 的下拉框选已安装模型
+10. 点击 `Run Diagnostic / Run Normal / Run Continuous / Resume`
+11. UI 会自动传参：`--model <selected_model>`
 
 语言和主题只保存在当前 Streamlit 会话里，不会改写 `config.yaml`。中文界面会保留
 Ollama、模型名、命令和文件路径等技术标识，方便按错误提示继续操作。
@@ -115,16 +117,18 @@ ollama run qwen3:8b
 
 ## 我该把输入写在哪里
 
-核心输入写在：`projects/pama/task.md`
+核心输入写在：`projects/example/task.md`
 
 可选补充可以从模板创建：
 
 ```bash
-cp projects/pama/memory.example.md projects/<project>/memory.md
+cp projects/example/memory.example.md projects/<project>/memory.md
 ```
 
-当前 `projects/pama` 是仓库自带示例项目。如果要换主题，可以新建 `projects/<name>/`，
+当前 `projects/example` 是仓库自带示例项目。如果要换主题，可以新建 `projects/<name>/`，
 然后在 `config.yaml` 里同步修改 `project_name` 和 `topic:`。
+
+UI 会显示相对项目路径，例如 `projects/example`，避免把本机绝对路径展示到页面上。
 
 - `task.md`：你本次希望研究/回答的问题（必须有内容）
 - `memory.md`：历史上下文、限制、已知结论（可空，程序会自动更新）
@@ -133,7 +137,7 @@ cp projects/pama/memory.example.md projects/<project>/memory.md
 
 最小只需要：
 
-- `projects/pama/task.md` 里有清晰问题描述
+- `projects/example/task.md` 里有清晰问题描述
 
 其他都可以保持默认。
 
@@ -164,8 +168,8 @@ make continuous
 
 程序会在安全点停止，并生成：
 
-- `projects/pama/checkpoint.json`
-- `projects/pama/interrupted_report.md`
+- `projects/example/checkpoint.json`
+- `projects/example/interrupted_report.md`
 
 ## 如何恢复（resume）
 
@@ -173,7 +177,7 @@ make continuous
 make resume
 ```
 
-恢复会读取 `projects/pama/checkpoint.json`：
+恢复会读取 `projects/example/checkpoint.json`：
 
 - 从 `last_completed_round + 1` 继续
 - 不覆盖已有 round 文件
@@ -181,11 +185,11 @@ make resume
 
 ## 输出文件怎么读（先看哪个）
 
-先看：`projects/pama/best_output.md`
+先看：`projects/example/best_output.md`
 
 这是当前最佳版本（按 Judge 分数）。
 
-再看：`projects/pama/runs/<run_id>/round_xx/`
+再看：`projects/example/runs/<run_id>/round_xx/`
 
 每轮有 4 个文件：
 

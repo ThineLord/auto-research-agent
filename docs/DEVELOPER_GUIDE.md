@@ -54,18 +54,20 @@ The `topic` block makes the reusable prompts project-agnostic:
 
 ```yaml
 topic:
-  title: Privacy-Aware Memory Adapter (PAMA) for Personal AI Agents
-  description: Research planning for privacy-aware memory adaptation in personal AI agents.
+  title: Example Research Planning Task
+  description: A public-safe starter project for learning the local research workflow.
   keywords:
-    - privacy
-    - memory
-    - adapter
+    - research
+    - planning
+    - methods
     - evaluation
-    - baseline
+    - risks
 ```
 
-The tracked `projects/pama` folder is the sample project. To work on another topic, create a new
+The tracked `projects/example` folder is the sample project. To work on another topic, create a new
 folder under `projects/`, point `project_name` at it, and update the `topic` block plus `task.md`.
+The UI prefers this public-safe example as its initial selection when it is present, while custom
+projects remain selectable from the project dropdown.
 
 ## Streamlit And Runtime Flow
 
