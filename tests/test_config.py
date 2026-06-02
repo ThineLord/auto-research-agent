@@ -28,8 +28,9 @@ class ConfigValidationTests(unittest.TestCase):
         config_path.write_text(text, encoding="utf-8")
         return config_path
 
-    def test_current_config_file_loads_as_typed_and_normalized_config(self) -> None:
-        config = load_app_config(ROOT / "config.yaml")
+    def test_sample_config_file_loads_as_typed_and_normalized_config(self) -> None:
+        config_path = ROOT / "config.example.yaml"
+        config = load_app_config(config_path)
 
         self.assertEqual(config.model.provider, "ollama")
         self.assertEqual(config.model.name, "qwen3:8b")
@@ -38,7 +39,7 @@ class ConfigValidationTests(unittest.TestCase):
         self.assertIn("privacy", config.topic.keywords)
         self.assertGreaterEqual(config.runtime.normal_max_runtime_seconds, 60)
 
-        normalized = load_config(ROOT / "config.yaml")
+        normalized = load_config(config_path)
         self.assertEqual(normalized["model"]["name"], config.model.name)
         self.assertEqual(normalized["topic"]["title"], config.topic.title)
         self.assertEqual(normalized["topic"]["keywords"], list(config.topic.keywords))

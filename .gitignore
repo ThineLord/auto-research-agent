@@ -9,9 +9,13 @@ venv/
 env/
 ENV/
 
-# Environment files
+# Environment and local configuration
 .env
 .env.*
+!.env.example
+config.yaml
+config.local.yaml
+settings.local.json
 
 # Build and packaging
 build/
@@ -23,9 +27,25 @@ dist/
 .idea/
 .vscode/
 
+# Python/test/tool caches
+.pytest_cache/
+.ruff_cache/
+.cache/
+cache/
+
 # Logs and generated artifacts
 *.log
+/runs/
+/outputs/
+/artifacts/
+/logs/
+/reports/
 projects/*/runs/
+projects/*/outputs/
+projects/*/artifacts/
+projects/*/logs/
+projects/*/cache/
+projects/*/memory.md
 projects/*/best_output.md
 projects/*/score_history.json
 projects/*/research_state.json
@@ -39,3 +59,17 @@ projects/*/active_run.json
 projects/*/ui_run_process.json
 projects/*/*.pdf
 *.pdf
+*.jsonl
+*.sqlite
+*.db
+*.pkl
+*.pt
+*.bin
+*.ckpt
+*.tar
+*.tar.gz
+*.zip
+
+# Local/generated reports; keep the public cleanup report trackable.
+docs/reports/*
+!docs/reports/privacy_cleanup_report.md

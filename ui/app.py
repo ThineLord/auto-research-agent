@@ -31,7 +31,7 @@ CONFIG_PATH = ROOT / "config.yaml"
 CANONICAL_ROOT = Path(
     os.environ.get(
         "AUTO_RESEARCH_AGENT_ROOT",
-        str(Path.home() / "GitHub_Repository" / "auto-research-agent"),
+        str(ROOT),
     )
 ).resolve()
 

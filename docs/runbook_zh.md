@@ -1,0 +1,289 @@
+# Auto Research Agent 安全实验 Runbook
+
+目标：今天安全跑一个小实验，能看到输出、打开 UI、理解结果，并且不覆盖已有 runs。
+
+## 1. 先确认环境
+
+```bash
+cd auto-research-agent
+cp config.example.yaml config.yaml
+source .venv/bin/activate
+```
+
+进入项目、创建本地配置并激活虚拟环境。
+
+```bash
+make lint
+make format-check
+make import-check
+.venv/bin/python -m pytest -q
+```
+
+先跑本地检查。当前期望结果：全部通过。
+
+```bash
+ollama list
+```
+
+确认 Ollama 可用，并确认你想用的模型已经安装。
+
+## 2. 如何跑 fake/mock 模式
+
+当前项目没有正式 CLI mock 参数，例如没有：
+
+```bash
+python -m src.main --mock
+```
+
+现有 fake/mock 覆盖在测试里，适合验证“循环能写文件、best score 能更新、UI helper 能读状态”，不会调用 Ollama：
+
+```bash
+.venv/bin/python -m pytest tests/test_round_loop.py::RoundLoopTests::test_round_loop_writes_outputs_and_keeps_best_score -q
+```
+
+验证 round loop 用 fake agents 落盘。
+
+```bash
+.venv/bin/python -m pytest tests/test_ui_helpers.py::SharedUiBackendHelperTests::test_ui_progress_resume_and_output_helpers -q
+```
+
+验证 UI progress/resume/output catalog helper。
+
+如果之后要加真正 mock run，最小方向是在 `src/cli.py` 增加 `--mock`，在 `src/runner.py` 复用现有 round loop，注入 fake `ResearchAgents`。
+
+## 3. 如何跑一次最小真实 Ollama 模式
+
+最安全的一轮真实实验是 diagnostic：
+
+```bash
+make diagnostic ARGS="--model qwen3:8b"
+```
+
+或使用本地配置里的默认模型：
+
+```bash
+make diagnostic
+```
+
+Diagnostic 的特点：
+
+- 固定 1 轮。
+- 会调用 Ollama。
+- 会生成新的 `projects/pama/runs/<run_id>/round_01/`。
+- 会写 `projects/pama/checkpoint.json` 和 `projects/pama/score_history.json`。
+- 不更新 `memory.md`，比较适合 smoke test。
+
+如果你想明确指定另一个已安装模型，例如 `deepseek-r1:8b`：
+
+```bash
+make diagnostic ARGS="--model deepseek-r1:8b"
+```
+
+## 4. 如何避免长时间运行
+
+优先用：
+
+```bash
+make diagnostic ARGS="--model qwen3:8b"
+```
+
+避免在今天的 smoke test 里直接用：
+
+```bash
+make continuous
+make session
+make resume
+```
+
+原因：
+
+- `continuous` 设计上会持续跑。
+- `session` 会先生成 objective/plan，再跑迭代，再生成 report，调用次数更多。
+- `resume` 会从本地 `projects/pama/checkpoint.json` 继续旧 run。
+
+如果误启动了长任务：
+
+```bash
+touch projects/pama/STOP_REQUESTED
+```
+
+请求安全停止。程序会在安全点退出，并更新 checkpoint。
+
+终端里直接运行的进程，也可以按：
+
+```bash
+Ctrl+C
+```
+
+## 5. 如何指定 rounds 数量
+
+当前 CLI 没有 `--max-rounds` 参数。实际 rounds 来自 `config.yaml`：
+
+```yaml
+max_rounds: 5
+```
+
+要跑 1 轮，不要改配置，直接用 diagnostic。
+
+要跑 2 轮普通模式，目前只能临时修改 `config.yaml`：
+
+```yaml
+max_rounds: 2
+stop_if_no_improvement_rounds: 2
+```
+
+然后运行：
+
+```bash
+make run ARGS="--model qwen3:8b"
+```
+
+跑完后检查本地 `config.yaml`，并按你的真实偏好决定是否保留。当前项目更推荐后续加 `--max-rounds`，这样不需要频繁修改本地配置。
+
+## 6. 如何指定模型
+
+CLI 支持 `--model` 覆盖配置：
+
+```bash
+make diagnostic ARGS="--model qwen3:8b"
+make run ARGS="--model deepseek-r1:8b"
+make resume ARGS="--model llama3.1:8b"
+```
+
+如果模型没安装，会提示：
+
+```text
+Model <name> is not installed. Run: ollama pull <name>
+```
+
+拉取模型：
+
+```bash
+ollama pull qwen3:8b
+```
+
+## 7. 如何查看输出目录
+
+最新 checkpoint：
+
+```bash
+.venv/bin/python - <<'PY'
+import json
+from pathlib import Path
+checkpoint = json.loads(Path("projects/pama/checkpoint.json").read_text())
+print("run_root:", checkpoint.get("run_root"))
+print("last_completed_round:", checkpoint.get("last_completed_round"))
+print("best_score:", checkpoint.get("best_score"))
+print("stop_reason:", checkpoint.get("stop_reason"))
+PY
+```
+
+列出最近 run：
+
+```bash
+ls -lt projects/pama/runs | head
+```
+
+查看某一轮四个文件：
+
+```bash
+ls projects/pama/runs/<run_id>/round_01
+```
+
+通常会看到：
+
+```text
+01_draft.md
+02_review.md
+03_revised.md
+04_judge.md
+```
+
+优先阅读：
+
+```bash
+sed -n '1,220p' projects/pama/best_output.md
+```
+
+再看最新 round：
+
+```bash
+sed -n '1,220p' projects/pama/runs/<run_id>/round_01/04_judge.md
+sed -n '1,220p' projects/pama/runs/<run_id>/round_01/03_revised.md
+```
+
+## 8. 如何用 Streamlit 打开 UI
+
+```bash
+make ui
+```
+
+打开：
+
+```text
+http://localhost:8501
+```
+
+备用脚本：
+
+```bash
+scripts/start_ui.sh
+```
+
+UI 中重点看：
+
+- `A. Project selector`：确认是 `pama`。
+- `C. Run controls`：启动 diagnostic/normal/continuous/resume，或安全暂停。
+- `D. Progress panel`：看 Mode、Round、Stage、Best score、Model、Stop reason。
+- `E. Live logs panel`：看 `run.log` 和模型操作日志。
+- `F. Output browser`：看 best output、checkpoint、score history、latest round draft/review/revised/judge。
+
+## 9. 如何停止 UI
+
+如果 UI 是前台运行：
+
+```bash
+Ctrl+C
+```
+
+确认端口已释放：
+
+```bash
+lsof -iTCP:8501 -sTCP:LISTEN -n -P || true
+```
+
+没有输出表示 8501 没有服务在监听。
+
+## 10. 如何判断这次 run 是否成功
+
+一个最小真实 run 成功，至少满足：
+
+- 终端没有报 `Config error`、`Model ... is not installed`、`Ollama is not available`。
+- `projects/pama/checkpoint.json` 存在且 `last_completed_round >= 1`。
+- `projects/pama/checkpoint.json` 里 `run_root` 指向的目录存在。
+- `run_root/round_01/01_draft.md`、`02_review.md`、`03_revised.md`、`04_judge.md` 都存在。
+- `projects/pama/score_history.json` 有至少一条记录。
+- `04_judge.md` 能解析出分数，或 `score_history.json` 里 `invalid_score_this_round` 是 `false`。
+
+快速检查：
+
+```bash
+.venv/bin/python - <<'PY'
+import json
+from pathlib import Path
+project = Path("projects/pama")
+checkpoint = json.loads((project / "checkpoint.json").read_text())
+run_root = Path(checkpoint["run_root"])
+round_dir = run_root / f"round_{int(checkpoint['last_completed_round']):02d}"
+files = ["01_draft.md", "02_review.md", "03_revised.md", "04_judge.md"]
+print("run_root:", run_root)
+print("round_dir:", round_dir)
+print("stop_reason:", checkpoint.get("stop_reason"))
+print("best_score:", checkpoint.get("best_score"))
+for name in files:
+    path = round_dir / name
+    print(name, "OK" if path.exists() and path.stat().st_size > 0 else "MISSING/EMPTY")
+PY
+```
+
+如果 `stop_reason` 是 `OLLAMA_TIMEOUT`，说明模型调用太慢或超时；下次优先换更小模型，或只跑 diagnostic。

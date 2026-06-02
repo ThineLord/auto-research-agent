@@ -21,7 +21,9 @@
 ## 快速开始
 
 ```bash
-cd <PROJECT_ROOT>
+git clone <repo-url>
+cd auto-research-agent
+cp config.example.yaml config.yaml
 make install-dev
 ollama pull qwen3:8b
 # 可选强化模型
@@ -37,9 +39,16 @@ make run
 
 - `projects/pama/task.md`：你的研究任务（必填，最小输入）
 - `<PROJECT_MEMORY_FILE>`：历史上下文记忆（可选，程序会自动维护）
-- `config.yaml`：运行参数（模型、轮数、超时等）
+- `config.example.yaml`：安全示例配置
+- `config.yaml`：本地运行参数（复制示例后生成，不提交）
 
 ## 配置安全检查
+
+第一次运行前先创建本地配置：
+
+```bash
+cp config.example.yaml config.yaml
+```
 
 启动 CLI 或 UI 时会先校验 `config.yaml`。未知字段、错误类型、超出范围的数值、无效
 URL 或无效项目名会直接报出具体字段，避免运行到一半才失败。当前推荐格式是嵌套的
@@ -90,8 +99,8 @@ make diagnostic ARGS="--model llama3.1:8b"
 - 从检查点恢复
   - `make resume`
 - 启动本地图形界面
-  - `cd <PROJECT_ROOT> && make ui`
-  - 或使用固定路径启动脚本：`<PROJECT_ROOT>/scripts/start_ui.sh`
+  - `make ui`
+  - 或运行项目自带脚本：`scripts/start_ui.sh`
 
 直接调用入口也可以使用：
 
@@ -115,12 +124,12 @@ make check
 ## Graphical UI
 
 - 启动：
-  - `cd <PROJECT_ROOT>`
+  - `cd auto-research-agent`
   - `make ui`
-  - 或直接运行：`<PROJECT_ROOT>/scripts/start_ui.sh`
+  - 或直接运行：`scripts/start_ui.sh`
 - 路径检查：
   - UI 顶部会显示 `App root`
-  - 正确路径应为 `<PROJECT_ROOT>`
+  - 正确路径应为当前仓库根目录
 - 选择模型：
   - 在 `Model Management` 里从已安装模型下拉框选择（运行按钮会带上 `--model <name>`）
 - 拉取模型：
@@ -178,10 +187,12 @@ make check
 - `projects/*/current_plan.md`
 - `projects/*/final_session_report.md`
 - `projects/*/run.log`
+- `projects/*/memory.md`
+- `config.yaml`
 - `projects/*/checkpoint.json`
 - `projects/*/interrupted_report.md`
 - `projects/*/STOP_REQUESTED`
-- `.env*`
+- `.env` / `.env.*`（保留 `.env.example`）
 - `.venv/`
 
 ## 推送到 GitHub（稳定版本交接）

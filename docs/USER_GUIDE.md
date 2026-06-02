@@ -25,10 +25,12 @@
 进入项目目录后运行：
 
 ```bash
+cp config.example.yaml config.yaml
 make install-dev
 ```
 
-这会用 `python3` 创建 `.venv`，并安装运行和测试所需依赖。
+这会先创建本地配置，再用 `python3` 创建 `.venv`，并安装运行和测试所需依赖。
+`config.yaml` 是本地文件，不应该提交到 Git。
 
 命令行切换模型：
 
@@ -70,11 +72,11 @@ topic:
 
 在 UI 中切换模型：
 
-1. 推荐直接运行：`<PROJECT_ROOT>/scripts/start_ui.sh`
-2. 或手动进入唯一项目目录：`cd <PROJECT_ROOT>`
+1. 进入项目目录：`cd auto-research-agent`
+2. 推荐直接运行：`scripts/start_ui.sh`
 3. 安装依赖：`make install-dev`
 4. 打开 `make ui`
-5. 确认 UI 顶部的 `App root` 是 `<PROJECT_ROOT>`
+5. 确认 UI 顶部的 `App root` 是当前仓库根目录
 6. 在 `Model Management` 的下拉框选已安装模型
 7. 点击 `Run Diagnostic / Run Normal / Run Continuous / Resume`
 8. UI 会自动传参：`--model <selected_model>`
@@ -110,7 +112,11 @@ ollama run qwen3:8b
 
 核心输入写在：`projects/pama/task.md`
 
-可选补充写在：`<PROJECT_MEMORY_FILE>`
+可选补充可以从模板创建：
+
+```bash
+cp projects/pama/memory.example.md <PROJECT_MEMORY_FILE>
+```
 
 当前 `projects/pama` 是仓库自带示例项目。如果要换主题，可以新建 `projects/<name>/`，
 然后在 `config.yaml` 里同步修改 `project_name` 和 `topic:`。
@@ -201,7 +207,12 @@ make resume
 - `projects/*/research_state.json`
 - `projects/*/current_plan.md`
 - `projects/*/final_session_report.md`
-- `.env*`
+- `projects/*/run.log`
+- `projects/*/checkpoint.json`
+- `projects/*/interrupted_report.md`
+- `projects/*/memory.md`
+- `config.yaml`
+- `.env` / `.env.*`（保留 `.env.example`）
 - `.venv/`
 
 ## 推送当前稳定状态到 GitHub
