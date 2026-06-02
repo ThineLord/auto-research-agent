@@ -6,7 +6,7 @@ THEME_LABEL_KEYS = {
     "dark": "theme_dark",
 }
 
-THEME_TOKENS: dict[str, dict[str, str]] = {
+THEME_VALUES: dict[str, dict[str, str]] = {
     "day": {
         "app_bg": "#f6f8fb",
         "main_bg": "#ffffff",
@@ -69,7 +69,7 @@ def normalize_theme(theme: str | None) -> str:
 
 
 def build_theme_css(theme: str | None) -> str:
-    tokens = THEME_TOKENS[normalize_theme(theme)]
+    tokens = THEME_VALUES[normalize_theme(theme)]
     return f"""
 <style>
 :root {{
@@ -194,6 +194,26 @@ p, li, label, span,
 [data-testid="stSelectbox"] div {{
   background: var(--ara-input-bg) !important;
   border-color: var(--ara-input-border) !important;
+  color: var(--ara-text) !important;
+}}
+
+[data-baseweb="popover"],
+[data-baseweb="popover"] > div,
+[data-baseweb="popover"] [role="listbox"],
+[data-baseweb="popover"] [role="option"],
+[data-baseweb="menu"],
+ul[role="listbox"],
+li[role="option"] {{
+  background: var(--ara-surface) !important;
+  border-color: var(--ara-border) !important;
+  color: var(--ara-text) !important;
+}}
+
+[data-baseweb="popover"] [role="option"]:hover,
+[data-baseweb="popover"] [aria-selected="true"],
+li[role="option"]:hover,
+li[aria-selected="true"] {{
+  background: var(--ara-surface-alt) !important;
   color: var(--ara-text) !important;
 }}
 

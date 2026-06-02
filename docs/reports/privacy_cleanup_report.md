@@ -6,7 +6,7 @@ Date: 2026-06-02
 
 - Local absolute paths in public docs and UI defaults.
 - Local runtime configuration tracked as `config.yaml`.
-- Auto-managed research memory tracked as the PAMA project memory file.
+- Auto-managed research memory tracked as a project memory file.
 - Local run outputs and state files present in the worktree but already untracked.
 - Generated reports under `docs/reports/` that contained local audit details.
 
@@ -17,15 +17,15 @@ No real API credentials or account values were found in the current tracked tree
 These files were removed from the Git index with `git rm --cached` and still exist locally:
 
 - `config.yaml`
-- the PAMA project memory file
+- the previously tracked project memory file
 
-Local run outputs such as `projects/pama/runs/`, `projects/pama/run.log`, `projects/pama/checkpoint.json`, `projects/pama/score_history.json`, `projects/pama/research_state.json`, `projects/pama/best_output.md`, and `projects/pama/interrupted_report.md` remain local-only through ignore rules.
+Local run outputs such as `projects/example/runs/`, `projects/example/run.log`, `projects/example/checkpoint.json`, `projects/example/score_history.json`, `projects/example/research_state.json`, `projects/example/best_output.md`, and `projects/example/interrupted_report.md` remain local-only through ignore rules.
 
 ## 3. Template Files Added
 
 - `config.example.yaml`
 - `.env.example`
-- `projects/pama/memory.example.md`
+- `projects/example/memory.example.md`
 
 Public setup docs now tell users to run:
 
@@ -36,7 +36,7 @@ cp config.example.yaml config.yaml
 Optional project memory can be created with:
 
 ```bash
-cp projects/pama/memory.example.md projects/<project>/memory.md
+cp projects/example/memory.example.md projects/<project>/memory.md
 ```
 
 ## 4. Ignore Rule Summary
@@ -63,17 +63,17 @@ cp projects/pama/memory.example.md projects/<project>/memory.md
 - Current path and credential scans found no private path or credential values in non-ignored files.
 - The requested exact scan still reports benign wording in docs and the sample task related to model usage accounting and text processing. No real sensitive values were present in those hits.
 
-## 7. Needs Manual Confirmation
+## 7. Current Public-Safe Defaults
 
-- Confirm whether `projects/pama/task.md` is safe to publish as an example project. It contains a real-looking research direction, though no personal data or credentials were found.
-- Confirm whether existing untracked local reports under `docs/reports/` should stay local-only or be rewritten as public docs later.
+- `projects/example/task.md` is a generic starter task and is safe to publish.
+- Existing untracked local reports under `docs/reports/` stay local-only through `.gitignore`.
 - Confirm whether Git author metadata and past commit attribution are acceptable for the public repository.
 
 ## 8. History Rewrite Recommendation
 
 Recommended before publishing a fully clean public repository.
 
-Reason: history contains local absolute paths in earlier README/User Guide/UI commits, and the PAMA project memory file has historically contained auto-managed run summaries. No real credentials were found by the scans run during this cleanup, but the historical path exposure and generated run memory are enough to justify cleanup if the repository will be made public.
+Reason: history contains local absolute paths in earlier README/User Guide/UI commits, and a project memory file has historically contained auto-managed run summaries. No real credentials were found by the scans run during this cleanup, but the historical path exposure and generated run memory are enough to justify cleanup if the repository will be made public.
 
 Suggested approach:
 
@@ -92,7 +92,7 @@ The dry-run rewrite passed in a throwaway clone, then the same `git-filter-repo`
 Pre-rewrite history contained:
 
 - the tracked local config file
-- the tracked PAMA project memory file
+- the tracked project memory file
 - older local absolute-path references in README/User Guide/UI history
 
 No real credential values were found. The remaining keyword matches are benign references to text tokenization or model usage accounting.
@@ -121,7 +121,7 @@ The bundle is the authoritative pre-rewrite backup and should remain local-only.
 The original-repository rewrite removed these paths from all rewritten commits:
 
 - `config.yaml`
-- the PAMA project memory file
+- the project memory file
 
 The rewrite did not remove `config.example.yaml`, `.env.example`, source files, tests, docs, prompts, or project templates.
 
@@ -131,7 +131,7 @@ The temporary replacement file mapped:
 
 - the previous absolute repository path to `<PROJECT_ROOT>`
 - the previous local user home path to `<USER_HOME>`
-- the previous PAMA memory file text path to `<PROJECT_MEMORY_FILE>`
+- the previous project memory file text path to `<PROJECT_MEMORY_FILE>`
 
 Ordinary `config.yaml` text was not replaced because the codebase legitimately refers to that local config filename in docs, source, and tests.
 
@@ -159,7 +159,7 @@ Commands run after rewrite:
 git status --short
 git branch --show-current
 git log --oneline --decorate -n 10
-git log --all --stat -- config.yaml <PAMA_MEMORY_FILE>
+git log --all --stat -- config.yaml <PROJECT_MEMORY_FILE>
 git log -S"<LOCAL_USER_PATH>" --all --oneline --decorate --
 git rev-list --all | xargs -n 25 git grep -n -I -E "<local-path-or-memory-patterns>"
 git rev-list --all | xargs -n 25 git grep -n -I -i -E "<credential-keyword-patterns>"
@@ -171,7 +171,7 @@ Results:
 
 - Working tree was clean before the report update.
 - Current branch remained `privacy/public-safe-cleanup`.
-- Historical file-level scan for the removed local config file and removed PAMA memory file returned no output.
+- Historical file-level scan for the removed local config file and removed project memory file returned no output.
 - Historical exact local user path search returned no output.
 - Historical grep for exact local path and removed memory path returned no output.
 - Current-tree sensitive scan returned no output.

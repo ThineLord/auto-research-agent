@@ -27,12 +27,12 @@ class FailingLLM:
 
 
 class TopicContextTests(unittest.TestCase):
-    def test_prompt_templates_do_not_hardcode_pama(self) -> None:
+    def test_prompt_templates_do_not_hardcode_legacy_private_topic(self) -> None:
         for prompt_path in (ROOT / "prompts").glob("*.md"):
             with self.subTest(prompt=prompt_path.name):
                 content = prompt_path.read_text(encoding="utf-8")
-                self.assertNotIn("PAMA", content)
-                self.assertNotIn("Privacy-Aware Memory Adapter", content)
+                self.assertNotIn("Legacy Private Research Topic", content)
+                self.assertNotIn("Private Topic Placeholder", content)
 
     def test_agents_inject_configured_topic_context_into_user_prompt(self) -> None:
         llm = CapturingLLM()
@@ -71,7 +71,7 @@ class TopicContextTests(unittest.TestCase):
         )
 
         self.assertIn("Graph Retrieval Evaluation", objective)
-        self.assertNotIn("PAMA", objective)
+        self.assertNotIn("Legacy Private Research Topic", objective)
 
 
 if __name__ == "__main__":

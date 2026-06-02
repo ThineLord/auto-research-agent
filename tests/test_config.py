@@ -34,9 +34,9 @@ class ConfigValidationTests(unittest.TestCase):
 
         self.assertEqual(config.model.provider, "ollama")
         self.assertEqual(config.model.name, "qwen3:8b")
-        self.assertEqual(config.project_name, "pama")
-        self.assertIn("Privacy-Aware Memory Adapter", config.topic.title)
-        self.assertIn("privacy", config.topic.keywords)
+        self.assertEqual(config.project_name, "example")
+        self.assertIn("Example Research Planning Task", config.topic.title)
+        self.assertIn("research", config.topic.keywords)
         self.assertGreaterEqual(config.runtime.normal_max_runtime_seconds, 60)
 
         normalized = load_config(config_path)
@@ -81,7 +81,7 @@ runtime:
 
         config = load_app_config(config_path)
 
-        self.assertEqual(config.project_name, "default")
+        self.assertEqual(config.project_name, "example")
         self.assertEqual(config.topic.title, "Configured Research Topic")
         self.assertIn("evaluation", config.topic.keywords)
         self.assertIn("Configured Research Topic", format_topic_context(config.topic))
@@ -164,7 +164,7 @@ timeout_seconds: 20
         cases = [
             ("model:\n  provider: openai\n", "config.model.provider"),
             ("model:\n  name: '   '\n", "config.model.name"),
-            ("project_name: ../pama\n", "config.project_name"),
+            ("project_name: ../private\n", "config.project_name"),
             ("topic: demo\n", "config.topic"),
             ("topic:\n  title: ' '\n", "config.topic.title"),
             ("topic:\n  keywords: []\n", "config.topic.keywords"),

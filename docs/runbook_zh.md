@@ -69,8 +69,8 @@ Diagnostic 的特点：
 
 - 固定 1 轮。
 - 会调用 Ollama。
-- 会生成新的 `projects/pama/runs/<run_id>/round_01/`。
-- 会写 `projects/pama/checkpoint.json` 和 `projects/pama/score_history.json`。
+- 会生成新的 `projects/example/runs/<run_id>/round_01/`。
+- 会写 `projects/example/checkpoint.json` 和 `projects/example/score_history.json`。
 - 不更新 `memory.md`，比较适合 smoke test。
 
 如果你想明确指定另一个已安装模型，例如 `deepseek-r1:8b`：
@@ -99,12 +99,12 @@ make resume
 
 - `continuous` 设计上会持续跑。
 - `session` 会先生成 objective/plan，再跑迭代，再生成 report，调用次数更多。
-- `resume` 会从本地 `projects/pama/checkpoint.json` 继续旧 run。
+- `resume` 会从本地 `projects/example/checkpoint.json` 继续旧 run。
 
 如果误启动了长任务：
 
 ```bash
-touch projects/pama/STOP_REQUESTED
+touch projects/example/STOP_REQUESTED
 ```
 
 请求安全停止。程序会在安全点退出，并更新 checkpoint。
@@ -170,7 +170,7 @@ ollama pull qwen3:8b
 .venv/bin/python - <<'PY'
 import json
 from pathlib import Path
-checkpoint = json.loads(Path("projects/pama/checkpoint.json").read_text())
+checkpoint = json.loads(Path("projects/example/checkpoint.json").read_text())
 print("run_root:", checkpoint.get("run_root"))
 print("last_completed_round:", checkpoint.get("last_completed_round"))
 print("best_score:", checkpoint.get("best_score"))
@@ -181,13 +181,13 @@ PY
 列出最近 run：
 
 ```bash
-ls -lt projects/pama/runs | head
+ls -lt projects/example/runs | head
 ```
 
 查看某一轮四个文件：
 
 ```bash
-ls projects/pama/runs/<run_id>/round_01
+ls projects/example/runs/<run_id>/round_01
 ```
 
 通常会看到：
@@ -202,14 +202,14 @@ ls projects/pama/runs/<run_id>/round_01
 优先阅读：
 
 ```bash
-sed -n '1,220p' projects/pama/best_output.md
+sed -n '1,220p' projects/example/best_output.md
 ```
 
 再看最新 round：
 
 ```bash
-sed -n '1,220p' projects/pama/runs/<run_id>/round_01/04_judge.md
-sed -n '1,220p' projects/pama/runs/<run_id>/round_01/03_revised.md
+sed -n '1,220p' projects/example/runs/<run_id>/round_01/04_judge.md
+sed -n '1,220p' projects/example/runs/<run_id>/round_01/03_revised.md
 ```
 
 ## 8. 如何用 Streamlit 打开 UI
@@ -232,7 +232,7 @@ scripts/start_ui.sh
 
 UI 中重点看：
 
-- `A. Project selector`：确认是 `pama`。
+- `A. Project selector`：默认应为公开安全的 `example`；如需运行自己的项目，再手动选择。
 - `C. Run controls`：启动 diagnostic/normal/continuous/resume，或安全暂停。
 - `D. Progress panel`：看 Mode、Round、Stage、Best score、Model、Stop reason。
 - `E. Live logs panel`：看 `run.log` 和模型操作日志。
@@ -259,10 +259,10 @@ lsof -iTCP:8501 -sTCP:LISTEN -n -P || true
 一个最小真实 run 成功，至少满足：
 
 - 终端没有报 `Config error`、`Model ... is not installed`、`Ollama is not available`。
-- `projects/pama/checkpoint.json` 存在且 `last_completed_round >= 1`。
-- `projects/pama/checkpoint.json` 里 `run_root` 指向的目录存在。
+- `projects/example/checkpoint.json` 存在且 `last_completed_round >= 1`。
+- `projects/example/checkpoint.json` 里 `run_root` 指向的目录存在。
 - `run_root/round_01/01_draft.md`、`02_review.md`、`03_revised.md`、`04_judge.md` 都存在。
-- `projects/pama/score_history.json` 有至少一条记录。
+- `projects/example/score_history.json` 有至少一条记录。
 - `04_judge.md` 能解析出分数，或 `score_history.json` 里 `invalid_score_this_round` 是 `false`。
 
 快速检查：
@@ -271,7 +271,7 @@ lsof -iTCP:8501 -sTCP:LISTEN -n -P || true
 .venv/bin/python - <<'PY'
 import json
 from pathlib import Path
-project = Path("projects/pama")
+project = Path("projects/example")
 checkpoint = json.loads((project / "checkpoint.json").read_text())
 run_root = Path(checkpoint["run_root"])
 round_dir = run_root / f"round_{int(checkpoint['last_completed_round']):02d}"
