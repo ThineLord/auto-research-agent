@@ -87,152 +87,125 @@ Do not force push until the rewritten history has been reviewed.
 
 ## 9. History Rewrite Findings
 
-Second-stage audit commit: `341b2ba745b4ef2265f1868964f520e6f62de934`.
+The dry-run rewrite passed in a throwaway clone, then the same `git-filter-repo` rewrite was applied to the original local repository on 2026-06-02. No remote update was performed.
 
-History still contains:
+Pre-rewrite history contained:
 
-- the tracked file path `config.yaml`
-- the tracked PAMA project memory file path
+- the tracked local config file
+- the tracked PAMA project memory file
 - older local absolute-path references in README/User Guide/UI history
 
-History audit did not find real credential values. The remaining keyword matches are benign references to text tokenization or model usage accounting.
+No real credential values were found. The remaining keyword matches are benign references to text tokenization or model usage accounting.
 
-`git-filter-repo` and BFG were not available on this machine, so no history rewrite was executed during this stage.
+## 10. Original Repository Rewrite Result
 
-## 10. Commands Executed
+- Original branch: `privacy/public-safe-cleanup`
+- Cleanup commit before rewrite: `341b2ba745b4ef2265f1868964f520e6f62de934`
+- Report commit before rewrite: `a0bd1eff86baa5d0e44c6225662d27c0d68b901b`
+- Rewritten HEAD before this report update: `50d500a32f628b3fbe0f7ee3aff9f33c041795b0`
+- Rewrite tool: `git-filter-repo` from the verified local user install
+- Remote action: none
 
-```bash
-git status --short
-git diff --cached --stat
-git commit -m "chore: make repository public-safe"
-git log --all --stat -- "$PRIVATE_MEMORY_PATH" config.yaml
-git log -S"<PRIVATE_USER_HOME>" --all --oneline --decorate --
-git log -S"$PRIVATE_MEMORY_PATH" --all --oneline --decorate --
-git rev-list --all | xargs -n 25 git grep -n -I -E "<path-and-config-patterns>"
-git rev-list --all | xargs -n 25 git grep -n -I -i -E "<credential-patterns>"
-git filter-repo --version
-command -v bfg
-.venv/bin/python -m pytest -q
-```
+## 11. Backup Branch, Tag, And Bundle
 
-## 11. Files To Remove From History
+Created before rewrite:
 
-Use `git-filter-repo` to remove these file paths from all historical commits:
+- Branch: `backup/pre-history-rewrite`
+- Tag: `backup-before-history-rewrite`
+- Bundle: `../auto-research-agent-before-history-rewrite.bundle`
+
+The bundle is the authoritative pre-rewrite backup and should remain local-only. Because `git-filter-repo` rewrites all local refs, the backup branch and tag now resolve to rewritten commits while preserving their names.
+
+## 12. Files Removed From History
+
+The original-repository rewrite removed these paths from all rewritten commits:
 
 - `config.yaml`
-- `$PRIVATE_MEMORY_PATH`
+- the PAMA project memory file
 
-Do not remove `config.example.yaml`, `.env.example`, source files, tests, docs, prompts, or project templates.
+The rewrite did not remove `config.example.yaml`, `.env.example`, source files, tests, docs, prompts, or project templates.
 
-## 12. Strings To Replace From History
+## 13. Strings Replaced From History
 
-Prepare a replacement file outside committed docs, for example `/tmp/auto-research-agent-replacements.txt`:
+The temporary replacement file mapped:
 
-```text
-literal:<PRIVATE_REPO_ABS_PATH>==><PROJECT_ROOT>
-literal:<PRIVATE_USER_HOME>==><USER_HOME>
-```
+- the previous absolute repository path to `<PROJECT_ROOT>`
+- the previous local user home path to `<USER_HOME>`
+- the previous PAMA memory file text path to `<PROJECT_MEMORY_FILE>`
 
-Only add a broad prefix replacement after manual review:
+Ordinary `config.yaml` text was not replaced because the codebase legitimately refers to that local config filename in docs, source, and tests.
 
-```text
-literal:<PRIVATE_USERS_PREFIX>==><USER_HOME_PREFIX>
-```
+## 14. Remote Status After Rewrite
 
-Avoid replacing ordinary `config.yaml` text in source/docs. The codebase legitimately refers to the local config filename.
-
-## 13. Proposed Local Dry Run
-
-Install `git-filter-repo` first, then test in a throwaway clone:
+`git-filter-repo` removed `origin` during rewrite. The remote was restored locally:
 
 ```bash
-python3 -m pip install --user git-filter-repo
-
-cd /tmp
-PRIVATE_REPO_PATH="${PRIVATE_REPO_PATH:?set this to the local repo path first}"
-git clone --no-local "$PRIVATE_REPO_PATH" auto-research-agent-rewrite-dryrun
-cd auto-research-agent-rewrite-dryrun
-git switch privacy/public-safe-cleanup
-PRIVATE_MEMORY_PATH="${PRIVATE_MEMORY_PATH:?set this to the PAMA memory path first}"
-
-cat > /tmp/auto-research-agent-replacements.txt <<'EOF'
-literal:<PRIVATE_REPO_ABS_PATH>==><PROJECT_ROOT>
-literal:<PRIVATE_USER_HOME>==><USER_HOME>
-EOF
-
-git filter-repo --force \
-  --path config.yaml \
-  --path "$PRIVATE_MEMORY_PATH" \
-  --invert-paths \
-  --replace-text /tmp/auto-research-agent-replacements.txt
-
-cp config.example.yaml config.yaml
-python3 -m venv .venv
-.venv/bin/python -m pip install -e ".[dev]"
-.venv/bin/python -m pytest -q
+origin  https://github.com/ThineLord/auto-research-agent.git
 ```
 
-## 14. Proposed In-Repo Rewrite Commands
+Read-only remote check after restore:
 
-Run these only after reviewing the dry-run output:
+- `refs/heads/master`: `33f1c166e4b8e0bf6f612d7fd2bac0ac4e4de7f9`
+- `refs/heads/privacy/public-safe-cleanup`: not present
+- `refs/heads/main`: not present
+
+No push was performed.
+
+## 15. Verification Commands And Results
+
+Commands run after rewrite:
 
 ```bash
 git status --short
-git branch backup/pre-history-rewrite
-git tag backup-before-history-rewrite
-git bundle create ../auto-research-agent-before-history-rewrite.bundle --all
-PRIVATE_MEMORY_PATH="${PRIVATE_MEMORY_PATH:?set this to the PAMA memory path first}"
-
-cat > /tmp/auto-research-agent-replacements.txt <<'EOF'
-literal:<PRIVATE_REPO_ABS_PATH>==><PROJECT_ROOT>
-literal:<PRIVATE_USER_HOME>==><USER_HOME>
-EOF
-
-git filter-repo --force \
-  --path config.yaml \
-  --path "$PRIVATE_MEMORY_PATH" \
-  --invert-paths \
-  --replace-text /tmp/auto-research-agent-replacements.txt
-```
-
-After rewriting, re-check:
-
-```bash
-git status --short
+git branch --show-current
 git log --oneline --decorate -n 10
-git log --all --stat -- "$PRIVATE_MEMORY_PATH" config.yaml
-PRIVATE_PATH_PATTERN="${PRIVATE_PATH_PATTERN:?set this to the escaped private path pattern first}"
-PRIVATE_MEMORY_PATTERN="${PRIVATE_MEMORY_PATTERN:?set this to the escaped memory path pattern first}"
-rg -n "$PRIVATE_PATH_PATTERN|$PRIVATE_MEMORY_PATH|$SENSITIVE_REGEX" .
-git rev-list --all | xargs -n 25 git grep -n -I -E "$PRIVATE_PATH_PATTERN|$PRIVATE_MEMORY_PATTERN"
-git rev-list --all | xargs -n 25 git grep -n -I -i -E "$SENSITIVE_REGEX"
+git log --all --stat -- config.yaml <PAMA_MEMORY_FILE>
+git log -S"<LOCAL_USER_PATH>" --all --oneline --decorate --
+git rev-list --all | xargs -n 25 git grep -n -I -E "<local-path-or-memory-patterns>"
+git rev-list --all | xargs -n 25 git grep -n -I -i -E "<credential-keyword-patterns>"
+rg -n "<current-tree-sensitive-patterns>" .
 .venv/bin/python -m pytest -q
 ```
 
-## 15. Verification Result
+Results:
 
-- Cleanup commit was created successfully.
-- History rewrite was not executed because `git-filter-repo` and BFG were unavailable.
-- Current working tree remains public-safe after the cleanup commit.
-- Historical sensitive-path findings remain until a reviewed rewrite is performed.
-- Tests pass with `.venv/bin/python -m pytest -q`.
+- Working tree was clean before the report update.
+- Current branch remained `privacy/public-safe-cleanup`.
+- Historical file-level scan for the removed local config file and removed PAMA memory file returned no output.
+- Historical exact local user path search returned no output.
+- Historical grep for exact local path and removed memory path returned no output.
+- Current-tree sensitive scan returned no output.
+- Historical credential-keyword grep only returned benign tokenization/model-cost wording.
+- Tests passed with `36 passed, 24 subtests passed`.
 
-## 16. Push Instructions For Review Only
+## 16. Whether It Is Now Safe To Push
 
-Do not run these until the rewrite is reviewed and collaborators are coordinated.
+It is safe to prepare a reviewed `--force-with-lease` update after manually reviewing the rewritten branch, confirming collaborator coordination, and deciding whether this cleanup branch should replace the public default branch.
 
-If pushing the rewritten cleanup branch for review:
+Do not publish the pre-rewrite bundle.
+
+## 17. Recommended Push Commands - NOT EXECUTED
+
+These commands were not run.
+
+If pushing the rewritten cleanup branch for review, the remote branch was not present during the final read-only check, so no force is required:
 
 ```bash
-git push --force-with-lease origin privacy/public-safe-cleanup
-git push --force-with-lease origin --tags
+git push -u origin privacy/public-safe-cleanup
 ```
 
-If replacing the public default branch after review:
+If you want an absent-branch lease check anyway:
 
 ```bash
-git push --force-with-lease origin privacy/public-safe-cleanup:master
-git push --force-with-lease origin --tags
+git push --force-with-lease=refs/heads/privacy/public-safe-cleanup: -u origin privacy/public-safe-cleanup
 ```
 
-Use `--force-with-lease`, not plain `--force`.
+If replacing the public `master` branch after review, use the exact remote value observed during the final read-only check:
+
+```bash
+git push --force-with-lease=refs/heads/master:33f1c166e4b8e0bf6f612d7fd2bac0ac4e4de7f9 origin privacy/public-safe-cleanup:master
+```
+
+Do not push the local pre-rewrite bundle. Do not push the backup tag unless you intentionally want that public marker.
+
+Use `--force-with-lease`, not plain force.
