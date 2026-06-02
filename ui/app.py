@@ -24,6 +24,8 @@ from src.runtime import (
     start_background_process,
 )
 from src.storage import read_file_text, read_json_file, tail_file_lines, write_file_text
+from ui.i18n import LANGUAGE_LABELS, translate
+from ui.theme import DEFAULT_THEME, THEME_LABEL_KEYS, build_theme_css, normalize_theme
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECTS_DIR = ROOT / "projects"
@@ -39,6 +41,82 @@ AGENT_LOG_RE = re.compile(
     r"round=(?P<round>\d+)\s+\|\s+agent=(?P<agent>\w+)\s+\|\s+status=(?P<status>\w+)"
 )
 ROUND_ENTER_RE = re.compile(r"round_enter round=(?P<round>\d+)")
+DELETE_NONE = "__none__"
+
+
+def current_language() -> str:
+    language = st.session_state.get("ui_language", "en")
+    return str(language) if language in LANGUAGE_LABELS else "en"
+
+
+def current_theme() -> str:
+    return normalize_theme(str(st.session_state.get("ui_theme", DEFAULT_THEME)))
+
+
+def t(key: str, **kwargs: Any) -> str:
+    return translate(current_language(), key, **kwargs)
+
+
+def ensure_ui_preferences() -> None:
+    if st.session_state.get("ui_language") not in LANGUAGE_LABELS:
+        st.session_state["ui_language"] = "en"
+    st.session_state["ui_theme"] = current_theme()
+
+
+def render_interface_controls() -> None:
+    st.sidebar.header(t("sidebar_interface"))
+    st.sidebar.selectbox(
+        t("language_selector"),
+        list(LANGUAGE_LABELS),
+        format_func=lambda language: LANGUAGE_LABELS[language],
+        key="ui_language",
+    )
+    st.sidebar.selectbox(
+        t("theme_selector"),
+        list(THEME_LABEL_KEYS),
+        format_func=lambda theme: t(THEME_LABEL_KEYS[theme]),
+        key="ui_theme",
+    )
+
+
+def localized_message(payload: dict[str, Any]) -> str:
+    message_key = payload.get("message_key")
+    if not message_key:
+        return str(payload.get("message", ""))
+
+    message_args = dict(payload.get("message_args", {}))
+    if payload.get("model_mismatch"):
+        message_args["model_note"] = t(
+            "resume_model_note",
+            checkpoint_model=payload.get("checkpoint_model", ""),
+            selected_model=payload.get("selected_model", ""),
+        )
+    else:
+        message_args.setdefault("model_note", "")
+    return t(str(message_key), **message_args)
+
+
+def localize_ollama_models_error(error: str) -> str:
+    if error == "Ollama is not installed or not in PATH.":
+        return t("ollama_not_installed")
+    if error.startswith("Failed to query Ollama: "):
+        return t("ollama_query_failed", detail=error.removeprefix("Failed to query Ollama: "))
+    if error.startswith("Ollama is not available: "):
+        return t("ollama_unavailable", detail=error.removeprefix("Ollama is not available: "))
+    return error
+
+
+def localized_stage(stage: Any) -> str:
+    stage_text = str(stage)
+    if stage_text == "Idle":
+        return t("stage_idle")
+    if stage_text == "starting":
+        return t("stage_starting")
+    if stage_text == "starting round":
+        return t("stage_starting_round")
+    if stage_text.startswith("after "):
+        return t("stage_after_agent", agent=stage_text.removeprefix("after "))
+    return stage_text
 
 
 def _safe_int(value: Any, default: int = 0) -> int:
@@ -62,6 +140,8 @@ def check_model_health(
             "api_ok": False,
             "model_ok": False,
             "message": "No model selected.",
+            "message_key": "health_no_model",
+            "message_args": {},
         }
 
     url = f"{base_url.rstrip('/')}/api/tags"
@@ -75,6 +155,8 @@ def check_model_health(
             "api_ok": False,
             "model_ok": False,
             "message": f"Ollama API timed out at {base_url}.",
+            "message_key": "health_timeout",
+            "message_args": {"base_url": base_url},
         }
     except (requests.RequestException, ValueError) as exc:
         return {
@@ -82,6 +164,8 @@ def check_model_health(
             "api_ok": False,
             "model_ok": False,
             "message": f"Ollama API is not healthy at {base_url}: {exc}",
+            "message_key": "health_api_unhealthy",
+            "message_args": {"base_url": base_url, "error": exc},
         }
 
     api_models = [
@@ -99,12 +183,16 @@ def check_model_health(
             "api_ok": True,
             "model_ok": False,
             "message": f"Ollama is reachable, but `{model_name}` is not installed.",
+            "message_key": "health_model_missing",
+            "message_args": {"model": model_name},
         }
     return {
         "ok": True,
         "api_ok": True,
         "model_ok": True,
         "message": f"Ollama is reachable and `{model_name}` is installed.",
+        "message_key": "health_model_ok",
+        "message_args": {"model": model_name},
     }
 
 
@@ -173,17 +261,24 @@ def describe_resume_state(
             "can_resume": False,
             "level": "info",
             "message": "No checkpoint exists yet. Run a workflow before resuming.",
+            "message_key": "resume_no_checkpoint",
+            "message_args": {},
         }
     if run_active:
         return {
             "can_resume": False,
             "level": "warning",
             "message": "A run is active. Resume is blocked until the current run exits.",
+            "message_key": "resume_blocked_active",
+            "message_args": {},
         }
 
     checkpoint_model = str(checkpoint.get("model", "")).strip()
     selected_model = selected_model.strip()
     model_note = ""
+    model_mismatch = bool(
+        checkpoint_model and selected_model and checkpoint_model != selected_model
+    )
     if checkpoint_model and selected_model and checkpoint_model != selected_model:
         model_note = (
             f" Checkpoint model was `{checkpoint_model}`; selected model is `{selected_model}`."
@@ -195,6 +290,11 @@ def describe_resume_state(
             "can_resume": True,
             "level": "success",
             "message": f"Resume available from round {next_round}.{model_note}",
+            "message_key": "resume_available",
+            "message_args": {"next_round": next_round},
+            "model_mismatch": model_mismatch,
+            "checkpoint_model": checkpoint_model,
+            "selected_model": selected_model,
         }
 
     stop_reason = checkpoint.get("stop_reason", "unknown")
@@ -202,6 +302,11 @@ def describe_resume_state(
         "can_resume": False,
         "level": "info",
         "message": f"Resume is unavailable. Last stop reason: `{stop_reason}`.{model_note}",
+        "message_key": "resume_unavailable",
+        "message_args": {"stop_reason": stop_reason},
+        "model_mismatch": model_mismatch,
+        "checkpoint_model": checkpoint_model,
+        "selected_model": selected_model,
     }
 
 
@@ -217,13 +322,37 @@ def detect_output_kind(path: Path) -> str:
 
 def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[dict[str, Any]]:
     catalog = [
-        {"label": "Best output", "path": project_dir / "best_output.md"},
-        {"label": "Final session report", "path": project_dir / "final_session_report.md"},
-        {"label": "Interrupted report", "path": project_dir / "interrupted_report.md"},
-        {"label": "Checkpoint", "path": project_dir / "checkpoint.json"},
-        {"label": "Score history", "path": project_dir / "score_history.json"},
-        {"label": "Run log", "path": project_dir / "run.log"},
-        {"label": "Model operation log", "path": project_dir / "model_ops.log"},
+        {
+            "label": "Best output",
+            "label_key": "output_best",
+            "path": project_dir / "best_output.md",
+        },
+        {
+            "label": "Final session report",
+            "label_key": "output_final_report",
+            "path": project_dir / "final_session_report.md",
+        },
+        {
+            "label": "Interrupted report",
+            "label_key": "output_interrupted_report",
+            "path": project_dir / "interrupted_report.md",
+        },
+        {
+            "label": "Checkpoint",
+            "label_key": "output_checkpoint",
+            "path": project_dir / "checkpoint.json",
+        },
+        {
+            "label": "Score history",
+            "label_key": "output_score_history",
+            "path": project_dir / "score_history.json",
+        },
+        {"label": "Run log", "label_key": "output_run_log", "path": project_dir / "run.log"},
+        {
+            "label": "Model operation log",
+            "label_key": "output_model_ops_log",
+            "path": project_dir / "model_ops.log",
+        },
     ]
 
     run_root = Path(str(checkpoint.get("run_root", "")))
@@ -232,16 +361,33 @@ def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[
         round_dir = run_root / f"round_{round_index:02d}"
         catalog.extend(
             [
-                {"label": "Latest round draft", "path": round_dir / "01_draft.md"},
-                {"label": "Latest round review", "path": round_dir / "02_review.md"},
-                {"label": "Latest round revised", "path": round_dir / "03_revised.md"},
-                {"label": "Latest round judge", "path": round_dir / "04_judge.md"},
+                {
+                    "label": "Latest round draft",
+                    "label_key": "output_latest_draft",
+                    "path": round_dir / "01_draft.md",
+                },
+                {
+                    "label": "Latest round review",
+                    "label_key": "output_latest_review",
+                    "path": round_dir / "02_review.md",
+                },
+                {
+                    "label": "Latest round revised",
+                    "label_key": "output_latest_revised",
+                    "path": round_dir / "03_revised.md",
+                },
+                {
+                    "label": "Latest round judge",
+                    "label_key": "output_latest_judge",
+                    "path": round_dir / "04_judge.md",
+                },
             ]
         )
 
     return [
         {
             "label": item["label"],
+            "label_key": item["label_key"],
             "path": item["path"],
             "kind": detect_output_kind(item["path"]),
             "exists": item["path"].exists(),
@@ -263,26 +409,24 @@ def is_canonical_root() -> bool:
 
 
 def render_runtime_location_check() -> None:
-    st.caption(f"App root: `{ROOT}`")
+    st.sidebar.caption(t("app_root_label"))
+    st.sidebar.code(str(ROOT), language="text")
     if is_canonical_root():
-        st.success("Running from the canonical project folder.")
+        st.sidebar.success(t("canonical_root_success"))
         return
 
-    st.error(
-        "This Streamlit app is not running from the canonical project folder. "
-        "Stop this server and restart Streamlit from the path below."
-    )
+    st.error(t("canonical_root_error"))
     st.code(
         f"cd {CANONICAL_ROOT}\nmake ui",
         language="bash",
     )
 
 
-def render_process_result(result, success_message: str) -> None:
+def render_process_result(result, success_key: str, **kwargs: Any) -> None:
     if result.error:
-        st.error(result.error)
+        st.error(t("process_error_prefix", error=result.error))
     elif result.pid:
-        st.success(success_message.format(pid=result.pid))
+        st.success(t(success_key, pid=result.pid, **kwargs))
 
 
 def render_live_progress_and_logs(
@@ -304,50 +448,53 @@ def render_live_progress_and_logs(
         run_meta=run_meta,
     )
     p1, p2, p3, p4 = st.columns(4)
-    p1.metric("Mode", str(progress["mode"]))
-    p2.metric("Round", str(progress["round"]))
-    p3.metric("Stage", str(progress["stage"]))
-    p4.metric("Best score", str(progress["best_score"]))
-    st.write(f"PID: `{progress['pid']}`")
-    st.write(f"Model: `{progress['model']}`")
-    st.write(f"Last successful agent: `{progress['last_successful_agent']}`")
-    st.write(f"Stop reason: `{progress['stop_reason']}`")
-    st.write(f"Stop signal present: `{stop_signal_path.exists()}`")
-    st.write(f"Selected model: `{st.session_state.get('selected_model', default_model)}`")
+    p1.metric(t("metric_mode"), str(progress["mode"]))
+    p2.metric(t("metric_round"), str(progress["round"]))
+    p3.metric(t("metric_stage"), localized_stage(progress["stage"]))
+    p4.metric(t("metric_best_score"), str(progress["best_score"]))
+    st.write(t("pid_line", pid=progress["pid"]))
+    st.write(t("model_line", model=progress["model"]))
+    st.write(t("last_successful_agent", agent=progress["last_successful_agent"]))
+    st.write(t("stop_reason", reason=progress["stop_reason"]))
+    st.write(t("stop_signal_present", present=stop_signal_path.exists()))
+    st.write(t("selected_model", model=st.session_state.get("selected_model", default_model)))
 
-    st.subheader("E. Live logs panel")
-    st.code(run_log_text or "(no logs yet)", language="text")
-    st.caption("Model operation logs")
+    st.subheader(t("live_logs_panel"))
+    st.code(run_log_text or t("no_logs_yet"), language="text")
+    st.caption(t("model_operation_logs"))
     st.code(
-        tail_file_lines(model_job_log_path, max_lines=120) or "(no model operation logs yet)",
+        tail_file_lines(model_job_log_path, max_lines=120) or t("no_model_operation_logs"),
         language="text",
     )
 
 
 def main() -> None:
     st.set_page_config(page_title="Auto Research Agent", layout="wide")
-    st.title("Auto Research Agent")
+    ensure_ui_preferences()
+    st.markdown(build_theme_css(current_theme()), unsafe_allow_html=True)
+    render_interface_controls()
+    st.title(t("app_title"))
     render_runtime_location_check()
     try:
         app_config = load_app_config(CONFIG_PATH)
     except (ConfigValidationError, FileNotFoundError) as exc:
-        st.error(f"Config error: {exc}")
+        st.error(t("config_error", error=exc))
         st.stop()
 
-    st.subheader("Quick Actions")
+    st.subheader(t("quick_actions"))
     quick_test_col, quick_status_col = st.columns([1, 3])
     with quick_test_col:
-        if st.button("Run Tests", key="run_tests_quick"):
+        if st.button(t("run_tests"), key="run_tests_quick"):
             st.session_state["test_result"] = run_project_tests(ROOT)
     with quick_status_col:
         quick_test_result = st.session_state.get("test_result")
         if quick_test_result:
             if quick_test_result["ok"]:
-                st.success(f"Tests passed in {quick_test_result['elapsed']:.2f}s")
+                st.success(t("tests_passed_short", elapsed=quick_test_result["elapsed"]))
             else:
-                st.error(f"Tests failed in {quick_test_result['elapsed']:.2f}s")
+                st.error(t("tests_failed_short", elapsed=quick_test_result["elapsed"]))
         else:
-            st.info("Click Run Tests to check the project without running Ollama.")
+            st.info(t("quick_tests_help"))
 
     projects = (
         sorted([p.name for p in PROJECTS_DIR.iterdir() if p.is_dir()])
@@ -358,14 +505,14 @@ def main() -> None:
         projects.index(app_config.project_name) if app_config.project_name in projects else 0
     )
     selected_project = st.selectbox(
-        "A. Project selector", projects, index=default_index if projects else None
+        t("project_selector"), projects, index=default_index if projects else None
     )
     if not selected_project:
-        st.warning("No project found under projects/.")
+        st.warning(t("no_project_found"))
         return
 
     proj_path = project_path(selected_project)
-    st.write(f"Project path: `{proj_path}`")
+    st.write(t("project_path", path=proj_path))
 
     task_path = proj_path / "task.md"
     memory_path = proj_path / "memory.md"
@@ -380,26 +527,30 @@ def main() -> None:
     col_input_left, col_input_right = st.columns(2)
     with col_input_left:
         task_text = st.text_area(
-            "B. Input editor - task.md", value=read_file_text(task_path), height=260
+            t("input_editor_task"), value=read_file_text(task_path), height=260
         )
     with col_input_right:
         memory_text = st.text_area(
-            "B. Input editor - memory.md", value=read_file_text(memory_path), height=260
+            t("input_editor_memory"), value=read_file_text(memory_path), height=260
         )
-    if st.button("Save Input"):
+    if st.button(t("save_input")):
         write_file_text(task_path, task_text)
         write_file_text(memory_path, memory_text)
-        st.success("task.md and memory.md saved.")
+        st.success(t("input_saved"))
 
-    st.subheader("C. Run controls")
+    st.subheader(t("run_controls"))
     run_active = bool(run_meta)
     model_job_active = bool(model_job_meta)
     blocked = run_active or model_job_active
     if run_active:
-        st.info(f"Run active (PID {run_meta.get('pid')}): `{run_meta.get('command')}`")
+        st.info(t("run_active", pid=run_meta.get("pid"), command=run_meta.get("command")))
     if model_job_active:
         st.warning(
-            f"Model job active (PID {model_job_meta.get('pid')}): `{model_job_meta.get('command')}`"
+            t(
+                "model_job_active",
+                pid=model_job_meta.get("pid"),
+                command=model_job_meta.get("command"),
+            )
         )
 
     models, models_error = query_ollama_models(timeout_seconds=15)
@@ -411,12 +562,12 @@ def main() -> None:
         st.session_state["selected_model"] = installed_model_names[0]
 
     if models_error:
-        st.error(models_error)
-    st.write(f"Selected model: `{st.session_state.get('selected_model', default_model)}`")
+        st.error(t("ollama_models_error_prefix", error=localize_ollama_models_error(models_error)))
+    st.write(t("selected_model", model=st.session_state.get("selected_model", default_model)))
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     with c1:
-        if st.button("Run Diagnostic", disabled=blocked or bool(models_error)):
+        if st.button(t("run_diagnostic"), disabled=blocked or bool(models_error)):
             model = st.session_state.get("selected_model", default_model)
             result = start_background_process(
                 command=[sys.executable, "-m", "src.main", "--diagnostic", "--model", model],
@@ -428,10 +579,11 @@ def main() -> None:
             )
             render_process_result(
                 result,
-                f"Started diagnostic run with model `{model}` (PID {{pid}})",
+                "started_diagnostic",
+                model=model,
             )
     with c2:
-        if st.button("Run Normal", disabled=blocked or bool(models_error)):
+        if st.button(t("run_normal"), disabled=blocked or bool(models_error)):
             model = st.session_state.get("selected_model", default_model)
             result = start_background_process(
                 command=[sys.executable, "-m", "src.main", "--model", model],
@@ -443,10 +595,11 @@ def main() -> None:
             )
             render_process_result(
                 result,
-                f"Started normal run with model `{model}` (PID {{pid}})",
+                "started_normal",
+                model=model,
             )
     with c3:
-        if st.button("Run Continuous", disabled=blocked or bool(models_error)):
+        if st.button(t("run_continuous"), disabled=blocked or bool(models_error)):
             model = st.session_state.get("selected_model", default_model)
             result = start_background_process(
                 command=[sys.executable, "-m", "src.main", "--continuous", "--model", model],
@@ -458,12 +611,13 @@ def main() -> None:
             )
             render_process_result(
                 result,
-                f"Started continuous run with model `{model}` (PID {{pid}})",
+                "started_continuous",
+                model=model,
             )
     with c4:
-        if st.button("Pause / Stop Safely", disabled=not run_active):
+        if st.button(t("pause_stop_safely"), disabled=not run_active):
             write_file_text(stop_signal_path, "STOP_REQUESTED\n")
-            st.warning(f"Stop signal created: `{stop_signal_path}`")
+            st.warning(t("stop_signal_created", path=stop_signal_path))
     resume_state = describe_resume_state(
         checkpoint=checkpoint,
         run_active=run_active,
@@ -471,7 +625,7 @@ def main() -> None:
     )
     with c5:
         if st.button(
-            "Resume",
+            t("resume"),
             disabled=blocked or bool(models_error) or not resume_state["can_resume"],
         ):
             model = st.session_state.get("selected_model", default_model)
@@ -485,66 +639,84 @@ def main() -> None:
             )
             render_process_result(
                 result,
-                f"Started resume run with model `{model}` (PID {{pid}})",
+                "started_resume",
+                model=model,
             )
     with c6:
-        if st.button("Run Tests", disabled=run_active, key="run_tests_top"):
+        if st.button(t("run_tests"), disabled=run_active, key="run_tests_top"):
             st.session_state["test_result"] = run_project_tests(ROOT)
 
     if resume_state["level"] == "success":
-        st.success(resume_state["message"])
+        st.success(localized_message(resume_state))
     elif resume_state["level"] == "warning":
-        st.warning(resume_state["message"])
+        st.warning(localized_message(resume_state))
     else:
-        st.info(resume_state["message"])
+        st.info(localized_message(resume_state))
 
-    st.subheader("Project Tests")
-    st.caption("Run the local automated tests without starting Ollama.")
+    st.subheader(t("project_tests"))
+    st.caption(t("project_tests_help"))
     test_col_left, test_col_right = st.columns([1, 3])
     with test_col_left:
-        if st.button("Run Tests", disabled=run_active, key="run_tests_panel"):
+        if st.button(t("run_tests"), disabled=run_active, key="run_tests_panel"):
             st.session_state["test_result"] = run_project_tests(ROOT)
     with test_col_right:
         last_test = st.session_state.get("test_result")
         if last_test:
             if last_test["ok"]:
                 st.success(
-                    f"Tests passed in {last_test['elapsed']:.2f}s using `{last_test['command']}`"
+                    t(
+                        "tests_passed_detail",
+                        elapsed=last_test["elapsed"],
+                        command=last_test["command"],
+                    )
                 )
             else:
                 returncode = last_test["returncode"]
-                st.error(f"Tests failed in {last_test['elapsed']:.2f}s (return code: {returncode})")
+                st.error(
+                    t(
+                        "tests_failed_detail",
+                        elapsed=last_test["elapsed"],
+                        returncode=returncode,
+                    )
+                )
         else:
-            st.info("No test run yet.")
+            st.info(t("no_test_run"))
     if st.session_state.get("test_result"):
-        with st.expander("Test output", expanded=True):
+        with st.expander(t("test_output"), expanded=True):
             st.code(st.session_state["test_result"]["output"], language="text")
 
-    st.subheader("Model Management")
-    st.caption("Available to download: any valid Ollama model name.")
+    st.subheader(t("model_management"))
+    st.caption(t("model_management_help"))
     rec = {
-        "qwen3:8b": "default balanced model",
-        "qwen3:14b": "stronger, slower",
-        "deepseek-r1:8b": "reasoning-oriented experiment",
-        "llama3.1:8b": "stable fallback",
+        "qwen3:8b": "model_default_balanced",
+        "qwen3:14b": "model_stronger_slower",
+        "deepseek-r1:8b": "model_reasoning_experiment",
+        "llama3.1:8b": "model_stable_fallback",
     }
-    st.markdown("**Recommended models**")
-    for name, desc in rec.items():
-        installed_tag = " (installed)" if name in installed_model_names else ""
-        st.write(f"- `{name}` — {desc}{installed_tag}")
+    st.markdown(f"**{t('recommended_models')}**")
+    for name, desc_key in rec.items():
+        installed_tag = t("installed_tag") if name in installed_model_names else ""
+        st.write(f"- `{name}` - {t(desc_key)}{installed_tag}")
 
-    st.markdown("**Installed models**")
+    st.markdown(f"**{t('installed_models')}**")
     if models:
         st.dataframe(
-            [{"name": m["name"], "size": m["size"], "modified": m["modified"]} for m in models],
+            [
+                {
+                    t("models_table_name"): m["name"],
+                    t("models_table_size"): m["size"],
+                    t("models_table_modified"): m["modified"],
+                }
+                for m in models
+            ],
             use_container_width=True,
         )
     else:
-        st.caption("No installed model found.")
+        st.caption(t("no_installed_model"))
 
     if installed_model_names:
         selected_model = st.selectbox(
-            "Model selector",
+            t("model_selector"),
             installed_model_names,
             index=installed_model_names.index(st.session_state["selected_model"])
             if st.session_state["selected_model"] in installed_model_names
@@ -553,13 +725,13 @@ def main() -> None:
         st.session_state["selected_model"] = selected_model
     else:
         selected_model = st.text_input(
-            "Model selector (manual)", value=st.session_state["selected_model"]
+            t("model_selector_manual"), value=st.session_state["selected_model"]
         )
         st.session_state["selected_model"] = selected_model.strip()
 
     health_col, health_result_col = st.columns([1, 3])
     with health_col:
-        if st.button("Check Model Health"):
+        if st.button(t("check_model_health")):
             st.session_state["model_health"] = check_model_health(
                 base_url=app_config.ollama_base_url,
                 selected_model=st.session_state.get("selected_model", ""),
@@ -569,28 +741,28 @@ def main() -> None:
         model_health = st.session_state.get("model_health")
         if model_health:
             if model_health["ok"]:
-                st.success(model_health["message"])
+                st.success(localized_message(model_health))
             else:
-                st.error(model_health["message"])
+                st.error(localized_message(model_health))
         else:
-            st.info("Run a fast health check before starting long workflows.")
+            st.info(t("health_check_help"))
 
-    if st.button("Save Selected Model as Default", disabled=bool(models_error)):
+    if st.button(t("save_default_model"), disabled=bool(models_error)):
         model_to_save = st.session_state.get("selected_model", "").strip()
         if not model_to_save:
-            st.error("Model name is empty.")
+            st.error(t("model_name_empty"))
         else:
             err = save_default_model_name(CONFIG_PATH, model_to_save)
             if err:
                 st.error(err)
             else:
-                st.success(f"Saved `{model_to_save}` to config.yaml (model.name).")
+                st.success(t("saved_default_model", model=model_to_save))
 
-    pull_model_name = st.text_input("Pull model by name", value="qwen3:8b")
-    if st.button("Pull Model", disabled=blocked):
+    pull_model_name = st.text_input(t("pull_model_by_name"), value="qwen3:8b")
+    if st.button(t("pull_model"), disabled=blocked):
         pull_model_name = pull_model_name.strip()
         if not pull_model_name:
-            st.error("Please enter a model name.")
+            st.error(t("enter_model_name"))
         else:
             result = start_background_process(
                 command=["ollama", "pull", pull_model_name],
@@ -602,21 +774,23 @@ def main() -> None:
             )
             render_process_result(
                 result,
-                f"Started pulling model `{pull_model_name}` (PID {{pid}})",
+                "started_pull_model",
+                model=pull_model_name,
             )
 
     delete_target = st.selectbox(
-        "Delete model (installed)",
-        installed_model_names if installed_model_names else ["(none)"],
+        t("delete_model"),
+        installed_model_names if installed_model_names else [DELETE_NONE],
+        format_func=lambda model: t("none_option") if model == DELETE_NONE else model,
     )
-    confirm_delete = st.checkbox("I understand deletion cannot be undone.")
-    if st.button("Delete Selected Model", disabled=blocked or not installed_model_names):
+    confirm_delete = st.checkbox(t("confirm_delete"))
+    if st.button(t("delete_selected_model"), disabled=blocked or not installed_model_names):
         if not confirm_delete:
-            st.error("Please confirm deletion first.")
+            st.error(t("confirm_delete_first"))
         elif run_active and delete_target == str(run_meta.get("model", "")):
-            st.error("Cannot delete the model used by the currently running task.")
-        elif delete_target == "(none)":
-            st.error("No deletable model selected.")
+            st.error(t("cannot_delete_running_model"))
+        elif delete_target == DELETE_NONE:
+            st.error(t("no_deletable_model"))
         else:
             result = start_background_process(
                 command=["ollama", "rm", delete_target],
@@ -628,12 +802,13 @@ def main() -> None:
             )
             render_process_result(
                 result,
-                f"Started deleting model `{delete_target}` (PID {{pid}})",
+                "started_delete_model",
+                model=delete_target,
             )
 
-    st.subheader("D. Progress panel")
+    st.subheader(t("progress_panel"))
     auto_refresh = st.checkbox(
-        "Auto refresh logs every 2 seconds",
+        t("auto_refresh_logs"),
         value=True,
         key="auto_refresh_logs",
     )
@@ -649,22 +824,22 @@ def main() -> None:
         default_model=default_model,
     )
 
-    st.subheader("F. Output browser")
+    st.subheader(t("output_browser"))
     output_catalog = build_output_catalog(proj_path, checkpoint)
     selected_output_index = st.selectbox(
-        "Output file",
+        t("output_file"),
         range(len(output_catalog)),
         format_func=lambda idx: (
-            output_catalog[idx]["label"]
+            t(str(output_catalog[idx]["label_key"]))
             if output_catalog[idx]["exists"]
-            else f"{output_catalog[idx]['label']} (not generated)"
+            else f"{t(str(output_catalog[idx]['label_key']))}{t('not_generated_suffix')}"
         ),
     )
     selected_output = output_catalog[selected_output_index]
     selected_path = selected_output["path"]
     st.caption(str(selected_path))
     if not selected_output["exists"]:
-        st.info("This output has not been generated yet.")
+        st.info(t("output_not_generated"))
     else:
         content = read_file_text(selected_path)
         if selected_output["kind"] == "json":
@@ -673,9 +848,9 @@ def main() -> None:
             except json.JSONDecodeError:
                 st.code(content, language="text")
         elif selected_output["kind"] == "markdown":
-            st.markdown(content or "_Empty file._")
+            st.markdown(content or t("empty_markdown"))
         else:
-            st.code(content or "(empty file)", language="text")
+            st.code(content or t("empty_text"), language="text")
 
 
 if __name__ == "__main__":

@@ -28,7 +28,7 @@ help:
 		"  make continuous    Run continuous mode" \
 		"  make resume        Resume from checkpoint" \
 		"  make session       Run session mode" \
-		"  make ui            Start the Streamlit UI" \
+		"  make ui            Start the Streamlit UI with language/theme controls" \
 		"" \
 		"Run make install-dev once on a new checkout before testing or running." \
 		"Pass extra CLI flags with ARGS, for example:" \
