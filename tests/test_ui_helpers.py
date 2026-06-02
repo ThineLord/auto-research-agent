@@ -14,6 +14,8 @@ import src.runtime as runtime_module
 from src.config import (
     list_installed_ollama_models,
     load_default_model_name,
+    parse_ollama_list_output,
+    parse_ollama_tags_payload,
     query_ollama_models,
     save_default_model_name,
 )
@@ -110,6 +112,34 @@ class SharedUiBackendHelperTests(unittest.TestCase):
             self.assertIsNone(result.pid)
             self.assertIn("Failed to start run process", result.error or "")
 
+    def test_parse_ollama_list_output_sorts_dedupes_and_handles_empty_list(self) -> None:
+        output = (
+            "NAME           ID              SIZE      MODIFIED\n"
+            "qwen3:8b       abc123          4.7 GB    2 days ago\n"
+            "llama3.1:8b    def456          4.9 GB    yesterday\n"
+            "qwen3:8b       duplicate       4.7 GB    today\n"
+        )
+
+        models = parse_ollama_list_output(output)
+
+        self.assertEqual([model["name"] for model in models], ["llama3.1:8b", "qwen3:8b"])
+        self.assertEqual(models[1]["id"], "abc123")
+        self.assertEqual(parse_ollama_list_output("NAME ID SIZE MODIFIED\n"), [])
+
+    def test_parse_ollama_tags_payload_reads_api_models(self) -> None:
+        models = parse_ollama_tags_payload(
+            {
+                "models": [
+                    {"name": "qwen3:8b", "digest": "abc", "size": 123, "modified_at": "today"},
+                    {"name": "phi3:mini", "digest": "def", "size": 456},
+                ]
+            }
+        )
+
+        self.assertEqual([model["name"] for model in models], ["phi3:mini", "qwen3:8b"])
+        self.assertEqual(models[0]["id"], "def")
+        self.assertEqual(models[1]["modified"], "today")
+
     def test_query_ollama_models_parses_success_and_reports_missing_binary(self) -> None:
         result = SimpleNamespace(
             returncode=0,
@@ -125,21 +155,47 @@ class SharedUiBackendHelperTests(unittest.TestCase):
             models, error = query_ollama_models()
 
         self.assertIsNone(error)
-        self.assertEqual([model["name"] for model in models], ["qwen3:8b", "llama3.1:8b"])
-        self.assertEqual(models[0]["id"], "abc123")
-        self.assertEqual(models[1]["modified"], "yesterday")
+        self.assertEqual([model["name"] for model in models], ["llama3.1:8b", "qwen3:8b"])
+        self.assertEqual(models[1]["id"], "abc123")
+        self.assertEqual(models[0]["modified"], "yesterday")
 
         with patch.object(config_module.subprocess, "run", return_value=result):
             names, error = list_installed_ollama_models()
 
         self.assertIsNone(error)
-        self.assertEqual(names, ["qwen3:8b", "llama3.1:8b"])
+        self.assertEqual(names, ["llama3.1:8b", "qwen3:8b"])
 
-        with patch.object(config_module.subprocess, "run", side_effect=FileNotFoundError):
+        with (
+            patch.object(config_module.subprocess, "run", side_effect=FileNotFoundError),
+            patch.object(
+                config_module,
+                "query_ollama_api_models",
+                return_value=([], "api down"),
+            ),
+        ):
             models, error = query_ollama_models()
 
         self.assertEqual(models, [])
         self.assertIn("Ollama is not installed", error or "")
+
+    def test_query_ollama_models_falls_back_to_api_when_command_fails(self) -> None:
+        result = SimpleNamespace(returncode=1, stdout="", stderr="service down")
+
+        with (
+            patch.object(config_module.subprocess, "run", return_value=result),
+            patch.object(
+                config_module,
+                "query_ollama_api_models",
+                return_value=(
+                    [{"name": "phi3:mini", "id": "", "size": "", "modified": ""}],
+                    None,
+                ),
+            ),
+        ):
+            models, error = query_ollama_models()
+
+        self.assertIsNone(error)
+        self.assertEqual([model["name"] for model in models], ["phi3:mini"])
 
     def test_default_model_helpers_read_and_update_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -201,6 +257,60 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertIs(ui_app.read_file_text, read_file_text)
         self.assertIs(ui_app.read_json_file, read_json_file)
         self.assertIs(ui_app.run_project_tests, run_project_tests)
+
+    def test_ui_model_picker_prefers_manual_then_session_config_and_default(self) -> None:
+        import ui.app as ui_app
+
+        self.assertEqual(
+            ui_app.resolve_effective_model(
+                selected_model="qwen3:8b",
+                manual_model=" phi3:mini ",
+                config_model="llama3.2:3b",
+            ),
+            "phi3:mini",
+        )
+        self.assertEqual(
+            ui_app.resolve_effective_model(
+                selected_model="qwen3:8b",
+                manual_model=" ",
+                config_model="llama3.2:3b",
+            ),
+            "qwen3:8b",
+        )
+        self.assertEqual(
+            ui_app.resolve_effective_model(
+                selected_model="",
+                manual_model="",
+                config_model="llama3.2:3b",
+            ),
+            "llama3.2:3b",
+        )
+
+        installed_models = ["gemma2:2b", "qwen3:8b", "phi3:mini"]
+        self.assertEqual(
+            ui_app.choose_model_picker_default(
+                installed_model_names=installed_models,
+                session_model="phi3:mini",
+                config_model="gemma2:2b",
+            ),
+            "phi3:mini",
+        )
+        self.assertEqual(
+            ui_app.choose_model_picker_default(
+                installed_model_names=installed_models,
+                session_model="missing:latest",
+                config_model="gemma2:2b",
+            ),
+            "gemma2:2b",
+        )
+        self.assertEqual(
+            ui_app.choose_model_picker_default(
+                installed_model_names=["gemma2:2b", "qwen3:8b"],
+                session_model="missing:latest",
+                config_model="missing:also",
+            ),
+            "qwen3:8b",
+        )
 
     def test_ui_progress_resume_and_output_helpers(self) -> None:
         import ui.app as ui_app

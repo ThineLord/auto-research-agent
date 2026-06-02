@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import json
 import math
 import re
 import subprocess
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 import yaml
 
@@ -405,6 +408,21 @@ def format_topic_context(topic: TopicConfig) -> str:
     return f"Title: {topic.title}\nDescription: {topic.description}\nKeywords: {keywords}"
 
 
+def normalize_ollama_models(models: Iterable[Mapping[str, Any]]) -> List[Dict[str, str]]:
+    normalized: Dict[str, Dict[str, str]] = {}
+    for model in models:
+        name = str(model.get("name", "")).strip()
+        if not name or name in normalized:
+            continue
+        normalized[name] = {
+            "name": name,
+            "id": str(model.get("id", "") or model.get("digest", "")).strip(),
+            "size": str(model.get("size", "")).strip(),
+            "modified": str(model.get("modified", "") or model.get("modified_at", "")).strip(),
+        }
+    return sorted(normalized.values(), key=lambda model: model["name"].casefold())
+
+
 def parse_ollama_list_output(output: str) -> List[Dict[str, str]]:
     models: List[Dict[str, str]] = []
     lines = [line for line in output.splitlines() if line.strip()]
@@ -423,10 +441,38 @@ def parse_ollama_list_output(output: str) -> List[Dict[str, str]]:
                 "modified": parts[3] if len(parts) > 3 else "",
             }
         )
-    return models
+    return normalize_ollama_models(models)
 
 
-def query_ollama_models(timeout_seconds: int = 10) -> Tuple[List[Dict[str, str]], Optional[str]]:
+def parse_ollama_tags_payload(payload: Mapping[str, Any]) -> List[Dict[str, str]]:
+    raw_models = payload.get("models", [])
+    if not isinstance(raw_models, list):
+        return []
+    return normalize_ollama_models(model for model in raw_models if isinstance(model, Mapping))
+
+
+def query_ollama_api_models(
+    *,
+    base_url: str = DEFAULT_OLLAMA_BASE_URL,
+    timeout_seconds: int = 10,
+) -> Tuple[List[Dict[str, str]], Optional[str]]:
+    url = f"{base_url.rstrip('/')}/api/tags"
+    request = Request(url, headers={"Accept": "application/json"})
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+        return [], f"Failed to query Ollama API at {url}: {exc}"
+    if not isinstance(payload, Mapping):
+        return [], f"Failed to query Ollama API at {url}: response was not a JSON object"
+    return parse_ollama_tags_payload(payload), None
+
+
+def query_ollama_models(
+    timeout_seconds: int = 10,
+    base_url: str = DEFAULT_OLLAMA_BASE_URL,
+) -> Tuple[List[Dict[str, str]], Optional[str]]:
+    command_error: str | None = None
     try:
         result = subprocess.run(
             ["ollama", "list"],
@@ -436,15 +482,24 @@ def query_ollama_models(timeout_seconds: int = 10) -> Tuple[List[Dict[str, str]]
             timeout=timeout_seconds,
         )
     except FileNotFoundError:
-        return [], "Ollama is not installed or not in PATH."
+        command_error = "Ollama is not installed or not in PATH."
     except subprocess.SubprocessError as exc:
-        return [], f"Failed to query Ollama: {exc}"
+        command_error = f"Failed to query Ollama: {exc}"
+    else:
+        if result.returncode == 0:
+            return parse_ollama_list_output(result.stdout), None
+        command_error = (
+            result.stderr.strip() or result.stdout.strip() or "Unknown error from ollama list."
+        )
 
-    if result.returncode != 0:
-        err = result.stderr.strip() or result.stdout.strip() or "Unknown error from ollama list."
-        return [], f"Ollama is not available: {err}"
+    api_models, api_error = query_ollama_api_models(
+        base_url=base_url,
+        timeout_seconds=timeout_seconds,
+    )
+    if api_error is None:
+        return api_models, None
 
-    return parse_ollama_list_output(result.stdout), None
+    return [], f"Ollama is not available: {command_error}; API fallback failed: {api_error}"
 
 
 def list_installed_ollama_models() -> Tuple[List[str], Optional[str]]:

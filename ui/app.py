@@ -11,6 +11,7 @@ import requests
 import streamlit as st
 
 from src.config import (
+    DEFAULT_MODEL_NAME,
     ConfigValidationError,
     load_app_config,
     query_ollama_models,
@@ -38,6 +39,7 @@ CANONICAL_ROOT = Path(
         str(ROOT),
     )
 ).resolve()
+SUGGESTED_SMALLER_MODELS = ("llama3.2:3b", "phi3:mini", "qwen2.5:3b", "gemma2:2b")
 
 AGENT_LOG_RE = re.compile(
     r"round=(?P<round>\d+)\s+\|\s+agent=(?P<agent>\w+)\s+\|\s+status=(?P<status>\w+)"
@@ -144,6 +146,45 @@ def localize_ollama_models_error(error: str) -> str:
     if error.startswith("Ollama is not available: "):
         return t("ollama_unavailable", detail=error.removeprefix("Ollama is not available: "))
     return error
+
+
+def choose_model_picker_default(
+    *,
+    installed_model_names: Sequence[str],
+    session_model: str | None,
+    config_model: str,
+    default_model: str = DEFAULT_MODEL_NAME,
+) -> str:
+    installed = [name.strip() for name in installed_model_names if name.strip()]
+    if not installed:
+        return ""
+
+    for candidate in (session_model, config_model, default_model):
+        model_name = str(candidate or "").strip()
+        if model_name in installed:
+            return model_name
+    return installed[0]
+
+
+def resolve_effective_model(
+    *,
+    selected_model: str | None,
+    manual_model: str | None,
+    config_model: str,
+) -> str:
+    manual_model = str(manual_model or "").strip()
+    if manual_model:
+        return manual_model
+    selected_model = str(selected_model or "").strip()
+    if selected_model:
+        return selected_model
+    return config_model.strip()
+
+
+def refresh_ollama_model_cache(*, base_url: str, timeout_seconds: int = 5) -> None:
+    models, error = query_ollama_models(timeout_seconds=timeout_seconds, base_url=base_url)
+    st.session_state["ollama_models"] = models
+    st.session_state["ollama_models_error"] = error or ""
 
 
 def localized_stage(stage: Any) -> str:
@@ -611,22 +652,87 @@ def main() -> None:
             )
         )
 
-    models, models_error = query_ollama_models(timeout_seconds=15)
-    installed_model_names = [m["name"] for m in models]
     default_model = app_config.model.name
-    if "selected_model" not in st.session_state:
-        st.session_state["selected_model"] = default_model
-    if st.session_state["selected_model"] not in installed_model_names and installed_model_names:
-        st.session_state["selected_model"] = installed_model_names[0]
+    if "ollama_models" not in st.session_state or "ollama_models_error" not in st.session_state:
+        refresh_ollama_model_cache(base_url=app_config.ollama_base_url)
 
-    if models_error:
-        st.error(t("ollama_models_error_prefix", error=localize_ollama_models_error(models_error)))
-    st.write(t("selected_model", model=st.session_state.get("selected_model", default_model)))
+    st.markdown(f"**{t('installed_ollama_models')}**")
+    refresh_col, model_status_col = st.columns([1, 4])
+    with refresh_col:
+        if st.button(t("refresh_models")):
+            refresh_ollama_model_cache(base_url=app_config.ollama_base_url)
+            st.session_state["model_list_refreshed"] = True
+
+    models = list(st.session_state.get("ollama_models", []))
+    models_error = str(st.session_state.get("ollama_models_error", "") or "")
+    model_list_refreshed = bool(st.session_state.pop("model_list_refreshed", False))
+    installed_model_names = [m["name"] for m in models if str(m.get("name", "")).strip()]
+
+    with model_status_col:
+        if models_error:
+            st.error(
+                t(
+                    "ollama_models_error_prefix",
+                    error=localize_ollama_models_error(models_error),
+                )
+            )
+        elif not installed_model_names:
+            st.warning(t("no_ollama_models_detected"))
+            st.caption(t("suggested_smaller_models", models=", ".join(SUGGESTED_SMALLER_MODELS)))
+        elif model_list_refreshed:
+            st.success(t("model_list_refreshed"))
+        else:
+            st.info(t("use_selected_model"))
+
+    dropdown_default = choose_model_picker_default(
+        installed_model_names=installed_model_names,
+        session_model=st.session_state.get("selected_model_picker")
+        or st.session_state.get("selected_model"),
+        config_model=default_model,
+    )
+    if (
+        installed_model_names
+        and st.session_state.get("selected_model_picker") not in installed_model_names
+    ):
+        st.session_state["selected_model_picker"] = dropdown_default
+    st.session_state.setdefault("manual_model_name", "")
+
+    picker_col, manual_col, effective_col = st.columns([2, 2, 2])
+    with picker_col:
+        if installed_model_names:
+            selected_model = st.selectbox(
+                t("model_selector"),
+                installed_model_names,
+                index=installed_model_names.index(dropdown_default)
+                if dropdown_default in installed_model_names
+                else 0,
+                key="selected_model_picker",
+            )
+        else:
+            selected_model = ""
+            st.caption(t("no_installed_model"))
+    with manual_col:
+        manual_model_name = st.text_input(
+            t("manual_model_name"),
+            key="manual_model_name",
+            placeholder=default_model,
+            help=t("manual_model_help"),
+        )
+    effective_model = resolve_effective_model(
+        selected_model=selected_model,
+        manual_model=manual_model_name,
+        config_model=default_model,
+    )
+    st.session_state["selected_model"] = effective_model
+    with effective_col:
+        st.write(t("effective_model", model=effective_model or t("none_option")))
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     with c1:
-        if st.button(t("run_diagnostic"), disabled=blocked or bool(models_error)):
-            model = st.session_state.get("selected_model", default_model)
+        if st.button(
+            t("run_diagnostic"), disabled=blocked or bool(models_error) or not effective_model
+        ):
+            model = effective_model
             result = start_background_process(
                 command=[sys.executable, "-m", "src.main", "--diagnostic", "--model", model],
                 cwd=ROOT,
@@ -641,8 +747,10 @@ def main() -> None:
                 model=model,
             )
     with c2:
-        if st.button(t("run_normal"), disabled=blocked or bool(models_error)):
-            model = st.session_state.get("selected_model", default_model)
+        if st.button(
+            t("run_normal"), disabled=blocked or bool(models_error) or not effective_model
+        ):
+            model = effective_model
             result = start_background_process(
                 command=[sys.executable, "-m", "src.main", "--model", model],
                 cwd=ROOT,
@@ -657,8 +765,10 @@ def main() -> None:
                 model=model,
             )
     with c3:
-        if st.button(t("run_continuous"), disabled=blocked or bool(models_error)):
-            model = st.session_state.get("selected_model", default_model)
+        if st.button(
+            t("run_continuous"), disabled=blocked or bool(models_error) or not effective_model
+        ):
+            model = effective_model
             result = start_background_process(
                 command=[sys.executable, "-m", "src.main", "--continuous", "--model", model],
                 cwd=ROOT,
@@ -679,14 +789,17 @@ def main() -> None:
     resume_state = describe_resume_state(
         checkpoint=checkpoint,
         run_active=run_active,
-        selected_model=st.session_state.get("selected_model", default_model),
+        selected_model=effective_model,
     )
     with c5:
         if st.button(
             t("resume"),
-            disabled=blocked or bool(models_error) or not resume_state["can_resume"],
+            disabled=blocked
+            or bool(models_error)
+            or not effective_model
+            or not resume_state["can_resume"],
         ):
-            model = st.session_state.get("selected_model", default_model)
+            model = effective_model
             result = start_background_process(
                 command=[sys.executable, "-m", "src.main", "--resume", "--model", model],
                 cwd=ROOT,
@@ -746,10 +859,11 @@ def main() -> None:
     st.subheader(t("model_management"))
     st.caption(t("model_management_help"))
     rec = {
-        "qwen3:8b": "model_default_balanced",
-        "qwen3:14b": "model_stronger_slower",
-        "deepseek-r1:8b": "model_reasoning_experiment",
-        "llama3.1:8b": "model_stable_fallback",
+        "qwen3:8b": "model_quality_balanced",
+        "llama3.2:3b": "model_smaller_if_available",
+        "phi3:mini": "model_smaller_if_available",
+        "qwen2.5:3b": "model_smaller_if_available",
+        "gemma2:2b": "model_smaller_if_available",
     }
     st.markdown(f"**{t('recommended_models')}**")
     for name, desc_key in rec.items():
@@ -772,27 +886,12 @@ def main() -> None:
     else:
         st.caption(t("no_installed_model"))
 
-    if installed_model_names:
-        selected_model = st.selectbox(
-            t("model_selector"),
-            installed_model_names,
-            index=installed_model_names.index(st.session_state["selected_model"])
-            if st.session_state["selected_model"] in installed_model_names
-            else 0,
-        )
-        st.session_state["selected_model"] = selected_model
-    else:
-        selected_model = st.text_input(
-            t("model_selector_manual"), value=st.session_state["selected_model"]
-        )
-        st.session_state["selected_model"] = selected_model.strip()
-
     health_col, health_result_col = st.columns([1, 3])
     with health_col:
         if st.button(t("check_model_health")):
             st.session_state["model_health"] = check_model_health(
                 base_url=app_config.ollama_base_url,
-                selected_model=st.session_state.get("selected_model", ""),
+                selected_model=effective_model,
                 installed_model_names=installed_model_names,
             )
     with health_result_col:
@@ -806,7 +905,7 @@ def main() -> None:
             st.info(t("health_check_help"))
 
     if st.button(t("save_default_model"), disabled=bool(models_error)):
-        model_to_save = st.session_state.get("selected_model", "").strip()
+        model_to_save = effective_model.strip()
         if not model_to_save:
             st.error(t("model_name_empty"))
         else:
