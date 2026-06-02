@@ -115,7 +115,7 @@ ollama run qwen3:8b
 可选补充可以从模板创建：
 
 ```bash
-cp projects/pama/memory.example.md <PROJECT_MEMORY_FILE>
+cp projects/pama/memory.example.md projects/<project>/memory.md
 ```
 
 当前 `projects/pama` 是仓库自带示例项目。如果要换主题，可以新建 `projects/<name>/`，

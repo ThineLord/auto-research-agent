@@ -38,7 +38,7 @@ make run
 ## 输入文件说明
 
 - `projects/pama/task.md`：你的研究任务（必填，最小输入）
-- `<PROJECT_MEMORY_FILE>`：历史上下文记忆（可选，程序会自动维护）
+- `projects/<project>/memory.md`：历史上下文记忆（可选，程序会自动维护）
 - `config.example.yaml`：安全示例配置
 - `config.yaml`：本地运行参数（复制示例后生成，不提交）
 

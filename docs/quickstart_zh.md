@@ -29,7 +29,7 @@ Auto Research Agent 是一个本地优先的研究计划迭代助手：读取 `p
 - 跑一个不调用模型的最小单元测试，确认核心循环写文件逻辑还活着。
 - 查看已有输出：先读 `projects/pama/best_output.md`，再看对应 run 目录里的 round 文件。
 - 打开 Streamlit UI，查看 checkpoint、score history、run log、最新 round 文件。
-- 修改 `projects/pama/task.md` 和 `<PROJECT_MEMORY_FILE>`，然后从 UI 或 CLI 启动新 run。
+- 修改 `projects/<project>/task.md` 和 `projects/<project>/memory.md`，然后从 UI 或 CLI 启动新 run。
 - 用 `make resume` 从已有 checkpoint 继续，但这会调用本地 Ollama 模型。
 - 比较不同 round 的 `01_draft.md`、`02_review.md`、`03_revised.md`、`04_judge.md`。
 - 用 `score_history.json` 粗看评分、超时、重复 judge、无效分数、错误轮次。
