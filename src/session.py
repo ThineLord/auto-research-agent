@@ -210,6 +210,7 @@ def run_session_mode(
     topic_context: str = "",
     topic_title: str = "the configured research topic",
     topic_keywords: Sequence[str] = (),
+    project_metadata: dict[str, object] | None = None,
 ) -> None:
     console.rule("Research Session Mode")
     memory_for_prompt = get_memory_for_prompt(memory_path)
@@ -259,6 +260,7 @@ def run_session_mode(
         global_max_runtime_seconds=global_max_runtime_seconds,
         per_agent_timeout_seconds=per_agent_timeout_seconds,
         topic_keywords=topic_keywords,
+        project_metadata=project_metadata,
     )
 
     research_state_path = project_dir / "research_state.json"

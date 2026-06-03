@@ -28,6 +28,8 @@ from .constants import (
 DEFAULT_MODEL_NAME = "qwen3:8b"
 DEFAULT_MODEL_TEMPERATURE = 0.4
 DEFAULT_MODEL_TIMEOUT_SECONDS = 300
+DEFAULT_OLLAMA_MAX_PROMPT_CHARS = 12000
+DEFAULT_GEMINI_MAX_PROMPT_CHARS = 32000
 MODEL_PROVIDER_OLLAMA = "ollama"
 MODEL_PROVIDER_GEMINI = "gemini"
 SUPPORTED_MODEL_PROVIDERS = {MODEL_PROVIDER_OLLAMA, MODEL_PROVIDER_GEMINI}
@@ -76,6 +78,7 @@ class ModelConfig:
     name: str = DEFAULT_MODEL_NAME
     temperature: float = DEFAULT_MODEL_TEMPERATURE
     timeout_seconds: int = DEFAULT_MODEL_TIMEOUT_SECONDS
+    max_prompt_chars: int = DEFAULT_OLLAMA_MAX_PROMPT_CHARS
     gemini: GeminiConfig = field(default_factory=GeminiConfig)
 
 
@@ -111,6 +114,7 @@ class AppConfig:
                 "name": self.model.name,
                 "temperature": self.model.temperature,
                 "timeout_seconds": self.model.timeout_seconds,
+                "max_prompt_chars": self.model.max_prompt_chars,
                 "gemini": {
                     "api_key_env": self.model.gemini.api_key_env,
                     "api_key": self.model.gemini.api_key,
@@ -363,7 +367,14 @@ def _validate_model_config(config: Mapping[str, Any]) -> ModelConfig:
         _validate_mapping_keys(
             "config.model",
             raw_model,
-            {"provider", "name", "temperature", "timeout_seconds", "gemini"},
+            {
+                "provider",
+                "name",
+                "temperature",
+                "timeout_seconds",
+                "max_prompt_chars",
+                "gemini",
+            },
         )
         model_mapping = raw_model
     else:
@@ -393,11 +404,22 @@ def _validate_model_config(config: Mapping[str, Any]) -> ModelConfig:
         min_value=1,
         max_value=MAX_MODEL_TIMEOUT_SECONDS,
     )
+    default_max_prompt_chars = (
+        DEFAULT_GEMINI_MAX_PROMPT_CHARS
+        if provider == MODEL_PROVIDER_GEMINI
+        else DEFAULT_OLLAMA_MAX_PROMPT_CHARS
+    )
+    max_prompt_chars = _validate_int(
+        model_mapping.get("max_prompt_chars", default_max_prompt_chars),
+        "config.model.max_prompt_chars",
+        min_value=1000,
+    )
     return ModelConfig(
         provider=provider,
         name=model_name,
         temperature=temperature,
         timeout_seconds=timeout_seconds,
+        max_prompt_chars=max_prompt_chars,
         gemini=_validate_gemini_config(model_mapping.get("gemini", {})),
     )
 
@@ -819,6 +841,7 @@ def save_default_model_selection(
     model_cfg["name"] = model_name.strip() or default_model_name
     model_cfg.setdefault("temperature", current_config.model.temperature)
     model_cfg.setdefault("timeout_seconds", current_config.model.timeout_seconds)
+    model_cfg.setdefault("max_prompt_chars", current_config.model.max_prompt_chars)
 
     if (
         provider == MODEL_PROVIDER_GEMINI

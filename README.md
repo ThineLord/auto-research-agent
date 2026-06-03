@@ -76,7 +76,8 @@ cp config.example.yaml config.yaml
 启动 CLI 或 UI 时会先校验 `config.yaml`。未知字段、错误类型、超出范围的数值、无效
 URL 或无效项目名会直接报出具体字段，避免运行到一半才失败。当前推荐格式是嵌套的
 `model:` 配置；兼容旧格式 `model: qwen3:8b`，也兼容旧的顶层 `temperature` 和
-`timeout_seconds`，但嵌套 `model:` 里的值会优先生效。
+`timeout_seconds`，但嵌套 `model:` 里的值会优先生效。`model.max_prompt_chars`
+用于在本地模型收到过长 prompt 前快速失败，避免反复等待长时间 Ollama 超时。
 
 `topic:` 配置决定通用提示词收到的项目主题上下文。当前仓库里的 `projects/example` 是示例
 项目；如果换成新研究方向，请新建 `projects/<name>/`，修改 `project_name`，并同步更新
@@ -201,8 +202,8 @@ make check
   - 选择已安装模型并勾选确认，点击 `Delete Selected Model`
   - 若该模型正被运行任务使用，UI 会阻止删除
 - 输入任务：
-  - 项目选择器默认打开公开安全的 `example` 项目
-  - 项目路径和输出路径会显示为 `projects/example` 这类相对路径
+  - 如果 `config.yaml` 里的 `project_name` 存在，项目选择器默认打开该项目；否则才回到公开安全的 `example` 项目
+  - 项目路径和输出路径会显示为 `projects/<project>` 这类相对路径
   - 在 UI 的 `task.md` 和 `memory.md` 文本框编辑，然后点击 `Save Input`
 - 开始运行：
   - `Run Diagnostic` / `Run Normal` / `Run Continuous`

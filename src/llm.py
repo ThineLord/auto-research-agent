@@ -18,17 +18,19 @@ from .cloud_free import (
 )
 from .config import (
     DEFAULT_GEMINI_API_KEY_ENV,
+    DEFAULT_GEMINI_MAX_PROMPT_CHARS,
+    DEFAULT_OLLAMA_MAX_PROMPT_CHARS,
     MODEL_PROVIDER_GEMINI,
     MODEL_PROVIDER_OLLAMA,
     GeminiConfig,
 )
 
-MAX_PROMPT_CHARS = 32000
 logger = logging.getLogger(__name__)
 
 
 class LLMClientProtocol(Protocol):
     timeout_seconds: int
+    max_prompt_chars: int
 
     def generate(
         self,
@@ -47,6 +49,7 @@ class OllamaClient:
     base_url: str
     model: str
     timeout_seconds: int = 120
+    max_prompt_chars: int = DEFAULT_OLLAMA_MAX_PROMPT_CHARS
 
     def generate(
         self,
@@ -60,8 +63,31 @@ class OllamaClient:
     ) -> str:
         """Generate a response from Ollama chat API."""
         url = f"{self.base_url.rstrip('/')}/api/chat"
-        if len(user_prompt) > MAX_PROMPT_CHARS:
-            user_prompt = user_prompt[-MAX_PROMPT_CHARS:]
+        system_chars = len(system_prompt or "")
+        original_user_chars = len(user_prompt)
+        prompt_chars = system_chars + original_user_chars
+        if self.max_prompt_chars > 0 and prompt_chars > self.max_prompt_chars:
+            logger.warning(
+                "llm_prompt_too_large",
+                extra={
+                    "event": "llm_prompt_too_large",
+                    "provider": MODEL_PROVIDER_OLLAMA,
+                    "model": self.model,
+                    "stage": agent_name,
+                    "agent_name": agent_name,
+                    "prompt_chars": prompt_chars,
+                    "system_chars": system_chars,
+                    "user_chars": original_user_chars,
+                    "max_prompt_chars": self.max_prompt_chars,
+                    "timeout_seconds": self.timeout_seconds,
+                },
+            )
+            raise RuntimeError(
+                f"Ollama prompt too large for stage '{agent_name}': "
+                f"prompt_chars={prompt_chars}, max_prompt_chars={self.max_prompt_chars}. "
+                "Shorten task.md/memory.md or raise model.max_prompt_chars only if the "
+                "selected local model and server can handle the context."
+            )
 
         messages = []
         if system_prompt:
@@ -85,9 +111,15 @@ class OllamaClient:
             "llm_request_start",
             extra={
                 "event": "llm_request_start",
+                "provider": MODEL_PROVIDER_OLLAMA,
+                "model": self.model,
+                "stage": agent_name,
                 "agent_name": agent_name,
-                "system_chars": len(system_prompt or ""),
+                "prompt_chars": prompt_chars,
+                "system_chars": system_chars,
                 "user_chars": len(user_prompt),
+                "original_user_chars": original_user_chars,
+                "max_prompt_chars": self.max_prompt_chars,
                 "timeout_seconds": self.timeout_seconds,
                 "structured_response": response_format is not None,
             },
@@ -117,6 +149,9 @@ class OllamaClient:
             "llm_request_end",
             extra={
                 "event": "llm_request_end",
+                "provider": MODEL_PROVIDER_OLLAMA,
+                "model": self.model,
+                "stage": agent_name,
                 "agent_name": agent_name,
                 "response_chars": len(content),
                 "elapsed_seconds": round(elapsed, 3),
@@ -175,6 +210,7 @@ class GeminiClient:
     api_key_env: str = DEFAULT_GEMINI_API_KEY_ENV
     api_key: str = ""
     timeout_seconds: int = 120
+    max_prompt_chars: int = DEFAULT_GEMINI_MAX_PROMPT_CHARS
     cloud_free_config: CloudFreeConfig | None = None
     _scheduler: CloudFreeScheduler | None = field(init=False, default=None)
 
@@ -258,13 +294,37 @@ class GeminiClient:
         top_p: float = 0.9,
         response_format: Optional[Dict[str, Any]] = None,
     ) -> str:
+        system_chars = len(system_prompt or "")
+        original_user_chars = len(user_prompt)
+        prompt_chars = system_chars + original_user_chars
         if self.cloud_free_config and self.cloud_free_config.cloud_free_mode:
             user_prompt = apply_cloud_prompt_budget(
                 user_prompt,
                 self.cloud_free_config.prompt_budget_chars,
             )
-        elif len(user_prompt) > MAX_PROMPT_CHARS:
-            user_prompt = user_prompt[-MAX_PROMPT_CHARS:]
+        elif self.max_prompt_chars > 0 and prompt_chars > self.max_prompt_chars:
+            logger.warning(
+                "llm_prompt_too_large",
+                extra={
+                    "event": "llm_prompt_too_large",
+                    "provider": MODEL_PROVIDER_GEMINI,
+                    "model": self.model,
+                    "stage": agent_name,
+                    "agent_name": agent_name,
+                    "prompt_chars": prompt_chars,
+                    "system_chars": system_chars,
+                    "user_chars": original_user_chars,
+                    "max_prompt_chars": self.max_prompt_chars,
+                    "timeout_seconds": self.timeout_seconds,
+                },
+            )
+            raise RuntimeError(
+                f"Gemini prompt too large for stage '{agent_name}': "
+                f"prompt_chars={prompt_chars}, max_prompt_chars={self.max_prompt_chars}. "
+                "Shorten task.md/memory.md or raise model.max_prompt_chars if the selected "
+                "cloud model supports the context."
+            )
+        final_prompt_chars = system_chars + len(user_prompt)
 
         self._ensure_api_key_available()
         client = self._create_client()
@@ -281,9 +341,15 @@ class GeminiClient:
             extra={
                 "event": "llm_request_start",
                 "provider": MODEL_PROVIDER_GEMINI,
+                "model": self.model,
+                "stage": agent_name,
                 "agent_name": agent_name,
-                "system_chars": len(system_prompt or ""),
+                "prompt_chars": final_prompt_chars,
+                "original_prompt_chars": prompt_chars,
+                "system_chars": system_chars,
                 "user_chars": len(user_prompt),
+                "original_user_chars": original_user_chars,
+                "max_prompt_chars": self.max_prompt_chars,
                 "timeout_seconds": self.timeout_seconds,
                 "structured_response": response_format is not None,
             },
@@ -318,6 +384,8 @@ class GeminiClient:
             extra={
                 "event": "llm_request_end",
                 "provider": MODEL_PROVIDER_GEMINI,
+                "model": self.model,
+                "stage": agent_name,
                 "agent_name": agent_name,
                 "response_chars": len(content),
                 "elapsed_seconds": round(elapsed, 3),
@@ -338,6 +406,7 @@ def create_llm_client(
     ollama_base_url: str,
     timeout_seconds: int,
     gemini_config: GeminiConfig,
+    max_prompt_chars: int | None = None,
     explicit_gemini_api_key: str = "",
     cloud_free_config: CloudFreeConfig | None = None,
 ) -> LLMClientProtocol:
@@ -347,6 +416,7 @@ def create_llm_client(
             base_url=ollama_base_url,
             model=model_name,
             timeout_seconds=timeout_seconds,
+            max_prompt_chars=max_prompt_chars or DEFAULT_OLLAMA_MAX_PROMPT_CHARS,
         )
     if provider == MODEL_PROVIDER_GEMINI:
         return GeminiClient(
@@ -354,6 +424,7 @@ def create_llm_client(
             api_key_env=gemini_config.api_key_env,
             api_key=explicit_gemini_api_key or gemini_config.api_key,
             timeout_seconds=timeout_seconds,
+            max_prompt_chars=max_prompt_chars or DEFAULT_GEMINI_MAX_PROMPT_CHARS,
             cloud_free_config=cloud_free_config,
         )
     raise ValueError(f"Unsupported model provider: {provider}")

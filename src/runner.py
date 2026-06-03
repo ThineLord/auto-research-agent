@@ -21,6 +21,7 @@ from .constants import (
     STOP_MAX_ROUNDS,
     STOP_NO_IMPROVEMENT,
     STOP_OLLAMA_TIMEOUT,
+    STOP_PROMPT_TOO_LARGE,
     STOP_USER_REQUESTED,
 )
 from .runtime import log_run as _log
@@ -141,6 +142,8 @@ def run_iterative_rounds(
     run_root_override: Optional[Path] = None,
     initial_best_score: float = -1.0,
     topic_keywords: Optional[Sequence[str]] = None,
+    project_metadata: Optional[Dict[str, Any]] = None,
+    max_consecutive_draft_timeouts: int = 1,
 ) -> Dict[str, Any]:
     # Termination guarantee:
     # 1) The only round loop is a bounded for-loop over [1..max_rounds].
@@ -161,6 +164,29 @@ def run_iterative_rounds(
         mode,
         f"run_start run_id={run_id} run_root={run_root} model={model_name}",
     )
+    write_json_file(
+        run_root / "run_manifest.json",
+        {
+            "run_id": run_id,
+            "run_root": str(run_root),
+            "mode": mode,
+            "model": model_name,
+            "started_at": datetime.now().isoformat(),
+            "project": project_metadata or {},
+        },
+    )
+    if project_metadata:
+        _log(
+            console,
+            log_path,
+            mode,
+            "project_source "
+            f"kind={project_metadata.get('source_kind', 'unknown')} "
+            f"name={project_metadata.get('project_name', '')} "
+            f"title={project_metadata.get('project_title', '')} "
+            f"project_dir={project_metadata.get('project_dir', '')} "
+            f"task_path={project_metadata.get('task_path', '')}",
+        )
     _log(
         console,
         log_path,
@@ -188,6 +214,7 @@ def run_iterative_rounds(
     invalid_score_seen = False
     timeout_seen = False
     paused_until_reset_message = ""
+    consecutive_draft_timeouts = 0
 
     def _remaining_runtime_seconds() -> int:
         remaining = global_max_runtime_seconds - (time.monotonic() - started_at)
@@ -466,6 +493,14 @@ def run_iterative_rounds(
         timeout_this_round = any("timed out" in (err or "").lower() for err in round_errors)
         if timeout_this_round:
             timeout_seen = True
+        draft_timeout_this_round = "timed out" in (draft_error or "").lower()
+        prompt_too_large_this_round = any(
+            "prompt too large" in (err or "").lower() for err in round_errors
+        )
+        if draft_timeout_this_round:
+            consecutive_draft_timeouts += 1
+        else:
+            consecutive_draft_timeouts = 0
 
         save_round_outputs(
             round_dir,
@@ -572,6 +607,7 @@ def run_iterative_rounds(
             "updated_at": datetime.now().isoformat(),
             "mode": mode,
             "model": model_name,
+            "project": project_metadata or {},
             "cloud_free": _cloud_free_status(agents),
         }
         write_json_file(checkpoint_path, checkpoint_data)
@@ -582,6 +618,7 @@ def run_iterative_rounds(
             log_path,
             mode,
             f"stop_check round={round_index} timeout={timeout_this_round} "
+            f"draft_timeout_streak={consecutive_draft_timeouts} "
             f"repetitive={repetitive_judge} non_improve_streak={non_improve_streak} "
             f"invalid_score={parsed_score is None} elapsed={elapsed_after_round:.2f}s",
         )
@@ -594,6 +631,30 @@ def run_iterative_rounds(
         if timeout_this_round and not disable_timeout_stop:
             stop_reason = STOP_OLLAMA_TIMEOUT
             _log(console, log_path, mode, f"stop_reason={STOP_OLLAMA_TIMEOUT} round={round_index}")
+            break
+
+        if (
+            max_consecutive_draft_timeouts > 0
+            and consecutive_draft_timeouts >= max_consecutive_draft_timeouts
+        ):
+            stop_reason = STOP_OLLAMA_TIMEOUT
+            _log(
+                console,
+                log_path,
+                mode,
+                f"stop_reason={STOP_OLLAMA_TIMEOUT} round={round_index} "
+                f"draft_timeout_streak={consecutive_draft_timeouts}",
+            )
+            break
+
+        if prompt_too_large_this_round:
+            stop_reason = STOP_PROMPT_TOO_LARGE
+            _log(
+                console,
+                log_path,
+                mode,
+                f"stop_reason={STOP_PROMPT_TOO_LARGE} round={round_index}",
+            )
             break
 
         if not disable_no_improvement_stop and non_improve_streak >= stop_if_no_improvement_rounds:
@@ -652,6 +713,7 @@ def run_iterative_rounds(
         "updated_at": datetime.now().isoformat(),
         "mode": mode,
         "model": model_name,
+        "project": project_metadata or {},
         "cloud_free": _cloud_free_status(agents),
     }
     if stop_reason == STOP_CLOUD_DAILY_QUOTA:

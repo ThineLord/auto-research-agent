@@ -66,8 +66,8 @@ topic:
 
 The tracked `projects/example` folder is the sample project. To work on another topic, create a new
 folder under `projects/`, point `project_name` at it, and update the `topic` block plus `task.md`.
-The UI prefers this public-safe example as its initial selection when it is present, while custom
-projects remain selectable from the project dropdown.
+The UI uses the configured `project_name` as its initial selection when that folder exists, and
+falls back to the public-safe example only when the configured project is unavailable.
 
 ## Streamlit And Runtime Flow
 

@@ -25,7 +25,9 @@ from .cloud_free import (
     save_profile_artifact,
 )
 from .config import (
+    DEFAULT_GEMINI_MAX_PROMPT_CHARS,
     DEFAULT_GEMINI_MODEL,
+    DEFAULT_OLLAMA_MAX_PROMPT_CHARS,
     MODEL_PROVIDER_GEMINI,
     MODEL_PROVIDER_OLLAMA,
     SUPPORTED_MODEL_PROVIDERS,
@@ -41,11 +43,11 @@ from .constants import RUN_LOCK_FILENAME
 from .diagnostic import run_diagnostic_mode
 from .llm import create_llm_client
 from .logging_config import configure_logging
+from .project_input import ProjectInputError, load_project_input
 from .resume import run_resume_mode
 from .runner import run_iterative_rounds
 from .runtime import acquire_run_lock, release_run_lock
 from .session import run_session_mode
-from .storage import read_text
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
@@ -138,6 +140,12 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         type=int,
         default=None,
         help="Override cloud free prompt budget in characters.",
+    )
+    parser.add_argument(
+        "--max-prompt-chars",
+        type=int,
+        default=None,
+        help="Override maximum prompt size before an LLM call fails fast.",
     )
     return parser.parse_args(argv)
 
@@ -232,12 +240,41 @@ def main() -> None:
     temperature = config_temperature
     top_p = config.top_p
     timeout_seconds = config_timeout
+    if args.max_prompt_chars is not None:
+        max_prompt_chars = max(1000, args.max_prompt_chars)
+    elif args.provider and provider != config_provider:
+        max_prompt_chars = (
+            DEFAULT_GEMINI_MAX_PROMPT_CHARS
+            if provider == MODEL_PROVIDER_GEMINI
+            else DEFAULT_OLLAMA_MAX_PROMPT_CHARS
+        )
+    else:
+        max_prompt_chars = config.model.max_prompt_chars
     topic_context = format_topic_context(config.topic)
     topic_keywords = config.topic.keywords
 
     project_dir = root / "projects" / project_name
     memory_path = project_dir / "memory.md"
     prompts_dir = root / "prompts"
+
+    try:
+        project_input = load_project_input(
+            root=root,
+            project_name=project_name,
+            explicit_project=args.project is not None,
+        )
+    except ProjectInputError as exc:
+        console.print(f"[red]Project input error: {exc}[/red]")
+        return
+    project_dir = project_input.project_dir
+    memory_path = project_dir / "memory.md"
+    task_text = project_input.task_text
+    project_metadata = project_input.as_metadata()
+    console.print(
+        "[bold cyan]Project input:[/bold cyan] "
+        f"kind={project_input.source_kind} | name={project_input.project_name} | "
+        f"title={project_input.project_title} | task={project_input.task_path}"
+    )
 
     if provider == MODEL_PROVIDER_OLLAMA:
         installed_models, ollama_error = list_installed_ollama_models()
@@ -352,10 +389,6 @@ def main() -> None:
                 f"[cyan]Cloud free runner selected {model_name}: {recommendation.reason}[/cyan]"
             )
 
-    task_text = read_text(project_dir / "task.md")
-    if not task_text:
-        raise ValueError(f"Task file is empty: {project_dir / 'task.md'}")
-
     provider_label = "Local" if provider == MODEL_PROVIDER_OLLAMA else "Cloud"
     console.print(
         f"[bold cyan]{provider_label}: Using provider: {provider} | model: {model_name}[/bold cyan]"
@@ -388,6 +421,7 @@ def main() -> None:
         model_name=model_name,
         ollama_base_url=base_url,
         timeout_seconds=timeout_seconds,
+        max_prompt_chars=max_prompt_chars,
         gemini_config=gemini_config,
         cloud_free_config=cloud_free_config
         if provider == MODEL_PROVIDER_GEMINI and cloud_free_config.cloud_free_mode
@@ -415,6 +449,7 @@ def main() -> None:
                 global_max_runtime_seconds=normal_max_runtime_seconds,
                 per_agent_timeout_seconds=timeout_seconds,
                 topic_keywords=topic_keywords,
+                project_metadata=project_metadata,
             )
             return
 
@@ -434,6 +469,7 @@ def main() -> None:
                 disable_no_improvement_stop=True,
                 disable_timeout_stop=True,
                 topic_keywords=topic_keywords,
+                project_metadata=project_metadata,
             )
             return
 
@@ -446,6 +482,7 @@ def main() -> None:
                 memory_path=memory_path,
                 model_name=model_label,
                 topic_context=topic_context,
+                project_metadata=project_metadata,
             )
             return
 
@@ -465,6 +502,7 @@ def main() -> None:
                 topic_context=topic_context,
                 topic_title=config.topic.title,
                 topic_keywords=topic_keywords,
+                project_metadata=project_metadata,
             )
             return
 
@@ -481,6 +519,7 @@ def main() -> None:
             global_max_runtime_seconds=normal_max_runtime_seconds,
             per_agent_timeout_seconds=timeout_seconds,
             topic_keywords=topic_keywords,
+            project_metadata=project_metadata,
         )
     except KeyboardInterrupt:
         console.print(

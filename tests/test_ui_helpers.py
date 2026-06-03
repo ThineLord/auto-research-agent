@@ -304,6 +304,15 @@ class SharedUiBackendHelperTests(unittest.TestCase):
             "qwen3:8b",
         )
 
+        self.assertEqual(
+            ui_app.default_project_index(["example", "nebula_unique_task"], "nebula_unique_task"),
+            1,
+        )
+        self.assertEqual(
+            ui_app.default_project_index(["example", "other"], "missing_project"),
+            0,
+        )
+
     def test_ui_cloud_provider_helpers_build_safe_command_and_env(self) -> None:
         import ui.app as ui_app
 

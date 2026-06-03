@@ -51,6 +51,47 @@ class LlmClientTests(unittest.TestCase):
         payload = post.call_args.kwargs["json"]
         self.assertEqual(payload["format"], response_format)
 
+    def test_ollama_prompt_too_large_fails_before_request(self) -> None:
+        with patch.object(llm_module.requests, "post") as post:
+            with self.assertRaisesRegex(RuntimeError, "Ollama prompt too large"):
+                OllamaClient(
+                    base_url="http://localhost:11434",
+                    model="test",
+                    max_prompt_chars=10,
+                ).generate(
+                    agent_name="draft",
+                    system_prompt="system",
+                    user_prompt="this prompt is too long",
+                )
+
+        post.assert_not_called()
+
+    def test_ollama_request_start_logs_provider_model_stage_and_prompt_size(self) -> None:
+        response = SimpleNamespace(
+            raise_for_status=lambda: None,
+            json=lambda: {"message": {"content": "ok"}},
+        )
+
+        with (
+            patch.object(llm_module.requests, "post", return_value=response),
+            patch.object(llm_module.logger, "info") as log_info,
+        ):
+            OllamaClient(base_url="http://localhost:11434", model="test").generate(
+                agent_name="draft",
+                system_prompt="sys",
+                user_prompt="hello",
+            )
+
+        start_call = next(
+            call for call in log_info.call_args_list if call.args[0] == "llm_request_start"
+        )
+        extra = start_call.kwargs["extra"]
+        self.assertEqual(extra["provider"], "ollama")
+        self.assertEqual(extra["model"], "test")
+        self.assertEqual(extra["stage"], "draft")
+        self.assertEqual(extra["prompt_chars"], 8)
+        self.assertEqual(extra["timeout_seconds"], 120)
+
     def test_gemini_generate_calls_google_genai_client(self) -> None:
         generate_content = Mock(return_value=SimpleNamespace(text=" OK "))
         fake_client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
