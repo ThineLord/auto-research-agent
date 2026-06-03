@@ -59,7 +59,9 @@ if find_spec("yaml") is None:
 
 import src.main as main_module
 from src.cli import parse_args
-from src.constants import STOP_MAX_ROUNDS
+from src.cloud_free import CloudFreeDailyQuotaExhausted
+from src.constants import STOP_CLOUD_DAILY_QUOTA, STOP_MAX_ROUNDS, STOP_USER_REQUESTED
+from src.resume import run_resume_mode
 from src.runner import run_iterative_rounds
 
 
@@ -68,9 +70,9 @@ class FakeLLM:
 
 
 class FakeAgents:
-    def __init__(self) -> None:
+    def __init__(self, judge_scores: list[int] | None = None) -> None:
         self.llm = FakeLLM()
-        self.judge_scores = [50, 40]
+        self.judge_scores = list(judge_scores or [50, 40])
 
     def draft(
         self,
@@ -112,6 +114,89 @@ class FakeAgents:
                 "blockers": ["Needs one more validation pass."],
                 "next_step": "CONTINUE",
             }
+        )
+
+
+class QuotaPauseAgents(FakeAgents):
+    def draft(
+        self,
+        *,
+        task: str,
+        memory: str,
+        round_index: int,
+        previous_best: str,
+        previous_judge: str,
+    ) -> str:
+        raise CloudFreeDailyQuotaExhausted(
+            "Free-tier daily quota likely exhausted; safe to resume after reset."
+        )
+
+
+class StopAfterJudgeAgents(FakeAgents):
+    def __init__(self, stop_path: Path, stop_after_judge: int) -> None:
+        super().__init__([91, 92, 93, 94])
+        self.stop_path = stop_path
+        self.stop_after_judge = stop_after_judge
+        self.judge_calls = 0
+
+    def judge(self, *, task: str, memory: str, revised_output: str) -> str:
+        output = super().judge(task=task, memory=memory, revised_output=revised_output)
+        self.judge_calls += 1
+        if self.judge_calls == self.stop_after_judge:
+            self.stop_path.write_text("STOP_REQUESTED\n", encoding="utf-8")
+        return output
+
+
+class StopAfterDraftAgents(FakeAgents):
+    def __init__(self, stop_path: Path, stop_after_draft: int) -> None:
+        super().__init__([88, 77])
+        self.stop_path = stop_path
+        self.stop_after_draft = stop_after_draft
+        self.draft_calls = 0
+
+    def draft(
+        self,
+        *,
+        task: str,
+        memory: str,
+        round_index: int,
+        previous_best: str,
+        previous_judge: str,
+    ) -> str:
+        output = super().draft(
+            task=task,
+            memory=memory,
+            round_index=round_index,
+            previous_best=previous_best,
+            previous_judge=previous_judge,
+        )
+        self.draft_calls += 1
+        if self.draft_calls == self.stop_after_draft:
+            self.stop_path.write_text("STOP_REQUESTED\n", encoding="utf-8")
+        return output
+
+
+class RecordingAgents(FakeAgents):
+    def __init__(self) -> None:
+        super().__init__([64])
+        self.draft_rounds: list[int] = []
+
+    def draft(
+        self,
+        *,
+        task: str,
+        memory: str,
+        round_index: int,
+        previous_best: str,
+        previous_judge: str,
+    ) -> str:
+        self.draft_rounds.append(round_index)
+        return super().draft(
+            task=task,
+            memory=memory,
+            round_index=round_index,
+            previous_best=previous_best,
+            previous_judge=previous_judge,
         )
 
 
@@ -170,6 +255,150 @@ class RoundLoopTests(unittest.TestCase):
             score_history = (project_dir / "score_history.json").read_text(encoding="utf-8")
             self.assertIn('"score": 50.0', score_history)
             self.assertIn('"score": 40.0', score_history)
+
+    def test_round_loop_checkpoints_resumable_cloud_quota_pause(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+
+            result = run_iterative_rounds(
+                console=Console(),
+                agents=QuotaPauseAgents(),
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="continuous",
+                model_name="gemini:gemini-3.5-flash",
+                max_rounds=2,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+            )
+
+            checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
+            self.assertEqual(result["stop_reason"], STOP_CLOUD_DAILY_QUOTA)
+            self.assertEqual(checkpoint["stop_reason"], STOP_CLOUD_DAILY_QUOTA)
+            self.assertTrue(checkpoint["can_resume"])
+            self.assertTrue(checkpoint["paused_until_reset"])
+            self.assertEqual(checkpoint["last_completed_round"], 0)
+
+    def test_stop_after_requested_rounds_keeps_exact_completed_count(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            stop_path = project_dir / "STOP_REQUESTED"
+
+            result = run_iterative_rounds(
+                console=Console(),
+                agents=StopAfterJudgeAgents(stop_path, stop_after_judge=3),
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="test",
+                model_name="fake-model",
+                max_rounds=5,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+            )
+
+            run_root = Path(result["run_root"])
+            checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
+            score_history = json.loads(
+                (project_dir / "score_history.json").read_text(encoding="utf-8")
+            )
+
+            self.assertEqual(result["completed_rounds"], 3)
+            self.assertEqual(result["stop_reason"], STOP_USER_REQUESTED)
+            self.assertEqual(checkpoint["last_completed_round"], 3)
+            self.assertEqual([entry["round"] for entry in score_history], [1, 2, 3])
+            self.assertEqual([entry["score"] for entry in score_history], [91.0, 92.0, 93.0])
+            self.assertFalse((run_root / "round_04").exists())
+
+    def test_stopped_partial_round_does_not_append_zero_score_or_advance_checkpoint(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            stop_path = project_dir / "STOP_REQUESTED"
+
+            result = run_iterative_rounds(
+                console=Console(),
+                agents=StopAfterDraftAgents(stop_path, stop_after_draft=2),
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="test",
+                model_name="fake-model",
+                max_rounds=5,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+            )
+
+            run_root = Path(result["run_root"])
+            checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
+            score_history = json.loads(
+                (project_dir / "score_history.json").read_text(encoding="utf-8")
+            )
+
+            self.assertEqual(result["completed_rounds"], 1)
+            self.assertEqual(result["stop_reason"], STOP_USER_REQUESTED)
+            self.assertEqual(checkpoint["last_completed_round"], 1)
+            self.assertEqual([entry["round"] for entry in score_history], [1])
+            self.assertEqual([entry["score"] for entry in score_history], [88.0])
+            self.assertNotIn(0.0, [entry["score"] for entry in score_history])
+            self.assertTrue((run_root / "round_02").exists())
+            self.assertIn(
+                "Judge skipped",
+                (run_root / "round_02" / "04_judge.md").read_text(encoding="utf-8"),
+            )
+
+    def test_resume_starts_after_last_real_completed_round(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            (project_dir / "checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 3,
+                        "best_score": 93.0,
+                        "can_resume": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            agents = RecordingAgents()
+
+            run_resume_mode(
+                console=Console(),
+                agents=agents,
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                model_name="fake-model",
+                max_rounds=4,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+            )
+
+            checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
+            self.assertEqual(agents.draft_rounds, [4])
+            self.assertEqual(checkpoint["last_completed_round"], 4)
 
 
 if __name__ == "__main__":

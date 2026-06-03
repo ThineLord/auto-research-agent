@@ -11,7 +11,21 @@ from typing import List, Optional
 from rich.console import Console
 
 from .agents import ResearchAgents
+from .cloud_free import (
+    FREE_RUNNER_MANUAL,
+    FREE_RUNNER_PRESETS,
+    build_candidate_pool,
+    discover_free_cloud_models,
+    filter_safe_text_models,
+    load_discovery_artifact,
+    load_profile_artifact,
+    profile_free_cloud_models,
+    recommend_free_cloud_model,
+    save_discovery_artifact,
+    save_profile_artifact,
+)
 from .config import (
+    DEFAULT_GEMINI_MODEL,
     MODEL_PROVIDER_GEMINI,
     MODEL_PROVIDER_OLLAMA,
     SUPPORTED_MODEL_PROVIDERS,
@@ -80,6 +94,51 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         default=None,
         help="Override project folder name under projects/.",
     )
+    parser.add_argument(
+        "--cloud-free-discover",
+        action="store_true",
+        help="Discover safe free-run Gemini/Gemma text models and save an ignored artifact.",
+    )
+    parser.add_argument(
+        "--cloud-free-profile",
+        action="store_true",
+        help="Profile safe free-run Gemini/Gemma candidates and save an ignored artifact.",
+    )
+    parser.add_argument(
+        "--free-runner-preset",
+        choices=FREE_RUNNER_PRESETS,
+        default=None,
+        help="Cloud free runner preset.",
+    )
+    parser.add_argument(
+        "--disable-cloud-free-mode",
+        action="store_true",
+        help="Disable Gemini free-tier pacing/retry scheduler for this run.",
+    )
+    parser.add_argument(
+        "--min-delay-seconds",
+        type=float,
+        default=None,
+        help="Override cloud free scheduler minimum delay.",
+    )
+    parser.add_argument(
+        "--max-delay-seconds",
+        type=float,
+        default=None,
+        help="Override cloud free scheduler maximum delay.",
+    )
+    parser.add_argument(
+        "--max-retries",
+        type=int,
+        default=None,
+        help="Override cloud free scheduler retry count.",
+    )
+    parser.add_argument(
+        "--prompt-budget-chars",
+        type=int,
+        default=None,
+        help="Override cloud free prompt budget in characters.",
+    )
     return parser.parse_args(argv)
 
 
@@ -99,6 +158,38 @@ def _validate_project_override(project_name: str) -> Optional[str]:
     if normalized in {".", ".."} or "/" in normalized or "\\" in normalized:
         return "Project name must be a simple folder name under projects/."
     return None
+
+
+def _print_cloud_model_table(console: Console, models: list[object]) -> None:
+    for model in models:
+        model_id = str(getattr(model, "model_id", ""))
+        safe = bool(getattr(model, "safe_text_generation", False))
+        source = str(getattr(model, "source", ""))
+        blocked = str(getattr(model, "blocked_reason", ""))
+        console.print(
+            f"- {model_id} | safe={safe} | source={source}"
+            + (f" | blocked={blocked}" if blocked else "")
+        )
+
+
+def _apply_cloud_free_arg_overrides(config, args: argparse.Namespace):
+    cloud_free_config = config.cloud_free
+    updates = {}
+    if args.free_runner_preset:
+        updates["free_runner_preset"] = args.free_runner_preset
+    if args.disable_cloud_free_mode:
+        updates["cloud_free_mode"] = False
+    if args.min_delay_seconds is not None:
+        updates["min_delay_seconds"] = max(0.0, args.min_delay_seconds)
+    if args.max_delay_seconds is not None:
+        updates["max_delay_seconds"] = max(0.0, args.max_delay_seconds)
+    if args.max_retries is not None:
+        updates["max_retries"] = max(0, args.max_retries)
+    if args.prompt_budget_chars is not None:
+        updates["prompt_budget_chars"] = max(1000, args.prompt_budget_chars)
+    if updates:
+        cloud_free_config = replace(cloud_free_config, **updates)
+    return cloud_free_config
 
 
 def main() -> None:
@@ -121,8 +212,13 @@ def main() -> None:
     ) = resolve_model_provider_settings(config)
     provider = args.provider or config_provider
     model_name = args.model or config_model_name
+    if args.cloud_free_discover or args.cloud_free_profile:
+        provider = MODEL_PROVIDER_GEMINI
+        if args.model is None:
+            model_name = DEFAULT_GEMINI_MODEL
     gemini_api_key_env = args.gemini_api_key_env or config_gemini.api_key_env
     gemini_config = replace(config_gemini, api_key_env=gemini_api_key_env)
+    cloud_free_config = _apply_cloud_free_arg_overrides(config, args)
     model_label = format_model_label(provider, model_name)
     base_url = config.ollama_base_url
     project_name = args.project.strip() if args.project else config.project_name
@@ -142,10 +238,6 @@ def main() -> None:
     project_dir = root / "projects" / project_name
     memory_path = project_dir / "memory.md"
     prompts_dir = root / "prompts"
-
-    task_text = read_text(project_dir / "task.md")
-    if not task_text:
-        raise ValueError(f"Task file is empty: {project_dir / 'task.md'}")
 
     if provider == MODEL_PROVIDER_OLLAMA:
         installed_models, ollama_error = list_installed_ollama_models()
@@ -173,6 +265,96 @@ def main() -> None:
     else:
         console.print(f"[red]Unsupported model provider: {provider}[/red]")
         return
+
+    if args.cloud_free_discover:
+        discovered, error = discover_free_cloud_models(
+            api_key_env=gemini_api_key_env,
+            api_key=gemini_config.api_key,
+            config=cloud_free_config,
+        )
+        if error:
+            console.print(f"[red]Cloud model discovery failed: {error}[/red]")
+            return
+        artifact = save_discovery_artifact(project_dir, discovered)
+        candidates = build_candidate_pool(
+            discovered_models=discovered,
+            configured_models=gemini_config.models,
+            config=cloud_free_config,
+        )
+        console.print(f"[green]Discovered {len(discovered)} cloud models.[/green]")
+        console.print(f"[green]Safe free-run candidates: {len(candidates)}[/green]")
+        _print_cloud_model_table(console, candidates)
+        console.print(f"[cyan]Saved discovery artifact:[/cyan] {artifact}")
+        return
+
+    if args.cloud_free_profile:
+        discovered, error = discover_free_cloud_models(
+            api_key_env=gemini_api_key_env,
+            api_key=gemini_config.api_key,
+            config=cloud_free_config,
+        )
+        if error:
+            console.print(
+                f"[yellow]Discovery failed; profiling configured seeds only: {error}[/yellow]"
+            )
+            discovered = []
+        else:
+            save_discovery_artifact(project_dir, discovered)
+        candidates = build_candidate_pool(
+            discovered_models=discovered,
+            configured_models=gemini_config.models,
+            config=cloud_free_config,
+        )
+        safe_candidates = filter_safe_text_models(candidates, include_unavailable=True)
+        profiles = profile_free_cloud_models(
+            candidates=safe_candidates,
+            api_key_env=gemini_api_key_env,
+            api_key=gemini_config.api_key,
+            timeout_seconds=timeout_seconds,
+        )
+        artifact = save_profile_artifact(project_dir, profiles)
+        recommendation = recommend_free_cloud_model(
+            candidates=safe_candidates,
+            profiles=profiles,
+            preset=cloud_free_config.free_runner_preset,
+        )
+        console.print(f"[green]Profiled {len(profiles)} safe free-run candidates.[/green]")
+        if recommendation:
+            console.print(
+                "[cyan]Recommended model:[/cyan] "
+                f"{recommendation.model_id} ({recommendation.reason})"
+            )
+        console.print(f"[cyan]Saved profile artifact:[/cyan] {artifact}")
+        return
+
+    if (
+        provider == MODEL_PROVIDER_GEMINI
+        and cloud_free_config.cloud_free_mode
+        and cloud_free_config.free_runner_preset != FREE_RUNNER_MANUAL
+        and args.model is None
+    ):
+        discovered = load_discovery_artifact(project_dir)
+        profiles = load_profile_artifact(project_dir)
+        candidates = build_candidate_pool(
+            discovered_models=discovered,
+            configured_models=gemini_config.models,
+            config=cloud_free_config,
+        )
+        recommendation = recommend_free_cloud_model(
+            candidates=candidates,
+            profiles=profiles,
+            preset=cloud_free_config.free_runner_preset,
+        )
+        if recommendation:
+            model_name = recommendation.model_id
+            model_label = format_model_label(provider, model_name)
+            console.print(
+                f"[cyan]Cloud free runner selected {model_name}: {recommendation.reason}[/cyan]"
+            )
+
+    task_text = read_text(project_dir / "task.md")
+    if not task_text:
+        raise ValueError(f"Task file is empty: {project_dir / 'task.md'}")
 
     provider_label = "Local" if provider == MODEL_PROVIDER_OLLAMA else "Cloud"
     console.print(
@@ -207,6 +389,9 @@ def main() -> None:
         ollama_base_url=base_url,
         timeout_seconds=timeout_seconds,
         gemini_config=gemini_config,
+        cloud_free_config=cloud_free_config
+        if provider == MODEL_PROVIDER_GEMINI and cloud_free_config.cloud_free_mode
+        else None,
     )
     agents = ResearchAgents.from_prompt_dir(
         llm=llm,

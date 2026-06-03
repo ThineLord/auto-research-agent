@@ -102,6 +102,34 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "cloud_model_management_note": (
             "Cloud Gemini runs do not use local Ollama models, pull, or delete operations."
         ),
+        "cloud_free_runner": "Cloud Free Runner",
+        "cloud_free_zero_cost_warning": "Zero-cost mode disables paid/tool features.",
+        "cloud_free_limits_warning": (
+            "Actual free limits depend on your AI Studio project. Backoff, checkpoint, and "
+            "resume are expected under free-tier 429s. For long zero-cost runs prefer "
+            "Auto/Volume; profiled long-run recommendation is gemma-4-26b-a4b-it. "
+            "Quality uses gemini-3.5-flash for short high-quality tests and may back off."
+        ),
+        "free_runner_preset": "Free runner preset",
+        "free_runner_auto": "Auto: best zero-cost long-run",
+        "free_runner_quality": "Quality free: Gemini 3.5 Flash (short tests)",
+        "free_runner_volume": "Volume free: high-TPM/Gemma or Flash-Lite",
+        "free_runner_manual": "Manual",
+        "discover_free_cloud_models": "Discover free cloud models",
+        "profile_safe_free_models": "Profile safe free models",
+        "discovering_free_cloud_models": "Discovering safe free cloud models...",
+        "profiling_free_cloud_models": "Profiling safe free cloud models...",
+        "cloud_free_discovery_failed": "Cloud model discovery failed: {error}",
+        "cloud_free_discovery_saved": "Saved discovery artifact with {count} models.",
+        "cloud_free_profile_saved": "Saved profile artifact with {count} candidates.",
+        "cloud_free_recommendation": "Recommended `{model}`: {reason}",
+        "cloud_free_manual_mode": "Manual preset uses the selected or typed cloud model.",
+        "cloud_free_runtime_status": "Cloud free runtime status",
+        "cloud_free_status": "Status",
+        "cloud_free_delay": "Delay (s)",
+        "cloud_free_recent_429": "Recent 429",
+        "cloud_free_rounds_hour": "Rounds/hour",
+        "cloud_free_selected_model": "Selected",
         "gemini_temperature_note": (
             "Gemini 3 models often work best near temperature 1.0; this app still uses the "
             "configured project temperature for compatibility."
@@ -207,6 +235,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "output_score_history": "Score history",
         "output_run_log": "Run log",
         "output_model_ops_log": "Model operation log",
+        "output_cloud_free_discovery": "Cloud free discovery",
+        "output_cloud_free_profile": "Cloud free profile",
         "output_latest_draft": "Latest round draft",
         "output_latest_review": "Latest round review",
         "output_latest_revised": "Latest round revised",

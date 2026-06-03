@@ -5,11 +5,17 @@ from __future__ import annotations
 import logging
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Protocol
 
 import requests
 
+from .cloud_free import (
+    CloudFreeConfig,
+    CloudFreeDailyQuotaExhausted,
+    CloudFreeScheduler,
+    apply_cloud_prompt_budget,
+)
 from .config import (
     DEFAULT_GEMINI_API_KEY_ENV,
     MODEL_PROVIDER_GEMINI,
@@ -169,6 +175,15 @@ class GeminiClient:
     api_key_env: str = DEFAULT_GEMINI_API_KEY_ENV
     api_key: str = ""
     timeout_seconds: int = 120
+    cloud_free_config: CloudFreeConfig | None = None
+    _scheduler: CloudFreeScheduler | None = field(init=False, default=None)
+
+    def __post_init__(self) -> None:
+        if self.cloud_free_config and self.cloud_free_config.cloud_free_mode:
+            self._scheduler = CloudFreeScheduler(
+                model_id=self.model,
+                config=self.cloud_free_config,
+            )
 
     def _available_api_key(self) -> str:
         configured_key = self.api_key.strip()
@@ -243,7 +258,12 @@ class GeminiClient:
         top_p: float = 0.9,
         response_format: Optional[Dict[str, Any]] = None,
     ) -> str:
-        if len(user_prompt) > MAX_PROMPT_CHARS:
+        if self.cloud_free_config and self.cloud_free_config.cloud_free_mode:
+            user_prompt = apply_cloud_prompt_budget(
+                user_prompt,
+                self.cloud_free_config.prompt_budget_chars,
+            )
+        elif len(user_prompt) > MAX_PROMPT_CHARS:
             user_prompt = user_prompt[-MAX_PROMPT_CHARS:]
 
         self._ensure_api_key_available()
@@ -269,11 +289,23 @@ class GeminiClient:
             },
         )
         try:
-            response = client.models.generate_content(
-                model=self.model,
-                contents=user_prompt,
-                config=config,
-            )
+
+            def operation() -> Any:
+                return client.models.generate_content(
+                    model=self.model,
+                    contents=user_prompt,
+                    config=config,
+                )
+
+            response = self._scheduler.call(operation) if self._scheduler else operation()
+        except CloudFreeDailyQuotaExhausted:
+            raise
+        except RuntimeError as exc:
+            if self._scheduler is not None:
+                raise
+            raise RuntimeError(
+                "Failed to call Gemini API. Check API key, model name, and network access."
+            ) from exc
         except Exception as exc:  # noqa: BLE001
             raise RuntimeError(
                 "Failed to call Gemini API. Check API key, model name, and network access."
@@ -293,6 +325,11 @@ class GeminiClient:
         )
         return content
 
+    def cloud_free_status(self) -> dict[str, Any]:
+        if self._scheduler is None:
+            return {}
+        return self._scheduler.status()
+
 
 def create_llm_client(
     *,
@@ -302,6 +339,7 @@ def create_llm_client(
     timeout_seconds: int,
     gemini_config: GeminiConfig,
     explicit_gemini_api_key: str = "",
+    cloud_free_config: CloudFreeConfig | None = None,
 ) -> LLMClientProtocol:
     provider = provider.strip().lower()
     if provider == MODEL_PROVIDER_OLLAMA:
@@ -316,5 +354,6 @@ def create_llm_client(
             api_key_env=gemini_config.api_key_env,
             api_key=explicit_gemini_api_key or gemini_config.api_key,
             timeout_seconds=timeout_seconds,
+            cloud_free_config=cloud_free_config,
         )
     raise ValueError(f"Unsupported model provider: {provider}")

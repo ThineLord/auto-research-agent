@@ -10,6 +10,8 @@ from typing import Callable, Dict, Optional, Tuple
 from rich.console import Console
 
 from .agents import ResearchAgents
+from .cloud_free import CloudFreeDailyQuotaExhausted, next_pacific_reset_heuristic
+from .constants import STOP_CLOUD_DAILY_QUOTA
 from .llm import LLMClientProtocol
 from .runtime import log_run as _log
 from .runtime import shorten_text_by_words as _shorten_text_by_words
@@ -96,6 +98,8 @@ def run_diagnostic_mode(
                 log_path,
                 f"mode=diagnostic | round=1 | agent={agent_name} | status=end",
             )
+        except CloudFreeDailyQuotaExhausted:
+            raise
         except RuntimeError as exc:
             output = f"[{agent_name.upper()} ERROR] {exc}"
             error = str(exc)
@@ -109,58 +113,83 @@ def run_diagnostic_mode(
         console.print(f"[Round 1] {agent_name} timing: {elapsed:.2f}s")
         return output, error
 
-    draft_output, draft_error = run_agent(
-        "draft",
-        lambda: diagnostic_agents.draft(
-            task=diagnostic_task,
-            memory=diagnostic_memory,
-            round_index=1,
-            previous_best="",
-            previous_judge="",
-        ),
-    )
-    if draft_error:
-        review_output = "[REVIEW SKIPPED] draft failed in diagnostic mode."
-        review_error = "skipped due to draft failure"
-        console.print("[Round 1] Skipping review because draft failed.")
-    else:
-        review_output, review_error = run_agent(
-            "review",
-            lambda: diagnostic_agents.review(
+    try:
+        draft_output, draft_error = run_agent(
+            "draft",
+            lambda: diagnostic_agents.draft(
                 task=diagnostic_task,
                 memory=diagnostic_memory,
-                draft_output=draft_output,
+                round_index=1,
+                previous_best="",
+                previous_judge="",
             ),
         )
+        if draft_error:
+            review_output = "[REVIEW SKIPPED] draft failed in diagnostic mode."
+            review_error = "skipped due to draft failure"
+            console.print("[Round 1] Skipping review because draft failed.")
+        else:
+            review_output, review_error = run_agent(
+                "review",
+                lambda: diagnostic_agents.review(
+                    task=diagnostic_task,
+                    memory=diagnostic_memory,
+                    draft_output=draft_output,
+                ),
+            )
 
-    if draft_error or review_error:
-        revised_output = "[REVISE SKIPPED] upstream failure in diagnostic mode."
-        revise_error = "skipped due to upstream failure"
-        console.print("[Round 1] Skipping revise because upstream failed.")
-    else:
-        revised_output, revise_error = run_agent(
-            "revise",
-            lambda: diagnostic_agents.revise(
-                task=diagnostic_task,
-                memory=diagnostic_memory,
-                draft_output=draft_output,
-                review_output=review_output,
-            ),
-        )
+        if draft_error or review_error:
+            revised_output = "[REVISE SKIPPED] upstream failure in diagnostic mode."
+            revise_error = "skipped due to upstream failure"
+            console.print("[Round 1] Skipping revise because upstream failed.")
+        else:
+            revised_output, revise_error = run_agent(
+                "revise",
+                lambda: diagnostic_agents.revise(
+                    task=diagnostic_task,
+                    memory=diagnostic_memory,
+                    draft_output=draft_output,
+                    review_output=review_output,
+                ),
+            )
 
-    if revise_error:
-        judge_output = "SCORE: 0\n- Judge skipped because revise failed."
-        judge_error = "skipped due to revise failure"
-        console.print("[Round 1] Skipping judge because revise failed.")
-    else:
-        judge_output, judge_error = run_agent(
-            "judge",
-            lambda: diagnostic_agents.judge(
-                task=diagnostic_task,
-                memory=diagnostic_memory,
-                revised_output=revised_output,
-            ),
+        if revise_error:
+            judge_output = "SCORE: 0\n- Judge skipped because revise failed."
+            judge_error = "skipped due to revise failure"
+            console.print("[Round 1] Skipping judge because revise failed.")
+        else:
+            judge_output, judge_error = run_agent(
+                "judge",
+                lambda: diagnostic_agents.judge(
+                    task=diagnostic_task,
+                    memory=diagnostic_memory,
+                    revised_output=revised_output,
+                ),
+            )
+    except CloudFreeDailyQuotaExhausted as exc:
+        message = str(exc)
+        console.print(f"[yellow]{message}[/yellow]")
+        write_json_file(
+            project_dir / "checkpoint.json",
+            {
+                "run_id": run_root.name,
+                "run_root": str(run_root),
+                "last_completed_round": 0,
+                "last_successful_agent": "none",
+                "best_score": 0.0,
+                "best_round_path": "",
+                "stop_reason": STOP_CLOUD_DAILY_QUOTA,
+                "can_resume": True,
+                "updated_at": datetime.now().isoformat(),
+                "mode": "diagnostic",
+                "model": model_name,
+                "status": "paused_until_reset",
+                "paused_until_reset": True,
+                "pause_message": message,
+                "reset_heuristic": next_pacific_reset_heuristic(),
+            },
         )
+        return
 
     save_round_outputs(
         round_dir,

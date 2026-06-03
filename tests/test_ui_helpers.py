@@ -334,6 +334,7 @@ class SharedUiBackendHelperTests(unittest.TestCase):
             model="gemini-3.5-flash",
             gemini_api_key_env="TEAM_GEMINI_KEY",
             project="example",
+            free_runner_preset="volume_free",
         )
 
         self.assertIn("--provider", command)
@@ -344,6 +345,8 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertIn("TEAM_GEMINI_KEY", command)
         self.assertIn("--project", command)
         self.assertIn("example", command)
+        self.assertIn("--free-runner-preset", command)
+        self.assertIn("volume_free", command)
         self.assertNotIn("secret-key", command)
         self.assertEqual(
             ui_app.build_provider_env_overrides(
