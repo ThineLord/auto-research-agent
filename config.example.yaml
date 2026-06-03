@@ -3,6 +3,7 @@ model:
   name: qwen3:8b
   temperature: 0.3
   timeout_seconds: 300
+  max_prompt_chars: 12000
   gemini:
     api_key_env: GEMINI_API_KEY
     api_key: ""

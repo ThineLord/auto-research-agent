@@ -36,6 +36,7 @@ def run_diagnostic_mode(
     memory_path: Path,
     model_name: str,
     topic_context: str = "",
+    project_metadata: Dict[str, object] | None = None,
 ) -> None:
     log_path = project_dir / "run.log"
     console.rule("Diagnostic Mode")
@@ -44,6 +45,18 @@ def run_diagnostic_mode(
         "no memory update, no retries"
     )
     _log(console, log_path, "diagnostic", f"run_start model={model_name}")
+    if project_metadata:
+        _log(
+            console,
+            log_path,
+            "diagnostic",
+            "project_source "
+            f"kind={project_metadata.get('source_kind', 'unknown')} "
+            f"name={project_metadata.get('project_name', '')} "
+            f"title={project_metadata.get('project_title', '')} "
+            f"project_dir={project_metadata.get('project_dir', '')} "
+            f"task_path={project_metadata.get('task_path', '')}",
+        )
 
     # Allow slower local machines/model warm-up while keeping a sane upper bound.
     llm.timeout_seconds = min(llm.timeout_seconds, 300)
@@ -70,6 +83,17 @@ def run_diagnostic_mode(
     )
 
     run_root = make_run_root(project_dir)
+    write_json_file(
+        run_root / "run_manifest.json",
+        {
+            "run_id": run_root.name,
+            "run_root": str(run_root),
+            "mode": "diagnostic",
+            "model": model_name,
+            "started_at": datetime.now().isoformat(),
+            "project": project_metadata or {},
+        },
+    )
     round_index = 1
     round_dir = make_round_dir(run_root, round_index)
     memory_text = get_memory_for_prompt(memory_path)
@@ -183,6 +207,7 @@ def run_diagnostic_mode(
                 "updated_at": datetime.now().isoformat(),
                 "mode": "diagnostic",
                 "model": model_name,
+                "project": project_metadata or {},
                 "status": "paused_until_reset",
                 "paused_until_reset": True,
                 "pause_message": message,
@@ -263,6 +288,7 @@ def run_diagnostic_mode(
             "updated_at": datetime.now().isoformat(),
             "mode": "diagnostic",
             "model": model_name,
+            "project": project_metadata or {},
         },
     )
     console.rule("Diagnostic Summary")

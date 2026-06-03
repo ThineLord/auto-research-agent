@@ -105,10 +105,10 @@ def load_ui_config() -> tuple[Any, bool]:
 def default_project_index(projects: list[str], configured_project_name: str) -> int:
     if not projects:
         return 0
-    if PUBLIC_SAFE_PROJECT_NAME in projects:
-        return projects.index(PUBLIC_SAFE_PROJECT_NAME)
     if configured_project_name in projects:
         return projects.index(configured_project_name)
+    if PUBLIC_SAFE_PROJECT_NAME in projects:
+        return projects.index(PUBLIC_SAFE_PROJECT_NAME)
     return 0
 
 

@@ -25,6 +25,7 @@ def run_resume_mode(
     global_max_runtime_seconds: int,
     per_agent_timeout_seconds: int,
     topic_keywords: Sequence[str] = (),
+    project_metadata: dict[str, object] | None = None,
 ) -> None:
     checkpoint_path = project_dir / "checkpoint.json"
     checkpoint = read_json_file(checkpoint_path)
@@ -61,4 +62,5 @@ def run_resume_mode(
         run_root_override=run_root_path,
         initial_best_score=initial_best_score,
         topic_keywords=topic_keywords,
+        project_metadata=project_metadata,
     )

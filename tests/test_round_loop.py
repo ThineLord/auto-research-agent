@@ -60,7 +60,12 @@ if find_spec("yaml") is None:
 import src.main as main_module
 from src.cli import parse_args
 from src.cloud_free import CloudFreeDailyQuotaExhausted
-from src.constants import STOP_CLOUD_DAILY_QUOTA, STOP_MAX_ROUNDS, STOP_USER_REQUESTED
+from src.constants import (
+    STOP_CLOUD_DAILY_QUOTA,
+    STOP_MAX_ROUNDS,
+    STOP_OLLAMA_TIMEOUT,
+    STOP_USER_REQUESTED,
+)
 from src.resume import run_resume_mode
 from src.runner import run_iterative_rounds
 
@@ -200,6 +205,26 @@ class RecordingAgents(FakeAgents):
         )
 
 
+class DraftTimeoutAgents(FakeAgents):
+    def __init__(self) -> None:
+        super().__init__([0, 0, 0])
+        self.draft_calls = 0
+
+    def draft(
+        self,
+        *,
+        task: str,
+        memory: str,
+        round_index: int,
+        previous_best: str,
+        previous_judge: str,
+    ) -> str:
+        self.draft_calls += 1
+        raise RuntimeError(
+            "Ollama request timed out. Increase timeout_seconds or check model/server health."
+        )
+
+
 class RoundLoopTests(unittest.TestCase):
     def test_main_reexports_backward_compatible_api(self) -> None:
         self.assertIs(main_module.run_iterative_rounds, run_iterative_rounds)
@@ -255,6 +280,77 @@ class RoundLoopTests(unittest.TestCase):
             score_history = (project_dir / "score_history.json").read_text(encoding="utf-8")
             self.assertIn('"score": 50.0', score_history)
             self.assertIn('"score": 40.0', score_history)
+
+    def test_round_loop_records_project_source_in_manifest_checkpoint_and_log(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            metadata = {
+                "project_name": "nebula_unique_task",
+                "project_dir": str(project_dir),
+                "task_path": str(project_dir / "task.md"),
+                "project_title": "Nebula Constraint Solver",
+                "source_kind": "user_provided",
+                "explicit_project": True,
+                "is_example_project": False,
+            }
+
+            result = run_iterative_rounds(
+                console=Console(),
+                agents=FakeAgents([50]),
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="test",
+                model_name="fake-model",
+                max_rounds=1,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+                project_metadata=metadata,
+            )
+
+            run_root = Path(result["run_root"])
+            manifest = json.loads((run_root / "run_manifest.json").read_text(encoding="utf-8"))
+            checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
+            run_log = (project_dir / "run.log").read_text(encoding="utf-8")
+
+            self.assertEqual(manifest["project"]["source_kind"], "user_provided")
+            self.assertEqual(manifest["project"]["project_title"], "Nebula Constraint Solver")
+            self.assertEqual(checkpoint["project"]["task_path"], str(project_dir / "task.md"))
+            self.assertIn("project_source kind=user_provided", run_log)
+
+    def test_continuous_mode_stops_after_first_draft_timeout_even_when_timeout_stop_disabled(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            agents = DraftTimeoutAgents()
+
+            result = run_iterative_rounds(
+                console=Console(),
+                agents=agents,
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="continuous",
+                model_name="fake-model",
+                max_rounds=3,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+                disable_no_improvement_stop=True,
+                disable_timeout_stop=True,
+            )
+
+            self.assertEqual(agents.draft_calls, 1)
+            self.assertEqual(result["completed_rounds"], 1)
+            self.assertEqual(result["stop_reason"], STOP_OLLAMA_TIMEOUT)
 
     def test_round_loop_checkpoints_resumable_cloud_quota_pause(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

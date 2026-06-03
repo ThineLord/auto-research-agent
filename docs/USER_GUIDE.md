@@ -57,6 +57,7 @@ model:
   name: qwen3:8b
   temperature: 0.3
   timeout_seconds: 300
+  max_prompt_chars: 12000
   gemini:
     api_key_env: GEMINI_API_KEY
     api_key: ""
@@ -78,7 +79,8 @@ topic:
 
 旧写法 `model: qwen3:8b` 仍可用；旧的顶层 `temperature` 和 `timeout_seconds`
 也仍可作为 fallback。若同一项同时出现在顶层和 `model:` 里，以 `model:` 里的值为准。
-`topic:` 会传给 Draft / Review / Revise / Judge，让同一套提示词可以服务不同项目。
+`model.max_prompt_chars` 用于在本地模型收到过长 prompt 前快速失败；`topic:` 会传给
+Draft / Review / Revise / Judge，让同一套提示词可以服务不同项目。
 
 如果要用 Gemini，推荐通过环境变量提供 key：
 
@@ -99,8 +101,8 @@ make diagnostic ARGS="--provider gemini --model gemini-3.5-flash"
 5. 在侧边栏确认 `App root` 是当前仓库根目录
 6. 在侧边栏 `Language` 选择 `English` 或 `中文`
 7. 在侧边栏 `Theme` 选择 `Day Mode` 或 `Dark Mode`
-8. 项目选择器默认显示公开安全的 `example` 项目；如需运行自己的项目，再手动选择
-   `projects/<name>/`
+8. 如果 `config.yaml` 里的 `project_name` 存在，项目选择器默认显示该项目；否则才显示
+   公开安全的 `example` 项目
 9. 在 `Model provider` / `模型来源` 选择 `Local Ollama` 或 `Cloud Gemini`
 10. 本地模式会自动读取本机 Ollama 已安装模型，并显示在 `Installed Ollama models`
 11. 如果刚安装或删除模型，点击 `Refresh models` / `刷新模型`

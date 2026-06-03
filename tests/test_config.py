@@ -7,9 +7,11 @@ from pathlib import Path
 import yaml
 
 from src.config import (
+    DEFAULT_GEMINI_MAX_PROMPT_CHARS,
     DEFAULT_GEMINI_MODEL,
     DEFAULT_GEMINI_MODELS,
     DEFAULT_MODEL_NAME,
+    DEFAULT_OLLAMA_MAX_PROMPT_CHARS,
     MODEL_PROVIDER_GEMINI,
     MODEL_PROVIDER_OLLAMA,
     ConfigValidationError,
@@ -42,6 +44,7 @@ class ConfigValidationTests(unittest.TestCase):
 
         self.assertEqual(config.model.provider, "ollama")
         self.assertEqual(config.model.name, "qwen3:8b")
+        self.assertEqual(config.model.max_prompt_chars, DEFAULT_OLLAMA_MAX_PROMPT_CHARS)
         self.assertEqual(config.model.gemini.api_key_env, "GEMINI_API_KEY")
         self.assertEqual(config.model.gemini.api_key, "")
         self.assertEqual(config.model.gemini.models, DEFAULT_GEMINI_MODELS)
@@ -88,6 +91,7 @@ runtime:
         self.assertEqual(config.model.provider, MODEL_PROVIDER_OLLAMA)
         self.assertEqual(config.model.temperature, 0.7)
         self.assertEqual(config.model.timeout_seconds, 120)
+        self.assertEqual(config.model.max_prompt_chars, DEFAULT_OLLAMA_MAX_PROMPT_CHARS)
         self.assertEqual(resolve_model_settings(config.as_dict()), ("llama3.1:8b", 0.7, 120))
         self.assertEqual(
             resolve_model_provider_settings(config.as_dict()),
@@ -136,6 +140,7 @@ model:
   name: qwen3:14b
   temperature: 0.2
   timeout_seconds: 200
+  max_prompt_chars: 16000
 temperature: 0.9
 timeout_seconds: 20
 """
@@ -144,6 +149,7 @@ timeout_seconds: 20
         config = load_app_config(config_path)
 
         self.assertEqual(resolve_model_settings(config), ("qwen3:14b", 0.2, 200))
+        self.assertEqual(config.model.max_prompt_chars, 16000)
 
     def test_gemini_model_config_loads_and_formats_cloud_label(self) -> None:
         config_path = self.write_config(
@@ -167,6 +173,7 @@ model:
 
         self.assertEqual(config.model.provider, MODEL_PROVIDER_GEMINI)
         self.assertEqual(config.model.name, "gemini-2.5-pro")
+        self.assertEqual(config.model.max_prompt_chars, DEFAULT_GEMINI_MAX_PROMPT_CHARS)
         self.assertEqual(config.model.gemini.models, ("gemini-3.5-flash", "gemini-2.5-pro"))
         self.assertEqual(
             resolve_model_provider_settings(config),
@@ -229,6 +236,7 @@ model:
         cases = [
             ("model:\n  temperature: true\n", "config.model.temperature: must be a number"),
             ("model:\n  timeout_seconds: '300'\n", "config.model.timeout_seconds"),
+            ("model:\n  max_prompt_chars: 999\n", "config.model.max_prompt_chars"),
             ("max_rounds: 0\n", "config.max_rounds"),
             ("stop_if_no_improvement_rounds: -1\n", "config.stop_if_no_improvement_rounds"),
             ("top_p: 0\n", "config.top_p"),
