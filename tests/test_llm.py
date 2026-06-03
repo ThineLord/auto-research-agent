@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import src.llm as llm_module
-from src.llm import OllamaClient
+from src.llm import GeminiClient, OllamaClient
+
+
+class FakeGenerateContentConfig:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
 
 
 class LlmClientTests(unittest.TestCase):
@@ -45,6 +50,90 @@ class LlmClientTests(unittest.TestCase):
 
         payload = post.call_args.kwargs["json"]
         self.assertEqual(payload["format"], response_format)
+
+    def test_gemini_generate_calls_google_genai_client(self) -> None:
+        generate_content = Mock(return_value=SimpleNamespace(text=" OK "))
+        fake_client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+        fake_genai = SimpleNamespace(Client=Mock(return_value=fake_client))
+        fake_types = SimpleNamespace(GenerateContentConfig=FakeGenerateContentConfig)
+
+        with (
+            patch.object(llm_module, "_load_google_genai", return_value=(fake_genai, fake_types)),
+            patch.dict(llm_module.os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True),
+        ):
+            output = GeminiClient(model="gemini-3.5-flash").generate(
+                agent_name="draft",
+                system_prompt="system",
+                user_prompt="hello",
+                temperature=0.7,
+                top_p=0.8,
+            )
+
+        self.assertEqual(output, "OK")
+        fake_genai.Client.assert_called_once_with()
+        generate_content.assert_called_once()
+        kwargs = generate_content.call_args.kwargs
+        self.assertEqual(kwargs["model"], "gemini-3.5-flash")
+        self.assertEqual(kwargs["contents"], "hello")
+        self.assertEqual(kwargs["config"].kwargs["system_instruction"], "system")
+        self.assertEqual(kwargs["config"].kwargs["temperature"], 0.7)
+        self.assertEqual(kwargs["config"].kwargs["top_p"], 0.8)
+
+    def test_gemini_generate_passes_structured_response_config(self) -> None:
+        generate_content = Mock(return_value=SimpleNamespace(text='{"score": 80}'))
+        fake_client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+        fake_genai = SimpleNamespace(Client=Mock(return_value=fake_client))
+        fake_types = SimpleNamespace(GenerateContentConfig=FakeGenerateContentConfig)
+        response_format = {
+            "type": "object",
+            "properties": {"score": {"type": "number"}},
+            "required": ["score"],
+        }
+
+        with patch.object(
+            llm_module,
+            "_load_google_genai",
+            return_value=(fake_genai, fake_types),
+        ):
+            GeminiClient(model="gemini-3.5-flash", api_key="local-key").generate(
+                system_prompt="judge",
+                user_prompt="score this",
+                response_format=response_format,
+            )
+
+        config = generate_content.call_args.kwargs["config"]
+        self.assertEqual(config.kwargs["response_mime_type"], "application/json")
+        self.assertEqual(config.kwargs["response_json_schema"], response_format)
+        fake_genai.Client.assert_called_once_with(api_key="local-key")
+
+    def test_gemini_generate_requires_api_key_source(self) -> None:
+        with patch.dict(llm_module.os.environ, {}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "Gemini API key is missing"):
+                GeminiClient(model="gemini-3.5-flash", api_key_env="MISSING_KEY").generate(
+                    system_prompt=None,
+                    user_prompt="hello",
+                )
+
+    def test_gemini_generate_exception_does_not_leak_api_key(self) -> None:
+        secret = "SECRET-KEY"
+        generate_content = Mock(side_effect=RuntimeError(f"bad request {secret}"))
+        fake_client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+        fake_genai = SimpleNamespace(Client=Mock(return_value=fake_client))
+        fake_types = SimpleNamespace(GenerateContentConfig=FakeGenerateContentConfig)
+
+        with patch.object(
+            llm_module,
+            "_load_google_genai",
+            return_value=(fake_genai, fake_types),
+        ):
+            with self.assertRaises(RuntimeError) as ctx:
+                GeminiClient(model="gemini-3.5-flash", api_key=secret).generate(
+                    system_prompt=None,
+                    user_prompt="hello",
+                )
+
+        self.assertIn("Failed to call Gemini API", str(ctx.exception))
+        self.assertNotIn(secret, str(ctx.exception))
 
 
 if __name__ == "__main__":

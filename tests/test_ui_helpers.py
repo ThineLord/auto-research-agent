@@ -71,6 +71,27 @@ class SharedUiBackendHelperTests(unittest.TestCase):
 
             self.assertFalse(meta_path.exists())
 
+    def test_is_pid_running_treats_zombie_process_as_stale(self) -> None:
+        with (
+            patch.object(runtime_module.os, "kill"),
+            patch.object(
+                runtime_module.subprocess,
+                "run",
+                return_value=SimpleNamespace(returncode=0, stdout="Z+\n"),
+            ),
+        ):
+            self.assertFalse(runtime_module.is_pid_running(123))
+
+        with (
+            patch.object(runtime_module.os, "kill"),
+            patch.object(
+                runtime_module.subprocess,
+                "run",
+                return_value=SimpleNamespace(returncode=0, stdout="S+\n"),
+            ),
+        ):
+            self.assertTrue(runtime_module.is_pid_running(123))
+
     def test_start_background_process_writes_meta_and_reports_errors(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -81,7 +102,7 @@ class SharedUiBackendHelperTests(unittest.TestCase):
                 runtime_module.subprocess,
                 "Popen",
                 return_value=SimpleNamespace(pid=456),
-            ):
+            ) as popen:
                 result = start_background_process(
                     command=["python", "-m", "src.main"],
                     cwd=root,
@@ -89,12 +110,17 @@ class SharedUiBackendHelperTests(unittest.TestCase):
                     meta_path=meta_path,
                     kind="run",
                     extra={"model": "qwen3:8b"},
+                    env_overrides={"GEMINI_API_KEY": "secret-key"},
                 )
 
             self.assertEqual(result.pid, 456)
             self.assertIsNone(result.error)
+            self.assertEqual(popen.call_args.kwargs["env"]["GEMINI_API_KEY"], "secret-key")
             self.assertEqual(read_json_file(meta_path)["pid"], 456)
             self.assertEqual(read_json_file(meta_path)["model"], "qwen3:8b")
+            meta_text = meta_path.read_text(encoding="utf-8")
+            self.assertNotIn("secret-key", meta_text)
+            self.assertNotIn("env_overrides", meta_text)
 
             with patch.object(
                 runtime_module.subprocess,
@@ -277,6 +303,78 @@ class SharedUiBackendHelperTests(unittest.TestCase):
             ),
             "qwen3:8b",
         )
+
+    def test_ui_cloud_provider_helpers_build_safe_command_and_env(self) -> None:
+        import ui.app as ui_app
+
+        self.assertEqual(
+            ui_app.resolve_effective_cloud_model(
+                selected_model="gemini-2.5-flash",
+                manual_model=" gemini-custom ",
+                default_model="gemini-3.5-flash",
+            ),
+            "gemini-custom",
+        )
+        self.assertEqual(
+            ui_app.resolve_effective_cloud_model(
+                selected_model="gemini-2.5-flash",
+                manual_model="",
+                default_model="gemini-3.5-flash",
+            ),
+            "gemini-2.5-flash",
+        )
+        self.assertEqual(
+            ui_app.provider_model_label("gemini", "gemini-3.5-flash"),
+            "gemini:gemini-3.5-flash",
+        )
+
+        command = ui_app.build_run_command(
+            provider="gemini",
+            mode="diagnostic",
+            model="gemini-3.5-flash",
+            gemini_api_key_env="TEAM_GEMINI_KEY",
+            project="example",
+        )
+
+        self.assertIn("--provider", command)
+        self.assertIn("gemini", command)
+        self.assertIn("--model", command)
+        self.assertIn("gemini-3.5-flash", command)
+        self.assertIn("--gemini-api-key-env", command)
+        self.assertIn("TEAM_GEMINI_KEY", command)
+        self.assertIn("--project", command)
+        self.assertIn("example", command)
+        self.assertNotIn("secret-key", command)
+        self.assertEqual(
+            ui_app.build_provider_env_overrides(
+                provider="gemini",
+                api_key_env="TEAM_GEMINI_KEY",
+                api_key_value=" secret-key ",
+            ),
+            {"TEAM_GEMINI_KEY": "secret-key"},
+        )
+        self.assertEqual(
+            ui_app.build_provider_env_overrides(
+                provider="ollama",
+                api_key_env="TEAM_GEMINI_KEY",
+                api_key_value="secret-key",
+            ),
+            {},
+        )
+
+    def test_cloud_provider_does_not_treat_ollama_model_error_as_blocking(self) -> None:
+        import ui.app as ui_app
+
+        local_blocked = bool("Ollama is not available") or not "qwen3:8b"
+        cloud_blocked = (not "gemini-3.5-flash") or (
+            not ui_app.has_gemini_api_key_source(
+                api_key_env="GEMINI_API_KEY",
+                api_key_value="secret-key",
+            )
+        )
+
+        self.assertTrue(local_blocked)
+        self.assertFalse(cloud_blocked)
         self.assertEqual(
             ui_app.resolve_effective_model(
                 selected_model="",
@@ -397,6 +495,36 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertTrue(health["api_ok"])
         self.assertFalse(health["model_ok"])
         self.assertIn("not installed", health["message"])
+
+    def test_gemini_health_check_uses_mocked_client_and_missing_key_short_circuits(self) -> None:
+        import ui.app as ui_app
+
+        with patch.object(ui_app, "has_gemini_api_key_source", return_value=False):
+            health = ui_app.check_gemini_model_health(
+                selected_model="gemini-3.5-flash",
+                api_key_env="GEMINI_API_KEY",
+            )
+
+        self.assertFalse(health["ok"])
+        self.assertEqual(health["message_key"], "gemini_health_missing_key")
+
+        with (
+            patch.object(ui_app, "has_gemini_api_key_source", return_value=True),
+            patch.object(
+                ui_app.GeminiClient,
+                "generate",
+                return_value="OK",
+            ) as generate,
+        ):
+            health = ui_app.check_gemini_model_health(
+                selected_model="gemini-3.5-flash",
+                api_key_env="GEMINI_API_KEY",
+                api_key_value="secret-key",
+            )
+
+        self.assertTrue(health["ok"])
+        self.assertEqual(health["message_key"], "gemini_health_ok")
+        generate.assert_called_once()
 
 
 if __name__ == "__main__":

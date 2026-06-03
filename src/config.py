@@ -24,6 +24,17 @@ from .constants import (
 DEFAULT_MODEL_NAME = "qwen3:8b"
 DEFAULT_MODEL_TEMPERATURE = 0.4
 DEFAULT_MODEL_TIMEOUT_SECONDS = 300
+MODEL_PROVIDER_OLLAMA = "ollama"
+MODEL_PROVIDER_GEMINI = "gemini"
+SUPPORTED_MODEL_PROVIDERS = {MODEL_PROVIDER_OLLAMA, MODEL_PROVIDER_GEMINI}
+DEFAULT_GEMINI_MODEL = "gemini-3.5-flash"
+DEFAULT_GEMINI_API_KEY_ENV = "GEMINI_API_KEY"
+DEFAULT_GEMINI_MODELS = (
+    "gemini-3.5-flash",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash-lite",
+)
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
 DEFAULT_PROJECT_NAME = "example"
 DEFAULT_TOPIC_TITLE = "Configured Research Topic"
@@ -50,11 +61,19 @@ class ConfigValidationError(ValueError):
 
 
 @dataclass(frozen=True)
+class GeminiConfig:
+    api_key_env: str = DEFAULT_GEMINI_API_KEY_ENV
+    api_key: str = ""
+    models: Tuple[str, ...] = DEFAULT_GEMINI_MODELS
+
+
+@dataclass(frozen=True)
 class ModelConfig:
-    provider: str = "ollama"
+    provider: str = MODEL_PROVIDER_OLLAMA
     name: str = DEFAULT_MODEL_NAME
     temperature: float = DEFAULT_MODEL_TEMPERATURE
     timeout_seconds: int = DEFAULT_MODEL_TIMEOUT_SECONDS
+    gemini: GeminiConfig = field(default_factory=GeminiConfig)
 
 
 @dataclass(frozen=True)
@@ -88,6 +107,11 @@ class AppConfig:
                 "name": self.model.name,
                 "temperature": self.model.temperature,
                 "timeout_seconds": self.model.timeout_seconds,
+                "gemini": {
+                    "api_key_env": self.model.gemini.api_key_env,
+                    "api_key": self.model.gemini.api_key,
+                    "models": list(self.model.gemini.models),
+                },
             },
             "ollama_base_url": self.ollama_base_url,
             "project_name": self.project_name,
@@ -137,6 +161,12 @@ def _validate_non_empty_string(value: Any, field_name: str) -> str:
     if not normalized:
         raise ConfigValidationError(f"{field_name}: must be a non-empty string")
     return normalized
+
+
+def _validate_optional_string(value: Any, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise ConfigValidationError(f"{field_name}: must be a string")
+    return value.strip()
 
 
 def _validate_project_name(value: Any) -> str:
@@ -194,6 +224,61 @@ def _validate_int(
     return value
 
 
+def _validate_model_provider(value: Any) -> str:
+    provider = _validate_non_empty_string(value, "config.model.provider").lower()
+    if provider not in SUPPORTED_MODEL_PROVIDERS:
+        supported = ", ".join(sorted(SUPPORTED_MODEL_PROVIDERS))
+        raise ConfigValidationError(f"config.model.provider: must be one of: {supported}")
+    return provider
+
+
+def _validate_gemini_models(value: Any) -> Tuple[str, ...]:
+    if not isinstance(value, list):
+        raise ConfigValidationError(
+            "config.model.gemini.models: must be a list of non-empty strings"
+        )
+    if not value:
+        raise ConfigValidationError("config.model.gemini.models: must contain at least one model")
+
+    models: list[str] = []
+    seen = set()
+    for index, item in enumerate(value):
+        model = _validate_non_empty_string(
+            item,
+            f"config.model.gemini.models[{index}]",
+        )
+        if model in seen:
+            continue
+        seen.add(model)
+        models.append(model)
+    return tuple(models)
+
+
+def _validate_gemini_config(raw_gemini: Any) -> GeminiConfig:
+    if raw_gemini is None:
+        raw_gemini = {}
+    if not isinstance(raw_gemini, Mapping):
+        raise ConfigValidationError("config.model.gemini: must be a mapping")
+    _validate_mapping_keys(
+        "config.model.gemini",
+        raw_gemini,
+        {"api_key_env", "api_key", "models"},
+    )
+    return GeminiConfig(
+        api_key_env=_validate_non_empty_string(
+            raw_gemini.get("api_key_env", DEFAULT_GEMINI_API_KEY_ENV),
+            "config.model.gemini.api_key_env",
+        ),
+        api_key=_validate_optional_string(
+            raw_gemini.get("api_key", ""),
+            "config.model.gemini.api_key",
+        ),
+        models=_validate_gemini_models(
+            raw_gemini.get("models", list(DEFAULT_GEMINI_MODELS)),
+        ),
+    )
+
+
 def _read_yaml_mapping(config_path: Path) -> Dict[str, Any]:
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
@@ -220,22 +305,23 @@ def _validate_model_config(config: Mapping[str, Any]) -> ModelConfig:
         _validate_mapping_keys(
             "config.model",
             raw_model,
-            {"provider", "name", "temperature", "timeout_seconds"},
+            {"provider", "name", "temperature", "timeout_seconds", "gemini"},
         )
         model_mapping = raw_model
-        model_name = _validate_non_empty_string(
-            model_mapping.get("name", DEFAULT_MODEL_NAME),
-            "config.model.name",
-        )
     else:
         raise ConfigValidationError("config.model: must be a mapping or model name string")
 
-    provider = _validate_non_empty_string(
-        model_mapping.get("provider", "ollama"),
-        "config.model.provider",
+    provider = _validate_model_provider(
+        model_mapping.get("provider", MODEL_PROVIDER_OLLAMA),
     )
-    if provider != "ollama":
-        raise ConfigValidationError("config.model.provider: must be 'ollama'")
+    if not isinstance(raw_model, str):
+        default_model_name = (
+            DEFAULT_GEMINI_MODEL if provider == MODEL_PROVIDER_GEMINI else DEFAULT_MODEL_NAME
+        )
+        model_name = _validate_non_empty_string(
+            model_mapping.get("name", default_model_name),
+            "config.model.name",
+        )
 
     temperature = _validate_float(
         model_mapping.get("temperature", top_level_temperature),
@@ -254,6 +340,7 @@ def _validate_model_config(config: Mapping[str, Any]) -> ModelConfig:
         name=model_name,
         temperature=temperature,
         timeout_seconds=timeout_seconds,
+        gemini=_validate_gemini_config(model_mapping.get("gemini", {})),
     )
 
 
@@ -395,6 +482,31 @@ def resolve_model_settings(config: ConfigInput) -> Tuple[str, float, int]:
     return config.model.name, config.model.temperature, config.model.timeout_seconds
 
 
+def resolve_model_provider_settings(
+    config: ConfigInput,
+) -> tuple[str, str, float, int, GeminiConfig]:
+    if isinstance(config, AppConfig):
+        model = config.model
+    else:
+        model = _build_app_config(config).model
+    return (
+        model.provider,
+        model.name,
+        model.temperature,
+        model.timeout_seconds,
+        model.gemini,
+    )
+
+
+def format_model_label(provider: str, model_name: str) -> str:
+    provider = provider.strip().lower()
+    if provider == MODEL_PROVIDER_OLLAMA:
+        return model_name
+    if provider == MODEL_PROVIDER_GEMINI:
+        return f"{MODEL_PROVIDER_GEMINI}:{model_name}"
+    raise ConfigValidationError(f"model provider is not supported: {provider}")
+
+
 def resolve_runtime_limits(config: ConfigInput) -> Tuple[int, int]:
     if isinstance(config, AppConfig):
         runtime = config.runtime
@@ -520,6 +632,20 @@ def save_default_model_name(
     model_name: str,
     default_name: str = DEFAULT_MODEL_NAME,
 ) -> Optional[str]:
+    return save_default_model_selection(
+        config_path,
+        provider=MODEL_PROVIDER_OLLAMA,
+        model_name=model_name.strip() or default_name,
+    )
+
+
+def save_default_model_selection(
+    config_path: Path,
+    *,
+    provider: str,
+    model_name: str,
+    gemini_api_key_env: str | None = None,
+) -> Optional[str]:
     if not config_path.exists():
         return f"config file not found: {config_path}"
     try:
@@ -527,13 +653,38 @@ def save_default_model_name(
         current_config = _build_app_config(config)
     except ConfigValidationError as exc:
         return f"invalid config.yaml: {exc}"
+    try:
+        provider = _validate_model_provider(provider)
+    except ConfigValidationError as exc:
+        return f"invalid model provider: {exc}"
+
     model_cfg = config.get("model", {})
     if not isinstance(model_cfg, dict):
         model_cfg = {}
-    model_cfg.setdefault("provider", current_config.model.provider)
-    model_cfg["name"] = model_name.strip() or default_name
+    default_model_name = (
+        DEFAULT_GEMINI_MODEL if provider == MODEL_PROVIDER_GEMINI else DEFAULT_MODEL_NAME
+    )
+    model_cfg["provider"] = provider
+    model_cfg["name"] = model_name.strip() or default_model_name
     model_cfg.setdefault("temperature", current_config.model.temperature)
     model_cfg.setdefault("timeout_seconds", current_config.model.timeout_seconds)
+
+    if (
+        provider == MODEL_PROVIDER_GEMINI
+        or gemini_api_key_env is not None
+        or isinstance(model_cfg.get("gemini"), Mapping)
+    ):
+        api_key_env = (
+            gemini_api_key_env.strip()
+            if isinstance(gemini_api_key_env, str) and gemini_api_key_env.strip()
+            else current_config.model.gemini.api_key_env
+        )
+        model_cfg["gemini"] = {
+            "api_key_env": api_key_env,
+            "api_key": "",
+            "models": list(current_config.model.gemini.models),
+        }
+
     config["model"] = model_cfg
     try:
         _build_app_config(config)
