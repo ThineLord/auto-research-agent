@@ -11,12 +11,21 @@ import requests
 import streamlit as st
 
 from src.config import (
+    DEFAULT_GEMINI_API_KEY_ENV,
+    DEFAULT_GEMINI_MODEL,
+    DEFAULT_GEMINI_MODELS,
     DEFAULT_MODEL_NAME,
+    MODEL_PROVIDER_GEMINI,
+    MODEL_PROVIDER_OLLAMA,
+    SUPPORTED_MODEL_PROVIDERS,
     ConfigValidationError,
+    format_model_label,
     load_app_config,
     query_ollama_models,
     save_default_model_name,
+    save_default_model_selection,
 )
+from src.llm import GeminiClient
 from src.runtime import (
     get_active_process_meta,
     model_job_meta_path,
@@ -181,6 +190,89 @@ def resolve_effective_model(
     return config_model.strip()
 
 
+def resolve_effective_cloud_model(
+    selected_model: str | None,
+    manual_model: str | None,
+    default_model: str,
+) -> str:
+    manual_model = str(manual_model or "").strip()
+    if manual_model:
+        return manual_model
+    selected_model = str(selected_model or "").strip()
+    if selected_model:
+        return selected_model
+    return default_model.strip()
+
+
+def provider_model_label(provider: str, model: str) -> str:
+    return format_model_label(provider, model)
+
+
+def build_run_command(
+    provider: str,
+    mode: str,
+    model: str,
+    gemini_api_key_env: str | None = None,
+    project: str | None = None,
+) -> list[str]:
+    mode_flags = {
+        "diagnostic": ["--diagnostic"],
+        "normal": [],
+        "continuous": ["--continuous"],
+        "resume": ["--resume"],
+    }
+    if mode not in mode_flags:
+        raise ValueError(f"Unsupported run mode: {mode}")
+
+    command = [
+        sys.executable,
+        "-m",
+        "src.main",
+        *mode_flags[mode],
+        "--provider",
+        provider,
+        "--model",
+        model,
+    ]
+    if project:
+        command.extend(["--project", project])
+    if provider == MODEL_PROVIDER_GEMINI and gemini_api_key_env:
+        command.extend(["--gemini-api-key-env", gemini_api_key_env])
+    return command
+
+
+def build_provider_env_overrides(
+    provider: str,
+    api_key_env: str,
+    api_key_value: str,
+) -> dict[str, str]:
+    if provider != MODEL_PROVIDER_GEMINI:
+        return {}
+    env_name = api_key_env.strip()
+    key_value = api_key_value.strip()
+    if not env_name or not key_value:
+        return {}
+    return {env_name: key_value}
+
+
+def has_gemini_api_key_source(
+    *,
+    api_key_env: str,
+    api_key_value: str = "",
+    config_api_key: str = "",
+) -> bool:
+    if api_key_value.strip() or config_api_key.strip():
+        return True
+    for env_name in (
+        api_key_env.strip(),
+        DEFAULT_GEMINI_API_KEY_ENV,
+        "GOOGLE_API_KEY",
+    ):
+        if env_name and os.environ.get(env_name, "").strip():
+            return True
+    return False
+
+
 def refresh_ollama_model_cache(*, base_url: str, timeout_seconds: int = 5) -> None:
     models, error = query_ollama_models(timeout_seconds=timeout_seconds, base_url=base_url)
     st.session_state["ollama_models"] = models
@@ -207,7 +299,7 @@ def _safe_int(value: Any, default: int = 0) -> int:
         return default
 
 
-def check_model_health(
+def check_ollama_model_health(
     *,
     base_url: str,
     selected_model: str,
@@ -275,6 +367,103 @@ def check_model_health(
         "message_key": "health_model_ok",
         "message_args": {"model": model_name},
     }
+
+
+def check_gemini_model_health(
+    *,
+    selected_model: str,
+    api_key_env: str,
+    api_key_value: str = "",
+    timeout_seconds: int = 10,
+) -> dict[str, Any]:
+    model_name = selected_model.strip()
+    if not model_name:
+        return {
+            "ok": False,
+            "api_ok": False,
+            "model_ok": False,
+            "message": "No model selected.",
+            "message_key": "health_no_model",
+            "message_args": {},
+        }
+    if not has_gemini_api_key_source(
+        api_key_env=api_key_env,
+        api_key_value=api_key_value,
+    ):
+        return {
+            "ok": False,
+            "api_ok": False,
+            "model_ok": False,
+            "message": "Gemini API key is missing.",
+            "message_key": "gemini_health_missing_key",
+            "message_args": {},
+        }
+
+    try:
+        output = GeminiClient(
+            model=model_name,
+            api_key_env=api_key_env,
+            api_key=api_key_value.strip(),
+            timeout_seconds=timeout_seconds,
+        ).generate(
+            agent_name="health",
+            system_prompt="Reply only with OK.",
+            user_prompt="Reply with OK.",
+            temperature=0.0,
+            top_p=0.9,
+        )
+    except RuntimeError as exc:
+        return {
+            "ok": False,
+            "api_ok": False,
+            "model_ok": False,
+            "message": f"Gemini health check failed: {exc}",
+            "message_key": "gemini_health_failed",
+            "message_args": {"error": exc},
+        }
+
+    if not output.strip():
+        return {
+            "ok": False,
+            "api_ok": False,
+            "model_ok": False,
+            "message": "Gemini health check returned an empty response.",
+            "message_key": "gemini_health_failed",
+            "message_args": {"error": "empty response"},
+        }
+    return {
+        "ok": True,
+        "api_ok": True,
+        "model_ok": True,
+        "message": f"Gemini is reachable and `{model_name}` responded.",
+        "message_key": "gemini_health_ok",
+        "message_args": {"model": model_name},
+    }
+
+
+def check_model_health(
+    *,
+    provider: str = MODEL_PROVIDER_OLLAMA,
+    base_url: str = "",
+    selected_model: str,
+    installed_model_names: Sequence[str] = (),
+    api_key_env: str = DEFAULT_GEMINI_API_KEY_ENV,
+    api_key_value: str = "",
+    timeout_seconds: int = 5,
+) -> dict[str, Any]:
+    if provider == MODEL_PROVIDER_GEMINI:
+        return check_gemini_model_health(
+            selected_model=selected_model,
+            api_key_env=api_key_env,
+            api_key_value=api_key_value,
+            timeout_seconds=timeout_seconds,
+        )
+    return check_ollama_model_health(
+        base_url=base_url,
+        selected_model=selected_model,
+        installed_model_names=installed_model_names,
+        timeout_seconds=timeout_seconds,
+    )
 
 
 def infer_running_stage(
@@ -653,135 +842,243 @@ def main() -> None:
         )
 
     default_model = app_config.model.name
-    if "ollama_models" not in st.session_state or "ollama_models_error" not in st.session_state:
-        refresh_ollama_model_cache(base_url=app_config.ollama_base_url)
+    default_provider = (
+        app_config.model.provider
+        if app_config.model.provider in SUPPORTED_MODEL_PROVIDERS
+        else MODEL_PROVIDER_OLLAMA
+    )
+    if st.session_state.get("selected_provider") not in SUPPORTED_MODEL_PROVIDERS:
+        st.session_state["selected_provider"] = default_provider
+    selected_provider = st.selectbox(
+        t("model_provider"),
+        [MODEL_PROVIDER_OLLAMA, MODEL_PROVIDER_GEMINI],
+        format_func=lambda provider: (
+            t("provider_local_ollama")
+            if provider == MODEL_PROVIDER_OLLAMA
+            else t("provider_cloud_gemini")
+        ),
+        key="selected_provider",
+    )
+    run_process_blocked = run_active or (
+        model_job_active and selected_provider == MODEL_PROVIDER_OLLAMA
+    )
 
-    st.markdown(f"**{t('installed_ollama_models')}**")
-    refresh_col, model_status_col = st.columns([1, 4])
-    with refresh_col:
-        if st.button(t("refresh_models")):
+    models: list[dict[str, Any]] = []
+    models_error = ""
+    installed_model_names: list[str] = []
+    effective_model = ""
+    model_label = ""
+    run_model_blocked = True
+    gemini_api_key_env = app_config.model.gemini.api_key_env
+    provider_env_overrides: dict[str, str] = {}
+
+    if selected_provider == MODEL_PROVIDER_OLLAMA:
+        if "ollama_models" not in st.session_state or "ollama_models_error" not in st.session_state:
             refresh_ollama_model_cache(base_url=app_config.ollama_base_url)
-            st.session_state["model_list_refreshed"] = True
 
-    models = list(st.session_state.get("ollama_models", []))
-    models_error = str(st.session_state.get("ollama_models_error", "") or "")
-    model_list_refreshed = bool(st.session_state.pop("model_list_refreshed", False))
-    installed_model_names = [m["name"] for m in models if str(m.get("name", "")).strip()]
+        st.markdown(f"**{t('installed_ollama_models')}**")
+        refresh_col, model_status_col = st.columns([1, 4])
+        with refresh_col:
+            if st.button(t("refresh_models")):
+                refresh_ollama_model_cache(base_url=app_config.ollama_base_url)
+                st.session_state["model_list_refreshed"] = True
 
-    with model_status_col:
-        if models_error:
-            st.error(
-                t(
-                    "ollama_models_error_prefix",
-                    error=localize_ollama_models_error(models_error),
+        models = list(st.session_state.get("ollama_models", []))
+        models_error = str(st.session_state.get("ollama_models_error", "") or "")
+        model_list_refreshed = bool(st.session_state.pop("model_list_refreshed", False))
+        installed_model_names = [m["name"] for m in models if str(m.get("name", "")).strip()]
+
+        with model_status_col:
+            if models_error:
+                st.error(
+                    t(
+                        "ollama_models_error_prefix",
+                        error=localize_ollama_models_error(models_error),
+                    )
                 )
-            )
-        elif not installed_model_names:
-            st.warning(t("no_ollama_models_detected"))
-            st.caption(t("suggested_smaller_models", models=", ".join(SUGGESTED_SMALLER_MODELS)))
-        elif model_list_refreshed:
-            st.success(t("model_list_refreshed"))
-        else:
-            st.info(t("use_selected_model"))
+            elif not installed_model_names:
+                st.warning(t("no_ollama_models_detected"))
+                st.caption(
+                    t("suggested_smaller_models", models=", ".join(SUGGESTED_SMALLER_MODELS))
+                )
+            elif model_list_refreshed:
+                st.success(t("model_list_refreshed"))
+            else:
+                st.info(t("use_selected_model"))
 
-    dropdown_default = choose_model_picker_default(
-        installed_model_names=installed_model_names,
-        session_model=st.session_state.get("selected_model_picker")
-        or st.session_state.get("selected_model"),
-        config_model=default_model,
-    )
-    if (
-        installed_model_names
-        and st.session_state.get("selected_model_picker") not in installed_model_names
-    ):
-        st.session_state["selected_model_picker"] = dropdown_default
-    st.session_state.setdefault("manual_model_name", "")
-
-    picker_col, manual_col, effective_col = st.columns([2, 2, 2])
-    with picker_col:
-        if installed_model_names:
-            selected_model = st.selectbox(
-                t("model_selector"),
-                installed_model_names,
-                index=installed_model_names.index(dropdown_default)
-                if dropdown_default in installed_model_names
-                else 0,
-                key="selected_model_picker",
-            )
-        else:
-            selected_model = ""
-            st.caption(t("no_installed_model"))
-    with manual_col:
-        manual_model_name = st.text_input(
-            t("manual_model_name"),
-            key="manual_model_name",
-            placeholder=default_model,
-            help=t("manual_model_help"),
+        dropdown_default = choose_model_picker_default(
+            installed_model_names=installed_model_names,
+            session_model=st.session_state.get("selected_model_picker")
+            or st.session_state.get("selected_model"),
+            config_model=default_model,
         )
-    effective_model = resolve_effective_model(
-        selected_model=selected_model,
-        manual_model=manual_model_name,
-        config_model=default_model,
-    )
-    st.session_state["selected_model"] = effective_model
-    with effective_col:
-        st.write(t("effective_model", model=effective_model or t("none_option")))
+        if (
+            installed_model_names
+            and st.session_state.get("selected_model_picker") not in installed_model_names
+        ):
+            st.session_state["selected_model_picker"] = dropdown_default
+        st.session_state.setdefault("manual_model_name", "")
 
+        picker_col, manual_col, effective_col = st.columns([2, 2, 2])
+        with picker_col:
+            if installed_model_names:
+                selected_model = st.selectbox(
+                    t("model_selector"),
+                    installed_model_names,
+                    index=installed_model_names.index(dropdown_default)
+                    if dropdown_default in installed_model_names
+                    else 0,
+                    key="selected_model_picker",
+                )
+            else:
+                selected_model = ""
+                st.caption(t("no_installed_model"))
+        with manual_col:
+            manual_model_name = st.text_input(
+                t("manual_model_name"),
+                key="manual_model_name",
+                placeholder=default_model,
+                help=t("manual_model_help"),
+            )
+        effective_model = resolve_effective_model(
+            selected_model=selected_model,
+            manual_model=manual_model_name,
+            config_model=default_model,
+        )
+        model_label = provider_model_label(selected_provider, effective_model)
+        st.session_state["selected_model"] = model_label
+        with effective_col:
+            st.write(t("effective_model", model=effective_model or t("none_option")))
+        run_model_blocked = bool(models_error) or not effective_model
+    else:
+        st.markdown(f"**{t('cloud_model_settings')}**")
+        st.caption(t("cloud_model_management_note"))
+        gemini_api_key_env = st.text_input(
+            t("gemini_api_key_env"),
+            value=app_config.model.gemini.api_key_env,
+            key="gemini_api_key_env",
+        )
+        gemini_api_key_password = st.text_input(
+            t("gemini_api_key_password"),
+            type="password",
+            key="gemini_api_key_password",
+            help=t("gemini_api_key_password_help"),
+        )
+        cloud_models = list(app_config.model.gemini.models or DEFAULT_GEMINI_MODELS)
+        cloud_default_model = (
+            app_config.model.name
+            if app_config.model.provider == MODEL_PROVIDER_GEMINI
+            else DEFAULT_GEMINI_MODEL
+        )
+        selected_cloud_model = st.session_state.get("selected_cloud_model_picker")
+        if selected_cloud_model not in cloud_models:
+            selected_cloud_model = (
+                cloud_default_model if cloud_default_model in cloud_models else cloud_models[0]
+            )
+            st.session_state["selected_cloud_model_picker"] = selected_cloud_model
+
+        cloud_picker_col, cloud_manual_col, cloud_effective_col = st.columns([2, 2, 2])
+        with cloud_picker_col:
+            selected_cloud_model = st.selectbox(
+                t("gemini_model_selector"),
+                cloud_models,
+                index=cloud_models.index(selected_cloud_model),
+                key="selected_cloud_model_picker",
+            )
+        with cloud_manual_col:
+            manual_cloud_model = st.text_input(
+                t("manual_cloud_model_name"),
+                key="manual_cloud_model_name",
+                placeholder=cloud_default_model,
+            )
+        effective_model = resolve_effective_cloud_model(
+            selected_cloud_model,
+            manual_cloud_model,
+            cloud_default_model,
+        )
+        model_label = provider_model_label(selected_provider, effective_model)
+        st.session_state["selected_model"] = model_label
+        with cloud_effective_col:
+            st.write(t("effective_cloud_model", model=effective_model or t("none_option")))
+        st.caption(t("gemini_temperature_note"))
+
+        key_available = has_gemini_api_key_source(
+            api_key_env=gemini_api_key_env,
+            api_key_value=gemini_api_key_password,
+            config_api_key=app_config.model.gemini.api_key,
+        )
+        if not key_available:
+            st.warning(t("gemini_health_missing_key"))
+        provider_env_overrides = build_provider_env_overrides(
+            selected_provider,
+            gemini_api_key_env,
+            gemini_api_key_password,
+        )
+        run_model_blocked = not effective_model or not key_available
+
+        gemini_health_col, gemini_health_result_col = st.columns([1, 3])
+        with gemini_health_col:
+            if st.button(t("check_gemini_health")):
+                st.session_state["gemini_model_health"] = check_gemini_model_health(
+                    selected_model=effective_model,
+                    api_key_env=gemini_api_key_env,
+                    api_key_value=gemini_api_key_password or app_config.model.gemini.api_key,
+                )
+        with gemini_health_result_col:
+            gemini_health = st.session_state.get("gemini_model_health")
+            if gemini_health:
+                if gemini_health["ok"]:
+                    st.success(localized_message(gemini_health))
+                else:
+                    st.error(localized_message(gemini_health))
+            else:
+                st.info(t("health_check_help"))
+
+        if st.button(t("save_cloud_model")):
+            model_to_save = effective_model.strip()
+            if not model_to_save:
+                st.error(t("model_name_empty"))
+            else:
+                err = save_default_model_selection(
+                    CONFIG_PATH,
+                    provider=MODEL_PROVIDER_GEMINI,
+                    model_name=model_to_save,
+                    gemini_api_key_env=gemini_api_key_env,
+                )
+                if err:
+                    st.error(err)
+                else:
+                    st.success(t("saved_cloud_model", model=model_to_save))
+
+    def launch_run(mode: str, success_key: str) -> None:
+        result = start_background_process(
+            command=build_run_command(
+                selected_provider,
+                mode,
+                effective_model,
+                gemini_api_key_env if selected_provider == MODEL_PROVIDER_GEMINI else None,
+                selected_project,
+            ),
+            cwd=ROOT,
+            log_path=run_log_path,
+            meta_path=run_meta_path(proj_path),
+            kind="run",
+            extra={"model": model_label, "mode": mode, "provider": selected_provider},
+            env_overrides=provider_env_overrides,
+        )
+        render_process_result(result, success_key, model=model_label)
+
+    run_buttons_disabled = run_process_blocked or run_model_blocked
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     with c1:
-        if st.button(
-            t("run_diagnostic"), disabled=blocked or bool(models_error) or not effective_model
-        ):
-            model = effective_model
-            result = start_background_process(
-                command=[sys.executable, "-m", "src.main", "--diagnostic", "--model", model],
-                cwd=ROOT,
-                log_path=run_log_path,
-                meta_path=run_meta_path(proj_path),
-                kind="run",
-                extra={"model": model, "mode": "diagnostic"},
-            )
-            render_process_result(
-                result,
-                "started_diagnostic",
-                model=model,
-            )
+        if st.button(t("run_diagnostic"), disabled=run_buttons_disabled):
+            launch_run("diagnostic", "started_diagnostic")
     with c2:
-        if st.button(
-            t("run_normal"), disabled=blocked or bool(models_error) or not effective_model
-        ):
-            model = effective_model
-            result = start_background_process(
-                command=[sys.executable, "-m", "src.main", "--model", model],
-                cwd=ROOT,
-                log_path=run_log_path,
-                meta_path=run_meta_path(proj_path),
-                kind="run",
-                extra={"model": model, "mode": "normal"},
-            )
-            render_process_result(
-                result,
-                "started_normal",
-                model=model,
-            )
+        if st.button(t("run_normal"), disabled=run_buttons_disabled):
+            launch_run("normal", "started_normal")
     with c3:
-        if st.button(
-            t("run_continuous"), disabled=blocked or bool(models_error) or not effective_model
-        ):
-            model = effective_model
-            result = start_background_process(
-                command=[sys.executable, "-m", "src.main", "--continuous", "--model", model],
-                cwd=ROOT,
-                log_path=run_log_path,
-                meta_path=run_meta_path(proj_path),
-                kind="run",
-                extra={"model": model, "mode": "continuous"},
-            )
-            render_process_result(
-                result,
-                "started_continuous",
-                model=model,
-            )
+        if st.button(t("run_continuous"), disabled=run_buttons_disabled):
+            launch_run("continuous", "started_continuous")
     with c4:
         if st.button(t("pause_stop_safely"), disabled=not run_active):
             write_file_text(stop_signal_path, "STOP_REQUESTED\n")
@@ -789,30 +1086,14 @@ def main() -> None:
     resume_state = describe_resume_state(
         checkpoint=checkpoint,
         run_active=run_active,
-        selected_model=effective_model,
+        selected_model=model_label,
     )
     with c5:
         if st.button(
             t("resume"),
-            disabled=blocked
-            or bool(models_error)
-            or not effective_model
-            or not resume_state["can_resume"],
+            disabled=run_buttons_disabled or not resume_state["can_resume"],
         ):
-            model = effective_model
-            result = start_background_process(
-                command=[sys.executable, "-m", "src.main", "--resume", "--model", model],
-                cwd=ROOT,
-                log_path=run_log_path,
-                meta_path=run_meta_path(proj_path),
-                kind="run",
-                extra={"model": model, "mode": "resume"},
-            )
-            render_process_result(
-                result,
-                "started_resume",
-                model=model,
-            )
+            launch_run("resume", "started_resume")
     with c6:
         if st.button(t("run_tests"), disabled=run_active, key="run_tests_top"):
             st.session_state["test_result"] = run_project_tests(ROOT)
@@ -856,112 +1137,114 @@ def main() -> None:
         with st.expander(t("test_output"), expanded=True):
             st.code(st.session_state["test_result"]["output"], language="text")
 
-    st.subheader(t("model_management"))
-    st.caption(t("model_management_help"))
-    rec = {
-        "qwen3:8b": "model_quality_balanced",
-        "llama3.2:3b": "model_smaller_if_available",
-        "phi3:mini": "model_smaller_if_available",
-        "qwen2.5:3b": "model_smaller_if_available",
-        "gemma2:2b": "model_smaller_if_available",
-    }
-    st.markdown(f"**{t('recommended_models')}**")
-    for name, desc_key in rec.items():
-        installed_tag = t("installed_tag") if name in installed_model_names else ""
-        st.write(f"- `{name}` - {t(desc_key)}{installed_tag}")
+    if selected_provider == MODEL_PROVIDER_OLLAMA:
+        st.subheader(t("model_management"))
+        st.caption(t("model_management_help"))
+        rec = {
+            "qwen3:8b": "model_quality_balanced",
+            "llama3.2:3b": "model_smaller_if_available",
+            "phi3:mini": "model_smaller_if_available",
+            "qwen2.5:3b": "model_smaller_if_available",
+            "gemma2:2b": "model_smaller_if_available",
+        }
+        st.markdown(f"**{t('recommended_models')}**")
+        for name, desc_key in rec.items():
+            installed_tag = t("installed_tag") if name in installed_model_names else ""
+            st.write(f"- `{name}` - {t(desc_key)}{installed_tag}")
 
-    st.markdown(f"**{t('installed_models')}**")
-    if models:
-        st.dataframe(
-            [
-                {
-                    t("models_table_name"): m["name"],
-                    t("models_table_size"): m["size"],
-                    t("models_table_modified"): m["modified"],
-                }
-                for m in models
-            ],
-            width="stretch",
+        st.markdown(f"**{t('installed_models')}**")
+        if models:
+            st.dataframe(
+                [
+                    {
+                        t("models_table_name"): m["name"],
+                        t("models_table_size"): m["size"],
+                        t("models_table_modified"): m["modified"],
+                    }
+                    for m in models
+                ],
+                width="stretch",
+            )
+        else:
+            st.caption(t("no_installed_model"))
+
+        health_col, health_result_col = st.columns([1, 3])
+        with health_col:
+            if st.button(t("check_model_health")):
+                st.session_state["model_health"] = check_model_health(
+                    provider=MODEL_PROVIDER_OLLAMA,
+                    base_url=app_config.ollama_base_url,
+                    selected_model=effective_model,
+                    installed_model_names=installed_model_names,
+                )
+        with health_result_col:
+            model_health = st.session_state.get("model_health")
+            if model_health:
+                if model_health["ok"]:
+                    st.success(localized_message(model_health))
+                else:
+                    st.error(localized_message(model_health))
+            else:
+                st.info(t("health_check_help"))
+
+        if st.button(t("save_default_model"), disabled=bool(models_error)):
+            model_to_save = effective_model.strip()
+            if not model_to_save:
+                st.error(t("model_name_empty"))
+            else:
+                err = save_default_model_name(CONFIG_PATH, model_to_save)
+                if err:
+                    st.error(err)
+                else:
+                    st.success(t("saved_default_model", model=model_to_save))
+
+        pull_model_name = st.text_input(t("pull_model_by_name"), value="qwen3:8b")
+        if st.button(t("pull_model"), disabled=blocked):
+            pull_model_name = pull_model_name.strip()
+            if not pull_model_name:
+                st.error(t("enter_model_name"))
+            else:
+                result = start_background_process(
+                    command=["ollama", "pull", pull_model_name],
+                    cwd=ROOT,
+                    log_path=model_job_log_path,
+                    meta_path=model_job_meta_path(proj_path),
+                    kind="model_pull",
+                    extra={"model": pull_model_name},
+                )
+                render_process_result(
+                    result,
+                    "started_pull_model",
+                    model=pull_model_name,
+                )
+
+        delete_target = st.selectbox(
+            t("delete_model"),
+            installed_model_names if installed_model_names else [DELETE_NONE],
+            format_func=lambda model: t("none_option") if model == DELETE_NONE else model,
         )
-    else:
-        st.caption(t("no_installed_model"))
-
-    health_col, health_result_col = st.columns([1, 3])
-    with health_col:
-        if st.button(t("check_model_health")):
-            st.session_state["model_health"] = check_model_health(
-                base_url=app_config.ollama_base_url,
-                selected_model=effective_model,
-                installed_model_names=installed_model_names,
-            )
-    with health_result_col:
-        model_health = st.session_state.get("model_health")
-        if model_health:
-            if model_health["ok"]:
-                st.success(localized_message(model_health))
+        confirm_delete = st.checkbox(t("confirm_delete"))
+        if st.button(t("delete_selected_model"), disabled=blocked or not installed_model_names):
+            if not confirm_delete:
+                st.error(t("confirm_delete_first"))
+            elif run_active and delete_target == str(run_meta.get("model", "")):
+                st.error(t("cannot_delete_running_model"))
+            elif delete_target == DELETE_NONE:
+                st.error(t("no_deletable_model"))
             else:
-                st.error(localized_message(model_health))
-        else:
-            st.info(t("health_check_help"))
-
-    if st.button(t("save_default_model"), disabled=bool(models_error)):
-        model_to_save = effective_model.strip()
-        if not model_to_save:
-            st.error(t("model_name_empty"))
-        else:
-            err = save_default_model_name(CONFIG_PATH, model_to_save)
-            if err:
-                st.error(err)
-            else:
-                st.success(t("saved_default_model", model=model_to_save))
-
-    pull_model_name = st.text_input(t("pull_model_by_name"), value="qwen3:8b")
-    if st.button(t("pull_model"), disabled=blocked):
-        pull_model_name = pull_model_name.strip()
-        if not pull_model_name:
-            st.error(t("enter_model_name"))
-        else:
-            result = start_background_process(
-                command=["ollama", "pull", pull_model_name],
-                cwd=ROOT,
-                log_path=model_job_log_path,
-                meta_path=model_job_meta_path(proj_path),
-                kind="model_pull",
-                extra={"model": pull_model_name},
-            )
-            render_process_result(
-                result,
-                "started_pull_model",
-                model=pull_model_name,
-            )
-
-    delete_target = st.selectbox(
-        t("delete_model"),
-        installed_model_names if installed_model_names else [DELETE_NONE],
-        format_func=lambda model: t("none_option") if model == DELETE_NONE else model,
-    )
-    confirm_delete = st.checkbox(t("confirm_delete"))
-    if st.button(t("delete_selected_model"), disabled=blocked or not installed_model_names):
-        if not confirm_delete:
-            st.error(t("confirm_delete_first"))
-        elif run_active and delete_target == str(run_meta.get("model", "")):
-            st.error(t("cannot_delete_running_model"))
-        elif delete_target == DELETE_NONE:
-            st.error(t("no_deletable_model"))
-        else:
-            result = start_background_process(
-                command=["ollama", "rm", delete_target],
-                cwd=ROOT,
-                log_path=model_job_log_path,
-                meta_path=model_job_meta_path(proj_path),
-                kind="model_delete",
-                extra={"model": delete_target},
-            )
-            render_process_result(
-                result,
-                "started_delete_model",
-                model=delete_target,
-            )
+                result = start_background_process(
+                    command=["ollama", "rm", delete_target],
+                    cwd=ROOT,
+                    log_path=model_job_log_path,
+                    meta_path=model_job_meta_path(proj_path),
+                    kind="model_delete",
+                    extra={"model": delete_target},
+                )
+                render_process_result(
+                    result,
+                    "started_delete_model",
+                    model=delete_target,
+                )
 
     st.subheader(t("progress_panel"))
     auto_refresh = st.checkbox(

@@ -50,6 +50,18 @@ def is_pid_running(pid: int) -> bool:
         os.kill(pid, 0)
     except OSError:
         return False
+    try:
+        result = subprocess.run(
+            ["ps", "-o", "stat=", "-p", str(pid)],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return True
+    if result.returncode == 0 and result.stdout.strip().startswith("Z"):
+        return False
     return True
 
 
@@ -81,17 +93,22 @@ def start_background_process(
     meta_path: Path,
     kind: str,
     extra: Optional[Dict[str, Any]] = None,
+    env_overrides: Optional[Dict[str, str]] = None,
 ) -> BackgroundProcessResult:
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_file = log_path.open("a", encoding="utf-8")
         try:
+            env = os.environ.copy()
+            if env_overrides:
+                env.update(env_overrides)
             process = subprocess.Popen(
                 list(command),
                 cwd=str(cwd),
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
                 text=True,
+                env=env,
             )
         finally:
             log_file.close()

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .judge_output import JUDGE_OUTPUT_SCHEMA
-from .llm import OllamaClient
+from .llm import LLMClientProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ def _read_prompt(path: Path) -> str:
 
 @dataclass
 class ResearchAgents:
-    llm: OllamaClient
+    llm: LLMClientProtocol
     draft_prompt: str
     review_prompt: str
     revise_prompt: str
@@ -31,7 +31,7 @@ class ResearchAgents:
     def from_prompt_dir(
         cls,
         *,
-        llm: OllamaClient,
+        llm: LLMClientProtocol,
         prompt_dir: Path,
         temperature: float,
         top_p: float,

@@ -9,7 +9,7 @@ from typing import Any, Dict, Sequence
 from rich.console import Console
 
 from .agents import ResearchAgents
-from .llm import OllamaClient
+from .llm import LLMClientProtocol
 from .runner import run_iterative_rounds
 from .storage import get_memory_for_prompt, write_text
 
@@ -23,7 +23,7 @@ def _clip_words(text: str, max_words: int) -> str:
 
 def _safe_generate(
     *,
-    llm: OllamaClient,
+    llm: LLMClientProtocol,
     system_prompt: str,
     user_prompt: str,
     fallback: str,
@@ -39,7 +39,7 @@ def _safe_generate(
 
 def generate_focus_objective(
     *,
-    llm: OllamaClient,
+    llm: LLMClientProtocol,
     task_text: str,
     memory_text: str,
     console: Console,
@@ -74,7 +74,7 @@ def generate_focus_objective(
 
 def generate_current_plan(
     *,
-    llm: OllamaClient,
+    llm: LLMClientProtocol,
     objective: str,
     task_text: str,
     memory_text: str,
@@ -128,7 +128,7 @@ def generate_current_plan(
 
 def generate_final_session_report(
     *,
-    llm: OllamaClient,
+    llm: LLMClientProtocol,
     objective: str,
     plan_text: str,
     best_output: str,
@@ -197,7 +197,7 @@ def generate_final_session_report(
 def run_session_mode(
     *,
     console: Console,
-    llm: OllamaClient,
+    llm: LLMClientProtocol,
     agents: ResearchAgents,
     task_text: str,
     project_dir: Path,

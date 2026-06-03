@@ -1,6 +1,6 @@
 # auto-research-agent
 
-一个本地优先（Ollama）的小型研究循环助手：`Draft -> Review -> Revise -> Judge`。  
+一个支持本地 Ollama 与云端 Google Gemini 的小型研究循环助手：`Draft -> Review -> Revise -> Judge`。
 适合做学术研究规划草案、迭代改写与快速评分。
 
 详细新手说明请先看：`docs/USER_GUIDE.md`。
@@ -99,6 +99,28 @@ make diagnostic ARGS="--model llama3.2:3b"
 make run ARGS="--model phi3:mini"
 ```
 
+## 云端 Gemini
+
+图形界面现在可以在 `Model provider` / `模型来源` 中选择 `Local Ollama` 或
+`Cloud Gemini`。本地模式保持原来的 Ollama 模型刷新、拉取、删除、健康检查和运行流程；
+云端模式不会查询 Ollama，也不要求本机安装本地模型。
+
+推荐通过环境变量提供 Gemini API key：
+
+```bash
+export GEMINI_API_KEY="..."
+make diagnostic ARGS="--provider gemini --model gemini-3.5-flash"
+```
+
+UI 里的 Gemini password 输入框只用于当前 Streamlit session 和本次启动的子进程，不会保存到
+`config.yaml`、命令行、运行 meta、checkpoint 或日志。点击 `Save Cloud Model as Default`
+只会保存 provider、模型名和 API key 环境变量名。
+
+当前第一版云端 provider 只支持 Google Gemini。不支持 Vertex AI、OpenAI compatibility、
+streaming、tools/search/function calling 或 Interactions API 迁移。真实 Gemini 在线测试需要
+你下一轮提供 API key、要测的模型（例如 `gemini-3.5-flash`）和运行模式，建议先跑
+Diagnostic。
+
 ## 先看哪个输出
 
 先看：`projects/example/best_output.md`  
@@ -161,6 +183,7 @@ make check
   - 在侧边栏 `Theme` 选择 `Day Mode` 或 `Dark Mode`
   - 主题会覆盖主界面、侧边栏、按钮、输入框、日志、代码块和状态提示
 - 选择模型：
+  - 先在 `Model provider` / `模型来源` 选择 `Local Ollama` 或 `Cloud Gemini`
   - UI 会自动读取本机 Ollama 已安装模型，并显示在 `Installed Ollama models`
   - 点击 `Refresh models` / `刷新模型` 可重新读取本机模型列表
   - 从下拉框选择模型后，运行按钮会带上 `--model <name>`
@@ -177,7 +200,9 @@ make check
   - 在 UI 的 `task.md` 和 `memory.md` 文本框编辑，然后点击 `Save Input`
 - 开始运行：
   - `Run Diagnostic` / `Run Normal` / `Run Continuous`
-  - UI 会把当前模型自动传给后端（`--model <selected_model>`）
+  - UI 会把当前 provider 和模型自动传给后端（例如 `--provider ollama --model qwen3:8b`
+    或 `--provider gemini --model gemini-3.5-flash`）
+  - Gemini password 只通过子进程环境变量传递，不会进入命令行或 meta JSON
 - 运行项目测试：
   - 在 `Project Tests` 里点击 `Run Tests`
   - 会执行当前环境的 `pytest -q`，并在页面显示通过/失败和完整输出
@@ -224,6 +249,7 @@ make check
 - `projects/*/run.log`
 - `projects/*/memory.md`
 - `config.yaml`
+- 不要提交真实 API key、`.env`、含密钥的本地配置或运行输出
 - `projects/*/checkpoint.json`
 - `projects/*/interrupted_report.md`
 - `projects/*/STOP_REQUESTED`

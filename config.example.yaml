@@ -3,6 +3,14 @@ model:
   name: qwen3:8b
   temperature: 0.3
   timeout_seconds: 300
+  gemini:
+    api_key_env: GEMINI_API_KEY
+    api_key: ""
+    models:
+      - gemini-3.5-flash
+      - gemini-2.5-flash
+      - gemini-2.5-pro
+      - gemini-2.5-flash-lite
 ollama_base_url: http://localhost:11434
 project_name: example
 topic:

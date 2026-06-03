@@ -10,7 +10,7 @@ from typing import Callable, Dict, Optional, Tuple
 from rich.console import Console
 
 from .agents import ResearchAgents
-from .llm import OllamaClient
+from .llm import LLMClientProtocol
 from .runtime import log_run as _log
 from .runtime import shorten_text_by_words as _shorten_text_by_words
 from .storage import (
@@ -28,7 +28,7 @@ from .storage import (
 def run_diagnostic_mode(
     *,
     console: Console,
-    llm: OllamaClient,
+    llm: LLMClientProtocol,
     task_text: str,
     project_dir: Path,
     memory_path: Path,

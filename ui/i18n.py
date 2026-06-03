@@ -78,6 +78,35 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "save_input": "Save Input",
         "input_saved": "task.md and memory.md saved.",
         "run_controls": "C. Run controls",
+        "model_provider": "Model provider",
+        "provider_local_ollama": "Local Ollama",
+        "provider_cloud_gemini": "Cloud Gemini",
+        "cloud_model_settings": "Cloud Gemini settings",
+        "gemini_api_key_env": "Gemini API key environment variable",
+        "gemini_api_key_password": "Gemini API key",
+        "gemini_api_key_password_help": (
+            "Used only for this Streamlit session and the child process; it is not saved."
+        ),
+        "gemini_model_selector": "Gemini model selector",
+        "manual_cloud_model_name": "Manual cloud model name",
+        "effective_cloud_model": "Effective cloud model: `{model}`",
+        "check_gemini_health": "Check Gemini Health",
+        "gemini_health_ok": "Gemini is reachable and `{model}` responded.",
+        "gemini_health_missing_key": (
+            "Gemini API key is missing. Enter a key for this session or set the configured "
+            "environment variable."
+        ),
+        "gemini_health_failed": "Gemini health check failed: {error}",
+        "save_cloud_model": "Save Cloud Model as Default",
+        "saved_cloud_model": "Saved Cloud Gemini model `{model}` to config.yaml.",
+        "cloud_model_management_note": (
+            "Cloud Gemini runs do not use local Ollama models, pull, or delete operations."
+        ),
+        "gemini_temperature_note": (
+            "Gemini 3 models often work best near temperature 1.0; this app still uses the "
+            "configured project temperature for compatibility."
+        ),
+        "provider_line": "Provider: `{provider}`",
         "run_active": "Run active (PID {pid}): `{command}`",
         "model_job_active": "Model job active (PID {pid}): `{command}`",
         "ollama_models_error_prefix": "Ollama model list error: {error}",
@@ -265,6 +294,31 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "save_input": "保存输入",
         "input_saved": "task.md 和 memory.md 已保存。",
         "run_controls": "C. 运行控制",
+        "model_provider": "模型来源",
+        "provider_local_ollama": "本地 Ollama",
+        "provider_cloud_gemini": "云端 Gemini",
+        "cloud_model_settings": "云端 Gemini 设置",
+        "gemini_api_key_env": "Gemini API key 环境变量名",
+        "gemini_api_key_password": "Gemini API key",
+        "gemini_api_key_password_help": (
+            "只用于当前 Streamlit 会话和本次启动的子进程，不会保存到配置文件。"
+        ),
+        "gemini_model_selector": "Gemini 模型选择",
+        "manual_cloud_model_name": "手动输入云端模型名",
+        "effective_cloud_model": "实际使用云端模型：`{model}`",
+        "check_gemini_health": "检查 Gemini 状态",
+        "gemini_health_ok": "Gemini 可以连接，且 `{model}` 已响应。",
+        "gemini_health_missing_key": (
+            "缺少 Gemini API key。请在当前会话输入 key，或设置配置中的环境变量。"
+        ),
+        "gemini_health_failed": "Gemini 状态检查失败：{error}",
+        "save_cloud_model": "保存云端模型为默认值",
+        "saved_cloud_model": "已将云端 Gemini 模型 `{model}` 保存到 config.yaml。",
+        "cloud_model_management_note": "云端 Gemini 不依赖本地 Ollama，也不需要拉取或删除本地模型。",
+        "gemini_temperature_note": (
+            "Gemini 3 系列通常更适合接近 1.0 的 temperature；为保持兼容，本应用仍使用项目配置中的温度。"
+        ),
+        "provider_line": "来源：`{provider}`",
         "run_active": "任务正在运行（PID {pid}）：`{command}`",
         "model_job_active": "模型任务正在运行（PID {pid}）：`{command}`",
         "ollama_models_error_prefix": "Ollama 模型列表读取失败：{error}",

@@ -9,6 +9,7 @@ description = "Local-first iterative research assistant powered by Ollama."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "google-genai",
     "requests",
     "PyYAML",
     "rich",

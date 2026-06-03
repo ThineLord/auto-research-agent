@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import os
+from dataclasses import replace
 from pathlib import Path
 from typing import List, Optional
 
@@ -10,16 +12,20 @@ from rich.console import Console
 
 from .agents import ResearchAgents
 from .config import (
+    MODEL_PROVIDER_GEMINI,
+    MODEL_PROVIDER_OLLAMA,
+    SUPPORTED_MODEL_PROVIDERS,
     ConfigValidationError,
+    format_model_label,
     format_topic_context,
     list_installed_ollama_models,
     load_app_config,
-    resolve_model_settings,
+    resolve_model_provider_settings,
     resolve_runtime_limits,
 )
 from .constants import RUN_LOCK_FILENAME
 from .diagnostic import run_diagnostic_mode
-from .llm import OllamaClient
+from .llm import create_llm_client
 from .logging_config import configure_logging
 from .resume import run_resume_mode
 from .runner import run_iterative_rounds
@@ -54,9 +60,45 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         "--model",
         type=str,
         default=None,
-        help="Override Ollama model name, e.g. qwen3:8b",
+        help="Override model name, e.g. qwen3:8b or gemini-3.5-flash",
+    )
+    parser.add_argument(
+        "--provider",
+        choices=sorted(SUPPORTED_MODEL_PROVIDERS),
+        default=None,
+        help="Override model provider.",
+    )
+    parser.add_argument(
+        "--gemini-api-key-env",
+        type=str,
+        default=None,
+        help="Environment variable name that contains the Gemini API key.",
+    )
+    parser.add_argument(
+        "--project",
+        type=str,
+        default=None,
+        help="Override project folder name under projects/.",
     )
     return parser.parse_args(argv)
+
+
+def _has_gemini_api_key_source(*, api_key_env: str, config_api_key: str = "") -> bool:
+    if config_api_key.strip():
+        return True
+    for env_name in (api_key_env.strip(), "GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        if env_name and os.environ.get(env_name, "").strip():
+            return True
+    return False
+
+
+def _validate_project_override(project_name: str) -> Optional[str]:
+    normalized = project_name.strip()
+    if not normalized:
+        return "Project name must be a non-empty folder name under projects/."
+    if normalized in {".", ".."} or "/" in normalized or "\\" in normalized:
+        return "Project name must be a simple folder name under projects/."
+    return None
 
 
 def main() -> None:
@@ -70,10 +112,24 @@ def main() -> None:
         console.print(f"[red]Config error: {exc}[/red]")
         return
 
-    config_model_name, config_temperature, config_timeout = resolve_model_settings(config)
+    (
+        config_provider,
+        config_model_name,
+        config_temperature,
+        config_timeout,
+        config_gemini,
+    ) = resolve_model_provider_settings(config)
+    provider = args.provider or config_provider
     model_name = args.model or config_model_name
+    gemini_api_key_env = args.gemini_api_key_env or config_gemini.api_key_env
+    gemini_config = replace(config_gemini, api_key_env=gemini_api_key_env)
+    model_label = format_model_label(provider, model_name)
     base_url = config.ollama_base_url
-    project_name = config.project_name
+    project_name = args.project.strip() if args.project else config.project_name
+    project_error = _validate_project_override(project_name)
+    if project_error:
+        console.print(f"[red]{project_error}[/red]")
+        return
     max_rounds = config.max_rounds
     stop_if_no_improvement_rounds = config.stop_if_no_improvement_rounds
     normal_max_runtime_seconds, continuous_max_runtime_seconds = resolve_runtime_limits(config)
@@ -91,20 +147,37 @@ def main() -> None:
     if not task_text:
         raise ValueError(f"Task file is empty: {project_dir / 'task.md'}")
 
-    installed_models, ollama_error = list_installed_ollama_models()
-    if ollama_error:
-        console.print(f"[red]{ollama_error}[/red]")
-        console.print("[yellow]Start Ollama service, then retry.[/yellow]")
-        return
-    if model_name not in installed_models:
-        console.print(
-            f"[red]Model {model_name} is not installed. Run: ollama pull {model_name}[/red]"
-        )
-        if args.model is None and "llama3.1:8b" in installed_models:
-            console.print("[yellow]Suggestion: fallback available -> llama3.1:8b[/yellow]")
+    if provider == MODEL_PROVIDER_OLLAMA:
+        installed_models, ollama_error = list_installed_ollama_models()
+        if ollama_error:
+            console.print(f"[red]{ollama_error}[/red]")
+            console.print("[yellow]Start Ollama service, then retry.[/yellow]")
+            return
+        if model_name not in installed_models:
+            console.print(
+                f"[red]Model {model_name} is not installed. Run: ollama pull {model_name}[/red]"
+            )
+            if args.model is None and "llama3.1:8b" in installed_models:
+                console.print("[yellow]Suggestion: fallback available -> llama3.1:8b[/yellow]")
+            return
+    elif provider == MODEL_PROVIDER_GEMINI:
+        if not _has_gemini_api_key_source(
+            api_key_env=gemini_api_key_env,
+            config_api_key=gemini_config.api_key,
+        ):
+            console.print(
+                "[red]Gemini API key is missing. Set the configured environment variable, "
+                "GEMINI_API_KEY, or GOOGLE_API_KEY, then retry.[/red]"
+            )
+            return
+    else:
+        console.print(f"[red]Unsupported model provider: {provider}[/red]")
         return
 
-    console.print(f"[bold cyan]Using model: {model_name}[/bold cyan]")
+    provider_label = "Local" if provider == MODEL_PROVIDER_OLLAMA else "Cloud"
+    console.print(
+        f"[bold cyan]{provider_label}: Using provider: {provider} | model: {model_name}[/bold cyan]"
+    )
 
     requested_mode = "normal"
     if args.continuous:
@@ -119,7 +192,7 @@ def main() -> None:
     run_lock_path, lock_error = acquire_run_lock(
         project_dir,
         mode=requested_mode,
-        model_name=model_name,
+        model_name=model_label,
     )
     if lock_error:
         console.print(f"[red]{lock_error}[/red]")
@@ -128,10 +201,12 @@ def main() -> None:
         )
         return
 
-    llm = OllamaClient(
-        base_url=base_url,
-        model=model_name,
+    llm = create_llm_client(
+        provider=provider,
+        model_name=model_name,
+        ollama_base_url=base_url,
         timeout_seconds=timeout_seconds,
+        gemini_config=gemini_config,
     )
     agents = ResearchAgents.from_prompt_dir(
         llm=llm,
@@ -149,7 +224,7 @@ def main() -> None:
                 task_text=task_text,
                 project_dir=project_dir,
                 memory_path=memory_path,
-                model_name=model_name,
+                model_name=model_label,
                 max_rounds=max_rounds,
                 stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
                 global_max_runtime_seconds=normal_max_runtime_seconds,
@@ -166,7 +241,7 @@ def main() -> None:
                 project_dir=project_dir,
                 memory_path=memory_path,
                 mode="continuous",
-                model_name=model_name,
+                model_name=model_label,
                 max_rounds=9999,
                 stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
                 global_max_runtime_seconds=continuous_max_runtime_seconds,
@@ -184,7 +259,7 @@ def main() -> None:
                 task_text=task_text,
                 project_dir=project_dir,
                 memory_path=memory_path,
-                model_name=model_name,
+                model_name=model_label,
                 topic_context=topic_context,
             )
             return
@@ -197,7 +272,7 @@ def main() -> None:
                 task_text=task_text,
                 project_dir=project_dir,
                 memory_path=memory_path,
-                model_name=model_name,
+                model_name=model_label,
                 max_rounds=max_rounds,
                 stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
                 global_max_runtime_seconds=normal_max_runtime_seconds,
@@ -215,7 +290,7 @@ def main() -> None:
             project_dir=project_dir,
             memory_path=memory_path,
             mode="normal",
-            model_name=model_name,
+            model_name=model_label,
             max_rounds=max_rounds,
             stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
             global_max_runtime_seconds=normal_max_runtime_seconds,

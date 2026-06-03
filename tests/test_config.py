@@ -7,14 +7,22 @@ from pathlib import Path
 import yaml
 
 from src.config import (
+    DEFAULT_GEMINI_MODEL,
+    DEFAULT_GEMINI_MODELS,
+    DEFAULT_MODEL_NAME,
+    MODEL_PROVIDER_GEMINI,
+    MODEL_PROVIDER_OLLAMA,
     ConfigValidationError,
+    format_model_label,
     format_topic_context,
     load_app_config,
     load_config,
     load_default_model_name,
+    resolve_model_provider_settings,
     resolve_model_settings,
     resolve_runtime_limits,
     save_default_model_name,
+    save_default_model_selection,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,6 +42,9 @@ class ConfigValidationTests(unittest.TestCase):
 
         self.assertEqual(config.model.provider, "ollama")
         self.assertEqual(config.model.name, "qwen3:8b")
+        self.assertEqual(config.model.gemini.api_key_env, "GEMINI_API_KEY")
+        self.assertEqual(config.model.gemini.api_key, "")
+        self.assertEqual(config.model.gemini.models, DEFAULT_GEMINI_MODELS)
         self.assertEqual(config.project_name, "example")
         self.assertIn("Example Research Planning Task", config.topic.title)
         self.assertIn("research", config.topic.keywords)
@@ -71,9 +82,20 @@ runtime:
         config = load_app_config(config_path)
 
         self.assertEqual(config.model.name, "llama3.1:8b")
+        self.assertEqual(config.model.provider, MODEL_PROVIDER_OLLAMA)
         self.assertEqual(config.model.temperature, 0.7)
         self.assertEqual(config.model.timeout_seconds, 120)
         self.assertEqual(resolve_model_settings(config.as_dict()), ("llama3.1:8b", 0.7, 120))
+        self.assertEqual(
+            resolve_model_provider_settings(config.as_dict()),
+            (
+                MODEL_PROVIDER_OLLAMA,
+                "llama3.1:8b",
+                0.7,
+                120,
+                config.model.gemini,
+            ),
+        )
         self.assertEqual(resolve_runtime_limits(config), (120, 240))
 
     def test_topic_defaults_are_generic_when_not_configured(self) -> None:
@@ -120,6 +142,53 @@ timeout_seconds: 20
 
         self.assertEqual(resolve_model_settings(config), ("qwen3:14b", 0.2, 200))
 
+    def test_gemini_model_config_loads_and_formats_cloud_label(self) -> None:
+        config_path = self.write_config(
+            """
+model:
+  provider: gemini
+  name: gemini-2.5-pro
+  temperature: 0.3
+  timeout_seconds: 300
+  gemini:
+    api_key_env: GEMINI_API_KEY
+    api_key: ""
+    models:
+      - gemini-3.5-flash
+      - gemini-2.5-pro
+      - gemini-2.5-pro
+"""
+        )
+
+        config = load_app_config(config_path)
+
+        self.assertEqual(config.model.provider, MODEL_PROVIDER_GEMINI)
+        self.assertEqual(config.model.name, "gemini-2.5-pro")
+        self.assertEqual(config.model.gemini.models, ("gemini-3.5-flash", "gemini-2.5-pro"))
+        self.assertEqual(
+            resolve_model_provider_settings(config),
+            (
+                MODEL_PROVIDER_GEMINI,
+                "gemini-2.5-pro",
+                0.3,
+                300,
+                config.model.gemini,
+            ),
+        )
+        self.assertEqual(
+            format_model_label(MODEL_PROVIDER_GEMINI, "gemini-2.5-pro"),
+            "gemini:gemini-2.5-pro",
+        )
+        self.assertEqual(format_model_label(MODEL_PROVIDER_OLLAMA, "qwen3:8b"), "qwen3:8b")
+
+    def test_gemini_provider_uses_default_model_when_name_is_missing(self) -> None:
+        config_path = self.write_config("model:\n  provider: gemini\n")
+
+        config = load_app_config(config_path)
+
+        self.assertEqual(config.model.provider, MODEL_PROVIDER_GEMINI)
+        self.assertEqual(config.model.name, DEFAULT_GEMINI_MODEL)
+
     def test_rejects_malformed_yaml_and_non_mapping_yaml(self) -> None:
         malformed_path = self.write_config("model: [\n")
         list_path = self.write_config("- model\n")
@@ -133,6 +202,10 @@ timeout_seconds: 20
         cases = [
             ("unexpected: true\n", "config: unknown key"),
             ("model:\n  name: qwen3:8b\n  extra: true\n", "config.model: unknown key"),
+            (
+                "model:\n  gemini:\n    extra: true\n",
+                "config.model.gemini: unknown key",
+            ),
             ("topic:\n  title: Demo\n  extra: true\n", "config.topic: unknown key"),
             (
                 "runtime:\n  normal_max_runtime_seconds: 120\n  extra: true\n",
@@ -164,6 +237,13 @@ timeout_seconds: 20
         cases = [
             ("model:\n  provider: openai\n", "config.model.provider"),
             ("model:\n  name: '   '\n", "config.model.name"),
+            ("model:\n  gemini:\n    api_key_env: ' '\n", "config.model.gemini.api_key_env"),
+            ("model:\n  gemini:\n    api_key: 123\n", "config.model.gemini.api_key"),
+            ("model:\n  gemini:\n    models: []\n", "config.model.gemini.models"),
+            (
+                "model:\n  gemini:\n    models:\n      - gemini-3.5-flash\n      - 123\n",
+                "config.model.gemini.models",
+            ),
             ("project_name: ../private\n", "config.project_name"),
             ("topic: demo\n", "config.topic"),
             ("topic:\n  title: ' '\n", "config.topic.title"),
@@ -208,6 +288,52 @@ timeout_seconds: 180
         self.assertEqual(bad_config_path.read_text(encoding="utf-8"), before)
         with self.assertRaises(ConfigValidationError):
             load_default_model_name(bad_config_path)
+
+    def test_default_model_selection_saves_provider_model_and_non_sensitive_gemini_settings(
+        self,
+    ) -> None:
+        config_path = self.write_config(
+            """
+model:
+  provider: gemini
+  temperature: 0.5
+  timeout_seconds: 200
+  gemini:
+    api_key_env: OLD_GEMINI_KEY
+    api_key: super-secret
+    models:
+      - gemini-3.5-flash
+      - gemini-2.5-pro
+"""
+        )
+
+        self.assertIsNone(
+            save_default_model_selection(
+                config_path,
+                provider=MODEL_PROVIDER_GEMINI,
+                model_name="gemini-2.5-pro",
+                gemini_api_key_env="TEAM_GEMINI_KEY",
+            )
+        )
+
+        saved_text = config_path.read_text(encoding="utf-8")
+        saved = yaml.safe_load(saved_text)
+        self.assertEqual(saved["model"]["provider"], MODEL_PROVIDER_GEMINI)
+        self.assertEqual(saved["model"]["name"], "gemini-2.5-pro")
+        self.assertEqual(saved["model"]["gemini"]["api_key_env"], "TEAM_GEMINI_KEY")
+        self.assertEqual(saved["model"]["gemini"]["api_key"], "")
+        self.assertNotIn("super-secret", saved_text)
+
+        self.assertIsNone(
+            save_default_model_selection(
+                config_path,
+                provider=MODEL_PROVIDER_OLLAMA,
+                model_name="",
+            )
+        )
+        saved = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        self.assertEqual(saved["model"]["provider"], MODEL_PROVIDER_OLLAMA)
+        self.assertEqual(saved["model"]["name"], DEFAULT_MODEL_NAME)
 
 
 if __name__ == "__main__":
