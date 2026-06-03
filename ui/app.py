@@ -10,6 +10,23 @@ from typing import Any, Sequence
 import requests
 import streamlit as st
 
+from src.cloud_free import (
+    FREE_RUNNER_AUTO,
+    FREE_RUNNER_MANUAL,
+    FREE_RUNNER_PRESETS,
+    FREE_RUNNER_QUALITY,
+    FREE_RUNNER_VOLUME,
+    build_candidate_pool,
+    discover_free_cloud_models,
+    filter_safe_text_models,
+    initial_delay_seconds,
+    load_discovery_artifact,
+    load_profile_artifact,
+    profile_free_cloud_models,
+    recommend_free_cloud_model,
+    save_discovery_artifact,
+    save_profile_artifact,
+)
 from src.config import (
     DEFAULT_GEMINI_API_KEY_ENV,
     DEFAULT_GEMINI_MODEL,
@@ -55,6 +72,12 @@ AGENT_LOG_RE = re.compile(
 )
 ROUND_ENTER_RE = re.compile(r"round_enter round=(?P<round>\d+)")
 DELETE_NONE = "__none__"
+FREE_RUNNER_LABEL_KEYS = {
+    FREE_RUNNER_AUTO: "free_runner_auto",
+    FREE_RUNNER_QUALITY: "free_runner_quality",
+    FREE_RUNNER_VOLUME: "free_runner_volume",
+    FREE_RUNNER_MANUAL: "free_runner_manual",
+}
 
 
 def relative_repo_path(path: Path) -> str:
@@ -214,6 +237,7 @@ def build_run_command(
     model: str,
     gemini_api_key_env: str | None = None,
     project: str | None = None,
+    free_runner_preset: str | None = None,
 ) -> list[str]:
     mode_flags = {
         "diagnostic": ["--diagnostic"],
@@ -238,6 +262,8 @@ def build_run_command(
         command.extend(["--project", project])
     if provider == MODEL_PROVIDER_GEMINI and gemini_api_key_env:
         command.extend(["--gemini-api-key-env", gemini_api_key_env])
+    if provider == MODEL_PROVIDER_GEMINI and free_runner_preset:
+        command.extend(["--free-runner-preset", free_runner_preset])
     return command
 
 
@@ -623,6 +649,16 @@ def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[
             "label_key": "output_model_ops_log",
             "path": project_dir / "model_ops.log",
         },
+        {
+            "label": "Cloud free discovery",
+            "label_key": "output_cloud_free_discovery",
+            "path": project_dir / "artifacts" / "cloud_free_models.json",
+        },
+        {
+            "label": "Cloud free profile",
+            "label_key": "output_cloud_free_profile",
+            "path": project_dir / "artifacts" / "cloud_free_profile.json",
+        },
     ]
 
     run_root = Path(str(checkpoint.get("run_root", "")))
@@ -728,6 +764,25 @@ def render_live_progress_and_logs(
     st.write(t("stop_reason", reason=progress["stop_reason"]))
     st.write(t("stop_signal_present", present=stop_signal_path.exists()))
     st.write(t("selected_model", model=st.session_state.get("selected_model", default_model)))
+    cloud_free_status = checkpoint.get("cloud_free", {})
+    if isinstance(cloud_free_status, dict) and cloud_free_status:
+        st.caption(t("cloud_free_runtime_status"))
+        cf1, cf2, cf3, cf4 = st.columns(4)
+        cf1.metric(t("cloud_free_status"), str(cloud_free_status.get("status", "N/A")))
+        cf2.metric(
+            t("cloud_free_delay"),
+            str(cloud_free_status.get("current_delay_seconds", "N/A")),
+        )
+        cf3.metric(
+            t("cloud_free_recent_429"),
+            str(cloud_free_status.get("recent_429_count", "N/A")),
+        )
+        cf4.metric(
+            t("cloud_free_rounds_hour"),
+            str(cloud_free_status.get("estimated_completed_rounds_per_hour", "N/A")),
+        )
+    if checkpoint.get("paused_until_reset"):
+        st.warning(str(checkpoint.get("pause_message", "")))
 
     st.subheader(t("live_logs_panel"))
     st.code(run_log_text or t("no_logs_yet"), language="text")
@@ -970,6 +1025,103 @@ def main() -> None:
             if app_config.model.provider == MODEL_PROVIDER_GEMINI
             else DEFAULT_GEMINI_MODEL
         )
+        key_available = has_gemini_api_key_source(
+            api_key_env=gemini_api_key_env,
+            api_key_value=gemini_api_key_password,
+            config_api_key=app_config.model.gemini.api_key,
+        )
+        if not key_available:
+            st.warning(t("gemini_health_missing_key"))
+        provider_env_overrides = build_provider_env_overrides(
+            selected_provider,
+            gemini_api_key_env,
+            gemini_api_key_password,
+        )
+
+        st.markdown(f"**{t('cloud_free_runner')}**")
+        st.warning(t("cloud_free_zero_cost_warning"))
+        st.caption(t("cloud_free_limits_warning"))
+        preset_default = (
+            app_config.cloud_free.free_runner_preset
+            if app_config.cloud_free.free_runner_preset in FREE_RUNNER_PRESETS
+            else FREE_RUNNER_AUTO
+        )
+        if st.session_state.get("free_runner_preset") not in FREE_RUNNER_PRESETS:
+            st.session_state["free_runner_preset"] = preset_default
+        selected_free_runner_preset = st.selectbox(
+            t("free_runner_preset"),
+            list(FREE_RUNNER_PRESETS),
+            format_func=lambda preset: t(FREE_RUNNER_LABEL_KEYS[preset]),
+            key="free_runner_preset",
+        )
+
+        discovered_models = st.session_state.get("cloud_free_discovered_models")
+        if not isinstance(discovered_models, list):
+            discovered_models = load_discovery_artifact(proj_path)
+        profile_results = st.session_state.get("cloud_free_profile_results")
+        if not isinstance(profile_results, list):
+            profile_results = load_profile_artifact(proj_path)
+
+        discover_col, profile_col, recommendation_col = st.columns([1, 1, 3])
+        with discover_col:
+            if st.button(t("discover_free_cloud_models"), disabled=not key_available):
+                with st.spinner(t("discovering_free_cloud_models")):
+                    discovered, error = discover_free_cloud_models(
+                        api_key_env=gemini_api_key_env,
+                        api_key=gemini_api_key_password or app_config.model.gemini.api_key,
+                        config=app_config.cloud_free,
+                    )
+                if error:
+                    st.error(t("cloud_free_discovery_failed", error=error))
+                else:
+                    save_discovery_artifact(proj_path, discovered)
+                    st.session_state["cloud_free_discovered_models"] = discovered
+                    discovered_models = discovered
+                    st.success(t("cloud_free_discovery_saved", count=len(discovered)))
+        with profile_col:
+            if st.button(t("profile_safe_free_models"), disabled=not key_available):
+                profile_candidates = build_candidate_pool(
+                    discovered_models=discovered_models,
+                    configured_models=cloud_models,
+                    config=app_config.cloud_free,
+                )
+                safe_candidates = filter_safe_text_models(
+                    profile_candidates,
+                    include_unavailable=True,
+                )
+                with st.spinner(t("profiling_free_cloud_models")):
+                    profiles = profile_free_cloud_models(
+                        candidates=safe_candidates,
+                        api_key_env=gemini_api_key_env,
+                        api_key=gemini_api_key_password or app_config.model.gemini.api_key,
+                    )
+                save_profile_artifact(proj_path, profiles)
+                st.session_state["cloud_free_profile_results"] = profiles
+                profile_results = profiles
+                st.success(t("cloud_free_profile_saved", count=len(profiles)))
+
+        cloud_candidates = build_candidate_pool(
+            discovered_models=discovered_models,
+            configured_models=cloud_models,
+            config=app_config.cloud_free,
+        )
+        cloud_free_recommendation = recommend_free_cloud_model(
+            candidates=cloud_candidates,
+            profiles=profile_results,
+            preset=selected_free_runner_preset,
+        )
+        with recommendation_col:
+            if cloud_free_recommendation:
+                st.info(
+                    t(
+                        "cloud_free_recommendation",
+                        model=cloud_free_recommendation.model_id,
+                        reason=cloud_free_recommendation.reason,
+                    )
+                )
+            else:
+                st.info(t("cloud_free_manual_mode"))
+
         selected_cloud_model = st.session_state.get("selected_cloud_model_picker")
         if selected_cloud_model not in cloud_models:
             selected_cloud_model = (
@@ -996,25 +1148,40 @@ def main() -> None:
             manual_cloud_model,
             cloud_default_model,
         )
+        if (
+            selected_free_runner_preset != FREE_RUNNER_MANUAL
+            and cloud_free_recommendation is not None
+        ):
+            effective_model = cloud_free_recommendation.model_id
         model_label = provider_model_label(selected_provider, effective_model)
         st.session_state["selected_model"] = model_label
         with cloud_effective_col:
             st.write(t("effective_cloud_model", model=effective_model or t("none_option")))
         st.caption(t("gemini_temperature_note"))
-
-        key_available = has_gemini_api_key_source(
-            api_key_env=gemini_api_key_env,
-            api_key_value=gemini_api_key_password,
-            config_api_key=app_config.model.gemini.api_key,
-        )
-        if not key_available:
-            st.warning(t("gemini_health_missing_key"))
-        provider_env_overrides = build_provider_env_overrides(
-            selected_provider,
-            gemini_api_key_env,
-            gemini_api_key_password,
-        )
         run_model_blocked = not effective_model or not key_available
+
+        selected_profile = next(
+            (
+                profile
+                for profile in profile_results
+                if getattr(profile, "model_id", "") == effective_model
+            ),
+            None,
+        )
+        metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+        metric_col1.metric(t("cloud_free_selected_model"), effective_model or "N/A")
+        metric_col2.metric(
+            t("cloud_free_delay"),
+            f"{initial_delay_seconds(effective_model, selected_free_runner_preset):.1f}",
+        )
+        metric_col3.metric(
+            t("cloud_free_recent_429"),
+            str(getattr(selected_profile, "rate_limited", False)),
+        )
+        metric_col4.metric(
+            t("cloud_free_rounds_hour"),
+            f"{3600 / max(initial_delay_seconds(effective_model, selected_free_runner_preset), 1) / 4:.2f}",
+        )
 
         gemini_health_col, gemini_health_result_col = st.columns([1, 3])
         with gemini_health_col:
@@ -1058,6 +1225,7 @@ def main() -> None:
                 effective_model,
                 gemini_api_key_env if selected_provider == MODEL_PROVIDER_GEMINI else None,
                 selected_project,
+                selected_free_runner_preset if selected_provider == MODEL_PROVIDER_GEMINI else None,
             ),
             cwd=ROOT,
             log_path=run_log_path,

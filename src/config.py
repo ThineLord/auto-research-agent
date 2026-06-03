@@ -16,6 +16,10 @@ from urllib.request import Request, urlopen
 
 import yaml
 
+from .cloud_free import (
+    FREE_RUNNER_PRESETS,
+    CloudFreeConfig,
+)
 from .constants import (
     DEFAULT_CONTINUOUS_MAX_RUNTIME_SECONDS,
     DEFAULT_NORMAL_MAX_RUNTIME_SECONDS,
@@ -32,7 +36,6 @@ DEFAULT_GEMINI_API_KEY_ENV = "GEMINI_API_KEY"
 DEFAULT_GEMINI_MODELS = (
     "gemini-3.5-flash",
     "gemini-2.5-flash",
-    "gemini-2.5-pro",
     "gemini-2.5-flash-lite",
 )
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
@@ -99,6 +102,7 @@ class AppConfig:
     stop_if_no_improvement_rounds: int = DEFAULT_STOP_IF_NO_IMPROVEMENT_ROUNDS
     top_p: float = DEFAULT_TOP_P
     runtime: RuntimeConfig = field(default_factory=RuntimeConfig)
+    cloud_free: CloudFreeConfig = field(default_factory=CloudFreeConfig)
 
     def as_dict(self) -> Dict[str, Any]:
         return {
@@ -126,6 +130,18 @@ class AppConfig:
             "runtime": {
                 "normal_max_runtime_seconds": self.runtime.normal_max_runtime_seconds,
                 "continuous_max_runtime_seconds": self.runtime.continuous_max_runtime_seconds,
+            },
+            "cloud_free": {
+                "cloud_free_mode": self.cloud_free.cloud_free_mode,
+                "free_runner_preset": self.cloud_free.free_runner_preset,
+                "min_delay_seconds": self.cloud_free.min_delay_seconds,
+                "max_delay_seconds": self.cloud_free.max_delay_seconds,
+                "max_retries": self.cloud_free.max_retries,
+                "prompt_budget_chars": self.cloud_free.prompt_budget_chars,
+                "prompt_budget_tokens": self.cloud_free.prompt_budget_tokens,
+                "allow_model_fallback": self.cloud_free.allow_model_fallback,
+                "allowed_model_patterns": list(self.cloud_free.allowed_model_patterns),
+                "blocked_model_patterns": list(self.cloud_free.blocked_model_patterns),
             },
         }
 
@@ -222,6 +238,48 @@ def _validate_int(
     if max_value is not None and value > max_value:
         raise ConfigValidationError(f"{field_name}: must be <= {max_value}")
     return value
+
+
+def _validate_bool(value: Any, field_name: str) -> bool:
+    if not isinstance(value, bool):
+        raise ConfigValidationError(f"{field_name}: must be a boolean")
+    return value
+
+
+def _validate_optional_float(
+    value: Any,
+    field_name: str,
+    *,
+    min_value: float,
+) -> float | None:
+    if value is None:
+        return None
+    return _validate_float(value, field_name, min_value=min_value, max_value=86400.0)
+
+
+def _validate_optional_int(
+    value: Any,
+    field_name: str,
+    *,
+    min_value: int,
+) -> int | None:
+    if value is None:
+        return None
+    return _validate_int(value, field_name, min_value=min_value)
+
+
+def _validate_string_list(value: Any, field_name: str) -> Tuple[str, ...]:
+    if not isinstance(value, list):
+        raise ConfigValidationError(f"{field_name}: must be a list of non-empty strings")
+    items: list[str] = []
+    seen = set()
+    for index, item in enumerate(value):
+        normalized = _validate_non_empty_string(item, f"{field_name}[{index}]")
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        items.append(normalized)
+    return tuple(items)
 
 
 def _validate_model_provider(value: Any) -> str:
@@ -418,6 +476,97 @@ def _validate_runtime_config(config: Mapping[str, Any]) -> RuntimeConfig:
     )
 
 
+def _validate_free_runner_preset(value: Any) -> str:
+    preset = _validate_non_empty_string(value, "config.cloud_free.free_runner_preset")
+    if preset not in FREE_RUNNER_PRESETS:
+        supported = ", ".join(FREE_RUNNER_PRESETS)
+        raise ConfigValidationError(
+            f"config.cloud_free.free_runner_preset: must be one of: {supported}"
+        )
+    return preset
+
+
+def _validate_cloud_free_config(config: Mapping[str, Any]) -> CloudFreeConfig:
+    raw_cloud_free = config.get("cloud_free", {})
+    if raw_cloud_free is None:
+        raw_cloud_free = {}
+    if not isinstance(raw_cloud_free, Mapping):
+        raise ConfigValidationError("config.cloud_free: must be a mapping")
+    _validate_mapping_keys(
+        "config.cloud_free",
+        raw_cloud_free,
+        {
+            "cloud_free_mode",
+            "free_runner_preset",
+            "min_delay_seconds",
+            "max_delay_seconds",
+            "max_retries",
+            "prompt_budget_chars",
+            "prompt_budget_tokens",
+            "allow_model_fallback",
+            "allowed_model_patterns",
+            "blocked_model_patterns",
+        },
+    )
+
+    defaults = CloudFreeConfig()
+    min_delay_seconds = _validate_optional_float(
+        raw_cloud_free.get("min_delay_seconds", defaults.min_delay_seconds),
+        "config.cloud_free.min_delay_seconds",
+        min_value=0.0,
+    )
+    max_delay_seconds = _validate_float(
+        raw_cloud_free.get("max_delay_seconds", defaults.max_delay_seconds),
+        "config.cloud_free.max_delay_seconds",
+        min_value=0.0,
+        max_value=86400.0,
+    )
+    if min_delay_seconds is not None and max_delay_seconds < min_delay_seconds:
+        raise ConfigValidationError(
+            "config.cloud_free.max_delay_seconds: must be >= min_delay_seconds"
+        )
+
+    return CloudFreeConfig(
+        cloud_free_mode=_validate_bool(
+            raw_cloud_free.get("cloud_free_mode", defaults.cloud_free_mode),
+            "config.cloud_free.cloud_free_mode",
+        ),
+        free_runner_preset=_validate_free_runner_preset(
+            raw_cloud_free.get("free_runner_preset", defaults.free_runner_preset)
+        ),
+        min_delay_seconds=min_delay_seconds,
+        max_delay_seconds=max_delay_seconds,
+        max_retries=_validate_int(
+            raw_cloud_free.get("max_retries", defaults.max_retries),
+            "config.cloud_free.max_retries",
+            min_value=0,
+            max_value=20,
+        ),
+        prompt_budget_chars=_validate_int(
+            raw_cloud_free.get("prompt_budget_chars", defaults.prompt_budget_chars),
+            "config.cloud_free.prompt_budget_chars",
+            min_value=1000,
+        ),
+        prompt_budget_tokens=_validate_optional_int(
+            raw_cloud_free.get("prompt_budget_tokens", defaults.prompt_budget_tokens),
+            "config.cloud_free.prompt_budget_tokens",
+            min_value=100,
+        ),
+        allow_model_fallback=_validate_bool(
+            raw_cloud_free.get("allow_model_fallback", defaults.allow_model_fallback),
+            "config.cloud_free.allow_model_fallback",
+        ),
+        allowed_model_patterns=_validate_string_list(
+            raw_cloud_free.get("allowed_model_patterns", list(defaults.allowed_model_patterns)),
+            "config.cloud_free.allowed_model_patterns",
+        ),
+        blocked_model_patterns=_validate_string_list(
+            raw_cloud_free.get("blocked_model_patterns", list(defaults.blocked_model_patterns)),
+            "config.cloud_free.blocked_model_patterns",
+        ),
+    )
+
+
 def _build_app_config(raw_config: Mapping[str, Any]) -> AppConfig:
     _validate_mapping_keys(
         "config",
@@ -431,6 +580,7 @@ def _build_app_config(raw_config: Mapping[str, Any]) -> AppConfig:
             "stop_if_no_improvement_rounds",
             "top_p",
             "runtime",
+            "cloud_free",
             "temperature",
             "timeout_seconds",
         },
@@ -464,6 +614,7 @@ def _build_app_config(raw_config: Mapping[str, Any]) -> AppConfig:
             min_inclusive=False,
         ),
         runtime=_validate_runtime_config(raw_config),
+        cloud_free=_validate_cloud_free_config(raw_config),
     )
 
 

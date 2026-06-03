@@ -45,6 +45,9 @@ class ConfigValidationTests(unittest.TestCase):
         self.assertEqual(config.model.gemini.api_key_env, "GEMINI_API_KEY")
         self.assertEqual(config.model.gemini.api_key, "")
         self.assertEqual(config.model.gemini.models, DEFAULT_GEMINI_MODELS)
+        self.assertTrue(config.cloud_free.cloud_free_mode)
+        self.assertEqual(config.cloud_free.free_runner_preset, "auto_long_run")
+        self.assertEqual(config.cloud_free.max_retries, 5)
         self.assertEqual(config.project_name, "example")
         self.assertIn("Example Research Planning Task", config.topic.title)
         self.assertIn("research", config.topic.keywords)
@@ -211,6 +214,10 @@ model:
                 "runtime:\n  normal_max_runtime_seconds: 120\n  extra: true\n",
                 "config.runtime: unknown key",
             ),
+            (
+                "cloud_free:\n  extra: true\n",
+                "config.cloud_free: unknown key",
+            ),
         ]
 
         for text, message in cases:
@@ -255,6 +262,9 @@ model:
                 "runtime:\n  normal_max_runtime_seconds: 120\n  continuous_max_runtime_seconds: 60\n",
                 "continuous_max_runtime_seconds",
             ),
+            ("cloud_free:\n  free_runner_preset: paid_fast\n", "free_runner_preset"),
+            ("cloud_free:\n  max_retries: -1\n", "max_retries"),
+            ("cloud_free:\n  prompt_budget_chars: 999\n", "prompt_budget_chars"),
         ]
 
         for text, message in cases:

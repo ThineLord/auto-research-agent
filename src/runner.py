@@ -12,7 +12,9 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 from rich.console import Console
 
 from .agents import ResearchAgents
+from .cloud_free import CloudFreeDailyQuotaExhausted, next_pacific_reset_heuristic
 from .constants import (
+    STOP_CLOUD_DAILY_QUOTA,
     STOP_EXCEPTION,
     STOP_INVALID_SCORE,
     STOP_MANUAL_INTERRUPT,
@@ -94,6 +96,8 @@ def _run_agent_step(
                 f"mode={mode} | round={round_index} | agent={agent_name} | status=end",
             )
         return output, None
+    except CloudFreeDailyQuotaExhausted:
+        raise
     except RuntimeError as exc:
         console.print(f"[red][Round {round_index}] {agent_name} failed: {exc}[/red]")
         if log_path is not None:
@@ -104,6 +108,18 @@ def _run_agent_step(
         return f"[{agent_name.upper()} ERROR] {exc}", str(exc)
     finally:
         _run_agent_step._depth = depth  # type: ignore[attr-defined]
+
+
+def _cloud_free_status(agents: ResearchAgents) -> Dict[str, Any]:
+    status_fn = getattr(agents.llm, "cloud_free_status", None)
+    if not callable(status_fn):
+        return {}
+    status = status_fn()
+    return status if isinstance(status, dict) else {}
+
+
+def _is_user_stop_error(error: Optional[str]) -> bool:
+    return "user stop requested" in (error or "").lower()
 
 
 def run_iterative_rounds(
@@ -171,6 +187,7 @@ def run_iterative_rounds(
     last_successful_agent = "none"
     invalid_score_seen = False
     timeout_seen = False
+    paused_until_reset_message = ""
 
     def _remaining_runtime_seconds() -> int:
         remaining = global_max_runtime_seconds - (time.monotonic() - started_at)
@@ -195,6 +212,11 @@ def run_iterative_rounds(
                 mode,
                 "global_runtime_limit_reached_before_round",
             )
+            break
+
+        if _stop_requested(stop_signal_path):
+            stop_reason = STOP_USER_REQUESTED
+            _log(console, log_path, mode, f"user_stop_requested_before_round round={round_index}")
             break
 
         _log(console, log_path, mode, f"round_enter round={round_index}")
@@ -413,6 +435,18 @@ def run_iterative_rounds(
                 if not judge_error:
                     last_successful_agent = "judge"
             _persist_round_outputs("judge")
+        except CloudFreeDailyQuotaExhausted as exc:
+            stop_reason = STOP_CLOUD_DAILY_QUOTA
+            paused_until_reset_message = str(exc)
+            _log(
+                console,
+                log_path,
+                mode,
+                "cloud_free_paused_until_reset "
+                f"round={round_index} message={paused_until_reset_message}",
+            )
+            console.print(f"[yellow]{paused_until_reset_message}[/yellow]")
+            break
         except KeyboardInterrupt:
             stop_reason = STOP_MANUAL_INTERRUPT
             _log(console, log_path, mode, "manual_interrupt_caught")
@@ -441,6 +475,17 @@ def run_iterative_rounds(
             judge=judge_output,
         )
         _log(console, log_path, mode, f"round_saved round={round_index} path={round_dir}")
+
+        if any(_is_user_stop_error(err) for err in round_errors):
+            stop_reason = STOP_USER_REQUESTED
+            _log(
+                console,
+                log_path,
+                mode,
+                f"round_incomplete_not_scored round={round_index} reason={STOP_USER_REQUESTED}",
+            )
+            break
+
         last_review_output = review_output
         last_revised_output = revised_output
         last_judge_output = judge_output
@@ -527,6 +572,7 @@ def run_iterative_rounds(
             "updated_at": datetime.now().isoformat(),
             "mode": mode,
             "model": model_name,
+            "cloud_free": _cloud_free_status(agents),
         }
         write_json_file(checkpoint_path, checkpoint_data)
 
@@ -603,10 +649,25 @@ def run_iterative_rounds(
         "best_score": round(best_score, 2),
         "best_round_path": str(run_root / f"round_{best_round:02d}") if best_round else "",
         "stop_reason": stop_reason,
-        "can_resume": stop_reason in {STOP_USER_REQUESTED, STOP_MANUAL_INTERRUPT},
         "updated_at": datetime.now().isoformat(),
         "mode": mode,
         "model": model_name,
+        "cloud_free": _cloud_free_status(agents),
+    }
+    if stop_reason == STOP_CLOUD_DAILY_QUOTA:
+        checkpoint_final.update(
+            {
+                "status": "paused_until_reset",
+                "paused_until_reset": True,
+                "pause_message": paused_until_reset_message
+                or "Free-tier daily quota likely exhausted; safe to resume after reset.",
+                "reset_heuristic": next_pacific_reset_heuristic(),
+            }
+        )
+    checkpoint_final["can_resume"] = stop_reason in {
+        STOP_USER_REQUESTED,
+        STOP_MANUAL_INTERRUPT,
+        STOP_CLOUD_DAILY_QUOTA,
     }
     write_json_file(checkpoint_path, checkpoint_final)
 
