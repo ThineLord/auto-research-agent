@@ -211,6 +211,7 @@ def run_session_mode(
     topic_title: str = "the configured research topic",
     topic_keywords: Sequence[str] = (),
     project_metadata: dict[str, object] | None = None,
+    max_consecutive_provider_quota_failures: int = 2,
 ) -> None:
     console.rule("Research Session Mode")
     memory_for_prompt = get_memory_for_prompt(memory_path)
@@ -261,6 +262,7 @@ def run_session_mode(
         per_agent_timeout_seconds=per_agent_timeout_seconds,
         topic_keywords=topic_keywords,
         project_metadata=project_metadata,
+        max_consecutive_provider_quota_failures=max_consecutive_provider_quota_failures,
     )
 
     research_state_path = project_dir / "research_state.json"

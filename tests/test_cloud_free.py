@@ -151,6 +151,13 @@ class CloudFreePolicyTests(unittest.TestCase):
             scheduler.call(lambda: (_ for _ in ()).throw(error))
         self.assertEqual(scheduler.status()["status"], "paused_until_reset")
 
+    def test_wrapped_rate_limit_text_is_still_classified(self) -> None:
+        info = classify_gemini_error(RuntimeError("Gemini free-tier rate limit reached"))
+
+        self.assertTrue(info.rate_limited)
+        self.assertTrue(info.retryable)
+        self.assertEqual(info.error_type, "rate_limited")
+
     def test_prompt_budget_guard_preserves_critical_state(self) -> None:
         prompt = (
             "# Topic Context\nKeep this topic.\n\n"

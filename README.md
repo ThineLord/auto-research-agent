@@ -123,6 +123,19 @@ backoff。零成本长时间运行优先用 `Auto: best zero-cost long-run` 或
 `Volume free: high-TPM/Gemma or Flash-Lite`，`Quality free: Gemini 3.5 Flash` 更适合短的高质量测试。
 遇到免费层 429 时，backoff、checkpoint 和之后 resume 是预期行为，不代表功能失败。
 
+Benchmark 运行请优先使用安全 preset，而不是直接把免费 Gemini 跑成 25 轮长测：
+
+```bash
+make continuous ARGS="--provider gemini --benchmark-preset free_smoke"
+make continuous ARGS="--provider gemini --benchmark-preset free_eval"
+make continuous ARGS="--provider gemini --benchmark-preset paid_benchmark"
+```
+
+Preset 轮数：`free_smoke=4`、`free_eval=5`、`paid_benchmark=25`、`stress_test=50`。
+启动前 CLI 会估算每轮 LLM calls 和总 calls；Gemini 下如果超过保守低免费额度，会打印 warning。
+连续 provider quota/rate-limit 失败默认 2 轮后自动停止，stop reason 为
+`PROVIDER_QUOTA_EXHAUSTED`，避免继续生成大量无意义失败轮。
+
 当前第一版云端 provider 只支持 Google Gemini。不支持 Vertex AI、OpenAI compatibility、
 streaming、tools/search/function calling 或 Interactions API 迁移。真实 Gemini 在线测试需要
 你下一轮提供 API key、要测的模型（例如 `gemini-3.5-flash`）和运行模式，建议先跑

@@ -64,6 +64,7 @@ from src.constants import (
     STOP_CLOUD_DAILY_QUOTA,
     STOP_MAX_ROUNDS,
     STOP_OLLAMA_TIMEOUT,
+    STOP_PROVIDER_QUOTA_EXHAUSTED,
     STOP_USER_REQUESTED,
 )
 from src.resume import run_resume_mode
@@ -225,6 +226,32 @@ class DraftTimeoutAgents(FakeAgents):
         )
 
 
+class ProviderQuotaAgents(FakeAgents):
+    def __init__(self) -> None:
+        super().__init__([0, 0, 0])
+        self.draft_calls = 0
+
+    def draft(
+        self,
+        *,
+        task: str,
+        memory: str,
+        round_index: int,
+        previous_best: str,
+        previous_judge: str,
+    ) -> str:
+        self.draft_calls += 1
+        raise RuntimeError("PROVIDER_QUOTA_EXHAUSTED: Gemini provider quota or rate limit reached.")
+
+
+class GenericProviderFailureAgents(FakeAgents):
+    def __init__(self) -> None:
+        super().__init__([0])
+
+    def review(self, *, task: str, memory: str, draft_output: str) -> str:
+        raise RuntimeError("Gemini request failed.")
+
+
 class RoundLoopTests(unittest.TestCase):
     def test_main_reexports_backward_compatible_api(self) -> None:
         self.assertIs(main_module.run_iterative_rounds, run_iterative_rounds)
@@ -234,10 +261,22 @@ class RoundLoopTests(unittest.TestCase):
         self.assertTrue(callable(main_module.run_session_mode))
 
     def test_parse_args_accepts_mode_and_model_flags(self) -> None:
-        args = parse_args(["--diagnostic", "--model", "llama3.1:8b"])
+        args = parse_args(
+            [
+                "--diagnostic",
+                "--model",
+                "llama3.1:8b",
+                "--benchmark-preset",
+                "free_eval",
+                "--max-provider-quota-failures",
+                "2",
+            ]
+        )
 
         self.assertTrue(args.diagnostic)
         self.assertEqual(args.model, "llama3.1:8b")
+        self.assertEqual(args.benchmark_preset, "free_eval")
+        self.assertEqual(args.max_provider_quota_failures, 2)
 
     def test_round_loop_writes_outputs_and_keeps_best_score(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -351,6 +390,82 @@ class RoundLoopTests(unittest.TestCase):
             self.assertEqual(agents.draft_calls, 1)
             self.assertEqual(result["completed_rounds"], 1)
             self.assertEqual(result["stop_reason"], STOP_OLLAMA_TIMEOUT)
+
+    def test_round_loop_stops_after_consecutive_provider_quota_failures(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            agents = ProviderQuotaAgents()
+
+            result = run_iterative_rounds(
+                console=Console(),
+                agents=agents,
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="continuous",
+                model_name="gemini:gemini-3.5-flash",
+                max_rounds=5,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+                disable_no_improvement_stop=True,
+                disable_timeout_stop=True,
+                max_consecutive_provider_quota_failures=2,
+            )
+
+            run_root = Path(result["run_root"])
+            checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
+            score_history = json.loads(
+                (project_dir / "score_history.json").read_text(encoding="utf-8")
+            )
+
+            self.assertEqual(agents.draft_calls, 2)
+            self.assertEqual(result["completed_rounds"], 2)
+            self.assertEqual(result["stop_reason"], STOP_PROVIDER_QUOTA_EXHAUSTED)
+            self.assertEqual(checkpoint["stop_reason"], STOP_PROVIDER_QUOTA_EXHAUSTED)
+            self.assertTrue(checkpoint["can_resume"])
+            self.assertTrue(checkpoint["provider_quota_exhausted"])
+            self.assertEqual([entry["round"] for entry in score_history], [1, 2])
+            self.assertTrue(all(entry["provider_quota_this_round"] for entry in score_history))
+            self.assertFalse((run_root / "round_03").exists())
+
+    def test_round_loop_marks_generic_provider_failure_round(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+
+            result = run_iterative_rounds(
+                console=Console(),
+                agents=GenericProviderFailureAgents(),
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="continuous",
+                model_name="gemini:gemini-3.5-flash",
+                max_rounds=1,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+                disable_no_improvement_stop=True,
+                disable_timeout_stop=True,
+            )
+
+            score_history = json.loads(
+                (project_dir / "score_history.json").read_text(encoding="utf-8")
+            )
+
+            self.assertEqual(result["completed_rounds"], 1)
+            self.assertEqual(result["stop_reason"], STOP_MAX_ROUNDS)
+            self.assertEqual(score_history[0]["errors"][0], "Gemini request failed.")
+            self.assertTrue(score_history[0]["provider_failure_this_round"])
+            self.assertFalse(score_history[0]["provider_quota_this_round"])
+            self.assertTrue(score_history[0]["skipped_placeholder_this_round"])
+            self.assertFalse(score_history[0]["successful_research_round"])
 
     def test_round_loop_checkpoints_resumable_cloud_quota_pause(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

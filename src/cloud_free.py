@@ -403,9 +403,22 @@ def classify_gemini_error(exc: BaseException) -> GeminiErrorInfo:
     status = _status_code_from_exception(exc)
     message = _safe_error_message(exc)
     text = message.lower()
-    rate_limited = status == 429 or "429" in text or "resource exhausted" in text
+    rate_limited = (
+        status == 429
+        or "429" in text
+        or "resource exhausted" in text
+        or "rate limit" in text
+        or "rate_limited" in text
+        or "quota exceeded" in text
+        or "free-tier" in text
+    )
     daily_quota = rate_limited and bool(
-        re.search(r"\b(rpd|daily|per day|day quota|daily quota)\b", text, flags=re.I)
+        re.search(
+            r"\b(rpd|daily|per day|day quota|daily quota|requests per day)\b"
+            r"|generaterequestsperday",
+            text,
+            flags=re.I,
+        )
     )
     token_context = (
         bool(re.search(r"context|token|too large|maximum|input.*limit|prompt", text, flags=re.I))

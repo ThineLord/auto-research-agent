@@ -10,6 +10,7 @@ from typing import Any, Sequence
 import requests
 import streamlit as st
 
+from src.benchmarking import BENCHMARK_PRESETS
 from src.cloud_free import (
     FREE_RUNNER_AUTO,
     FREE_RUNNER_MANUAL,
@@ -77,6 +78,12 @@ FREE_RUNNER_LABEL_KEYS = {
     FREE_RUNNER_QUALITY: "free_runner_quality",
     FREE_RUNNER_VOLUME: "free_runner_volume",
     FREE_RUNNER_MANUAL: "free_runner_manual",
+}
+BENCHMARK_PRESET_LABEL_KEYS = {
+    "free_smoke": "benchmark_preset_free_smoke",
+    "free_eval": "benchmark_preset_free_eval",
+    "paid_benchmark": "benchmark_preset_paid_benchmark",
+    "stress_test": "benchmark_preset_stress_test",
 }
 
 
@@ -238,6 +245,8 @@ def build_run_command(
     gemini_api_key_env: str | None = None,
     project: str | None = None,
     free_runner_preset: str | None = None,
+    benchmark_preset: str | None = None,
+    max_provider_quota_failures: int | None = None,
 ) -> list[str]:
     mode_flags = {
         "diagnostic": ["--diagnostic"],
@@ -264,6 +273,10 @@ def build_run_command(
         command.extend(["--gemini-api-key-env", gemini_api_key_env])
     if provider == MODEL_PROVIDER_GEMINI and free_runner_preset:
         command.extend(["--free-runner-preset", free_runner_preset])
+    if benchmark_preset:
+        command.extend(["--benchmark-preset", benchmark_preset])
+    if max_provider_quota_failures is not None:
+        command.extend(["--max-provider-quota-failures", str(max(0, max_provider_quota_failures))])
     return command
 
 
@@ -1217,6 +1230,31 @@ def main() -> None:
                 else:
                     st.success(t("saved_cloud_model", model=model_to_save))
 
+    st.markdown(f"**{t('continuous_benchmark_settings')}**")
+    benchmark_preset_options = list(BENCHMARK_PRESETS)
+    if st.session_state.get("benchmark_preset") not in benchmark_preset_options:
+        st.session_state["benchmark_preset"] = "free_smoke"
+    benchmark_col, quota_col = st.columns([2, 1])
+    with benchmark_col:
+        selected_benchmark_preset = st.selectbox(
+            t("benchmark_preset"),
+            benchmark_preset_options,
+            format_func=lambda preset: t(
+                BENCHMARK_PRESET_LABEL_KEYS.get(preset, "benchmark_preset")
+            ),
+            key="benchmark_preset",
+        )
+    with quota_col:
+        selected_max_provider_quota_failures = int(
+            st.number_input(
+                t("max_provider_quota_failures"),
+                min_value=0,
+                max_value=20,
+                value=2,
+                step=1,
+            )
+        )
+
     def launch_run(mode: str, success_key: str) -> None:
         result = start_background_process(
             command=build_run_command(
@@ -1226,6 +1264,8 @@ def main() -> None:
                 gemini_api_key_env if selected_provider == MODEL_PROVIDER_GEMINI else None,
                 selected_project,
                 selected_free_runner_preset if selected_provider == MODEL_PROVIDER_GEMINI else None,
+                selected_benchmark_preset if mode == "continuous" else None,
+                selected_max_provider_quota_failures if mode == "continuous" else None,
             ),
             cwd=ROOT,
             log_path=run_log_path,

@@ -344,6 +344,8 @@ class SharedUiBackendHelperTests(unittest.TestCase):
             gemini_api_key_env="TEAM_GEMINI_KEY",
             project="example",
             free_runner_preset="volume_free",
+            benchmark_preset="free_smoke",
+            max_provider_quota_failures=2,
         )
 
         self.assertIn("--provider", command)
@@ -356,6 +358,10 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertIn("example", command)
         self.assertIn("--free-runner-preset", command)
         self.assertIn("volume_free", command)
+        self.assertIn("--benchmark-preset", command)
+        self.assertIn("free_smoke", command)
+        self.assertIn("--max-provider-quota-failures", command)
+        self.assertIn("2", command)
         self.assertNotIn("secret-key", command)
         self.assertEqual(
             ui_app.build_provider_env_overrides(

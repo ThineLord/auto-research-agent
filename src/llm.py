@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, Optional, Protocol
 
 import requests
@@ -15,6 +19,7 @@ from .cloud_free import (
     CloudFreeDailyQuotaExhausted,
     CloudFreeScheduler,
     apply_cloud_prompt_budget,
+    classify_gemini_error,
 )
 from .config import (
     DEFAULT_GEMINI_API_KEY_ENV,
@@ -26,6 +31,27 @@ from .config import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _redact_provider_message(text: str) -> str:
+    redacted = str(text or "")
+    redacted = re.sub(r"AIza[0-9A-Za-z_\-]{20,}", "[redacted-api-key]", redacted)
+    redacted = re.sub(
+        r"(?i)(api[_ -]?key|key|token)=['\"]?[^'\"\s,;]+",
+        r"\1=[redacted]",
+        redacted,
+    )
+    redacted = re.sub(r"\s+", " ", redacted).strip()
+    return redacted[:1000]
+
+
+def _write_provider_event(path: Path | None, payload: Dict[str, Any]) -> None:
+    if path is None:
+        return
+    event = {"time": datetime.now().isoformat(), **payload}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as file:
+        file.write(json.dumps(event, ensure_ascii=False, default=str) + "\n")
 
 
 class LLMClientProtocol(Protocol):
@@ -50,6 +76,23 @@ class OllamaClient:
     model: str
     timeout_seconds: int = 120
     max_prompt_chars: int = DEFAULT_OLLAMA_MAX_PROMPT_CHARS
+    provider_event_path: Path | None = None
+    run_id: str = ""
+    current_round: int | None = None
+    current_stage: str = ""
+
+    def set_provider_context(
+        self,
+        *,
+        provider_event_path: Path,
+        run_id: str,
+        round_index: int,
+        stage: str,
+    ) -> None:
+        self.provider_event_path = provider_event_path
+        self.run_id = run_id
+        self.current_round = round_index
+        self.current_stage = stage
 
     def generate(
         self,
@@ -107,6 +150,20 @@ class OllamaClient:
             payload["format"] = response_format
 
         started = time.monotonic()
+        _write_provider_event(
+            self.provider_event_path,
+            {
+                "event": "request_start",
+                "provider": MODEL_PROVIDER_OLLAMA,
+                "model": self.model,
+                "stage": agent_name,
+                "round": self.current_round,
+                "run_id": self.run_id,
+                "error_type": "",
+                "prompt_chars": prompt_chars,
+                "structured_response": response_format is not None,
+            },
+        )
         logger.info(
             "llm_request_start",
             extra={
@@ -133,11 +190,37 @@ class OllamaClient:
             response.raise_for_status()
             data = response.json()
         except requests.Timeout as exc:
+            _write_provider_event(
+                self.provider_event_path,
+                {
+                    "event": "request_error",
+                    "provider": MODEL_PROVIDER_OLLAMA,
+                    "model": self.model,
+                    "stage": agent_name,
+                    "round": self.current_round,
+                    "run_id": self.run_id,
+                    "error_type": "timeout",
+                    "message": _redact_provider_message(str(exc)),
+                },
+            )
             raise RuntimeError(
                 "Ollama request timed out. "
                 f"Increase timeout_seconds or check model/server health at {self.base_url}."
             ) from exc
         except requests.RequestException as exc:
+            _write_provider_event(
+                self.provider_event_path,
+                {
+                    "event": "request_error",
+                    "provider": MODEL_PROVIDER_OLLAMA,
+                    "model": self.model,
+                    "stage": agent_name,
+                    "round": self.current_round,
+                    "run_id": self.run_id,
+                    "error_type": "request_error",
+                    "message": _redact_provider_message(str(exc)),
+                },
+            )
             raise RuntimeError(
                 "Failed to call Ollama API. Ensure Ollama is running at "
                 f"{self.base_url} and model '{self.model}' is available."
@@ -145,6 +228,20 @@ class OllamaClient:
 
         elapsed = time.monotonic() - started
         content = data.get("message", {}).get("content", "").strip()
+        _write_provider_event(
+            self.provider_event_path,
+            {
+                "event": "request_end",
+                "provider": MODEL_PROVIDER_OLLAMA,
+                "model": self.model,
+                "stage": agent_name,
+                "round": self.current_round,
+                "run_id": self.run_id,
+                "error_type": "",
+                "response_chars": len(content),
+                "elapsed_seconds": round(elapsed, 3),
+            },
+        )
         logger.info(
             "llm_request_end",
             extra={
@@ -212,6 +309,10 @@ class GeminiClient:
     timeout_seconds: int = 120
     max_prompt_chars: int = DEFAULT_GEMINI_MAX_PROMPT_CHARS
     cloud_free_config: CloudFreeConfig | None = None
+    provider_event_path: Path | None = None
+    run_id: str = ""
+    current_round: int | None = None
+    current_stage: str = ""
     _scheduler: CloudFreeScheduler | None = field(init=False, default=None)
 
     def __post_init__(self) -> None:
@@ -220,6 +321,19 @@ class GeminiClient:
                 model_id=self.model,
                 config=self.cloud_free_config,
             )
+
+    def set_provider_context(
+        self,
+        *,
+        provider_event_path: Path,
+        run_id: str,
+        round_index: int,
+        stage: str,
+    ) -> None:
+        self.provider_event_path = provider_event_path
+        self.run_id = run_id
+        self.current_round = round_index
+        self.current_stage = stage
 
     def _available_api_key(self) -> str:
         configured_key = self.api_key.strip()
@@ -336,6 +450,21 @@ class GeminiClient:
         )
 
         started = time.monotonic()
+        _write_provider_event(
+            self.provider_event_path,
+            {
+                "event": "request_start",
+                "provider": MODEL_PROVIDER_GEMINI,
+                "model": self.model,
+                "stage": agent_name,
+                "round": self.current_round,
+                "run_id": self.run_id,
+                "error_type": "",
+                "prompt_chars": final_prompt_chars,
+                "original_prompt_chars": prompt_chars,
+                "structured_response": response_format is not None,
+            },
+        )
         logger.info(
             "llm_request_start",
             extra={
@@ -364,21 +493,95 @@ class GeminiClient:
                 )
 
             response = self._scheduler.call(operation) if self._scheduler else operation()
-        except CloudFreeDailyQuotaExhausted:
+        except CloudFreeDailyQuotaExhausted as exc:
+            _write_provider_event(
+                self.provider_event_path,
+                {
+                    "event": "request_error",
+                    "provider": MODEL_PROVIDER_GEMINI,
+                    "model": self.model,
+                    "stage": agent_name,
+                    "round": self.current_round,
+                    "run_id": self.run_id,
+                    "error_type": "daily_quota_exhausted",
+                    "message": _redact_provider_message(str(exc)),
+                },
+            )
             raise
         except RuntimeError as exc:
+            info = classify_gemini_error(exc)
+            error_type = info.error_type
+            _write_provider_event(
+                self.provider_event_path,
+                {
+                    "event": "request_error",
+                    "provider": MODEL_PROVIDER_GEMINI,
+                    "model": self.model,
+                    "stage": agent_name,
+                    "round": self.current_round,
+                    "run_id": self.run_id,
+                    "error_type": error_type,
+                    "retryable": info.retryable,
+                    "rate_limited": info.rate_limited,
+                    "daily_quota_exhausted": info.daily_quota_exhausted,
+                    "retry_after_seconds": info.retry_after_seconds,
+                    "message": _redact_provider_message(str(exc)),
+                },
+            )
+            if info.rate_limited or info.daily_quota_exhausted:
+                raise RuntimeError(
+                    "PROVIDER_QUOTA_EXHAUSTED: Gemini provider quota or rate limit reached. "
+                    f"{info.public_message}"
+                ) from exc
             if self._scheduler is not None:
                 raise
             raise RuntimeError(
                 "Failed to call Gemini API. Check API key, model name, and network access."
             ) from exc
         except Exception as exc:  # noqa: BLE001
+            info = classify_gemini_error(exc)
+            _write_provider_event(
+                self.provider_event_path,
+                {
+                    "event": "request_error",
+                    "provider": MODEL_PROVIDER_GEMINI,
+                    "model": self.model,
+                    "stage": agent_name,
+                    "round": self.current_round,
+                    "run_id": self.run_id,
+                    "error_type": info.error_type,
+                    "retryable": info.retryable,
+                    "rate_limited": info.rate_limited,
+                    "daily_quota_exhausted": info.daily_quota_exhausted,
+                    "retry_after_seconds": info.retry_after_seconds,
+                    "message": _redact_provider_message(str(exc)),
+                },
+            )
+            if info.rate_limited or info.daily_quota_exhausted:
+                raise RuntimeError(
+                    "PROVIDER_QUOTA_EXHAUSTED: Gemini provider quota or rate limit reached. "
+                    f"{info.public_message}"
+                ) from exc
             raise RuntimeError(
                 "Failed to call Gemini API. Check API key, model name, and network access."
             ) from exc
 
         content = _read_response_text(response)
         elapsed = time.monotonic() - started
+        _write_provider_event(
+            self.provider_event_path,
+            {
+                "event": "request_end",
+                "provider": MODEL_PROVIDER_GEMINI,
+                "model": self.model,
+                "stage": agent_name,
+                "round": self.current_round,
+                "run_id": self.run_id,
+                "error_type": "",
+                "response_chars": len(content),
+                "elapsed_seconds": round(elapsed, 3),
+            },
+        )
         logger.info(
             "llm_request_end",
             extra={

@@ -26,6 +26,7 @@ def run_resume_mode(
     per_agent_timeout_seconds: int,
     topic_keywords: Sequence[str] = (),
     project_metadata: dict[str, object] | None = None,
+    max_consecutive_provider_quota_failures: int = 2,
 ) -> None:
     checkpoint_path = project_dir / "checkpoint.json"
     checkpoint = read_json_file(checkpoint_path)
@@ -63,4 +64,5 @@ def run_resume_mode(
         initial_best_score=initial_best_score,
         topic_keywords=topic_keywords,
         project_metadata=project_metadata,
+        max_consecutive_provider_quota_failures=max_consecutive_provider_quota_failures,
     )

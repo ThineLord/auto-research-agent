@@ -20,6 +20,7 @@ from .constants import (
     STOP_MAX_ROUNDS,
     STOP_NO_IMPROVEMENT,
     STOP_OLLAMA_TIMEOUT,
+    STOP_PROVIDER_QUOTA_EXHAUSTED,
     STOP_USER_REQUESTED,
 )
 from .diagnostic import run_diagnostic_mode
@@ -37,6 +38,7 @@ __all__ = [
     "STOP_MAX_ROUNDS",
     "STOP_NO_IMPROVEMENT",
     "STOP_OLLAMA_TIMEOUT",
+    "STOP_PROVIDER_QUOTA_EXHAUSTED",
     "STOP_USER_REQUESTED",
     "ConfigValidationError",
     "list_installed_ollama_models",

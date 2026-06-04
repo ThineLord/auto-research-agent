@@ -4,13 +4,19 @@ from __future__ import annotations
 
 import argparse
 import os
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import List, Optional
 
 from rich.console import Console
 
 from .agents import ResearchAgents
+from .benchmarking import (
+    BENCHMARK_PRESETS,
+    benchmark_preset_rounds,
+    estimate_request_budget,
+    format_request_budget_estimate,
+)
 from .cloud_free import (
     FREE_RUNNER_MANUAL,
     FREE_RUNNER_PRESETS,
@@ -147,6 +153,27 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         default=None,
         help="Override maximum prompt size before an LLM call fails fast.",
     )
+    parser.add_argument(
+        "--max-rounds",
+        type=int,
+        default=None,
+        help="Override round count for normal/session/resume, or cap continuous mode.",
+    )
+    parser.add_argument(
+        "--benchmark-preset",
+        choices=sorted(BENCHMARK_PRESETS),
+        default=None,
+        help=(
+            "Benchmark-safe iteration preset: free_smoke=4, free_eval=5, "
+            "paid_benchmark=25, stress_test=50."
+        ),
+    )
+    parser.add_argument(
+        "--max-provider-quota-failures",
+        type=int,
+        default=2,
+        help="Stop after this many consecutive provider quota/rate-limit failed rounds.",
+    )
     return parser.parse_args(argv)
 
 
@@ -234,7 +261,20 @@ def main() -> None:
     if project_error:
         console.print(f"[red]{project_error}[/red]")
         return
+    benchmark_preset = getattr(args, "benchmark_preset", None)
+    max_rounds_override = getattr(args, "max_rounds", None)
+    max_provider_quota_failures = max(0, getattr(args, "max_provider_quota_failures", 2))
+    preset_rounds = benchmark_preset_rounds(benchmark_preset)
     max_rounds = config.max_rounds
+    if preset_rounds is not None:
+        max_rounds = preset_rounds
+    if max_rounds_override is not None:
+        max_rounds = max(1, max_rounds_override)
+    continuous_max_rounds = 9999
+    if preset_rounds is not None:
+        continuous_max_rounds = preset_rounds
+    if max_rounds_override is not None:
+        continuous_max_rounds = max(1, max_rounds_override)
     stop_if_no_improvement_rounds = config.stop_if_no_improvement_rounds
     normal_max_runtime_seconds, continuous_max_runtime_seconds = resolve_runtime_limits(config)
     temperature = config_temperature
@@ -404,6 +444,22 @@ def main() -> None:
     elif args.resume:
         requested_mode = "resume"
 
+    planned_rounds_for_budget = max_rounds
+    if requested_mode == "diagnostic":
+        planned_rounds_for_budget = 1
+    elif requested_mode == "continuous":
+        planned_rounds_for_budget = continuous_max_rounds
+    request_budget = estimate_request_budget(
+        provider=provider,
+        mode=requested_mode,
+        planned_rounds=planned_rounds_for_budget,
+    )
+    for line in format_request_budget_estimate(request_budget):
+        console.print(f"[yellow]{line}[/yellow]" if "warning" in line else f"[cyan]{line}[/cyan]")
+    project_metadata["request_budget"] = asdict(request_budget)
+    if benchmark_preset:
+        project_metadata["benchmark_preset"] = benchmark_preset
+
     run_lock_path, lock_error = acquire_run_lock(
         project_dir,
         mode=requested_mode,
@@ -450,6 +506,7 @@ def main() -> None:
                 per_agent_timeout_seconds=timeout_seconds,
                 topic_keywords=topic_keywords,
                 project_metadata=project_metadata,
+                max_consecutive_provider_quota_failures=max_provider_quota_failures,
             )
             return
 
@@ -462,7 +519,7 @@ def main() -> None:
                 memory_path=memory_path,
                 mode="continuous",
                 model_name=model_label,
-                max_rounds=9999,
+                max_rounds=continuous_max_rounds,
                 stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
                 global_max_runtime_seconds=continuous_max_runtime_seconds,
                 per_agent_timeout_seconds=timeout_seconds,
@@ -470,6 +527,7 @@ def main() -> None:
                 disable_timeout_stop=True,
                 topic_keywords=topic_keywords,
                 project_metadata=project_metadata,
+                max_consecutive_provider_quota_failures=max_provider_quota_failures,
             )
             return
 
@@ -503,6 +561,7 @@ def main() -> None:
                 topic_title=config.topic.title,
                 topic_keywords=topic_keywords,
                 project_metadata=project_metadata,
+                max_consecutive_provider_quota_failures=max_provider_quota_failures,
             )
             return
 
@@ -520,6 +579,7 @@ def main() -> None:
             per_agent_timeout_seconds=timeout_seconds,
             topic_keywords=topic_keywords,
             project_metadata=project_metadata,
+            max_consecutive_provider_quota_failures=max_provider_quota_failures,
         )
     except KeyboardInterrupt:
         console.print(

@@ -22,6 +22,7 @@ from .constants import (
     STOP_NO_IMPROVEMENT,
     STOP_OLLAMA_TIMEOUT,
     STOP_PROMPT_TOO_LARGE,
+    STOP_PROVIDER_QUOTA_EXHAUSTED,
     STOP_USER_REQUESTED,
 )
 from .runtime import log_run as _log
@@ -123,6 +124,63 @@ def _is_user_stop_error(error: Optional[str]) -> bool:
     return "user stop requested" in (error or "").lower()
 
 
+def _is_provider_quota_error(error: Optional[str]) -> bool:
+    text = (error or "").lower()
+    return any(
+        marker in text
+        for marker in (
+            "provider_quota_exhausted",
+            "resource_exhausted",
+            "rate limit",
+            "rate-limit",
+            "rate_limited",
+            "quota",
+            "free-tier",
+            "free tier",
+            "retry after",
+            "429",
+        )
+    )
+
+
+def _is_skipped_placeholder_error(error: Optional[str]) -> bool:
+    text = (error or "").lower()
+    return text.startswith("skipped due") or " skipped" in text
+
+
+def _is_provider_failure_error(error: Optional[str]) -> bool:
+    text = (error or "").lower()
+    if not text:
+        return False
+    return (
+        _is_provider_quota_error(error)
+        or "failed to call" in text
+        or "provider" in text
+        or "gemini request failed" in text
+        or "ollama request timed out" in text
+        or "ollama prompt too large" in text
+        or "gemini prompt too large" in text
+    )
+
+
+def _set_provider_context(
+    *,
+    agents: ResearchAgents,
+    project_dir: Path,
+    run_id: str,
+    round_index: int,
+    agent_name: str,
+) -> None:
+    setter = getattr(agents.llm, "set_provider_context", None)
+    if callable(setter):
+        setter(
+            provider_event_path=project_dir / "provider_events.jsonl",
+            run_id=run_id,
+            round_index=round_index,
+            stage=agent_name,
+        )
+
+
 def run_iterative_rounds(
     *,
     console: Console,
@@ -144,6 +202,7 @@ def run_iterative_rounds(
     topic_keywords: Optional[Sequence[str]] = None,
     project_metadata: Optional[Dict[str, Any]] = None,
     max_consecutive_draft_timeouts: int = 1,
+    max_consecutive_provider_quota_failures: int = 2,
 ) -> Dict[str, Any]:
     # Termination guarantee:
     # 1) The only round loop is a bounded for-loop over [1..max_rounds].
@@ -215,6 +274,8 @@ def run_iterative_rounds(
     timeout_seen = False
     paused_until_reset_message = ""
     consecutive_draft_timeouts = 0
+    consecutive_provider_quota_failures = 0
+    provider_quota_failure_seen = False
 
     def _remaining_runtime_seconds() -> int:
         remaining = global_max_runtime_seconds - (time.monotonic() - started_at)
@@ -304,6 +365,13 @@ def run_iterative_rounds(
                     )
                 else:
                     _apply_dynamic_timeout()
+                    _set_provider_context(
+                        agents=agents,
+                        project_dir=project_dir,
+                        run_id=run_id,
+                        round_index=round_index,
+                        agent_name="draft",
+                    )
                     draft_output, draft_error = _run_agent_step(
                         console=console,
                         round_index=round_index,
@@ -350,6 +418,13 @@ def run_iterative_rounds(
                     )
                 else:
                     _apply_dynamic_timeout()
+                    _set_provider_context(
+                        agents=agents,
+                        project_dir=project_dir,
+                        run_id=run_id,
+                        round_index=round_index,
+                        agent_name="review",
+                    )
                     review_output, review_error = _run_agent_step(
                         console=console,
                         round_index=round_index,
@@ -398,6 +473,13 @@ def run_iterative_rounds(
                     )
                 else:
                     _apply_dynamic_timeout()
+                    _set_provider_context(
+                        agents=agents,
+                        project_dir=project_dir,
+                        run_id=run_id,
+                        round_index=round_index,
+                        agent_name="revise",
+                    )
                     revised_output, revise_error = _run_agent_step(
                         console=console,
                         round_index=round_index,
@@ -447,6 +529,13 @@ def run_iterative_rounds(
                     )
                 else:
                     _apply_dynamic_timeout()
+                    _set_provider_context(
+                        agents=agents,
+                        project_dir=project_dir,
+                        run_id=run_id,
+                        round_index=round_index,
+                        agent_name="judge",
+                    )
                     judge_output, judge_error = _run_agent_step(
                         console=console,
                         round_index=round_index,
@@ -497,10 +586,24 @@ def run_iterative_rounds(
         prompt_too_large_this_round = any(
             "prompt too large" in (err or "").lower() for err in round_errors
         )
+        provider_quota_this_round = any(_is_provider_quota_error(err) for err in round_errors)
+        provider_failure_this_round = any(
+            _is_provider_failure_error(err)
+            for err in round_errors
+            if not _is_skipped_placeholder_error(err)
+        )
+        skipped_placeholder_this_round = any(
+            _is_skipped_placeholder_error(err) for err in round_errors
+        )
         if draft_timeout_this_round:
             consecutive_draft_timeouts += 1
         else:
             consecutive_draft_timeouts = 0
+        if provider_quota_this_round:
+            provider_quota_failure_seen = True
+            consecutive_provider_quota_failures += 1
+        else:
+            consecutive_provider_quota_failures = 0
 
         save_round_outputs(
             round_dir,
@@ -565,6 +668,11 @@ def run_iterative_rounds(
                 "repetitive_judge": repetitive_judge,
                 "errors": round_errors,
                 "timeout_this_round": timeout_this_round,
+                "provider_failure_this_round": provider_failure_this_round,
+                "provider_quota_this_round": provider_quota_this_round,
+                "provider_quota_streak": consecutive_provider_quota_failures,
+                "skipped_placeholder_this_round": skipped_placeholder_this_round,
+                "successful_research_round": not round_errors and parsed_score is not None,
                 "invalid_score_this_round": parsed_score is None,
                 "model": model_name,
             }
@@ -619,6 +727,8 @@ def run_iterative_rounds(
             mode,
             f"stop_check round={round_index} timeout={timeout_this_round} "
             f"draft_timeout_streak={consecutive_draft_timeouts} "
+            f"provider_quota={provider_quota_this_round} "
+            f"provider_quota_streak={consecutive_provider_quota_failures} "
             f"repetitive={repetitive_judge} non_improve_streak={non_improve_streak} "
             f"invalid_score={parsed_score is None} elapsed={elapsed_after_round:.2f}s",
         )
@@ -654,6 +764,20 @@ def run_iterative_rounds(
                 log_path,
                 mode,
                 f"stop_reason={STOP_PROMPT_TOO_LARGE} round={round_index}",
+            )
+            break
+
+        if (
+            max_consecutive_provider_quota_failures > 0
+            and consecutive_provider_quota_failures >= max_consecutive_provider_quota_failures
+        ):
+            stop_reason = STOP_PROVIDER_QUOTA_EXHAUSTED
+            _log(
+                console,
+                log_path,
+                mode,
+                f"stop_reason={STOP_PROVIDER_QUOTA_EXHAUSTED} round={round_index} "
+                f"provider_quota_streak={consecutive_provider_quota_failures}",
             )
             break
 
@@ -715,6 +839,7 @@ def run_iterative_rounds(
         "model": model_name,
         "project": project_metadata or {},
         "cloud_free": _cloud_free_status(agents),
+        "provider_quota_failure_seen": provider_quota_failure_seen,
     }
     if stop_reason == STOP_CLOUD_DAILY_QUOTA:
         checkpoint_final.update(
@@ -726,10 +851,23 @@ def run_iterative_rounds(
                 "reset_heuristic": next_pacific_reset_heuristic(),
             }
         )
+    if stop_reason == STOP_PROVIDER_QUOTA_EXHAUSTED:
+        checkpoint_final.update(
+            {
+                "status": "provider_quota_exhausted",
+                "provider_quota_exhausted": True,
+                "pause_message": (
+                    "Provider quota or rate limit failed consecutive rounds; "
+                    "resume after quota reset or reduce benchmark preset."
+                ),
+                "reset_heuristic": next_pacific_reset_heuristic(),
+            }
+        )
     checkpoint_final["can_resume"] = stop_reason in {
         STOP_USER_REQUESTED,
         STOP_MANUAL_INTERRUPT,
         STOP_CLOUD_DAILY_QUOTA,
+        STOP_PROVIDER_QUOTA_EXHAUSTED,
     }
     write_json_file(checkpoint_path, checkpoint_final)
 
@@ -768,5 +906,6 @@ def run_iterative_rounds(
         "total_runtime_seconds": total_runtime,
         "last_successful_agent": last_successful_agent,
         "timeout_seen": timeout_seen,
+        "provider_quota_failure_seen": provider_quota_failure_seen,
         "invalid_score_seen": invalid_score_seen,
     }

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -11,6 +14,10 @@ from src.llm import GeminiClient, OllamaClient
 class FakeGenerateContentConfig:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
+
+
+class FakeGeminiQuotaError(RuntimeError):
+    status_code = 429
 
 
 class LlmClientTests(unittest.TestCase):
@@ -175,6 +182,50 @@ class LlmClientTests(unittest.TestCase):
 
         self.assertIn("Failed to call Gemini API", str(ctx.exception))
         self.assertNotIn(secret, str(ctx.exception))
+
+    def test_gemini_provider_events_record_quota_error(self) -> None:
+        generate_content = Mock(
+            side_effect=FakeGeminiQuotaError(
+                "RESOURCE_EXHAUSTED quota exceeded for requests per day"
+            )
+        )
+        fake_client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+        fake_genai = SimpleNamespace(Client=Mock(return_value=fake_client))
+        fake_types = SimpleNamespace(GenerateContentConfig=FakeGenerateContentConfig)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            event_path = Path(tmp) / "provider_events.jsonl"
+            client = GeminiClient(model="gemini-3.5-flash", api_key="local-key")
+            client.set_provider_context(
+                provider_event_path=event_path,
+                run_id="run-1",
+                round_index=7,
+                stage="draft",
+            )
+
+            with patch.object(
+                llm_module,
+                "_load_google_genai",
+                return_value=(fake_genai, fake_types),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "PROVIDER_QUOTA_EXHAUSTED"):
+                    client.generate(
+                        agent_name="draft",
+                        system_prompt=None,
+                        user_prompt="hello",
+                    )
+
+            events = [
+                json.loads(line) for line in event_path.read_text(encoding="utf-8").splitlines()
+            ]
+            self.assertEqual(events[0]["event"], "request_start")
+            self.assertEqual(events[0]["round"], 7)
+            self.assertEqual(events[0]["stage"], "draft")
+            self.assertEqual(events[0]["error_type"], "")
+            self.assertEqual(events[1]["event"], "request_error")
+            self.assertEqual(events[1]["error_type"], "daily_quota_exhausted")
+            self.assertTrue(events[1]["rate_limited"])
+            self.assertTrue(events[1]["daily_quota_exhausted"])
 
 
 if __name__ == "__main__":
