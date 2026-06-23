@@ -640,7 +640,7 @@ def detect_output_kind(path: Path) -> str:
     return "text"
 
 
-def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[dict[str, Any]]:
+def resolve_run_artifact_paths(project_dir: Path, checkpoint: dict[str, Any]) -> dict[str, Path]:
     run_root_text = str(checkpoint.get("run_root", "")).strip()
     run_root = Path(run_root_text) if run_root_text else None
     run_config_path = (
@@ -653,6 +653,126 @@ def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[
         if checkpoint.get("run_summary")
         else (run_root / "run_summary.json" if run_root else project_dir / "run_summary.json")
     )
+
+    round_metrics_path = (
+        run_root / "round_metrics.json" if run_root else project_dir / "round_metrics.json"
+    )
+    if run_summary_path.exists():
+        run_summary = read_json_file(run_summary_path)
+        round_metrics_text = str(run_summary.get("round_metrics_path", "")).strip()
+        if round_metrics_text:
+            round_metrics_path = Path(round_metrics_text)
+
+    return {
+        "run_root": run_root or project_dir,
+        "run_config": run_config_path,
+        "run_summary": run_summary_path,
+        "round_metrics": round_metrics_path,
+    }
+
+
+def _display_value(value: Any, default: str = "N/A") -> str:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    text = str(value).strip()
+    return text if text else default
+
+
+def _first_present(*values: Any) -> Any:
+    for value in values:
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        return value
+    return None
+
+
+def _short_commit(value: Any) -> str:
+    commit = str(value or "").strip()
+    return commit[:12] if commit else "N/A"
+
+
+def build_run_metadata_rows(project_dir: Path, checkpoint: dict[str, Any]) -> list[dict[str, str]]:
+    paths = resolve_run_artifact_paths(project_dir, checkpoint)
+    run_config = read_json_file(paths["run_config"]) if paths["run_config"].exists() else {}
+    run_summary = read_json_file(paths["run_summary"]) if paths["run_summary"].exists() else {}
+    if not run_config and not run_summary:
+        return []
+
+    model = run_config.get("model") if isinstance(run_config.get("model"), dict) else {}
+    runtime = run_config.get("runtime") if isinstance(run_config.get("runtime"), dict) else {}
+    git_meta = run_config.get("git") if isinstance(run_config.get("git"), dict) else {}
+    resume = run_config.get("resume_eligibility")
+    resume = resume if isinstance(resume, dict) else {}
+
+    values = [
+        ("run_meta_run_id", _first_present(run_config.get("run_id"), run_summary.get("run_id"))),
+        (
+            "run_meta_mode",
+            _first_present(run_config.get("mode"), run_summary.get("mode"), checkpoint.get("mode")),
+        ),
+        (
+            "run_meta_provider",
+            _first_present(model.get("provider"), checkpoint.get("provider")),
+        ),
+        (
+            "run_meta_model",
+            _first_present(model.get("name"), run_summary.get("model"), checkpoint.get("model")),
+        ),
+        (
+            "run_meta_drafting_mode",
+            _first_present(
+                run_config.get("drafting_mode"),
+                run_summary.get("drafting_mode"),
+                checkpoint.get("drafting_mode"),
+            ),
+        ),
+        (
+            "run_meta_max_rounds",
+            _first_present(runtime.get("max_rounds"), checkpoint.get("max_rounds")),
+        ),
+        (
+            "run_meta_completed_rounds",
+            _first_present(
+                run_config.get("completed_rounds"),
+                run_summary.get("completed_rounds"),
+                checkpoint.get("last_completed_round"),
+            ),
+        ),
+        (
+            "run_meta_best_score",
+            _first_present(run_config.get("best_score"), run_summary.get("best_score")),
+        ),
+        (
+            "run_meta_stop_reason",
+            _first_present(
+                run_config.get("stop_reason"),
+                run_summary.get("stop_reason"),
+                checkpoint.get("stop_reason"),
+            ),
+        ),
+        (
+            "run_meta_resume",
+            resume.get("can_resume")
+            if "can_resume" in resume
+            else run_config.get("can_resume", run_summary.get("can_resume")),
+        ),
+        ("run_meta_git_commit", _short_commit(git_meta.get("commit"))),
+        ("run_meta_started_at", run_config.get("started_at")),
+        ("run_meta_ended_at", run_config.get("ended_at")),
+        ("run_meta_run_config_path", output_display_path(paths["run_config"])),
+        ("run_meta_run_summary_path", output_display_path(paths["run_summary"])),
+        ("run_meta_round_metrics_path", output_display_path(paths["round_metrics"])),
+    ]
+    return [{"field_key": field_key, "value": _display_value(value)} for field_key, value in values]
+
+
+def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[dict[str, Any]]:
+    paths = resolve_run_artifact_paths(project_dir, checkpoint)
+    run_root = paths["run_root"] if paths["run_root"] != project_dir else None
     catalog = [
         {
             "label": "Best output",
@@ -677,12 +797,20 @@ def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[
         {
             "label": "Run config",
             "label_key": "output_run_config",
-            "path": run_config_path,
+            "path": paths["run_config"],
+            "missing_key": "missing_run_config",
         },
         {
             "label": "Run summary",
             "label_key": "output_run_summary",
-            "path": run_summary_path,
+            "path": paths["run_summary"],
+            "missing_key": "missing_run_summary",
+        },
+        {
+            "label": "Round metrics",
+            "label_key": "output_round_metrics",
+            "path": paths["round_metrics"],
+            "missing_key": "missing_round_metrics",
         },
         {
             "label": "Score history",
@@ -742,6 +870,7 @@ def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[
             "path": item["path"],
             "kind": detect_output_kind(item["path"]),
             "exists": item["path"].exists(),
+            "missing_key": item.get("missing_key", "output_not_generated"),
         }
         for item in catalog
     ]
@@ -1559,6 +1688,16 @@ def main() -> None:
         default_model=default_model,
     )
 
+    st.subheader(t("run_metadata_summary"))
+    run_metadata_rows = [
+        {"field": t(str(row["field_key"])), "value": row["value"]}
+        for row in build_run_metadata_rows(proj_path, checkpoint)
+    ]
+    if run_metadata_rows:
+        st.dataframe(run_metadata_rows, width="stretch", hide_index=True)
+    else:
+        st.info(t("run_metadata_empty"))
+
     score_rows = load_score_history_rows(proj_path / "score_history.json")
     st.subheader(t("score_history_table"))
     if score_rows:
@@ -1583,7 +1722,7 @@ def main() -> None:
     selected_path = selected_output["path"]
     st.caption(output_display_path(selected_path))
     if not selected_output["exists"]:
-        st.info(t("output_not_generated"))
+        st.info(t(str(selected_output.get("missing_key", "output_not_generated"))))
     else:
         content = read_file_text(selected_path)
         if selected_output["kind"] == "json":

@@ -266,10 +266,12 @@ make check
 - 恢复：
   - 点击 `Resume`（等价 `.venv/bin/python -m src.main --resume`）
 - 看结果：
+  - UI 的 `Latest run metadata` 会汇总最近一次 run 的 provider/model、drafting mode、Git commit、stop reason、best score 和 artifact 路径
   - 先看 `projects/example/best_output.md`
   - 再看 `projects/example/runs/<run_id>/round_xx/`
   - 复现信息看 `projects/example/runs/<run_id>/run_config.json`
   - 汇总指标看 `projects/example/runs/<run_id>/run_summary.json`
+  - 每轮耗时和错误标志看 `projects/example/runs/<run_id>/round_metrics.json`
   - 实时状态看 `projects/example/checkpoint.json`
   - 实时日志看 `projects/example/run.log`
 

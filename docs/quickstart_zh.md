@@ -220,13 +220,15 @@ touch projects/example/STOP_REQUESTED
 - `Model Management`：列出模型、选择模型、健康检查、保存默认模型、拉取和删除模型。
 - `D. Progress panel`：显示 mode、round、stage、best score、PID、model、stop reason、stop signal。
 - `E. Live logs panel`：显示 `run.log` 和 `model_ops.log` 尾部。
-- `F. Output browser`：浏览 best output、final report、interrupted report、checkpoint、run config、score history、run log、latest round 四阶段文件。
+- `Latest run metadata`：汇总 run_config/run_summary 里的模型、drafting mode、Git commit、停止原因、最佳分数和 artifact 路径。
+- `F. Output browser`：浏览 best output、final report、interrupted report、checkpoint、run config、run summary、round metrics、score history、run log、latest round 四阶段文件。
 
 适合什么时候看：
 
 - 开始前：确认项目路径、模型是否安装、输入文件是否正确。
 - 运行中：看当前轮数、agent 阶段、是否卡住、日志是否持续更新。
 - 停止后：看 checkpoint、score history、best output、最新 round 文件。
+- 复现实验时：先看 `Latest run metadata`，再打开 run config、run summary 和 round metrics。
 - 恢复前：确认 UI 是否提示可从 checkpoint 继续。
 
 重点看：

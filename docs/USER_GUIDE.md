@@ -189,6 +189,9 @@ cp projects/example/memory.example.md projects/<project>/memory.md
 然后在 `config.yaml` 里同步修改 `project_name` 和 `topic:`。
 
 UI 会显示相对项目路径，例如 `projects/example`，避免把本机绝对路径展示到页面上。
+运行后，UI 的 `Latest run metadata` 会集中显示 run_config/run_summary 中的模型、drafting mode、
+Git commit、停止原因、最佳分数和 artifact 路径；`Output browser` 也可直接打开
+`round_metrics.json`。
 
 - `task.md`：你本次希望研究/回答的问题（必须有内容）
 - `memory.md`：历史上下文、限制、已知结论（可空，程序会自动更新）

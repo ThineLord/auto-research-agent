@@ -246,6 +246,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "output_checkpoint": "Checkpoint",
         "output_run_config": "Run config",
         "output_run_summary": "Run summary",
+        "output_round_metrics": "Round metrics",
         "output_score_history": "Score history",
         "output_run_log": "Run log",
         "output_model_ops_log": "Model operation log",
@@ -258,6 +259,38 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "score_history_table": "Score history table",
         "score_history_trend": "Score trend",
         "score_history_empty": "No score history yet.",
+        "run_metadata_summary": "Latest run metadata",
+        "run_metadata_empty": (
+            "No run metadata yet. Start a run to generate run_config.json and run_summary.json."
+        ),
+        "missing_run_config": (
+            "run_config.json is missing. New runs write it under runs/<run_id>/; older runs may "
+            "only have legacy run_manifest.json."
+        ),
+        "missing_run_summary": (
+            "run_summary.json is missing. It is written when a run finalizes; check run.log if "
+            "the run was interrupted."
+        ),
+        "missing_round_metrics": (
+            "round_metrics.json is missing. It is written under the run directory after scored "
+            "rounds complete."
+        ),
+        "run_meta_run_id": "Run ID",
+        "run_meta_mode": "Mode",
+        "run_meta_provider": "Provider",
+        "run_meta_model": "Model",
+        "run_meta_drafting_mode": "Drafting mode",
+        "run_meta_max_rounds": "Max rounds",
+        "run_meta_completed_rounds": "Completed rounds",
+        "run_meta_best_score": "Best score",
+        "run_meta_stop_reason": "Stop reason",
+        "run_meta_resume": "Resume eligible",
+        "run_meta_git_commit": "Git commit",
+        "run_meta_started_at": "Started at",
+        "run_meta_ended_at": "Ended at",
+        "run_meta_run_config_path": "Run config path",
+        "run_meta_run_summary_path": "Run summary path",
+        "run_meta_round_metrics_path": "Round metrics path",
         "stage_idle": "Idle",
         "stage_starting": "starting",
         "stage_starting_round": "starting round",
@@ -474,6 +507,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "output_checkpoint": "检查点",
         "output_run_config": "运行配置",
         "output_run_summary": "运行摘要",
+        "output_round_metrics": "轮次指标",
         "output_score_history": "评分历史",
         "output_run_log": "运行日志",
         "output_model_ops_log": "模型操作日志",
@@ -484,6 +518,29 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "score_history_table": "评分历史表",
         "score_history_trend": "分数趋势",
         "score_history_empty": "暂无评分历史。",
+        "run_metadata_summary": "最新运行元数据",
+        "run_metadata_empty": "还没有运行元数据。启动一次运行后会生成 run_config.json 和 run_summary.json。",
+        "missing_run_config": (
+            "缺少 run_config.json。新运行会写入 runs/<run_id>/；旧运行可能只有 legacy run_manifest.json。"
+        ),
+        "missing_run_summary": "缺少 run_summary.json。它会在运行结束收尾时写入；如果运行被中断，请查看 run.log。",
+        "missing_round_metrics": "缺少 round_metrics.json。完成有评分的轮次后，它会写入 run 目录。",
+        "run_meta_run_id": "Run ID",
+        "run_meta_mode": "模式",
+        "run_meta_provider": "Provider",
+        "run_meta_model": "模型",
+        "run_meta_drafting_mode": "起草模式",
+        "run_meta_max_rounds": "最大轮数",
+        "run_meta_completed_rounds": "已完成轮数",
+        "run_meta_best_score": "最佳分数",
+        "run_meta_stop_reason": "停止原因",
+        "run_meta_resume": "可恢复",
+        "run_meta_git_commit": "Git commit",
+        "run_meta_started_at": "开始时间",
+        "run_meta_ended_at": "结束时间",
+        "run_meta_run_config_path": "运行配置路径",
+        "run_meta_run_summary_path": "运行摘要路径",
+        "run_meta_round_metrics_path": "轮次指标路径",
         "stage_idle": "空闲",
         "stage_starting": "正在启动",
         "stage_starting_round": "正在开始新一轮",

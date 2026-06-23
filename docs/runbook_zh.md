@@ -270,7 +270,8 @@ UI 中重点看：
 - `C. Run controls`：启动 diagnostic/normal/continuous/resume，或安全暂停。
 - `D. Progress panel`：看 Mode、Round、Stage、Best score、Model、Stop reason。
 - `E. Live logs panel`：看 `run.log` 和模型操作日志。
-- `F. Output browser`：看 best output、checkpoint、run config、score history、latest round draft/review/revised/judge。
+- `Latest run metadata`：看 provider/model、drafting mode、Git commit、stop reason、best score。
+- `F. Output browser`：看 best output、checkpoint、run config、run summary、round metrics、score history、latest round draft/review/revised/judge。
 
 ## 9. 如何停止 UI
 

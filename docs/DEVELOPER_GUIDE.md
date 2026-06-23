@@ -107,6 +107,10 @@ Progress comes from:
 - `run.log` for the current running stage.
 - `STOP_REQUESTED` for safe user-initiated pause.
 
+The Streamlit UI renders a compact latest-run metadata table from `run_config.json` and
+`run_summary.json`, keeps artifact paths repo-relative or masked, and gives artifact-specific
+messages when `run_config.json`, `run_summary.json`, or `round_metrics.json` has not been written.
+
 The model health check is intentionally fast: it checks Ollama API availability and selected-model
 presence without sending a generation prompt.
 

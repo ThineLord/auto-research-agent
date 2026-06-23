@@ -480,10 +480,13 @@ class SharedUiBackendHelperTests(unittest.TestCase):
 
         labels = [item["label"] for item in catalog]
         self.assertIn("Checkpoint", labels)
+        self.assertIn("Round metrics", labels)
         self.assertIn("Latest round judge", labels)
         judge_item = next(item for item in catalog if item["label"] == "Latest round judge")
         self.assertTrue(judge_item["exists"])
         self.assertEqual(judge_item["kind"], "markdown")
+        metrics_item = next(item for item in catalog if item["label"] == "Round metrics")
+        self.assertEqual(metrics_item["missing_key"], "missing_round_metrics")
 
     def test_ui_score_history_rows_flatten_metrics_for_display(self) -> None:
         import ui.app as ui_app
@@ -513,6 +516,60 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertEqual(rows[0]["score"], 82)
         self.assertEqual(rows[0]["draft_s"], 1.2)
         self.assertEqual(rows[0]["errors"], 0)
+
+    def test_ui_run_metadata_rows_summarize_latest_run_without_absolute_paths(self) -> None:
+        import ui.app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            run_root = project_dir / "runs" / "run1"
+            run_root.mkdir(parents=True)
+            run_config_path = run_root / "run_config.json"
+            run_summary_path = run_root / "run_summary.json"
+            round_metrics_path = run_root / "round_metrics.json"
+            write_json_file(
+                run_config_path,
+                {
+                    "run_id": "run1",
+                    "mode": "normal",
+                    "drafting_mode": "continue_from_previous_draft",
+                    "started_at": "2026-06-23T01:00:00+00:00",
+                    "ended_at": "2026-06-23T01:02:00+00:00",
+                    "stop_reason": "max_rounds",
+                    "can_resume": False,
+                    "completed_rounds": 2,
+                    "best_score": 88.5,
+                    "model": {"provider": "ollama", "name": "qwen3:8b"},
+                    "runtime": {"max_rounds": 2},
+                    "git": {"commit": "abcdef1234567890"},
+                },
+            )
+            write_json_file(
+                run_summary_path,
+                {
+                    "run_id": "run1",
+                    "round_metrics_path": str(round_metrics_path),
+                },
+            )
+            checkpoint = {
+                "run_root": str(run_root),
+                "run_config": str(run_config_path),
+                "run_summary": str(run_summary_path),
+            }
+
+            rows = ui_app.build_run_metadata_rows(project_dir, checkpoint)
+            catalog = ui_app.build_output_catalog(project_dir, checkpoint)
+
+        by_key = {row["field_key"]: row["value"] for row in rows}
+        self.assertEqual(by_key["run_meta_provider"], "ollama")
+        self.assertEqual(by_key["run_meta_model"], "qwen3:8b")
+        self.assertEqual(by_key["run_meta_drafting_mode"], "continue_from_previous_draft")
+        self.assertEqual(by_key["run_meta_git_commit"], "abcdef123456")
+        self.assertEqual(by_key["run_meta_round_metrics_path"], "<repo>/round_metrics.json")
+        self.assertNotIn(str(Path(tmp)), "\n".join(by_key.values()))
+
+        metrics_item = next(item for item in catalog if item["label"] == "Round metrics")
+        self.assertEqual(metrics_item["path"], round_metrics_path)
 
     def test_fast_model_health_check_uses_api_and_selected_model_presence(self) -> None:
         import ui.app as ui_app
