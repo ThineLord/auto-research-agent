@@ -13,6 +13,14 @@ themes. Dominant themes include memory, agent, privacy, evaluation, and benchmar
 include retrieval, prompting, simulation, and differential privacy. Common evaluation signals include
 human evaluation, F1, attack success rate, Persona-Chat, and DailyDialog.
 
+## Metadata Quality
+
+- missing authors: 0
+- missing years: 0
+- missing venues: 0
+- missing URL/DOI/arXiv identifiers: 1
+- metadata-only records: 4
+
 ## Research Landscape
 
 - memory: 3 paper(s); representative work includes MemGPT, MemoryAgentBench, and a privacy-memory benchmark paper.

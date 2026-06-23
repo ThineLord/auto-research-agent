@@ -220,6 +220,7 @@ make survey
 Survey mode 会扫描 `projects/<project>/task.md`、可选 `memory.md`、项目 markdown 和已有
 `runs/**/*.md` 输出，生成 `projects/<project>/survey/survey_report.md`、
 `paper_metadata.json`、`related_work.md` 和 `survey_manifest.json`。
+输出会规范化 DOI/arXiv 标识并在 JSON 中记录缺失作者、年份、venue、URL/DOI/arXiv 的质量计数。
 
 ## 连续运行用哪个命令
 

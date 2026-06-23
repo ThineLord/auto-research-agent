@@ -204,6 +204,9 @@ themes/gaps/future directions, and writes:
 - `projects/<project>/survey/related_work.md`
 - `projects/<project>/survey/survey_manifest.json`
 
+DOI/arXiv identifiers are normalized during deduplication, and the JSON artifacts include
+metadata-quality counts for missing authors, years, venues, and durable identifiers.
+
 It does not call Ollama or Gemini. Configure source scanning under `literature_survey:` in
 `config.yaml`. Full docs: `docs/literature_survey_mode.md`.
 

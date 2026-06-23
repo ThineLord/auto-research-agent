@@ -33,19 +33,21 @@ Survey mode reads existing markdown and text sources under the selected project.
 - `Title: ...` metadata blocks
 - `## References` or `## Bibliography` lists with years or URLs
 - simple frontmatter-like `---` metadata blocks
+- DOI and arXiv identifiers in tables, metadata blocks, links, or reference text
 
 ## Outputs
 
 The workflow writes:
 
 - `survey_report.md`: structured survey report
-- `paper_metadata.json`: normalized paper metadata
+- `paper_metadata.json`: normalized paper metadata, quality counts, and representative groups
 - `related_work.md`: publication-style related work draft
-- `survey_manifest.json`: run metadata, config, source files, and output paths
+- `survey_manifest.json`: run metadata, config, source summaries, quality counts, and output paths
 
 The report contains:
 
 - Executive Summary
+- Metadata Quality
 - Research Landscape
 - Major Themes
 - Representative Papers
@@ -90,6 +92,7 @@ The implementation is deliberately modular:
 This MVP is deterministic and metadata-driven. It does not search the web, download papers, read
 PDFs, or use an LLM to rewrite prose. Better metadata in project files produces better survey
 reports. Add paper tables, references, and explicit limitation/future-work notes for stronger
-results.
+results. The metadata-quality section highlights missing authors, years, venues, and durable
+identifiers so incomplete local sources can be repaired incrementally.
 
 See `docs/examples/literature_survey_example.md` for a generated-style example.

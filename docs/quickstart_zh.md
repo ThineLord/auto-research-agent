@@ -140,6 +140,7 @@ make survey
 ```
 
 运行不调用模型的 Literature Survey Mode，输出到 `projects/<project>/survey/`。
+该模式会规范化 DOI/arXiv 去重，并在 JSON 输出中标出缺失作者、年份、venue 和持久标识符的记录数。
 
 ```bash
 make ui

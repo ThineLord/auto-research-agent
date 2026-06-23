@@ -75,6 +75,7 @@ Future Work: Add privacy stress tests
 
             report = result.report_path.read_text(encoding="utf-8")
             self.assertIn("## Executive Summary", report)
+            self.assertIn("## Metadata Quality", report)
             self.assertIn("## Research Landscape", report)
             self.assertIn("## Major Themes", report)
             self.assertIn("## Comparison Tables", report)
@@ -84,9 +85,15 @@ Future Work: Add privacy stress tests
 
             metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
             self.assertEqual(metadata["paper_count"], 4)
+            self.assertIn("metadata_quality", metadata)
+            self.assertIn("representative_groups", metadata)
             titles = {paper["title"] for paper in metadata["papers"]}
             self.assertIn("MemoryAgentBench: Evaluating Long-Term Agent Memory", titles)
             self.assertIn("Membership Inference Attacks Against Machine Learning Models", titles)
+
+            manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+            self.assertIn("source_summary", manifest)
+            self.assertIn("metadata_quality", manifest)
 
     def test_collection_respects_configured_limits_and_related_work_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -105,6 +112,75 @@ Future Work: Add privacy stress tests
             self.assertEqual(source_files, [(project_dir / "task.md").resolve()])
             self.assertEqual(papers, [])
             self.assertIn("no paper metadata", generate_related_work(papers).lower())
+
+    def test_reference_metadata_and_identifier_aliases_are_normalized(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project_dir = root / "projects" / "survey_demo"
+            run_dir = project_dir / "runs" / "run-1" / "round_01"
+            run_dir.mkdir(parents=True)
+            (project_dir / "task.md").write_text(
+                """# Survey
+
+| Title | Authors | Topics |
+|---|---|---|
+| Duplicate Systems Paper | Example Team | memory; evaluation |
+""",
+                encoding="utf-8",
+            )
+            (project_dir / "memory.md").write_text(
+                """## References
+
+- Example Team (2024). Duplicate Systems Paper. ICML. doi:10.1145/1234567.1234568
+- Other et al. (2025). Versioned ArXiv Paper. arXiv:2401.12345v2.
+""",
+                encoding="utf-8",
+            )
+            (run_dir / "03_revised.md").write_text(
+                """Title: Versioned ArXiv Paper
+Authors: Other et al.
+Year: 2025
+Venue: arXiv
+arXiv: https://arxiv.org/abs/2401.12345v1
+Topics: agent memory
+""",
+                encoding="utf-8",
+            )
+
+            project_input = load_project_input(
+                root=root,
+                project_name="survey_demo",
+                explicit_project=True,
+            )
+            result = run_literature_survey_mode(
+                console=Console(),
+                project_input=project_input,
+                config=LiteratureSurveyConfig(),
+            )
+
+            metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+            self.assertEqual(metadata["paper_count"], 2)
+            papers = {paper["title"]: paper for paper in metadata["papers"]}
+
+            duplicate = papers["Duplicate Systems Paper"]
+            self.assertEqual(duplicate["doi"], "10.1145/1234567.1234568")
+            self.assertEqual(duplicate["year"], 2024)
+            self.assertEqual(duplicate["venue"], "ICML")
+            self.assertEqual(duplicate["authors"], ["Example Team"])
+
+            arxiv = papers["Versioned ArXiv Paper"]
+            self.assertEqual(arxiv["arxiv_id"], "2401.12345")
+            self.assertEqual(arxiv["year"], 2025)
+            self.assertGreaterEqual(len(arxiv["source_paths"]), 2)
+
+            quality = metadata["metadata_quality"]
+            self.assertEqual(quality["paper_count"], 2)
+            self.assertEqual(quality["missing_year_count"], 0)
+            self.assertEqual(quality["missing_url_or_identifier_count"], 0)
+
+            manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["source_summary"]["by_kind"]["run_output"], 1)
+            self.assertTrue(manifest["representative_groups"])
 
 
 if __name__ == "__main__":

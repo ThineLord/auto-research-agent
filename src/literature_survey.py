@@ -247,6 +247,35 @@ def _clean_url(value: str) -> str:
     return url.rstrip(".")
 
 
+def _normalize_doi(value: str) -> str:
+    text = _normalize_space(value).strip("<>()[]{}.,;")
+    if not text:
+        return ""
+    text = re.sub(r"^(?:doi:\s*|https?://(?:dx\.)?doi\.org/)", "", text, flags=re.IGNORECASE)
+    match = re.search(r"\b10\.\d{4,9}/[-._;()/:A-Z0-9]+\b", text, flags=re.IGNORECASE)
+    if not match:
+        return ""
+    return match.group(0).rstrip(".,;)").lower()
+
+
+def _normalize_arxiv_id(value: str) -> str:
+    text = _normalize_space(value).strip("<>()[]{}.,;")
+    if not text:
+        return ""
+    text = re.sub(r"^(?:arxiv:\s*|https?://arxiv\.org/(?:abs|pdf)/)", "", text, flags=re.IGNORECASE)
+    text = text.removesuffix(".pdf").strip()
+    patterns = (
+        r"(?P<new>[0-9]{4}\.[0-9]{4,5})(?:v\d+)?",
+        r"(?P<old>[a-z-]+(?:\.[a-z-]+)?/[0-9]{7})(?:v\d+)?",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            groups = match.groupdict()
+            return (groups.get("new") or groups.get("old") or "").casefold()
+    return ""
+
+
 def _extract_year(value: object) -> int | None:
     match = re.search(r"\b(19|20)\d{2}\b", str(value or ""))
     if not match:
@@ -260,20 +289,42 @@ def _extract_url(text: str) -> str:
 
 
 def _extract_doi(text: str) -> str:
-    match = re.search(r"\b10\.\d{4,9}/[-._;()/:A-Z0-9]+\b", text, flags=re.IGNORECASE)
-    return match.group(0).rstrip(".,;").lower() if match else ""
+    return _normalize_doi(text)
 
 
 def _extract_arxiv_id(text: str) -> str:
     patterns = (
-        r"arxiv[:\s]+([0-9]{4}\.[0-9]{4,5}(?:v\d+)?)",
-        r"arxiv\.org/(?:abs|pdf)/([0-9]{4}\.[0-9]{4,5}(?:v\d+)?)",
+        r"arxiv[:\s]+([0-9]{4}\.[0-9]{4,5}(?:v\d+)?|[a-z-]+(?:\.[a-z-]+)?/[0-9]{7}(?:v\d+)?)",
+        r"arxiv\.org/(?:abs|pdf)/([0-9]{4}\.[0-9]{4,5}(?:v\d+)?|[a-z-]+(?:\.[a-z-]+)?/[0-9]{7}(?:v\d+)?)",
     )
     for pattern in patterns:
         match = re.search(pattern, text, flags=re.IGNORECASE)
         if match:
-            return match.group(1)
+            return _normalize_arxiv_id(match.group(1))
     return ""
+
+
+def _strip_identifier_noise(text: str) -> str:
+    stripped = re.sub(r"https?://[^\s)\]>\"']+", " ", text)
+    stripped = re.sub(
+        r"\bdoi:\s*10\.\d{4,9}/[-._;()/:A-Z0-9]+\b",
+        " ",
+        stripped,
+        flags=re.IGNORECASE,
+    )
+    stripped = re.sub(
+        r"\b10\.\d{4,9}/[-._;()/:A-Z0-9]+\b",
+        " ",
+        stripped,
+        flags=re.IGNORECASE,
+    )
+    stripped = re.sub(
+        r"\barxiv[:\s]+(?:[0-9]{4}\.[0-9]{4,5}(?:v\d+)?|[a-z-]+(?:\.[a-z-]+)?/[0-9]{7}(?:v\d+)?)",
+        " ",
+        stripped,
+        flags=re.IGNORECASE,
+    )
+    return _normalize_space(stripped)
 
 
 def _canonical_title(title: str) -> str:
@@ -511,28 +562,43 @@ def _parse_references(text: str) -> list[dict[str, object]]:
             continue
         year = _extract_year(citation)
         url = _extract_url(citation)
-        if year is None and not url:
+        doi = _extract_doi(citation)
+        arxiv_id = _extract_arxiv_id(citation)
+        if year is None and not (url or doi or arxiv_id):
             continue
         title = ""
+        authors = ""
+        venue = ""
         link_match = re.search(r"\[([^\]]+)]\((https?://[^)]+)\)", citation)
         if link_match:
             title = link_match.group(1)
             url = _clean_url(link_match.group(2)) or url
-        elif year is not None:
-            parts = re.split(r"\b(?:19|20)\d{2}\b", citation, maxsplit=1)
-            before_year = parts[0].strip(" ().")
-            after_year = parts[1].strip(" ().") if len(parts) > 1 else ""
-            title = after_year.split(". ")[0].strip() or before_year
+        year_match = re.search(r"\b(?:19|20)\d{2}\b", citation)
+        if year_match:
+            before_year = citation[: year_match.start()].strip(" ().")
+            authors = _normalize_space(re.sub(r"\[[^\]]+]\([^)]+\)", " ", before_year))
+            after_year = _strip_identifier_noise(citation[year_match.end() :]).strip(" ().")
+            segments = [
+                segment.strip(" .")
+                for segment in re.split(r"\.\s+", after_year)
+                if segment.strip(" .")
+            ]
+            if not title:
+                title = segments[0] if segments else before_year
+            if len(segments) > 1:
+                venue = segments[1]
         title = _normalize_space(title).strip("- ")
         if not title:
             title = citation
         blocks.append(
             {
                 "title": title,
+                "authors": authors,
                 "year": year,
+                "venue": venue,
                 "url": url,
-                "doi": _extract_doi(citation),
-                "arxiv_id": _extract_arxiv_id(citation),
+                "doi": doi,
+                "arxiv_id": arxiv_id,
                 "raw_citation": citation,
             }
         )
@@ -551,8 +617,8 @@ def _paper_from_block(
     abstract = _normalize_space(block.get("abstract", ""))
     raw_context = "\n".join(str(value) for value in block.values())
     url = _clean_url(str(block.get("url", ""))) or _extract_url(raw_context)
-    doi = _normalize_space(block.get("doi", "")).lower() or _extract_doi(raw_context)
-    arxiv_id = _normalize_space(block.get("arxiv_id", "")) or _extract_arxiv_id(raw_context)
+    doi = _normalize_doi(str(block.get("doi", ""))) or _extract_doi(raw_context)
+    arxiv_id = _normalize_arxiv_id(str(block.get("arxiv_id", ""))) or _extract_arxiv_id(raw_context)
     context = f"{raw_context}\n{abstract}"
     topics = _dedupe_tuple(
         _split_list(block.get("topics")),
@@ -618,14 +684,23 @@ def parse_papers_from_file(path: Path, project_dir: Path) -> list[PaperMetadata]
     return papers
 
 
-def _dedupe_key(paper: PaperMetadata) -> str:
+def _dedupe_keys(paper: PaperMetadata) -> tuple[str, ...]:
+    keys: list[str] = []
     if paper.doi:
-        return f"doi:{paper.doi.casefold()}"
+        keys.append(f"doi:{paper.doi.casefold()}")
     if paper.arxiv_id:
-        return f"arxiv:{paper.arxiv_id.casefold()}"
+        keys.append(f"arxiv:{paper.arxiv_id.casefold()}")
     if paper.url:
-        return f"url:{paper.url.casefold().rstrip('/')}"
-    return f"title:{_canonical_title(paper.title)}"
+        keys.append(f"url:{paper.url.casefold().rstrip('/')}")
+    title_key = _canonical_title(paper.title)
+    if title_key:
+        keys.append(f"title:{title_key}")
+    return tuple(dict.fromkeys(keys))
+
+
+def _dedupe_key(paper: PaperMetadata) -> str:
+    keys = _dedupe_keys(paper)
+    return keys[0] if keys else f"title:{_canonical_title(paper.title)}"
 
 
 def _prefer_text(*values: str) -> str:
@@ -661,13 +736,20 @@ def _merge_papers(first: PaperMetadata, second: PaperMetadata) -> PaperMetadata:
 def deduplicate_papers(papers: Iterable[PaperMetadata], *, max_papers: int) -> list[PaperMetadata]:
     by_key: dict[str, PaperMetadata] = {}
     for paper in papers:
-        key = _dedupe_key(paper)
-        if key in by_key:
-            by_key[key] = _merge_papers(by_key[key], paper)
+        keys = _dedupe_keys(paper)
+        existing_key = next((key for key in keys if key in by_key), "")
+        if existing_key:
+            merged = _merge_papers(by_key[existing_key], paper)
+            for key in _dedupe_tuple(keys, _dedupe_keys(merged)):
+                by_key[key] = merged
         else:
-            by_key[key] = paper
+            for key in keys:
+                by_key[key] = paper
+    unique_papers: dict[str, PaperMetadata] = {}
+    for paper in by_key.values():
+        unique_papers[_dedupe_key(paper)] = paper
     return sorted(
-        by_key.values(),
+        unique_papers.values(),
         key=lambda paper: (paper.year or 0, paper.title.casefold()),
         reverse=True,
     )[:max_papers]
@@ -708,6 +790,7 @@ def _representative_papers(
         papers,
         key=lambda paper: (
             len(paper.topics) + len(paper.methods) + len(paper.benchmarks) + len(paper.datasets),
+            len(paper.authors) + int(bool(paper.year)) + int(bool(paper.url or paper.doi)),
             paper.year or 0,
         ),
         reverse=True,
@@ -721,6 +804,48 @@ def _build_theme_groups(papers: Sequence[PaperMetadata]) -> dict[str, list[Paper
         for key in keys:
             groups[key].append(paper)
     return dict(sorted(groups.items(), key=lambda item: (-len(item[1]), item[0].casefold())))
+
+
+def _metadata_quality_summary(papers: Sequence[PaperMetadata]) -> dict[str, int]:
+    return {
+        "paper_count": len(papers),
+        "missing_authors_count": sum(1 for paper in papers if not paper.authors),
+        "missing_year_count": sum(1 for paper in papers if paper.year is None),
+        "missing_venue_count": sum(1 for paper in papers if not paper.venue),
+        "missing_url_or_identifier_count": sum(
+            1 for paper in papers if not (paper.url or paper.doi or paper.arxiv_id)
+        ),
+        "metadata_only_record_count": sum(1 for paper in papers if not paper.abstract),
+        "with_doi_count": sum(1 for paper in papers if bool(paper.doi)),
+        "with_arxiv_id_count": sum(1 for paper in papers if bool(paper.arxiv_id)),
+        "with_url_count": sum(1 for paper in papers if bool(paper.url)),
+    }
+
+
+def _source_summary(source_files: Sequence[Path], project_dir: Path) -> dict[str, Any]:
+    kind_counts = Counter(_source_kind(path, project_dir) for path in source_files)
+    return {
+        "source_file_count": len(source_files),
+        "by_kind": dict(sorted(kind_counts.items())),
+    }
+
+
+def _representative_group_summary(
+    papers: Sequence[PaperMetadata], *, limit: int = 8
+) -> list[dict[str, Any]]:
+    groups = _build_theme_groups(papers)
+    summary: list[dict[str, Any]] = []
+    for theme, theme_papers in list(groups.items())[:limit]:
+        summary.append(
+            {
+                "theme": theme,
+                "paper_count": len(theme_papers),
+                "representative_titles": [
+                    paper.title for paper in _representative_papers(theme_papers, limit=3)
+                ],
+            }
+        )
+    return summary
 
 
 def _render_comparison_table(papers: Sequence[PaperMetadata]) -> str:
@@ -785,6 +910,7 @@ def generate_survey_report(
     future_counts = _count_terms(papers, "future_work")
     representative = _representative_papers(papers)
     related_work = generate_related_work(papers)
+    metadata_quality = _metadata_quality_summary(papers)
 
     lines: list[str] = [
         "# Literature Survey Report",
@@ -813,6 +939,21 @@ def generate_survey_report(
             "No paper metadata was found. Add references, markdown tables, or Title/Authors/Year "
             "blocks to the selected project, then rerun survey mode."
         )
+
+    lines.extend(["", "## Metadata Quality", ""])
+    if papers:
+        lines.extend(
+            [
+                f"- missing authors: {metadata_quality['missing_authors_count']}",
+                f"- missing years: {metadata_quality['missing_year_count']}",
+                f"- missing venues: {metadata_quality['missing_venue_count']}",
+                "- missing URL/DOI/arXiv identifiers: "
+                f"{metadata_quality['missing_url_or_identifier_count']}",
+                f"- metadata-only records: {metadata_quality['metadata_only_record_count']}",
+            ]
+        )
+    else:
+        lines.append("- No paper records were available for quality checks.")
 
     lines.extend(["", "## Research Landscape", ""])
     if theme_groups:
@@ -924,6 +1065,9 @@ def run_literature_survey_mode(
     manifest_path = report_path.with_name("survey_manifest.json")
 
     papers, source_files = collect_papers(project_dir, config)
+    metadata_quality = _metadata_quality_summary(papers)
+    source_summary = _source_summary(source_files, project_dir)
+    representative_groups = _representative_group_summary(papers)
     report = generate_survey_report(
         papers=papers,
         source_files=source_files,
@@ -940,6 +1084,8 @@ def run_literature_survey_mode(
             "generated_at": generated_at,
             "project": project_input.as_metadata(),
             "paper_count": len(papers),
+            "metadata_quality": metadata_quality,
+            "representative_groups": representative_groups,
             "papers": [_serialize_paper(paper) for paper in papers],
         },
     )
@@ -951,7 +1097,10 @@ def run_literature_survey_mode(
             "project": project_input.as_metadata(),
             "config": asdict(config),
             "source_files": [str(path) for path in source_files],
+            "source_summary": source_summary,
             "paper_count": len(papers),
+            "metadata_quality": metadata_quality,
+            "representative_groups": representative_groups,
             "outputs": {
                 "report": str(report_path),
                 "paper_metadata": str(metadata_path),

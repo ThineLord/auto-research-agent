@@ -187,6 +187,7 @@ make survey
 
 Survey 输出默认写到 `projects/<project>/survey/`，包括 `survey_report.md`、`paper_metadata.json`、
 `related_work.md` 和 `survey_manifest.json`。
+JSON 输出会记录 DOI/arXiv 规范化后的去重结果，以及缺失作者、年份、venue、URL/DOI/arXiv 的质量计数。
 
 最新 checkpoint：
 

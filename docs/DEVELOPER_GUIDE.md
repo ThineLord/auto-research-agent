@@ -120,6 +120,10 @@ Generated survey artifacts live under `projects/<project>/survey/` by default an
 git. Keep example or golden outputs under `docs/examples/` instead of committing local project
 survey output.
 
+Survey metadata artifacts are expected to stay deterministic and schema-additive: parsers normalize
+DOI/arXiv aliases for deduplication, and both `paper_metadata.json` and `survey_manifest.json`
+include metadata-quality counts plus representative theme groups.
+
 ## Contribution Flow
 
 1. Start from a clean understanding of `git status`.
