@@ -47,6 +47,7 @@ from .config import (
 )
 from .constants import RUN_LOCK_FILENAME
 from .diagnostic import run_diagnostic_mode
+from .literature_survey import run_literature_survey_mode
 from .llm import create_llm_client
 from .logging_config import configure_logging
 from .project_input import ProjectInputError, load_project_input
@@ -77,6 +78,17 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         "--resume",
         action="store_true",
         help="Resume from projects/<project>/checkpoint.json.",
+    )
+    parser.add_argument(
+        "--survey",
+        action="store_true",
+        help="Run local Literature Survey Mode without provider calls.",
+    )
+    parser.add_argument(
+        "--survey-output",
+        type=str,
+        default=None,
+        help="Override survey report path. Relative paths resolve under the selected project.",
     )
     parser.add_argument(
         "--model",
@@ -315,6 +327,33 @@ def main() -> None:
         f"kind={project_input.source_kind} | name={project_input.project_name} | "
         f"title={project_input.project_title} | task={project_input.task_path}"
     )
+
+    if getattr(args, "survey", False):
+        survey_output = getattr(args, "survey_output", None)
+        survey_output_path = Path(survey_output).expanduser() if survey_output else None
+        if survey_output_path is not None and not survey_output_path.is_absolute():
+            survey_output_path = project_dir / survey_output_path
+        run_lock_path, lock_error = acquire_run_lock(
+            project_dir,
+            mode="literature_survey",
+            model_name="local-deterministic",
+        )
+        if lock_error:
+            console.print(f"[red]{lock_error}[/red]")
+            console.print(
+                f"[yellow]If this is stale, remove {project_dir / RUN_LOCK_FILENAME} and retry.[/yellow]"
+            )
+            return
+        try:
+            run_literature_survey_mode(
+                console=console,
+                project_input=project_input,
+                config=config.literature_survey,
+                output_path=survey_output_path,
+            )
+        finally:
+            release_run_lock(run_lock_path)
+        return
 
     if provider == MODEL_PROVIDER_OLLAMA:
         installed_models, ollama_error = list_installed_ollama_models()

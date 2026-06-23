@@ -24,6 +24,7 @@ from .constants import (
     STOP_USER_REQUESTED,
 )
 from .diagnostic import run_diagnostic_mode
+from .literature_survey import run_literature_survey_mode
 from .runner import run_iterative_rounds
 from .session import run_session_mode
 
@@ -48,6 +49,7 @@ __all__ = [
     "parse_args",
     "run_diagnostic_mode",
     "run_iterative_rounds",
+    "run_literature_survey_mode",
     "run_session_mode",
 ]
 

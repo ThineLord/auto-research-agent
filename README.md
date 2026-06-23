@@ -13,6 +13,8 @@
   - `make diagnostic`
 - 正常有界运行：
   - `make run`
+- 文献综述模式（本地确定性，不调用模型）：
+  - `make survey`
 - 推荐默认模型：
   - `qwen3:8b`
 - 稳定回退模型：
@@ -160,6 +162,8 @@ Diagnostic。
   - `make run`
 - 会话模式（包含 objective/plan/report）
   - `make session`
+- 文献综述模式（收集、去重、主题/缺口分析、相关工作草稿）
+  - `make survey`
 - 连续运行
   - `make continuous`
 - 从检查点恢复
@@ -172,8 +176,23 @@ Diagnostic。
 
 ```bash
 .venv/bin/python -m src.main --diagnostic
+.venv/bin/python -m src.main --survey
 .venv/bin/auto-research-agent --diagnostic
 ```
+
+## Literature Survey Mode
+
+Survey mode turns the selected project into a local literature-survey workspace. It scans existing
+project files and saved run outputs, normalizes paper metadata, deduplicates papers, extracts
+themes/gaps/future directions, and writes:
+
+- `projects/<project>/survey/survey_report.md`
+- `projects/<project>/survey/paper_metadata.json`
+- `projects/<project>/survey/related_work.md`
+- `projects/<project>/survey/survey_manifest.json`
+
+It does not call Ollama or Gemini. Configure source scanning under `literature_survey:` in
+`config.yaml`. Full docs: `docs/literature_survey_mode.md`.
 
 ## CI / 开发检查
 

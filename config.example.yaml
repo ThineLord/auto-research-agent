@@ -61,3 +61,14 @@ cloud_free:
     - file[-_ ]?search
     - context[-_ ]?cach
     - \btool
+literature_survey:
+  include_task: true
+  include_memory: true
+  include_project_markdown: true
+  include_run_outputs: true
+  source_globs:
+    - "outputs/**/*.md"
+    - "artifacts/**/*.md"
+  max_source_files: 80
+  max_papers: 200
+  output_dir: survey

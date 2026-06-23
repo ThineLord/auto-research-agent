@@ -2,7 +2,7 @@
 
 ## 1. 项目一句话说明
 
-Auto Research Agent 是一个本地优先的研究计划迭代助手：读取 `projects/<project>/task.md` 和 `memory.md`，用 Ollama 模型循环执行 `Draft -> Review -> Revise -> Judge`，把每轮草稿、审查、改写、评分和检查点保存到项目目录里。
+Auto Research Agent 是一个本地优先的研究计划迭代助手：读取 `projects/<project>/task.md` 和 `memory.md`，用本地 Ollama 或云端 Gemini 循环执行 `Draft -> Review -> Revise -> Judge`，把每轮草稿、审查、改写、评分和检查点保存到项目目录里。它也提供不调用模型的 Literature Survey Mode，用于整理项目里的论文元数据和相关工作草稿。
 
 ## 2. 项目状态
 
@@ -11,8 +11,10 @@ Auto Research Agent 是一个本地优先的研究计划迭代助手：读取 `p
 已实现的核心能力：
 
 - 基于 Ollama 的本地模型调用，示例配置默认模型是 `qwen3:8b`。
+- 基于 Google Gemini 的云端模型调用，支持 API key 环境变量或 UI session 输入。
 - 四阶段研究循环：draft、review、revise、judge。
 - 一轮诊断模式、普通有界模式、连续模式、session 模式、resume 模式。
+- 本地确定性的 Literature Survey Mode：扫描项目 markdown、run 输出和可选资料，生成 survey 报告与 related work 草稿。
 - 每轮输出落盘到 `projects/example/runs/<run_id>/round_xx/`。
 - `checkpoint.json`、`score_history.json`、`research_state.json`、`best_output.md` 等运行状态文件。
 - Streamlit UI：编辑输入、启动运行、暂停、恢复、模型管理、测试按钮、进度日志、输出浏览。
@@ -30,7 +32,8 @@ Auto Research Agent 是一个本地优先的研究计划迭代助手：读取 `p
 - 查看已有输出：先读 `projects/example/best_output.md`，再看对应 run 目录里的 round 文件。
 - 打开 Streamlit UI，查看 checkpoint、score history、run log、最新 round 文件。
 - 修改 `projects/<project>/task.md` 和 `projects/<project>/memory.md`，然后从 UI 或 CLI 启动新 run。
-- 用 `make resume` 从已有 checkpoint 继续，但这会调用本地 Ollama 模型。
+- 用 `make resume` 从已有 checkpoint 继续；这会调用当前 provider（Ollama 或 Gemini）。
+- 用 `make survey` 整理项目里的论文和相关工作；这不会调用 Ollama 或 Gemini。
 - 比较不同 round 的 `01_draft.md`、`02_review.md`、`03_revised.md`、`04_judge.md`。
 - 用 `score_history.json` 粗看评分、超时、重复 judge、无效分数、错误轮次。
 - 改本地 `config.yaml` 切换模型、轮数、runtime 上限、项目名和 topic。
@@ -108,6 +111,12 @@ make diagnostic
 运行一轮轻量诊断，会调用 Ollama 生成内容；适合确认模型、提示词、落盘流程是否真实可用。
 
 ```bash
+make diagnostic ARGS="--provider gemini --model gemini-3.5-flash"
+```
+
+使用 Gemini 做一轮诊断；需要先设置 `GEMINI_API_KEY`、`GOOGLE_API_KEY`，或在 UI 当前 session 输入 API key。
+
+```bash
 make run
 ```
 
@@ -124,6 +133,12 @@ make resume
 ```
 
 读取 `projects/example/checkpoint.json` 继续；会调用 Ollama。
+
+```bash
+make survey
+```
+
+运行不调用模型的 Literature Survey Mode，输出到 `projects/<project>/survey/`。
 
 ```bash
 make ui
@@ -262,7 +277,7 @@ touch projects/example/STOP_REQUESTED
 - `docs/USER_GUIDE.md`：已有用户指南。
 - `docs/DEVELOPER_GUIDE.md`：已有开发者指南。
 - `config.example.yaml`：安全示例配置。
-- `config.yaml`：本地主配置，包含模型、Ollama URL、项目名、topic、轮数、停止条件、runtime；不提交。
+- `config.yaml`：本地主配置，包含 provider/model、Ollama URL、Gemini 设置、项目名、topic、轮数、停止条件、runtime、survey 配置；不提交。
 - `Makefile`：安装、测试、运行、UI 的命令入口。
 - `pyproject.toml`：Python 包配置和依赖。
 - `requirements.txt`：兼容旧安装方式，指向 `-e .[dev]`。
@@ -275,14 +290,15 @@ touch projects/example/STOP_REQUESTED
 
 `src/` 主要文件：
 
-- `src/cli.py`：解析 `--diagnostic`、`--continuous`、`--resume`、`--session`、`--model`，分发运行模式。
+- `src/cli.py`：解析 `--diagnostic`、`--continuous`、`--resume`、`--session`、`--survey`、`--provider`、`--model`、`--max-rounds` 等参数，分发运行模式。
 - `src/main.py`：兼容入口，重新导出旧 API。
-- `src/config.py`：加载和校验 `config.yaml`，查询 Ollama 模型，保存默认模型。
-- `src/llm.py`：Ollama `/api/chat` 客户端。
+- `src/config.py`：加载和校验 `config.yaml`，查询 Ollama 模型，保存默认 provider/model。
+- `src/llm.py`：Ollama `/api/chat` 和 Gemini 客户端封装。
 - `src/agents.py`：Draft、Review、Revise、Judge agent 封装和 prompt 组装。
 - `src/runner.py`：普通/连续/resume 的核心 round loop、停止条件、checkpoint、score history。
 - `src/diagnostic.py`：一轮轻量诊断流程，不更新 memory。
 - `src/session.py`：session 模式，先生成 objective 和 plan，再跑迭代，最后生成 report。
+- `src/literature_survey.py`：不调用模型的文献综述资料收集、论文元数据解析、去重、主题/缺口分析和报告生成。
 - `src/resume.py`：读取 checkpoint 并从下一轮继续。
 - `src/storage.py`：文件读写、round 输出、score 解析、memory 更新、research_state 更新。
 - `src/runtime.py`：后台进程、UI 元数据、run lock、测试运行、停止信号。
@@ -379,7 +395,7 @@ touch projects/example/STOP_REQUESTED
 
 ### 更长期做
 
-- 支持多 provider：本地 Ollama、OpenAI API、其他兼容 API，并统一模型配置。
+- 扩展更多 provider：在现有 Ollama/Gemini 之外增加 OpenAI API 或其他兼容 API，并统一模型配置。
 - 支持完整成本统计：input tokens、output tokens、价格、总成本。
 - 支持多 judge 或人工复核，提高分数可信度。
 - 支持 prompt 版本管理和 run reproducibility。

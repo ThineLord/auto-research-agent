@@ -25,7 +25,8 @@ make import-check
 ollama list
 ```
 
-确认 Ollama 可用，并确认你想用的模型已经安装。
+确认 Ollama 可用，并确认你想用的本地模型已经安装。若只跑 Gemini 模式，改为确认
+`GEMINI_API_KEY` 或 `GOOGLE_API_KEY` 已设置；若只跑 `make survey`，不需要 Ollama 或 Gemini。
 
 ## 2. 如何跑 fake/mock 模式
 
@@ -51,7 +52,7 @@ python -m src.main --mock
 
 如果之后要加真正 mock run，最小方向是在 `src/cli.py` 增加 `--mock`，在 `src/runner.py` 复用现有 round loop，注入 fake `ResearchAgents`。
 
-## 3. 如何跑一次最小真实 Ollama 模式
+## 3. 如何跑一次最小真实模型模式
 
 最安全的一轮真实实验是 diagnostic：
 
@@ -78,6 +79,14 @@ Diagnostic 的特点：
 ```bash
 make diagnostic ARGS="--model deepseek-r1:8b"
 ```
+
+如果要跑 Gemini 诊断：
+
+```bash
+make diagnostic ARGS="--provider gemini --model gemini-3.5-flash"
+```
+
+这需要有效的 Gemini API key。云端模式不会检查本机 Ollama 模型。
 
 ## 4. 如何避免长时间运行
 
@@ -117,7 +126,7 @@ Ctrl+C
 
 ## 5. 如何指定 rounds 数量
 
-当前 CLI 没有 `--max-rounds` 参数。实际 rounds 来自 `config.yaml`：
+默认 rounds 来自 `config.yaml`：
 
 ```yaml
 max_rounds: 5
@@ -125,20 +134,13 @@ max_rounds: 5
 
 要跑 1 轮，不要改配置，直接用 diagnostic。
 
-要跑 2 轮普通模式，目前只能临时修改 `config.yaml`：
-
-```yaml
-max_rounds: 2
-stop_if_no_improvement_rounds: 2
-```
-
-然后运行：
+要跑 2 轮普通模式，可以直接用 CLI override：
 
 ```bash
-make run ARGS="--model qwen3:8b"
+make run ARGS="--model qwen3:8b --max-rounds 2"
 ```
 
-跑完后检查本地 `config.yaml`，并按你的真实偏好决定是否保留。当前项目更推荐后续加 `--max-rounds`，这样不需要频繁修改本地配置。
+如果希望长期改变默认轮数，再修改本地 `config.yaml`；该文件不提交。
 
 ## 6. 如何指定模型
 
@@ -163,6 +165,15 @@ ollama pull qwen3:8b
 ```
 
 ## 7. 如何查看输出目录
+
+如果只想整理项目里的论文和相关工作，不调用模型：
+
+```bash
+make survey
+```
+
+Survey 输出默认写到 `projects/<project>/survey/`，包括 `survey_report.md`、`paper_metadata.json`、
+`related_work.md` 和 `survey_manifest.json`。
 
 最新 checkpoint：
 

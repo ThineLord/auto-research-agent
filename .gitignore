@@ -51,6 +51,7 @@ projects/*/score_history.json
 projects/*/research_state.json
 projects/*/current_plan.md
 projects/*/final_session_report.md
+projects/*/survey/
 projects/*/run.log
 projects/*/checkpoint.json
 projects/*/interrupted_report.md
@@ -76,6 +77,7 @@ projects/*
 !projects/example/README.md
 !projects/example/task.md
 !projects/example/memory.example.md
+!projects/example/literature_survey_sources.md
 
 # Local/generated reports; keep the public cleanup report trackable.
 docs/reports/*

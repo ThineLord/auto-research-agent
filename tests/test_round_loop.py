@@ -264,6 +264,9 @@ class RoundLoopTests(unittest.TestCase):
         args = parse_args(
             [
                 "--diagnostic",
+                "--survey",
+                "--survey-output",
+                "custom_survey.md",
                 "--model",
                 "llama3.1:8b",
                 "--benchmark-preset",
@@ -274,6 +277,8 @@ class RoundLoopTests(unittest.TestCase):
         )
 
         self.assertTrue(args.diagnostic)
+        self.assertTrue(args.survey)
+        self.assertEqual(args.survey_output, "custom_survey.md")
         self.assertEqual(args.model, "llama3.1:8b")
         self.assertEqual(args.benchmark_preset, "free_eval")
         self.assertEqual(args.max_provider_quota_failures, 2)

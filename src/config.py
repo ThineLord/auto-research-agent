@@ -59,6 +59,11 @@ DEFAULT_TOP_P = 0.9
 MAX_MODEL_TIMEOUT_SECONDS = 300
 MAX_MODEL_TEMPERATURE = 2.0
 YAML_ERROR = getattr(yaml, "YAMLError", Exception)
+DEFAULT_LITERATURE_SURVEY_SOURCE_GLOBS = (
+    "outputs/**/*.md",
+    "artifacts/**/*.md",
+)
+DEFAULT_LITERATURE_SURVEY_OUTPUT_DIR = "survey"
 
 
 class ConfigValidationError(ValueError):
@@ -96,6 +101,18 @@ class TopicConfig:
 
 
 @dataclass(frozen=True)
+class LiteratureSurveyConfig:
+    include_task: bool = True
+    include_memory: bool = True
+    include_project_markdown: bool = True
+    include_run_outputs: bool = True
+    source_globs: Tuple[str, ...] = DEFAULT_LITERATURE_SURVEY_SOURCE_GLOBS
+    max_source_files: int = 80
+    max_papers: int = 200
+    output_dir: str = DEFAULT_LITERATURE_SURVEY_OUTPUT_DIR
+
+
+@dataclass(frozen=True)
 class AppConfig:
     model: ModelConfig = field(default_factory=ModelConfig)
     ollama_base_url: str = DEFAULT_OLLAMA_BASE_URL
@@ -106,6 +123,7 @@ class AppConfig:
     top_p: float = DEFAULT_TOP_P
     runtime: RuntimeConfig = field(default_factory=RuntimeConfig)
     cloud_free: CloudFreeConfig = field(default_factory=CloudFreeConfig)
+    literature_survey: LiteratureSurveyConfig = field(default_factory=LiteratureSurveyConfig)
 
     def as_dict(self) -> Dict[str, Any]:
         return {
@@ -146,6 +164,16 @@ class AppConfig:
                 "allow_model_fallback": self.cloud_free.allow_model_fallback,
                 "allowed_model_patterns": list(self.cloud_free.allowed_model_patterns),
                 "blocked_model_patterns": list(self.cloud_free.blocked_model_patterns),
+            },
+            "literature_survey": {
+                "include_task": self.literature_survey.include_task,
+                "include_memory": self.literature_survey.include_memory,
+                "include_project_markdown": self.literature_survey.include_project_markdown,
+                "include_run_outputs": self.literature_survey.include_run_outputs,
+                "source_globs": list(self.literature_survey.source_globs),
+                "max_source_files": self.literature_survey.max_source_files,
+                "max_papers": self.literature_survey.max_papers,
+                "output_dir": self.literature_survey.output_dir,
             },
         }
 
@@ -284,6 +312,20 @@ def _validate_string_list(value: Any, field_name: str) -> Tuple[str, ...]:
         seen.add(normalized)
         items.append(normalized)
     return tuple(items)
+
+
+def _validate_relative_output_dir(value: Any, field_name: str) -> str:
+    output_dir = _validate_non_empty_string(value, field_name)
+    if output_dir.startswith("/") or "\\" in output_dir:
+        raise ConfigValidationError(
+            f"{field_name}: must be a relative folder under projects/<project>/"
+        )
+    parts = output_dir.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ConfigValidationError(
+            f"{field_name}: must be a relative folder under projects/<project>/"
+        )
+    return output_dir
 
 
 def _validate_model_provider(value: Any) -> str:
@@ -589,6 +631,68 @@ def _validate_cloud_free_config(config: Mapping[str, Any]) -> CloudFreeConfig:
     )
 
 
+def _validate_literature_survey_config(config: Mapping[str, Any]) -> LiteratureSurveyConfig:
+    raw_survey = config.get("literature_survey", {})
+    if raw_survey is None:
+        raw_survey = {}
+    if not isinstance(raw_survey, Mapping):
+        raise ConfigValidationError("config.literature_survey: must be a mapping")
+    _validate_mapping_keys(
+        "config.literature_survey",
+        raw_survey,
+        {
+            "include_task",
+            "include_memory",
+            "include_project_markdown",
+            "include_run_outputs",
+            "source_globs",
+            "max_source_files",
+            "max_papers",
+            "output_dir",
+        },
+    )
+
+    defaults = LiteratureSurveyConfig()
+    return LiteratureSurveyConfig(
+        include_task=_validate_bool(
+            raw_survey.get("include_task", defaults.include_task),
+            "config.literature_survey.include_task",
+        ),
+        include_memory=_validate_bool(
+            raw_survey.get("include_memory", defaults.include_memory),
+            "config.literature_survey.include_memory",
+        ),
+        include_project_markdown=_validate_bool(
+            raw_survey.get("include_project_markdown", defaults.include_project_markdown),
+            "config.literature_survey.include_project_markdown",
+        ),
+        include_run_outputs=_validate_bool(
+            raw_survey.get("include_run_outputs", defaults.include_run_outputs),
+            "config.literature_survey.include_run_outputs",
+        ),
+        source_globs=_validate_string_list(
+            raw_survey.get("source_globs", list(defaults.source_globs)),
+            "config.literature_survey.source_globs",
+        ),
+        max_source_files=_validate_int(
+            raw_survey.get("max_source_files", defaults.max_source_files),
+            "config.literature_survey.max_source_files",
+            min_value=1,
+            max_value=1000,
+        ),
+        max_papers=_validate_int(
+            raw_survey.get("max_papers", defaults.max_papers),
+            "config.literature_survey.max_papers",
+            min_value=1,
+            max_value=5000,
+        ),
+        output_dir=_validate_relative_output_dir(
+            raw_survey.get("output_dir", defaults.output_dir),
+            "config.literature_survey.output_dir",
+        ),
+    )
+
+
 def _build_app_config(raw_config: Mapping[str, Any]) -> AppConfig:
     _validate_mapping_keys(
         "config",
@@ -603,6 +707,7 @@ def _build_app_config(raw_config: Mapping[str, Any]) -> AppConfig:
             "top_p",
             "runtime",
             "cloud_free",
+            "literature_survey",
             "temperature",
             "timeout_seconds",
         },
@@ -637,6 +742,7 @@ def _build_app_config(raw_config: Mapping[str, Any]) -> AppConfig:
         ),
         runtime=_validate_runtime_config(raw_config),
         cloud_free=_validate_cloud_free_config(raw_config),
+        literature_survey=_validate_literature_survey_config(raw_config),
     )
 
 

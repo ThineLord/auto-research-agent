@@ -15,6 +15,7 @@ from src.config import (
     MODEL_PROVIDER_GEMINI,
     MODEL_PROVIDER_OLLAMA,
     ConfigValidationError,
+    LiteratureSurveyConfig,
     format_model_label,
     format_topic_context,
     load_app_config,
@@ -51,6 +52,7 @@ class ConfigValidationTests(unittest.TestCase):
         self.assertTrue(config.cloud_free.cloud_free_mode)
         self.assertEqual(config.cloud_free.free_runner_preset, "auto_long_run")
         self.assertEqual(config.cloud_free.max_retries, 5)
+        self.assertEqual(config.literature_survey, LiteratureSurveyConfig())
         self.assertEqual(config.project_name, "example")
         self.assertIn("Example Research Planning Task", config.topic.title)
         self.assertIn("research", config.topic.keywords)
@@ -60,6 +62,7 @@ class ConfigValidationTests(unittest.TestCase):
         self.assertEqual(normalized["model"]["name"], config.model.name)
         self.assertEqual(normalized["topic"]["title"], config.topic.title)
         self.assertEqual(normalized["topic"]["keywords"], list(config.topic.keywords))
+        self.assertEqual(normalized["literature_survey"]["output_dir"], "survey")
         self.assertNotIn("temperature", normalized)
         self.assertEqual(
             resolve_model_settings(config),
@@ -225,6 +228,10 @@ model:
                 "cloud_free:\n  extra: true\n",
                 "config.cloud_free: unknown key",
             ),
+            (
+                "literature_survey:\n  extra: true\n",
+                "config.literature_survey: unknown key",
+            ),
         ]
 
         for text, message in cases:
@@ -273,6 +280,10 @@ model:
             ("cloud_free:\n  free_runner_preset: paid_fast\n", "free_runner_preset"),
             ("cloud_free:\n  max_retries: -1\n", "max_retries"),
             ("cloud_free:\n  prompt_budget_chars: 999\n", "prompt_budget_chars"),
+            ("literature_survey:\n  include_task: 'yes'\n", "include_task"),
+            ("literature_survey:\n  max_source_files: 0\n", "max_source_files"),
+            ("literature_survey:\n  max_papers: 0\n", "max_papers"),
+            ("literature_survey:\n  output_dir: ../reports\n", "output_dir"),
         ]
 
         for text, message in cases:

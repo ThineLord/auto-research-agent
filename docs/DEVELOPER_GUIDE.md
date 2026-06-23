@@ -10,8 +10,9 @@ Create the local environment and install runtime plus development dependencies:
 make install-dev
 ```
 
-The project targets Python 3.10+ and runs fully locally against Ollama. CI does not start
-Ollama or run model-backed workflows.
+The project targets Python 3.10+. Model-backed research workflows can run against local Ollama or
+cloud Gemini, while Literature Survey Mode is deterministic and local-only. CI does not start
+Ollama, call Gemini, or run model-backed workflows.
 
 Useful local commands:
 
@@ -37,6 +38,9 @@ Core modules:
 - `src/agents.py` wraps the Draft, Review, Revise, and Judge prompts and injects topic context.
 - `src/runner.py` coordinates iterative rounds, checkpoints, scoring, safe stop, and resume data.
 - `src/session.py` builds focused session objectives, current plans, and final session reports.
+- `src/literature_survey.py` implements local Literature Survey Mode: source collection, paper
+  metadata parsing, deduplication, theme/gap extraction, survey report rendering, and related-work
+  generation.
 - `src/storage.py` owns project file IO, memory summaries, score history, and research state.
 - `src/runtime.py` owns process metadata, run locks, test execution, and UI background process helpers.
 - `ui/app.py` is the Streamlit UI for editing inputs, running workflows, checking model health,
@@ -83,6 +87,16 @@ Progress comes from:
 
 The model health check is intentionally fast: it checks Ollama API availability and selected-model
 presence without sending a generation prompt.
+
+## Literature Survey Mode
+
+`make survey` dispatches through `src.cli` before provider validation. This is intentional: survey
+mode is deterministic and local, so it should run even when Ollama is stopped or Gemini credentials
+are unavailable. Configuration lives under `literature_survey:` in `config.yaml`.
+
+Generated survey artifacts live under `projects/<project>/survey/` by default and are ignored by
+git. Keep example or golden outputs under `docs/examples/` instead of committing local project
+survey output.
 
 ## Contribution Flow
 

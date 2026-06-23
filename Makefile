@@ -9,7 +9,7 @@ DEV_STAMP := $(VENV)/.install-dev.stamp
 
 .DEFAULT_GOAL := help
 
-.PHONY: help bootstrap venv install install-dev format format-check lint import-check test check ci run diagnostic continuous resume session ui
+.PHONY: help bootstrap venv install install-dev format format-check lint import-check test check ci run diagnostic continuous resume session survey ui
 
 help:
 	@printf "%s\n" \
@@ -28,6 +28,7 @@ help:
 		"  make continuous    Run continuous mode" \
 		"  make resume        Resume from checkpoint" \
 		"  make session       Run session mode" \
+		"  make survey        Run local Literature Survey Mode" \
 		"  make ui            Start the Streamlit UI with language/theme controls" \
 		"" \
 		"Run make install-dev once on a new checkout before testing or running." \
@@ -88,6 +89,9 @@ resume: install
 
 session: install
 	$(VENV_PYTHON) -m src.main --session $(ARGS)
+
+survey: install
+	$(VENV_PYTHON) -m src.main --survey $(ARGS)
 
 ui: install
 	$(VENV_PYTHON) -m streamlit run ui/app.py $(ARGS)

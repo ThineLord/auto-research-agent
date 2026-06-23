@@ -64,7 +64,6 @@ model:
     models:
       - gemini-3.5-flash
       - gemini-2.5-flash
-      - gemini-2.5-pro
       - gemini-2.5-flash-lite
 topic:
   title: Example Research Planning Task
@@ -198,6 +197,16 @@ make diagnostic
 
 确认本机模型、提示词和文件写入都正常，再跑正式模式。
 
+如果你只想整理项目里的论文和相关工作，不需要模型，运行：
+
+```bash
+make survey
+```
+
+Survey mode 会扫描 `projects/<project>/task.md`、可选 `memory.md`、项目 markdown 和已有
+`runs/**/*.md` 输出，生成 `projects/<project>/survey/survey_report.md`、
+`paper_metadata.json`、`related_work.md` 和 `survey_manifest.json`。
+
 ## 连续运行用哪个命令
 
 ```bash
@@ -263,6 +272,7 @@ make resume
 - `projects/*/research_state.json`
 - `projects/*/current_plan.md`
 - `projects/*/final_session_report.md`
+- `projects/*/survey/`
 - `projects/*/run.log`
 - `projects/*/checkpoint.json`
 - `projects/*/interrupted_report.md`
