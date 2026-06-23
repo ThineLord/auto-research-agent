@@ -648,6 +648,11 @@ def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[
         if checkpoint.get("run_config")
         else (run_root / "run_config.json" if run_root else project_dir / "run_config.json")
     )
+    run_summary_path = (
+        Path(str(checkpoint.get("run_summary")))
+        if checkpoint.get("run_summary")
+        else (run_root / "run_summary.json" if run_root else project_dir / "run_summary.json")
+    )
     catalog = [
         {
             "label": "Best output",
@@ -673,6 +678,11 @@ def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[
             "label": "Run config",
             "label_key": "output_run_config",
             "path": run_config_path,
+        },
+        {
+            "label": "Run summary",
+            "label_key": "output_run_summary",
+            "path": run_summary_path,
         },
         {
             "label": "Score history",
@@ -735,6 +745,41 @@ def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[
         }
         for item in catalog
     ]
+
+
+def load_score_history_rows(score_history_path: Path) -> list[dict[str, Any]]:
+    if not score_history_path.exists():
+        return []
+    try:
+        payload = json.loads(read_file_text(score_history_path))
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(payload, list):
+        return []
+
+    rows: list[dict[str, Any]] = []
+    for entry in payload:
+        if not isinstance(entry, dict):
+            continue
+        timings = entry.get("agent_timings_seconds")
+        timings = timings if isinstance(timings, dict) else {}
+        rows.append(
+            {
+                "round": entry.get("round"),
+                "score": entry.get("score"),
+                "improved": entry.get("improved"),
+                "drafting_mode": entry.get("drafting_mode", ""),
+                "timeout": entry.get("timeout_this_round", False),
+                "invalid_score": entry.get("invalid_score_this_round", False),
+                "errors": len(entry.get("errors") or []),
+                "draft_s": timings.get("draft", 0.0),
+                "review_s": timings.get("review", 0.0),
+                "revise_s": timings.get("revise", 0.0),
+                "judge_s": timings.get("judge", 0.0),
+                "round_s": entry.get("round_runtime_seconds", 0.0),
+            }
+        )
+    return rows
 
 
 def live_refresh_interval(auto_refresh: bool) -> str | None:
@@ -1513,6 +1558,15 @@ def main() -> None:
         stop_signal_path=stop_signal_path,
         default_model=default_model,
     )
+
+    score_rows = load_score_history_rows(proj_path / "score_history.json")
+    st.subheader(t("score_history_table"))
+    if score_rows:
+        st.dataframe(score_rows, width="stretch")
+        st.caption(t("score_history_trend"))
+        st.line_chart(score_rows, x="round", y="score")
+    else:
+        st.info(t("score_history_empty"))
 
     st.subheader(t("output_browser"))
     output_catalog = build_output_catalog(proj_path, checkpoint)

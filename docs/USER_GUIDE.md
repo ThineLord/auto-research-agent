@@ -276,11 +276,16 @@ make resume
 prompt 文件 SHA-256、Git commit、开始/结束时间、停止原因和是否可 resume。旧 run 如果只有
 `run_manifest.json`，工具会以兼容方式读取旧 metadata。
 
+如果要看本次 run 总览和每轮指标，查看：
+
+- `projects/example/runs/<run_id>/run_summary.json`
+- `projects/example/runs/<run_id>/round_metrics.json`
+
 ## memory.md / best_output.md / score_history.json 怎么理解
 
 - `memory.md`：被持续维护的“研究状态记忆”，会影响下一轮输入。
 - `best_output.md`：当前最高分对应的输出，通常是你优先阅读的文件。
-- `score_history.json`：每轮评分轨迹、是否提升、是否超时等结构化记录。
+- `score_history.json`：每轮评分轨迹、是否提升、是否超时、每个 agent 耗时和 Judge rubric 子项（如果可解析）。
 
 ## 哪些生成文件不要提交到 GitHub
 

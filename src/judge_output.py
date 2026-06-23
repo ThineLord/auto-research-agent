@@ -88,6 +88,14 @@ def _parse_json_score(candidate: str) -> Optional[float]:
     return _coerce_score(data.get("score"))
 
 
+def _parse_json_object(candidate: str) -> Optional[Dict[str, Any]]:
+    try:
+        data = json.loads(candidate)
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def _extract_first_json_object(text: str) -> Optional[str]:
     start = text.find("{")
     if start < 0:
@@ -136,6 +144,43 @@ def _parse_structured_score(judge_text: str) -> Optional[float]:
     if object_text:
         return _parse_json_score(object_text)
     return None
+
+
+def parse_judge_payload(judge_text: str) -> Dict[str, Any]:
+    """Parse the first structured judge JSON object, returning {} for legacy text."""
+    text = judge_text.strip()
+    if not text:
+        return {}
+
+    direct = _parse_json_object(text)
+    if direct is not None:
+        return direct
+
+    fenced_match = _FENCED_JSON_RE.search(text)
+    if fenced_match:
+        fenced = _parse_json_object(fenced_match.group(1).strip())
+        if fenced is not None:
+            return fenced
+
+    object_text = _extract_first_json_object(text)
+    if object_text:
+        parsed = _parse_json_object(object_text)
+        if parsed is not None:
+            return parsed
+    return {}
+
+
+def parse_judge_rubric(judge_text: str) -> Dict[str, float]:
+    payload = parse_judge_payload(judge_text)
+    rubric = payload.get("rubric")
+    if not isinstance(rubric, dict):
+        return {}
+    normalized: Dict[str, float] = {}
+    for key, value in rubric.items():
+        score = _coerce_score(value)
+        if score is not None:
+            normalized[str(key)] = score
+    return normalized
 
 
 def parse_judge_score(judge_text: str) -> Optional[float]:

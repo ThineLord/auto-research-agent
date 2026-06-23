@@ -485,6 +485,35 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertTrue(judge_item["exists"])
         self.assertEqual(judge_item["kind"], "markdown")
 
+    def test_ui_score_history_rows_flatten_metrics_for_display(self) -> None:
+        import ui.app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            score_history_path = Path(tmp) / "score_history.json"
+            score_history_path.write_text(
+                """
+[
+  {
+    "round": 1,
+    "score": 82,
+    "improved": true,
+    "drafting_mode": "best_guided",
+    "errors": [],
+    "agent_timings_seconds": {"draft": 1.2, "review": 0.8, "revise": 0.7, "judge": 0.5},
+    "round_runtime_seconds": 3.2
+  }
+]
+""",
+                encoding="utf-8",
+            )
+
+            rows = ui_app.load_score_history_rows(score_history_path)
+
+        self.assertEqual(rows[0]["round"], 1)
+        self.assertEqual(rows[0]["score"], 82)
+        self.assertEqual(rows[0]["draft_s"], 1.2)
+        self.assertEqual(rows[0]["errors"], 0)
+
     def test_fast_model_health_check_uses_api_and_selected_model_presence(self) -> None:
         import ui.app as ui_app
 

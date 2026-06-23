@@ -13,6 +13,7 @@ from .agents import ResearchAgents
 from .cloud_free import CloudFreeDailyQuotaExhausted, next_pacific_reset_heuristic
 from .config import DEFAULT_DRAFTING_MODE
 from .constants import STOP_CLOUD_DAILY_QUOTA
+from .judge_output import parse_judge_rubric
 from .llm import LLMClientProtocol
 from .run_config import build_initial_run_config, finalize_run_config
 from .runtime import log_run as _log
@@ -232,6 +233,7 @@ def run_diagnostic_mode(
                 "run_id": run_root.name,
                 "run_root": str(run_root),
                 "run_config": str(run_config_path),
+                "run_summary": str(run_root / "run_summary.json"),
                 "last_completed_round": 0,
                 "last_successful_agent": "none",
                 "best_score": 0.0,
@@ -259,6 +261,28 @@ def run_diagnostic_mode(
             total_runtime_seconds=time.monotonic() - run_started,
         )
         write_json_file(run_config_path, run_config)
+        write_json_file(
+            run_root / "run_summary.json",
+            {
+                "run_id": run_root.name,
+                "run_root": str(run_root),
+                "mode": "diagnostic",
+                "model": model_name,
+                "drafting_mode": drafting_mode,
+                "completed_rounds": 0,
+                "best_round": None,
+                "best_score": 0.0,
+                "stop_reason": STOP_CLOUD_DAILY_QUOTA,
+                "can_resume": True,
+                "total_runtime_seconds": round(time.monotonic() - run_started, 3),
+                "round_count": 0,
+                "successful_rounds": [],
+                "timeout_rounds": [],
+                "error_rounds": [],
+                "provider_failure_rounds": [],
+                "invalid_score_rounds": [],
+            },
+        )
         return
 
     save_round_outputs(
@@ -289,33 +313,47 @@ def run_diagnostic_mode(
         parsed_score = 0.0
 
     score_history_path = project_dir / "score_history.json"
+    round_metrics_path = run_root / "round_metrics.json"
+    errors = [e for e in [draft_error, review_error, revise_error, judge_error] if e]
+    timeout_this_round = any(
+        "timed out" in (e or "").lower()
+        for e in [draft_error, review_error, revise_error, judge_error]
+        if e
+    )
+    round_metric = {
+        "round": 1,
+        "score": parsed_score,
+        "improved": True,
+        "non_improve_streak": 0,
+        "repetitive_judge": False,
+        "errors": errors,
+        "agent_errors": {
+            "draft": draft_error,
+            "review": review_error,
+            "revise": revise_error,
+            "judge": judge_error,
+        },
+        "agent_timings_seconds": {agent: round(elapsed, 3) for agent, elapsed in timings.items()},
+        "round_runtime_seconds": round(sum(timings.values()), 3),
+        "timeout_this_round": timeout_this_round,
+        "invalid_score_this_round": parse_score(judge_output) is None,
+        "successful_research_round": not errors and parse_score(judge_output) is not None,
+        "judge_rubric": parse_judge_rubric(judge_output),
+        "model": model_name,
+        "drafting_mode": drafting_mode,
+    }
     write_score_history(
         score_history_path,
-        [
-            {
-                "round": 1,
-                "score": parsed_score,
-                "improved": True,
-                "non_improve_streak": 0,
-                "repetitive_judge": False,
-                "errors": [e for e in [draft_error, review_error, revise_error, judge_error] if e],
-                "timeout_this_round": any(
-                    "timed out" in (e or "").lower()
-                    for e in [draft_error, review_error, revise_error, judge_error]
-                    if e
-                ),
-                "invalid_score_this_round": parse_score(judge_output) is None,
-                "model": model_name,
-                "drafting_mode": drafting_mode,
-            }
-        ],
+        [round_metric],
     )
+    write_score_history(round_metrics_path, [round_metric])
     write_json_file(
         project_dir / "checkpoint.json",
         {
             "run_id": run_root.name,
             "run_root": str(run_root),
             "run_config": str(run_config_path),
+            "run_summary": str(run_root / "run_summary.json"),
             "last_completed_round": 1,
             "last_successful_agent": (
                 "judge"
@@ -349,6 +387,31 @@ def run_diagnostic_mode(
         total_runtime_seconds=time.monotonic() - run_started,
     )
     write_json_file(run_config_path, run_config)
+    write_json_file(
+        run_root / "run_summary.json",
+        {
+            "run_id": run_root.name,
+            "run_root": str(run_root),
+            "mode": "diagnostic",
+            "model": model_name,
+            "drafting_mode": drafting_mode,
+            "completed_rounds": 1,
+            "best_round": 1,
+            "best_score": round(parsed_score, 2),
+            "stop_reason": "MAX_ROUNDS",
+            "can_resume": False,
+            "total_runtime_seconds": round(time.monotonic() - run_started, 3),
+            "score_history_path": str(score_history_path),
+            "round_metrics_path": str(round_metrics_path),
+            "run_config_path": str(run_config_path),
+            "successful_rounds": [1] if round_metric["successful_research_round"] else [],
+            "timeout_rounds": [1] if timeout_this_round else [],
+            "error_rounds": [1] if errors else [],
+            "provider_failure_rounds": [],
+            "invalid_score_rounds": [1] if round_metric["invalid_score_this_round"] else [],
+            "round_count": 1,
+        },
+    )
     console.rule("Diagnostic Summary")
     console.print(f"[bold]Run root:[/bold] {run_root}")
     console.print(f"[bold]Round saved:[/bold] {round_dir}")

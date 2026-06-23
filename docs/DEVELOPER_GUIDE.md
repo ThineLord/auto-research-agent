@@ -39,6 +39,7 @@ Core modules:
 - `src/runner.py` coordinates iterative rounds, checkpoints, scoring, safe stop, and resume data.
 - `src/run_config.py` builds run-level reproducibility metadata, hashes prompt files, records Git
   commit state when available, and reads legacy `run_manifest.json` metadata for old runs.
+- `src/run_compare.py` loads `run_summary.json` artifacts and compares two or more run roots.
 - `src/session.py` builds focused session objectives, current plans, and final session reports.
 - `src/literature_survey.py` implements local Literature Survey Mode: source collection, paper
   metadata parsing, deduplication, theme/gap extraction, survey report rendering, and related-work
@@ -99,6 +100,10 @@ Progress comes from:
 - `runs/<run_id>/run_config.json` for reproducibility metadata: provider/model settings, runtime
   limits, topic snapshot, prompt hashes, Git commit, start/end timestamps, stop reason, and resume
   eligibility.
+- `runs/<run_id>/round_metrics.json` for per-round agent timings, error flags, scores, and rubric
+  subscores when Judge returns structured JSON.
+- `runs/<run_id>/run_summary.json` for run-level counts, best score, stop reason, and paths to
+  metrics/config artifacts.
 - `run.log` for the current running stage.
 - `STOP_REQUESTED` for safe user-initiated pause.
 

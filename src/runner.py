@@ -31,6 +31,7 @@ from .constants import (
     STOP_PROVIDER_QUOTA_EXHAUSTED,
     STOP_USER_REQUESTED,
 )
+from .judge_output import parse_judge_rubric
 from .run_config import build_initial_run_config, finalize_run_config, read_run_config
 from .runtime import log_run as _log
 from .runtime import stop_requested as _stop_requested
@@ -86,7 +87,7 @@ def _run_agent_step(
     call: Callable[[], str],
     log_path: Optional[Path] = None,
     mode: str = "normal",
-) -> Tuple[str, Optional[str]]:
+) -> Tuple[str, Optional[str], float]:
     depth = int(getattr(_run_agent_step, "_depth", 0))
     if depth > 0:
         raise RuntimeError("Recursive agent step detected; aborting for safety.")
@@ -96,25 +97,30 @@ def _run_agent_step(
         append_log_line(
             log_path, f"mode={mode} | round={round_index} | agent={agent_name} | status=start"
         )
+    started = time.monotonic()
     try:
         output = call()
+        elapsed = time.monotonic() - started
         console.print(f"[Round {round_index}] {agent_name.capitalize()} finished.")
         if log_path is not None:
             append_log_line(
                 log_path,
-                f"mode={mode} | round={round_index} | agent={agent_name} | status=end",
+                f"mode={mode} | round={round_index} | agent={agent_name} | "
+                f"status=end | elapsed={elapsed:.3f}s",
             )
-        return output, None
+        return output, None, elapsed
     except CloudFreeDailyQuotaExhausted:
         raise
     except RuntimeError as exc:
+        elapsed = time.monotonic() - started
         console.print(f"[red][Round {round_index}] {agent_name} failed: {exc}[/red]")
         if log_path is not None:
             append_log_line(
                 log_path,
-                f"mode={mode} | round={round_index} | agent={agent_name} | status=error | error={exc}",
+                f"mode={mode} | round={round_index} | agent={agent_name} | "
+                f"status=error | elapsed={elapsed:.3f}s | error={exc}",
             )
-        return f"[{agent_name.upper()} ERROR] {exc}", str(exc)
+        return f"[{agent_name.upper()} ERROR] {exc}", str(exc), elapsed
     finally:
         _run_agent_step._depth = depth  # type: ignore[attr-defined]
 
@@ -307,7 +313,9 @@ def run_iterative_rounds(
     previous_judge = ""
     judge_history: List[str] = []
     score_history: List[Dict[str, Any]] = []
+    round_metrics: List[Dict[str, Any]] = []
     score_history_path = project_dir / "score_history.json"
+    round_metrics_path = run_root / "round_metrics.json"
     research_state_path = project_dir / "research_state.json"
     non_improve_streak = 0
     stop_reason = STOP_MAX_ROUNDS
@@ -361,6 +369,12 @@ def run_iterative_rounds(
         review_output = ""
         revised_output = ""
         judge_output = ""
+        agent_timings_seconds = {
+            "draft": 0.0,
+            "review": 0.0,
+            "revise": 0.0,
+            "judge": 0.0,
+        }
 
         def _persist_round_outputs(stage: str) -> None:
             save_round_outputs(
@@ -419,7 +433,7 @@ def run_iterative_rounds(
                         round_index=round_index,
                         agent_name="draft",
                     )
-                    draft_output, draft_error = _run_agent_step(
+                    draft_output, draft_error, agent_timings_seconds["draft"] = _run_agent_step(
                         console=console,
                         round_index=round_index,
                         agent_name="draft",
@@ -488,7 +502,7 @@ def run_iterative_rounds(
                         round_index=round_index,
                         agent_name="review",
                     )
-                    review_output, review_error = _run_agent_step(
+                    review_output, review_error, agent_timings_seconds["review"] = _run_agent_step(
                         console=console,
                         round_index=round_index,
                         agent_name="review",
@@ -543,7 +557,7 @@ def run_iterative_rounds(
                         round_index=round_index,
                         agent_name="revise",
                     )
-                    revised_output, revise_error = _run_agent_step(
+                    revised_output, revise_error, agent_timings_seconds["revise"] = _run_agent_step(
                         console=console,
                         round_index=round_index,
                         agent_name="revise",
@@ -599,7 +613,7 @@ def run_iterative_rounds(
                         round_index=round_index,
                         agent_name="judge",
                     )
-                    judge_output, judge_error = _run_agent_step(
+                    judge_output, judge_error, agent_timings_seconds["judge"] = _run_agent_step(
                         console=console,
                         round_index=round_index,
                         agent_name="judge",
@@ -705,6 +719,7 @@ def run_iterative_rounds(
             mode,
             f"score_extracted round={round_index} parsed={parsed_score is not None} value={score:.2f}",
         )
+        judge_rubric = parse_judge_rubric(judge_output)
         completed_rounds = round_index
 
         improved = score > best_score
@@ -723,26 +738,38 @@ def run_iterative_rounds(
         repetitive_judge = _is_repetitive_judge(judge_output, judge_history)
         judge_history.append(judge_output)
 
-        score_history.append(
-            {
-                "round": round_index,
-                "score": score,
-                "improved": improved,
-                "non_improve_streak": non_improve_streak,
-                "repetitive_judge": repetitive_judge,
-                "errors": round_errors,
-                "timeout_this_round": timeout_this_round,
-                "provider_failure_this_round": provider_failure_this_round,
-                "provider_quota_this_round": provider_quota_this_round,
-                "provider_quota_streak": consecutive_provider_quota_failures,
-                "skipped_placeholder_this_round": skipped_placeholder_this_round,
-                "successful_research_round": not round_errors and parsed_score is not None,
-                "invalid_score_this_round": parsed_score is None,
-                "model": model_name,
-                "drafting_mode": drafting_mode,
-            }
-        )
+        round_metric = {
+            "round": round_index,
+            "score": score,
+            "improved": improved,
+            "non_improve_streak": non_improve_streak,
+            "repetitive_judge": repetitive_judge,
+            "errors": round_errors,
+            "agent_errors": {
+                "draft": draft_error,
+                "review": review_error,
+                "revise": revise_error,
+                "judge": judge_error,
+            },
+            "agent_timings_seconds": {
+                agent: round(elapsed, 3) for agent, elapsed in agent_timings_seconds.items()
+            },
+            "round_runtime_seconds": round(sum(agent_timings_seconds.values()), 3),
+            "timeout_this_round": timeout_this_round,
+            "provider_failure_this_round": provider_failure_this_round,
+            "provider_quota_this_round": provider_quota_this_round,
+            "provider_quota_streak": consecutive_provider_quota_failures,
+            "skipped_placeholder_this_round": skipped_placeholder_this_round,
+            "successful_research_round": not round_errors and parsed_score is not None,
+            "invalid_score_this_round": parsed_score is None,
+            "judge_rubric": judge_rubric,
+            "model": model_name,
+            "drafting_mode": drafting_mode,
+        }
+        score_history.append(round_metric)
+        round_metrics.append(round_metric)
         write_score_history(score_history_path, score_history)
+        write_score_history(round_metrics_path, round_metrics)
 
         memory_summary = summarize_round_memory(
             revised_output=revised_output,
@@ -772,6 +799,7 @@ def run_iterative_rounds(
             "run_id": run_id,
             "run_root": str(run_root),
             "run_config": str(run_config_path),
+            "run_summary": str(run_root / "run_summary.json"),
             "last_completed_round": round_index,
             "last_successful_agent": last_successful_agent,
             "best_score": round(best_score, 2),
@@ -903,6 +931,7 @@ def run_iterative_rounds(
         "run_id": run_id,
         "run_root": str(run_root),
         "run_config": str(run_config_path),
+        "run_summary": str(run_root / "run_summary.json"),
         "last_completed_round": completed_rounds,
         "last_successful_agent": last_successful_agent,
         "best_score": round(best_score, 2),
@@ -940,6 +969,43 @@ def run_iterative_rounds(
         )
     checkpoint_final["can_resume"] = can_resume
     write_json_file(checkpoint_path, checkpoint_final)
+    successful_rounds = [
+        entry["round"] for entry in round_metrics if entry.get("successful_research_round")
+    ]
+    timeout_rounds = [entry["round"] for entry in round_metrics if entry.get("timeout_this_round")]
+    error_rounds = [entry["round"] for entry in round_metrics if entry.get("errors")]
+    provider_failure_rounds = [
+        entry["round"] for entry in round_metrics if entry.get("provider_failure_this_round")
+    ]
+    invalid_score_rounds = [
+        entry["round"] for entry in round_metrics if entry.get("invalid_score_this_round")
+    ]
+    run_summary_path = run_root / "run_summary.json"
+    write_json_file(
+        run_summary_path,
+        {
+            "run_id": run_id,
+            "run_root": str(run_root),
+            "mode": mode,
+            "model": model_name,
+            "drafting_mode": drafting_mode,
+            "completed_rounds": completed_rounds,
+            "best_round": best_round,
+            "best_score": round(best_score, 2),
+            "stop_reason": stop_reason,
+            "can_resume": can_resume,
+            "total_runtime_seconds": round(total_runtime, 3),
+            "score_history_path": str(score_history_path),
+            "round_metrics_path": str(round_metrics_path),
+            "run_config_path": str(run_config_path),
+            "successful_rounds": successful_rounds,
+            "timeout_rounds": timeout_rounds,
+            "error_rounds": error_rounds,
+            "provider_failure_rounds": provider_failure_rounds,
+            "invalid_score_rounds": invalid_score_rounds,
+            "round_count": len(round_metrics),
+        },
+    )
     run_config = finalize_run_config(
         run_config,
         stop_reason=stop_reason,

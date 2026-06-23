@@ -421,6 +421,10 @@ class RoundLoopTests(unittest.TestCase):
             self.assertIn('"score": 40.0', score_history)
 
             run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+            run_summary = json.loads((run_root / "run_summary.json").read_text(encoding="utf-8"))
+            round_metrics = json.loads(
+                (run_root / "round_metrics.json").read_text(encoding="utf-8")
+            )
             checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
             self.assertEqual(run_config["schema_version"], 1)
             self.assertEqual(run_config["status"], "completed")
@@ -435,6 +439,14 @@ class RoundLoopTests(unittest.TestCase):
             self.assertIsNotNone(run_config["started_at"])
             self.assertIsNotNone(run_config["ended_at"])
             self.assertEqual(checkpoint["run_config"], str(run_root / "run_config.json"))
+            self.assertEqual(checkpoint["run_summary"], str(run_root / "run_summary.json"))
+            self.assertEqual(run_summary["best_score"], 50)
+            self.assertEqual(run_summary["completed_rounds"], 2)
+            self.assertEqual(run_summary["successful_rounds"], [1, 2])
+            self.assertEqual(len(round_metrics), 2)
+            self.assertIn("agent_timings_seconds", round_metrics[0])
+            self.assertIn("judge_rubric", round_metrics[0])
+            self.assertEqual(round_metrics[0]["judge_rubric"]["novelty_and_research_value"], 10.0)
 
     def test_drafting_modes_pass_expected_previous_context_to_draft_agent(self) -> None:
         expectations = {

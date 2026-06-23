@@ -176,6 +176,8 @@ touch projects/example/STOP_REQUESTED
 - `projects/example/runs/<run_id>/round_xx/03_revised.md`：每轮 revise 后的版本。
 - `projects/example/runs/<run_id>/round_xx/04_judge.md`：每轮 judge 输出。
 - `projects/example/runs/<run_id>/run_config.json`：复现实验所需的 provider/model、轮数/runtime、topic、prompt SHA-256、Git commit、开始/结束时间、停止原因和 resume 状态。
+- `projects/example/runs/<run_id>/round_metrics.json`：每轮 agent 耗时、错误/超时标记、分数和可解析 rubric 子项。
+- `projects/example/runs/<run_id>/run_summary.json`：本次 run 的总览、最佳分数、停止原因和指标文件路径。
 - `projects/example/best_output.md`：目前最高 judge 分数对应的 revised 输出。
 - `projects/example/score_history.json`：每轮分数、是否提升、是否超时、是否重复、错误等。
 - `projects/example/research_state.json`：当前 strongest hypothesis、biggest blocker、next experiment、open question。
@@ -236,7 +238,7 @@ touch projects/example/STOP_REQUESTED
 
 ## 7. 可视化有什么用
 
-从研究者视角看，当前 UI 对“运行管理”有用，对“研究质量判断”只提供基础信号。
+从研究者视角看，当前 UI 对“运行管理”有用，并提供基础分数表格和趋势线；更深入的跨 run 质量分析仍需要人工阅读输出或使用 helper。
 
 它能帮助判断 auto research 是否在变好：
 
@@ -247,8 +249,8 @@ touch projects/example/STOP_REQUESTED
 但它还不能充分证明研究真的在变好：
 
 - 分数只来自同一个 judge agent，缺少多 judge、一致性、人工标注或任务级指标。
-- `score_history.json` 没保存完整 rubric 子分项趋势。
 - 没有自动 diff、novelty drift、重复率、实验可执行度等指标。
+- 还没有完整实验 dashboard；当前只有 score history 表格和分数趋势。
 
 它能帮助发现卡顿、重复、退化、跑偏：
 
@@ -261,8 +263,8 @@ touch projects/example/STOP_REQUESTED
 
 - 可以。`drafting_mode` 支持 `best_guided`、`fresh_from_task_with_review`、`continue_from_previous_draft`。
 - CLI 可用 `--drafting-mode <mode>` 覆盖，UI 的 Run controls 里也有选择器。
-- checkpoint、score_history、run_config 都会记录本次选择。
-- 目前还没有自动 run-to-run 对比视图，所以严格 A/B 分析仍需要人工比较多个 run。
+- checkpoint、score_history、run_config、run_summary 都会记录本次选择。
+- 目前有 `src/run_compare.py` helper 可比较多个 run summary，但 UI 还没有多 run 对比视图。
 
 目前还缺的关键指标：
 
@@ -270,8 +272,8 @@ touch projects/example/STOP_REQUESTED
 - judge rubric 子分项随 round 的趋势。
 - draft/revised 与上一轮的相似度、差异摘要、重复率。
 - 是否引用了上一轮 draft、上一轮 review、previous best 的可追踪 lineage。
-- 不同模型、不同 drafting mode、不同 prompt 版本的 run-level 对比表。
-- 可视化曲线：score、耗时、错误、超时、重复、non-improve streak。
+- 不同模型、不同 drafting mode、不同 prompt 版本的 UI 对比表。
+- 更完整可视化曲线：rubric、耗时、错误、超时、重复、non-improve streak。
 
 ## 8. 代码结构导览
 
@@ -307,6 +309,7 @@ touch projects/example/STOP_REQUESTED
 - `src/storage.py`：文件读写、round 输出、score 解析、memory 更新、research_state 更新。
 - `src/runtime.py`：后台进程、UI 元数据、run lock、测试运行、停止信号。
 - `src/run_config.py`：生成 run-level 复现信息、prompt 文件 hash、Git commit，并兼容读取旧 `run_manifest.json`。
+- `src/run_compare.py`：读取 `run_summary.json`，比较两个或多个 run。
 - `src/judge_output.py`：judge JSON schema 和分数解析。
 - `src/logging_config.py`：结构化日志格式。
 - `src/constants.py`：停止原因和运行常量。
@@ -358,8 +361,8 @@ touch projects/example/STOP_REQUESTED
 
 ### 今天可以做
 
-- 把 `score_history.json` 扩展为保留 judge rubric 子分项。
-- 在 UI 里加一个简单 score history 表格或折线图。
+- 为 run comparison helper 增加 CLI 包装命令。
+- 在 UI 里加一个多 run 对比视图。
 - 清理 UI 的 Streamlit deprecation warning，把 `use_container_width=True` 改成 `width='stretch'`。
 - 明确已有 checkpoint 是否还要继续，还是新开一个 clean run。
 

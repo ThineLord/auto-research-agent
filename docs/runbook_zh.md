@@ -200,6 +200,7 @@ print("last_completed_round:", checkpoint.get("last_completed_round"))
 print("best_score:", checkpoint.get("best_score"))
 print("stop_reason:", checkpoint.get("stop_reason"))
 print("run_config:", checkpoint.get("run_config"))
+print("run_summary:", checkpoint.get("run_summary"))
 PY
 ```
 
@@ -228,6 +229,7 @@ ls projects/example/runs/<run_id>/round_01
 
 ```bash
 sed -n '1,220p' projects/example/runs/<run_id>/run_config.json
+sed -n '1,220p' projects/example/runs/<run_id>/run_summary.json
 ```
 
 优先阅读：
@@ -293,6 +295,7 @@ lsof -iTCP:8501 -sTCP:LISTEN -n -P || true
 - `projects/example/checkpoint.json` 存在且 `last_completed_round >= 1`。
 - `projects/example/checkpoint.json` 里 `run_root` 指向的目录存在。
 - `projects/example/checkpoint.json` 里 `run_config` 指向的 `run_config.json` 存在。
+- `run_root/run_summary.json` 和 `run_root/round_metrics.json` 存在。
 - `run_root/round_01/01_draft.md`、`02_review.md`、`03_revised.md`、`04_judge.md` 都存在。
 - `projects/example/score_history.json` 有至少一条记录。
 - `04_judge.md` 能解析出分数，或 `score_history.json` 里 `invalid_score_this_round` 是 `false`。
@@ -313,7 +316,11 @@ print("round_dir:", round_dir)
 print("stop_reason:", checkpoint.get("stop_reason"))
 print("best_score:", checkpoint.get("best_score"))
 run_config = Path(checkpoint.get("run_config") or run_root / "run_config.json")
+run_summary = Path(checkpoint.get("run_summary") or run_root / "run_summary.json")
+round_metrics = run_root / "round_metrics.json"
 print("run_config:", "OK" if run_config.exists() else "MISSING")
+print("run_summary:", "OK" if run_summary.exists() else "MISSING")
+print("round_metrics:", "OK" if round_metrics.exists() else "MISSING")
 for name in files:
     path = round_dir / name
     print(name, "OK" if path.exists() and path.stat().st_size > 0 else "MISSING/EMPTY")
