@@ -211,6 +211,11 @@ def run_session_mode(
     topic_title: str = "the configured research topic",
     topic_keywords: Sequence[str] = (),
     project_metadata: dict[str, object] | None = None,
+    model_provider: str = "",
+    model_parameters: dict[str, Any] | None = None,
+    topic_snapshot: dict[str, Any] | None = None,
+    prompt_dir: Path | None = None,
+    repo_root: Path | None = None,
     max_consecutive_provider_quota_failures: int = 2,
 ) -> None:
     console.rule("Research Session Mode")
@@ -262,6 +267,11 @@ def run_session_mode(
         per_agent_timeout_seconds=per_agent_timeout_seconds,
         topic_keywords=topic_keywords,
         project_metadata=project_metadata,
+        model_provider=model_provider,
+        model_parameters=model_parameters,
+        topic_snapshot=topic_snapshot,
+        prompt_dir=prompt_dir,
+        repo_root=repo_root,
         max_consecutive_provider_quota_failures=max_consecutive_provider_quota_failures,
     )
 

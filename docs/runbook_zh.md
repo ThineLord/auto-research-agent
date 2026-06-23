@@ -71,6 +71,7 @@ Diagnostic 的特点：
 - 固定 1 轮。
 - 会调用 Ollama。
 - 会生成新的 `projects/example/runs/<run_id>/round_01/`。
+- 会写 `projects/example/runs/<run_id>/run_config.json`。
 - 会写 `projects/example/checkpoint.json` 和 `projects/example/score_history.json`。
 - 不更新 `memory.md`，比较适合 smoke test。
 
@@ -186,6 +187,7 @@ print("run_root:", checkpoint.get("run_root"))
 print("last_completed_round:", checkpoint.get("last_completed_round"))
 print("best_score:", checkpoint.get("best_score"))
 print("stop_reason:", checkpoint.get("stop_reason"))
+print("run_config:", checkpoint.get("run_config"))
 PY
 ```
 
@@ -208,6 +210,12 @@ ls projects/example/runs/<run_id>/round_01
 02_review.md
 03_revised.md
 04_judge.md
+```
+
+复现实验设置：
+
+```bash
+sed -n '1,220p' projects/example/runs/<run_id>/run_config.json
 ```
 
 优先阅读：
@@ -247,7 +255,7 @@ UI 中重点看：
 - `C. Run controls`：启动 diagnostic/normal/continuous/resume，或安全暂停。
 - `D. Progress panel`：看 Mode、Round、Stage、Best score、Model、Stop reason。
 - `E. Live logs panel`：看 `run.log` 和模型操作日志。
-- `F. Output browser`：看 best output、checkpoint、score history、latest round draft/review/revised/judge。
+- `F. Output browser`：看 best output、checkpoint、run config、score history、latest round draft/review/revised/judge。
 
 ## 9. 如何停止 UI
 
@@ -272,6 +280,7 @@ lsof -iTCP:8501 -sTCP:LISTEN -n -P || true
 - 终端没有报 `Config error`、`Model ... is not installed`、`Ollama is not available`。
 - `projects/example/checkpoint.json` 存在且 `last_completed_round >= 1`。
 - `projects/example/checkpoint.json` 里 `run_root` 指向的目录存在。
+- `projects/example/checkpoint.json` 里 `run_config` 指向的 `run_config.json` 存在。
 - `run_root/round_01/01_draft.md`、`02_review.md`、`03_revised.md`、`04_judge.md` 都存在。
 - `projects/example/score_history.json` 有至少一条记录。
 - `04_judge.md` 能解析出分数，或 `score_history.json` 里 `invalid_score_this_round` 是 `false`。
@@ -291,6 +300,8 @@ print("run_root:", run_root)
 print("round_dir:", round_dir)
 print("stop_reason:", checkpoint.get("stop_reason"))
 print("best_score:", checkpoint.get("best_score"))
+run_config = Path(checkpoint.get("run_config") or run_root / "run_config.json")
+print("run_config:", "OK" if run_config.exists() else "MISSING")
 for name in files:
     path = round_dir / name
     print(name, "OK" if path.exists() and path.stat().st_size > 0 else "MISSING/EMPTY")

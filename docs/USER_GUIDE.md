@@ -256,6 +256,12 @@ make resume
 
 阅读顺序建议：`04_judge.md` -> `03_revised.md` -> `02_review.md` -> `01_draft.md`。
 
+如果要复现实验设置，查看：`projects/example/runs/<run_id>/run_config.json`
+
+它记录 provider/model、temperature/top_p/timeout、max rounds 和 runtime 限制、topic 快照、
+prompt 文件 SHA-256、Git commit、开始/结束时间、停止原因和是否可 resume。旧 run 如果只有
+`run_manifest.json`，工具会以兼容方式读取旧 metadata。
+
 ## memory.md / best_output.md / score_history.json 怎么理解
 
 - `memory.md`：被持续维护的“研究状态记忆”，会影响下一轮输入。

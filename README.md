@@ -147,6 +147,9 @@ Diagnostic。
 
 先看：`projects/example/best_output.md`  
 再看：`projects/example/runs/<run_id>/round_xx/` 里的 4 个阶段文件。
+如果要复现实验环境，再看同一 run 目录下的 `run_config.json`，其中记录 provider/model、
+轮数和运行时配置、topic 快照、prompt 文件 SHA-256、Git commit、开始/结束时间、停止原因和
+resume eligibility。
 
 ## 常用命令
 
@@ -252,6 +255,7 @@ make check
 - 看结果：
   - 先看 `projects/example/best_output.md`
   - 再看 `projects/example/runs/<run_id>/round_xx/`
+  - 复现信息看 `projects/example/runs/<run_id>/run_config.json`
   - 实时状态看 `projects/example/checkpoint.json`
   - 实时日志看 `projects/example/run.log`
 

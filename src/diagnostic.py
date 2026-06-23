@@ -13,6 +13,7 @@ from .agents import ResearchAgents
 from .cloud_free import CloudFreeDailyQuotaExhausted, next_pacific_reset_heuristic
 from .constants import STOP_CLOUD_DAILY_QUOTA
 from .llm import LLMClientProtocol
+from .run_config import build_initial_run_config, finalize_run_config
 from .runtime import log_run as _log
 from .runtime import shorten_text_by_words as _shorten_text_by_words
 from .storage import (
@@ -37,7 +38,14 @@ def run_diagnostic_mode(
     model_name: str,
     topic_context: str = "",
     project_metadata: Dict[str, object] | None = None,
+    model_provider: str = "",
+    model_parameters: Dict[str, object] | None = None,
+    topic_snapshot: Dict[str, object] | None = None,
+    prompt_dir: Path | None = None,
+    repo_root: Path | None = None,
 ) -> None:
+    run_started = time.monotonic()
+    started_at_iso = datetime.now().astimezone().isoformat()
     log_path = project_dir / "run.log"
     console.rule("Diagnostic Mode")
     console.print(
@@ -83,6 +91,26 @@ def run_diagnostic_mode(
     )
 
     run_root = make_run_root(project_dir)
+    run_config_path = run_root / "run_config.json"
+    run_config = build_initial_run_config(
+        run_id=run_root.name,
+        run_root=run_root,
+        mode="diagnostic",
+        model_name=model_name,
+        model_provider=model_provider,
+        model_parameters=model_parameters,
+        runtime_config={
+            "max_rounds": 1,
+            "start_round": 1,
+            "per_agent_timeout_seconds": llm.timeout_seconds,
+        },
+        topic_snapshot=topic_snapshot,
+        project_metadata=project_metadata,
+        prompt_dir=prompt_dir,
+        repo_root=repo_root,
+        started_at=started_at_iso,
+    )
+    write_json_file(run_config_path, run_config)
     write_json_file(
         run_root / "run_manifest.json",
         {
@@ -90,8 +118,9 @@ def run_diagnostic_mode(
             "run_root": str(run_root),
             "mode": "diagnostic",
             "model": model_name,
-            "started_at": datetime.now().isoformat(),
+            "started_at": started_at_iso,
             "project": project_metadata or {},
+            "run_config": str(run_config_path),
         },
     )
     round_index = 1
@@ -198,6 +227,7 @@ def run_diagnostic_mode(
             {
                 "run_id": run_root.name,
                 "run_root": str(run_root),
+                "run_config": str(run_config_path),
                 "last_completed_round": 0,
                 "last_successful_agent": "none",
                 "best_score": 0.0,
@@ -214,6 +244,16 @@ def run_diagnostic_mode(
                 "reset_heuristic": next_pacific_reset_heuristic(),
             },
         )
+        run_config = finalize_run_config(
+            run_config,
+            stop_reason=STOP_CLOUD_DAILY_QUOTA,
+            can_resume=True,
+            completed_rounds=0,
+            best_score=0.0,
+            best_round=None,
+            total_runtime_seconds=time.monotonic() - run_started,
+        )
+        write_json_file(run_config_path, run_config)
         return
 
     save_round_outputs(
@@ -269,6 +309,7 @@ def run_diagnostic_mode(
         {
             "run_id": run_root.name,
             "run_root": str(run_root),
+            "run_config": str(run_config_path),
             "last_completed_round": 1,
             "last_successful_agent": (
                 "judge"
@@ -291,6 +332,16 @@ def run_diagnostic_mode(
             "project": project_metadata or {},
         },
     )
+    run_config = finalize_run_config(
+        run_config,
+        stop_reason="MAX_ROUNDS",
+        can_resume=False,
+        completed_rounds=1,
+        best_score=parsed_score,
+        best_round=1,
+        total_runtime_seconds=time.monotonic() - run_started,
+    )
+    write_json_file(run_config_path, run_config)
     console.rule("Diagnostic Summary")
     console.print(f"[bold]Run root:[/bold] {run_root}")
     console.print(f"[bold]Round saved:[/bold] {round_dir}")

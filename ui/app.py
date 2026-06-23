@@ -630,6 +630,13 @@ def detect_output_kind(path: Path) -> str:
 
 
 def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[dict[str, Any]]:
+    run_root_text = str(checkpoint.get("run_root", "")).strip()
+    run_root = Path(run_root_text) if run_root_text else None
+    run_config_path = (
+        Path(str(checkpoint.get("run_config")))
+        if checkpoint.get("run_config")
+        else (run_root / "run_config.json" if run_root else project_dir / "run_config.json")
+    )
     catalog = [
         {
             "label": "Best output",
@@ -650,6 +657,11 @@ def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[
             "label": "Checkpoint",
             "label_key": "output_checkpoint",
             "path": project_dir / "checkpoint.json",
+        },
+        {
+            "label": "Run config",
+            "label_key": "output_run_config",
+            "path": run_config_path,
         },
         {
             "label": "Score history",
@@ -674,9 +686,8 @@ def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[
         },
     ]
 
-    run_root = Path(str(checkpoint.get("run_root", "")))
     round_index = _safe_int(checkpoint.get("last_completed_round"))
-    if round_index > 0 and run_root.exists():
+    if run_root and round_index > 0 and run_root.exists():
         round_dir = run_root / f"round_{round_index:02d}"
         catalog.extend(
             [

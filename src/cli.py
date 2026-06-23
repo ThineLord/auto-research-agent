@@ -302,8 +302,19 @@ def main() -> None:
         )
     else:
         max_prompt_chars = config.model.max_prompt_chars
+    model_parameters = {
+        "temperature": temperature,
+        "top_p": top_p,
+        "timeout_seconds": timeout_seconds,
+        "max_prompt_chars": max_prompt_chars,
+    }
     topic_context = format_topic_context(config.topic)
     topic_keywords = config.topic.keywords
+    topic_snapshot = {
+        "title": config.topic.title,
+        "description": config.topic.description,
+        "keywords": list(config.topic.keywords),
+    }
 
     project_dir = root / "projects" / project_name
     memory_path = project_dir / "memory.md"
@@ -545,6 +556,11 @@ def main() -> None:
                 per_agent_timeout_seconds=timeout_seconds,
                 topic_keywords=topic_keywords,
                 project_metadata=project_metadata,
+                model_provider=provider,
+                model_parameters=model_parameters,
+                topic_snapshot=topic_snapshot,
+                prompt_dir=prompts_dir,
+                repo_root=root,
                 max_consecutive_provider_quota_failures=max_provider_quota_failures,
             )
             return
@@ -566,6 +582,11 @@ def main() -> None:
                 disable_timeout_stop=True,
                 topic_keywords=topic_keywords,
                 project_metadata=project_metadata,
+                model_provider=provider,
+                model_parameters=model_parameters,
+                topic_snapshot=topic_snapshot,
+                prompt_dir=prompts_dir,
+                repo_root=root,
                 max_consecutive_provider_quota_failures=max_provider_quota_failures,
             )
             return
@@ -580,6 +601,11 @@ def main() -> None:
                 model_name=model_label,
                 topic_context=topic_context,
                 project_metadata=project_metadata,
+                model_provider=provider,
+                model_parameters=model_parameters,
+                topic_snapshot=topic_snapshot,
+                prompt_dir=prompts_dir,
+                repo_root=root,
             )
             return
 
@@ -600,6 +626,11 @@ def main() -> None:
                 topic_title=config.topic.title,
                 topic_keywords=topic_keywords,
                 project_metadata=project_metadata,
+                model_provider=provider,
+                model_parameters=model_parameters,
+                topic_snapshot=topic_snapshot,
+                prompt_dir=prompts_dir,
+                repo_root=root,
                 max_consecutive_provider_quota_failures=max_provider_quota_failures,
             )
             return
@@ -618,6 +649,11 @@ def main() -> None:
             per_agent_timeout_seconds=timeout_seconds,
             topic_keywords=topic_keywords,
             project_metadata=project_metadata,
+            model_provider=provider,
+            model_parameters=model_parameters,
+            topic_snapshot=topic_snapshot,
+            prompt_dir=prompts_dir,
+            repo_root=root,
             max_consecutive_provider_quota_failures=max_provider_quota_failures,
         )
     except KeyboardInterrupt:

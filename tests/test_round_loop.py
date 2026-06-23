@@ -289,6 +289,10 @@ class RoundLoopTests(unittest.TestCase):
             project_dir.mkdir()
             memory_path = project_dir / "memory.md"
             memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            prompt_dir = Path(tmp) / "prompts"
+            prompt_dir.mkdir()
+            (prompt_dir / "draft.md").write_text("Draft prompt\n", encoding="utf-8")
+            (prompt_dir / "judge.md").write_text("Judge prompt\n", encoding="utf-8")
 
             result = run_iterative_rounds(
                 console=Console(),
@@ -302,6 +306,20 @@ class RoundLoopTests(unittest.TestCase):
                 stop_if_no_improvement_rounds=10,
                 global_max_runtime_seconds=60,
                 per_agent_timeout_seconds=300,
+                model_provider="test-provider",
+                model_parameters={
+                    "temperature": 0.2,
+                    "top_p": 0.8,
+                    "timeout_seconds": 300,
+                    "max_prompt_chars": 12000,
+                },
+                topic_snapshot={
+                    "title": "Memory Adapter",
+                    "description": "Test topic.",
+                    "keywords": ["memory", "adapter"],
+                },
+                prompt_dir=prompt_dir,
+                repo_root=Path(tmp),
             )
 
             run_root = Path(result["run_root"])
@@ -324,6 +342,22 @@ class RoundLoopTests(unittest.TestCase):
             score_history = (project_dir / "score_history.json").read_text(encoding="utf-8")
             self.assertIn('"score": 50.0', score_history)
             self.assertIn('"score": 40.0', score_history)
+
+            run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+            checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
+            self.assertEqual(run_config["schema_version"], 1)
+            self.assertEqual(run_config["status"], "completed")
+            self.assertEqual(run_config["stop_reason"], STOP_MAX_ROUNDS)
+            self.assertFalse(run_config["can_resume"])
+            self.assertEqual(run_config["model"]["provider"], "test-provider")
+            self.assertEqual(run_config["model"]["name"], "fake-model")
+            self.assertEqual(run_config["runtime"]["max_rounds"], 2)
+            self.assertEqual(run_config["topic"]["title"], "Memory Adapter")
+            self.assertIn("draft.md", run_config["prompt_files"])
+            self.assertEqual(len(run_config["prompt_files"]["draft.md"]["sha256"]), 64)
+            self.assertIsNotNone(run_config["started_at"])
+            self.assertIsNotNone(run_config["ended_at"])
+            self.assertEqual(checkpoint["run_config"], str(run_root / "run_config.json"))
 
     def test_round_loop_records_project_source_in_manifest_checkpoint_and_log(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

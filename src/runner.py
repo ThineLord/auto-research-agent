@@ -25,6 +25,7 @@ from .constants import (
     STOP_PROVIDER_QUOTA_EXHAUSTED,
     STOP_USER_REQUESTED,
 )
+from .run_config import build_initial_run_config, finalize_run_config, read_run_config
 from .runtime import log_run as _log
 from .runtime import stop_requested as _stop_requested
 from .storage import (
@@ -201,6 +202,11 @@ def run_iterative_rounds(
     initial_best_score: float = -1.0,
     topic_keywords: Optional[Sequence[str]] = None,
     project_metadata: Optional[Dict[str, Any]] = None,
+    model_provider: str = "",
+    model_parameters: Optional[Dict[str, Any]] = None,
+    topic_snapshot: Optional[Dict[str, Any]] = None,
+    prompt_dir: Optional[Path] = None,
+    repo_root: Optional[Path] = None,
     max_consecutive_draft_timeouts: int = 1,
     max_consecutive_provider_quota_failures: int = 2,
 ) -> Dict[str, Any]:
@@ -217,6 +223,36 @@ def run_iterative_rounds(
     best_output_path = project_dir / "best_output.md"
     interrupted_report_path = project_dir / "interrupted_report.md"
     run_id = run_root.name
+    run_config_path = run_root / "run_config.json"
+    started_at_iso = datetime.now().astimezone().isoformat()
+    existing_run_config = read_run_config(run_root)
+    runtime_snapshot = {
+        "max_rounds": max_rounds,
+        "start_round": start_round,
+        "stop_if_no_improvement_rounds": stop_if_no_improvement_rounds,
+        "global_max_runtime_seconds": global_max_runtime_seconds,
+        "per_agent_timeout_seconds": per_agent_timeout_seconds,
+        "disable_no_improvement_stop": disable_no_improvement_stop,
+        "disable_timeout_stop": disable_timeout_stop,
+        "max_consecutive_draft_timeouts": max_consecutive_draft_timeouts,
+        "max_consecutive_provider_quota_failures": max_consecutive_provider_quota_failures,
+    }
+    run_config = build_initial_run_config(
+        run_id=run_id,
+        run_root=run_root,
+        mode=mode,
+        model_name=model_name,
+        model_provider=model_provider,
+        model_parameters=model_parameters,
+        runtime_config=runtime_snapshot,
+        topic_snapshot=topic_snapshot,
+        project_metadata=project_metadata,
+        prompt_dir=prompt_dir,
+        repo_root=repo_root,
+        started_at=started_at_iso,
+        existing_run_config=existing_run_config,
+    )
+    write_json_file(run_config_path, run_config)
     _log(
         console,
         log_path,
@@ -230,8 +266,9 @@ def run_iterative_rounds(
             "run_root": str(run_root),
             "mode": mode,
             "model": model_name,
-            "started_at": datetime.now().isoformat(),
+            "started_at": started_at_iso,
             "project": project_metadata or {},
+            "run_config": str(run_config_path),
         },
     )
     if project_metadata:
@@ -706,6 +743,7 @@ def run_iterative_rounds(
         checkpoint_data = {
             "run_id": run_id,
             "run_root": str(run_root),
+            "run_config": str(run_config_path),
             "last_completed_round": round_index,
             "last_successful_agent": last_successful_agent,
             "best_score": round(best_score, 2),
@@ -826,9 +864,16 @@ def run_iterative_rounds(
         f"best_score={best_score_text} last_successful_agent={last_successful_agent}",
     )
 
+    can_resume = stop_reason in {
+        STOP_USER_REQUESTED,
+        STOP_MANUAL_INTERRUPT,
+        STOP_CLOUD_DAILY_QUOTA,
+        STOP_PROVIDER_QUOTA_EXHAUSTED,
+    }
     checkpoint_final = {
         "run_id": run_id,
         "run_root": str(run_root),
+        "run_config": str(run_config_path),
         "last_completed_round": completed_rounds,
         "last_successful_agent": last_successful_agent,
         "best_score": round(best_score, 2),
@@ -863,13 +908,19 @@ def run_iterative_rounds(
                 "reset_heuristic": next_pacific_reset_heuristic(),
             }
         )
-    checkpoint_final["can_resume"] = stop_reason in {
-        STOP_USER_REQUESTED,
-        STOP_MANUAL_INTERRUPT,
-        STOP_CLOUD_DAILY_QUOTA,
-        STOP_PROVIDER_QUOTA_EXHAUSTED,
-    }
+    checkpoint_final["can_resume"] = can_resume
     write_json_file(checkpoint_path, checkpoint_final)
+    run_config = finalize_run_config(
+        run_config,
+        stop_reason=stop_reason,
+        can_resume=can_resume,
+        completed_rounds=completed_rounds,
+        best_score=best_score,
+        best_round=best_round,
+        total_runtime_seconds=total_runtime,
+        ended_at=checkpoint_final["updated_at"],
+    )
+    write_json_file(run_config_path, run_config)
 
     if stop_reason in {STOP_USER_REQUESTED, STOP_MANUAL_INTERRUPT}:
         write_interrupted_report(

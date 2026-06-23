@@ -16,6 +16,7 @@ Auto Research Agent 是一个本地优先的研究计划迭代助手：读取 `p
 - 一轮诊断模式、普通有界模式、连续模式、session 模式、resume 模式。
 - 本地确定性的 Literature Survey Mode：扫描项目 markdown、run 输出和可选资料，生成 survey 报告与 related work 草稿。
 - 每轮输出落盘到 `projects/example/runs/<run_id>/round_xx/`。
+- 每个 run 都会写 `projects/example/runs/<run_id>/run_config.json`，记录模型、runtime、topic、prompt hash、Git commit 和停止原因。
 - `checkpoint.json`、`score_history.json`、`research_state.json`、`best_output.md` 等运行状态文件。
 - Streamlit UI：编辑输入、启动运行、暂停、恢复、模型管理、测试按钮、进度日志、输出浏览。
 
@@ -174,6 +175,7 @@ touch projects/example/STOP_REQUESTED
 - `projects/example/runs/<run_id>/round_xx/02_review.md`：每轮 review。
 - `projects/example/runs/<run_id>/round_xx/03_revised.md`：每轮 revise 后的版本。
 - `projects/example/runs/<run_id>/round_xx/04_judge.md`：每轮 judge 输出。
+- `projects/example/runs/<run_id>/run_config.json`：复现实验所需的 provider/model、轮数/runtime、topic、prompt SHA-256、Git commit、开始/结束时间、停止原因和 resume 状态。
 - `projects/example/best_output.md`：目前最高 judge 分数对应的 revised 输出。
 - `projects/example/score_history.json`：每轮分数、是否提升、是否超时、是否重复、错误等。
 - `projects/example/research_state.json`：当前 strongest hypothesis、biggest blocker、next experiment、open question。
@@ -184,11 +186,11 @@ touch projects/example/STOP_REQUESTED
 - `projects/example/final_session_report.md`：session 模式最终报告。
 - `projects/example/model_ops.log`：UI 拉取或删除模型时的日志。
 
-建议之后统一方案：
+当前输出约定：
 
 - 保持 `projects/<project>/` 作为唯一项目状态根目录。
-- 把所有运行生成物都放进 `projects/<project>/runs/<run_id>/`，根目录只保留索引文件：`checkpoint.json`、`best_output.md`、`score_history.json`。
-- 给每个 run 增加 `run_config.json`，记录模型、drafting mode、prompt 版本、开始时间、停止原因。
+- 把每个 run 的可复现信息保存在 `projects/<project>/runs/<run_id>/run_config.json`。
+- 根目录只保留当前状态索引文件：`checkpoint.json`、`best_output.md`、`score_history.json`。
 
 ## 6. 可视化怎么打开
 
@@ -215,7 +217,7 @@ touch projects/example/STOP_REQUESTED
 - `Model Management`：列出模型、选择模型、健康检查、保存默认模型、拉取和删除模型。
 - `D. Progress panel`：显示 mode、round、stage、best score、PID、model、stop reason、stop signal。
 - `E. Live logs panel`：显示 `run.log` 和 `model_ops.log` 尾部。
-- `F. Output browser`：浏览 best output、final report、interrupted report、checkpoint、score history、run log、latest round 四阶段文件。
+- `F. Output browser`：浏览 best output、final report、interrupted report、checkpoint、run config、score history、run log、latest round 四阶段文件。
 
 适合什么时候看：
 
@@ -257,7 +259,7 @@ touch projects/example/STOP_REQUESTED
 
 它能不能比较两种 drafting mode：
 
-- 目前不能。代码没有显式 `drafting_mode` 配置，也没有把 mode 写入 run metadata。
+- 目前不能。`run_config.json` 已记录普通/diagnostic/continuous/session/resume 这类 workflow mode，但代码还没有显式 `drafting_mode` 配置。
 - 现在只能人工比较不同 run 或不同 round，不能做严格 A/B 实验。
 
 目前还缺的关键指标：
@@ -302,6 +304,7 @@ touch projects/example/STOP_REQUESTED
 - `src/resume.py`：读取 checkpoint 并从下一轮继续。
 - `src/storage.py`：文件读写、round 输出、score 解析、memory 更新、research_state 更新。
 - `src/runtime.py`：后台进程、UI 元数据、run lock、测试运行、停止信号。
+- `src/run_config.py`：生成 run-level 复现信息、prompt 文件 hash、Git commit，并兼容读取旧 `run_manifest.json`。
 - `src/judge_output.py`：judge JSON schema 和分数解析。
 - `src/logging_config.py`：结构化日志格式。
 - `src/constants.py`：停止原因和运行常量。
@@ -314,7 +317,7 @@ touch projects/example/STOP_REQUESTED
 - 改 draft/review/revise/judge 输入上下文：`src/agents.py` 和 `src/runner.py`。
 - 改暂停/继续：`src/runtime.py`、`src/resume.py`、`src/runner.py`。
 - 改 UI：`ui/app.py`。
-- 改输出结构：`src/storage.py`。
+- 改输出结构：`src/storage.py`、`src/run_config.py`。
 - 加测试：`tests/`。
 
 ## 9. 两种 drafting mode 的当前支持情况
@@ -332,7 +335,7 @@ touch projects/example/STOP_REQUESTED
 - 没有显式实现 A/B 两种 drafting mode。
 - 当前配置 schema 里没有 `drafting_mode`。
 - CLI 没有 `--drafting-mode`。
-- checkpoint、score_history、run 目录也没有记录 drafting mode。
+- checkpoint、score_history、run_config 还没有记录 drafting mode。
 
 当前实际行为更像一个混合模式：
 
@@ -379,7 +382,7 @@ touch projects/example/STOP_REQUESTED
 
 ### 今天可以做
 
-- 给每个 run 增加 `run_config.json`，记录模型、轮数、topic、prompt 文件 hash、drafting mode。
+- 把 `drafting_mode` 接入配置、CLI、checkpoint、score_history 和 `run_config.json`。
 - 把 `score_history.json` 扩展为保留 judge rubric 子分项。
 - 在 UI 里加一个简单 score history 表格或折线图。
 - 清理 UI 的 Streamlit deprecation warning，把 `use_container_width=True` 改成 `width='stretch'`。

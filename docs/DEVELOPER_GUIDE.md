@@ -37,6 +37,8 @@ Core modules:
 - `src/config.py` validates `config.yaml`, including model, runtime, project, and topic settings.
 - `src/agents.py` wraps the Draft, Review, Revise, and Judge prompts and injects topic context.
 - `src/runner.py` coordinates iterative rounds, checkpoints, scoring, safe stop, and resume data.
+- `src/run_config.py` builds run-level reproducibility metadata, hashes prompt files, records Git
+  commit state when available, and reads legacy `run_manifest.json` metadata for old runs.
 - `src/session.py` builds focused session objectives, current plans, and final session reports.
 - `src/literature_survey.py` implements local Literature Survey Mode: source collection, paper
   metadata parsing, deduplication, theme/gap extraction, survey report rendering, and related-work
@@ -82,6 +84,9 @@ the PID is no longer active.
 Progress comes from:
 
 - `checkpoint.json` for completed round, best score, stop reason, and resume eligibility.
+- `runs/<run_id>/run_config.json` for reproducibility metadata: provider/model settings, runtime
+  limits, topic snapshot, prompt hashes, Git commit, start/end timestamps, stop reason, and resume
+  eligibility.
 - `run.log` for the current running stage.
 - `STOP_REQUESTED` for safe user-initiated pause.
 
