@@ -53,6 +53,15 @@ DEFAULT_TOPIC_KEYWORDS = (
     "implementation",
     "baseline",
 )
+DRAFTING_MODE_BEST_GUIDED = "best_guided"
+DRAFTING_MODE_FRESH_WITH_REVIEW = "fresh_from_task_with_review"
+DRAFTING_MODE_CONTINUE_FROM_PREVIOUS = "continue_from_previous_draft"
+SUPPORTED_DRAFTING_MODES = (
+    DRAFTING_MODE_BEST_GUIDED,
+    DRAFTING_MODE_FRESH_WITH_REVIEW,
+    DRAFTING_MODE_CONTINUE_FROM_PREVIOUS,
+)
+DEFAULT_DRAFTING_MODE = DRAFTING_MODE_BEST_GUIDED
 DEFAULT_MAX_ROUNDS = 5
 DEFAULT_STOP_IF_NO_IMPROVEMENT_ROUNDS = 2
 DEFAULT_TOP_P = 0.9
@@ -118,6 +127,7 @@ class AppConfig:
     ollama_base_url: str = DEFAULT_OLLAMA_BASE_URL
     project_name: str = DEFAULT_PROJECT_NAME
     topic: TopicConfig = field(default_factory=TopicConfig)
+    drafting_mode: str = DEFAULT_DRAFTING_MODE
     max_rounds: int = DEFAULT_MAX_ROUNDS
     stop_if_no_improvement_rounds: int = DEFAULT_STOP_IF_NO_IMPROVEMENT_ROUNDS
     top_p: float = DEFAULT_TOP_P
@@ -146,6 +156,7 @@ class AppConfig:
                 "description": self.topic.description,
                 "keywords": list(self.topic.keywords),
             },
+            "drafting_mode": self.drafting_mode,
             "max_rounds": self.max_rounds,
             "stop_if_no_improvement_rounds": self.stop_if_no_improvement_rounds,
             "top_p": self.top_p,
@@ -511,6 +522,14 @@ def _validate_topic_config(config: Mapping[str, Any]) -> TopicConfig:
     )
 
 
+def _validate_drafting_mode(value: Any) -> str:
+    drafting_mode = _validate_non_empty_string(value, "config.drafting_mode")
+    if drafting_mode not in SUPPORTED_DRAFTING_MODES:
+        supported = ", ".join(SUPPORTED_DRAFTING_MODES)
+        raise ConfigValidationError(f"config.drafting_mode: must be one of: {supported}")
+    return drafting_mode
+
+
 def _validate_runtime_config(config: Mapping[str, Any]) -> RuntimeConfig:
     raw_runtime = config.get("runtime", {})
     if not isinstance(raw_runtime, Mapping):
@@ -702,6 +721,7 @@ def _build_app_config(raw_config: Mapping[str, Any]) -> AppConfig:
             "ollama_base_url",
             "project_name",
             "topic",
+            "drafting_mode",
             "max_rounds",
             "stop_if_no_improvement_rounds",
             "top_p",
@@ -720,6 +740,9 @@ def _build_app_config(raw_config: Mapping[str, Any]) -> AppConfig:
         ),
         project_name=_validate_project_name(raw_config.get("project_name", DEFAULT_PROJECT_NAME)),
         topic=_validate_topic_config(raw_config),
+        drafting_mode=_validate_drafting_mode(
+            raw_config.get("drafting_mode", DEFAULT_DRAFTING_MODE)
+        ),
         max_rounds=_validate_int(
             raw_config.get("max_rounds", DEFAULT_MAX_ROUNDS),
             "config.max_rounds",

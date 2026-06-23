@@ -25,6 +25,7 @@ topic:
 max_rounds: 5
 stop_if_no_improvement_rounds: 2
 top_p: 0.9
+drafting_mode: best_guided
 runtime:
   normal_max_runtime_seconds: 10800
   continuous_max_runtime_seconds: 43200

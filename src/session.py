@@ -9,6 +9,7 @@ from typing import Any, Dict, Sequence
 from rich.console import Console
 
 from .agents import ResearchAgents
+from .config import DEFAULT_DRAFTING_MODE
 from .llm import LLMClientProtocol
 from .runner import run_iterative_rounds
 from .storage import get_memory_for_prompt, write_text
@@ -216,6 +217,7 @@ def run_session_mode(
     topic_snapshot: dict[str, Any] | None = None,
     prompt_dir: Path | None = None,
     repo_root: Path | None = None,
+    drafting_mode: str = DEFAULT_DRAFTING_MODE,
     max_consecutive_provider_quota_failures: int = 2,
 ) -> None:
     console.rule("Research Session Mode")
@@ -272,6 +274,7 @@ def run_session_mode(
         topic_snapshot=topic_snapshot,
         prompt_dir=prompt_dir,
         repo_root=repo_root,
+        drafting_mode=drafting_mode,
         max_consecutive_provider_quota_failures=max_consecutive_provider_quota_failures,
     )
 

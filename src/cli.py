@@ -31,11 +31,13 @@ from .cloud_free import (
     save_profile_artifact,
 )
 from .config import (
+    DEFAULT_DRAFTING_MODE,
     DEFAULT_GEMINI_MAX_PROMPT_CHARS,
     DEFAULT_GEMINI_MODEL,
     DEFAULT_OLLAMA_MAX_PROMPT_CHARS,
     MODEL_PROVIDER_GEMINI,
     MODEL_PROVIDER_OLLAMA,
+    SUPPORTED_DRAFTING_MODES,
     SUPPORTED_MODEL_PROVIDERS,
     ConfigValidationError,
     format_model_label,
@@ -170,6 +172,12 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         type=int,
         default=None,
         help="Override round count for normal/session/resume, or cap continuous mode.",
+    )
+    parser.add_argument(
+        "--drafting-mode",
+        choices=SUPPORTED_DRAFTING_MODES,
+        default=None,
+        help=f"Draft context mode. Default from config.yaml: {DEFAULT_DRAFTING_MODE}.",
     )
     parser.add_argument(
         "--benchmark-preset",
@@ -310,6 +318,7 @@ def main() -> None:
     }
     topic_context = format_topic_context(config.topic)
     topic_keywords = config.topic.keywords
+    drafting_mode = getattr(args, "drafting_mode", None) or config.drafting_mode
     topic_snapshot = {
         "title": config.topic.title,
         "description": config.topic.description,
@@ -561,6 +570,7 @@ def main() -> None:
                 topic_snapshot=topic_snapshot,
                 prompt_dir=prompts_dir,
                 repo_root=root,
+                drafting_mode=drafting_mode,
                 max_consecutive_provider_quota_failures=max_provider_quota_failures,
             )
             return
@@ -587,6 +597,7 @@ def main() -> None:
                 topic_snapshot=topic_snapshot,
                 prompt_dir=prompts_dir,
                 repo_root=root,
+                drafting_mode=drafting_mode,
                 max_consecutive_provider_quota_failures=max_provider_quota_failures,
             )
             return
@@ -606,6 +617,7 @@ def main() -> None:
                 topic_snapshot=topic_snapshot,
                 prompt_dir=prompts_dir,
                 repo_root=root,
+                drafting_mode=drafting_mode,
             )
             return
 
@@ -631,6 +643,7 @@ def main() -> None:
                 topic_snapshot=topic_snapshot,
                 prompt_dir=prompts_dir,
                 repo_root=root,
+                drafting_mode=drafting_mode,
                 max_consecutive_provider_quota_failures=max_provider_quota_failures,
             )
             return
@@ -654,6 +667,7 @@ def main() -> None:
             topic_snapshot=topic_snapshot,
             prompt_dir=prompts_dir,
             repo_root=root,
+            drafting_mode=drafting_mode,
             max_consecutive_provider_quota_failures=max_provider_quota_failures,
         )
     except KeyboardInterrupt:

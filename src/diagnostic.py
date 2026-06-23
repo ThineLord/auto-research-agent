@@ -11,6 +11,7 @@ from rich.console import Console
 
 from .agents import ResearchAgents
 from .cloud_free import CloudFreeDailyQuotaExhausted, next_pacific_reset_heuristic
+from .config import DEFAULT_DRAFTING_MODE
 from .constants import STOP_CLOUD_DAILY_QUOTA
 from .llm import LLMClientProtocol
 from .run_config import build_initial_run_config, finalize_run_config
@@ -43,6 +44,7 @@ def run_diagnostic_mode(
     topic_snapshot: Dict[str, object] | None = None,
     prompt_dir: Path | None = None,
     repo_root: Path | None = None,
+    drafting_mode: str = DEFAULT_DRAFTING_MODE,
 ) -> None:
     run_started = time.monotonic()
     started_at_iso = datetime.now().astimezone().isoformat()
@@ -103,6 +105,7 @@ def run_diagnostic_mode(
             "max_rounds": 1,
             "start_round": 1,
             "per_agent_timeout_seconds": llm.timeout_seconds,
+            "drafting_mode": drafting_mode,
         },
         topic_snapshot=topic_snapshot,
         project_metadata=project_metadata,
@@ -118,6 +121,7 @@ def run_diagnostic_mode(
             "run_root": str(run_root),
             "mode": "diagnostic",
             "model": model_name,
+            "drafting_mode": drafting_mode,
             "started_at": started_at_iso,
             "project": project_metadata or {},
             "run_config": str(run_config_path),
@@ -237,6 +241,7 @@ def run_diagnostic_mode(
                 "updated_at": datetime.now().isoformat(),
                 "mode": "diagnostic",
                 "model": model_name,
+                "drafting_mode": drafting_mode,
                 "project": project_metadata or {},
                 "status": "paused_until_reset",
                 "paused_until_reset": True,
@@ -301,6 +306,7 @@ def run_diagnostic_mode(
                 ),
                 "invalid_score_this_round": parse_score(judge_output) is None,
                 "model": model_name,
+                "drafting_mode": drafting_mode,
             }
         ],
     )
@@ -329,6 +335,7 @@ def run_diagnostic_mode(
             "updated_at": datetime.now().isoformat(),
             "mode": "diagnostic",
             "model": model_name,
+            "drafting_mode": drafting_mode,
             "project": project_metadata or {},
         },
     )

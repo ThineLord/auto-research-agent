@@ -143,6 +143,18 @@ make run ARGS="--model qwen3:8b --max-rounds 2"
 
 如果希望长期改变默认轮数，再修改本地 `config.yaml`；该文件不提交。
 
+## 5.1 如何指定 drafting mode
+
+默认 `drafting_mode` 是 `best_guided`，保持旧行为。临时对比其他模式：
+
+```bash
+make run ARGS="--drafting-mode fresh_from_task_with_review --max-rounds 2"
+make run ARGS="--drafting-mode continue_from_previous_draft --max-rounds 2"
+```
+
+UI 的 `C. Run controls` 里也可以选择起草模式。每次运行会把 `drafting_mode` 写入
+`checkpoint.json`、`score_history.json` 和 `runs/<run_id>/run_config.json`。
+
 ## 6. 如何指定模型
 
 CLI 支持 `--model` 覆盖配置：

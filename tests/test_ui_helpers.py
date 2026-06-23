@@ -346,6 +346,7 @@ class SharedUiBackendHelperTests(unittest.TestCase):
             free_runner_preset="volume_free",
             benchmark_preset="free_smoke",
             max_provider_quota_failures=2,
+            drafting_mode="continue_from_previous_draft",
         )
 
         self.assertIn("--provider", command)
@@ -362,6 +363,8 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertIn("free_smoke", command)
         self.assertIn("--max-provider-quota-failures", command)
         self.assertIn("2", command)
+        self.assertIn("--drafting-mode", command)
+        self.assertIn("continue_from_previous_draft", command)
         self.assertNotIn("secret-key", command)
         self.assertEqual(
             ui_app.build_provider_env_overrides(

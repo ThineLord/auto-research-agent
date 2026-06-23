@@ -94,6 +94,7 @@ def build_initial_run_config(
     current_session_started_at = started_at or utc_now_iso()
     resume_sessions = list(existing.get("resume_sessions", []))
     start_round = int((runtime_config or {}).get("start_round", 1))
+    drafting_mode = str((runtime_config or {}).get("drafting_mode", ""))
     if start_round > 1:
         resume_sessions.append(
             {
@@ -119,6 +120,7 @@ def build_initial_run_config(
         "run_id": run_id,
         "run_root": str(run_root),
         "mode": mode,
+        "drafting_mode": drafting_mode,
         "status": "running",
         "started_at": start_time,
         "current_session_started_at": current_session_started_at,
@@ -201,6 +203,7 @@ def read_run_config(run_root: Path) -> dict[str, Any]:
         "run_id": manifest.get("run_id", run_root.name),
         "run_root": manifest.get("run_root", str(run_root)),
         "mode": manifest.get("mode", ""),
+        "drafting_mode": manifest.get("drafting_mode", ""),
         "status": "legacy",
         "started_at": manifest.get("started_at", ""),
         "ended_at": None,

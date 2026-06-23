@@ -70,6 +70,18 @@ topic:
     - risks
 ```
 
+`drafting_mode` is also validated at startup. Supported values are:
+
+- `best_guided`: backward-compatible default; Draft sees current best output and previous Judge
+  feedback.
+- `fresh_from_task_with_review`: Draft starts from the original task each round and may use previous
+  Review/Judge feedback.
+- `continue_from_previous_draft`: Draft continues from the previous draft/revised output and may use
+  feedback.
+
+The selected mode is written into `checkpoint.json`, `score_history.json`, and
+`runs/<run_id>/run_config.json`.
+
 The tracked `projects/example` folder is the sample project. To work on another topic, create a new
 folder under `projects/`, point `project_name` at it, and update the `topic` block plus `task.md`.
 The UI uses the configured `project_name` as its initial selection when that folder exists, and

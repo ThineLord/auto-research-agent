@@ -8,6 +8,7 @@ from typing import Any, Sequence
 from rich.console import Console
 
 from .agents import ResearchAgents
+from .config import DEFAULT_DRAFTING_MODE
 from .runner import run_iterative_rounds
 from .storage import read_json_file
 
@@ -31,6 +32,7 @@ def run_resume_mode(
     topic_snapshot: dict[str, Any] | None = None,
     prompt_dir: Path | None = None,
     repo_root: Path | None = None,
+    drafting_mode: str = DEFAULT_DRAFTING_MODE,
     max_consecutive_provider_quota_failures: int = 2,
 ) -> None:
     checkpoint_path = project_dir / "checkpoint.json"
@@ -74,5 +76,6 @@ def run_resume_mode(
         topic_snapshot=topic_snapshot,
         prompt_dir=prompt_dir,
         repo_root=repo_root,
+        drafting_mode=drafting_mode,
         max_consecutive_provider_quota_failures=max_consecutive_provider_quota_failures,
     )

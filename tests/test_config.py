@@ -7,11 +7,13 @@ from pathlib import Path
 import yaml
 
 from src.config import (
+    DEFAULT_DRAFTING_MODE,
     DEFAULT_GEMINI_MAX_PROMPT_CHARS,
     DEFAULT_GEMINI_MODEL,
     DEFAULT_GEMINI_MODELS,
     DEFAULT_MODEL_NAME,
     DEFAULT_OLLAMA_MAX_PROMPT_CHARS,
+    DRAFTING_MODE_CONTINUE_FROM_PREVIOUS,
     MODEL_PROVIDER_GEMINI,
     MODEL_PROVIDER_OLLAMA,
     ConfigValidationError,
@@ -53,6 +55,7 @@ class ConfigValidationTests(unittest.TestCase):
         self.assertEqual(config.cloud_free.free_runner_preset, "auto_long_run")
         self.assertEqual(config.cloud_free.max_retries, 5)
         self.assertEqual(config.literature_survey, LiteratureSurveyConfig())
+        self.assertEqual(config.drafting_mode, DEFAULT_DRAFTING_MODE)
         self.assertEqual(config.project_name, "example")
         self.assertIn("Example Research Planning Task", config.topic.title)
         self.assertIn("research", config.topic.keywords)
@@ -62,6 +65,7 @@ class ConfigValidationTests(unittest.TestCase):
         self.assertEqual(normalized["model"]["name"], config.model.name)
         self.assertEqual(normalized["topic"]["title"], config.topic.title)
         self.assertEqual(normalized["topic"]["keywords"], list(config.topic.keywords))
+        self.assertEqual(normalized["drafting_mode"], DEFAULT_DRAFTING_MODE)
         self.assertEqual(normalized["literature_survey"]["output_dir"], "survey")
         self.assertNotIn("temperature", normalized)
         self.assertEqual(
@@ -135,6 +139,13 @@ topic:
 
         self.assertEqual(config.topic.title, "Graph Retrieval Evaluation")
         self.assertEqual(config.topic.keywords, ("graph", "retrieval"))
+
+    def test_drafting_mode_validates_supported_values(self) -> None:
+        config_path = self.write_config(f"drafting_mode: {DRAFTING_MODE_CONTINUE_FROM_PREVIOUS}\n")
+
+        config = load_app_config(config_path)
+
+        self.assertEqual(config.drafting_mode, DRAFTING_MODE_CONTINUE_FROM_PREVIOUS)
 
     def test_nested_model_settings_take_precedence_over_legacy_top_level_values(self) -> None:
         config_path = self.write_config(
@@ -247,6 +258,7 @@ model:
             ("max_rounds: 0\n", "config.max_rounds"),
             ("stop_if_no_improvement_rounds: -1\n", "config.stop_if_no_improvement_rounds"),
             ("top_p: 0\n", "config.top_p"),
+            ("drafting_mode: freestyle\n", "config.drafting_mode"),
             ("model:\n  timeout_seconds: 301\n", "config.model.timeout_seconds"),
         ]
 

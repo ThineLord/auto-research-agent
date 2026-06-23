@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from .config import DRAFTING_MODE_BEST_GUIDED, DRAFTING_MODE_CONTINUE_FROM_PREVIOUS
 from .judge_output import JUDGE_OUTPUT_SCHEMA
 from .llm import LLMClientProtocol
 
@@ -61,14 +62,36 @@ class ResearchAgents:
         round_index: int,
         previous_best: str,
         previous_judge: str,
+        drafting_mode: str = DRAFTING_MODE_BEST_GUIDED,
+        previous_review: str = "",
+        previous_draft: str = "",
+        previous_revised: str = "",
     ) -> str:
-        prompt = (
-            self._topic_section() + f"# Round\n{round_index}\n\n"
-            f"# Research Task\n{task}\n\n"
-            f"# Project Memory\n{memory}\n\n"
-            f"# Previous Best (optional)\n{previous_best or '(none)'}\n\n"
-            f"# Previous Judge Feedback (optional)\n{previous_judge or '(none)'}\n"
-        )
+        if drafting_mode == DRAFTING_MODE_BEST_GUIDED:
+            prompt = (
+                self._topic_section() + f"# Round\n{round_index}\n\n"
+                f"# Research Task\n{task}\n\n"
+                f"# Project Memory\n{memory}\n\n"
+                f"# Previous Best (optional)\n{previous_best or '(none)'}\n\n"
+                f"# Previous Judge Feedback (optional)\n{previous_judge or '(none)'}\n"
+            )
+        else:
+            continuation_source = previous_revised or previous_draft
+            mode_instruction = (
+                "Continue from the previous draft/revised output below while using feedback."
+                if drafting_mode == DRAFTING_MODE_CONTINUE_FROM_PREVIOUS
+                else "Draft fresh from the original task. Do not continue from previous draft text."
+            )
+            prompt = (
+                self._topic_section() + f"# Round\n{round_index}\n\n"
+                f"# Drafting Mode\n{drafting_mode}\n\n"
+                f"# Mode Instruction\n{mode_instruction}\n\n"
+                f"# Research Task\n{task}\n\n"
+                f"# Project Memory\n{memory}\n\n"
+                f"# Previous Review Feedback (optional)\n{previous_review or '(none)'}\n\n"
+                f"# Previous Judge Feedback (optional)\n{previous_judge or '(none)'}\n\n"
+                f"# Previous Draft/Revised Output (optional)\n{continuation_source or '(none)'}\n"
+            )
         logger.info(
             "agent_prompt_prepared",
             extra={

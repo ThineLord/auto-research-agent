@@ -88,6 +88,10 @@ class FakeAgents:
         round_index: int,
         previous_best: str,
         previous_judge: str,
+        drafting_mode: str = "best_guided",
+        previous_review: str = "",
+        previous_draft: str = "",
+        previous_revised: str = "",
     ) -> str:
         return f"Draft round {round_index}: {task[:20]} | previous={bool(previous_best)}"
 
@@ -132,6 +136,10 @@ class QuotaPauseAgents(FakeAgents):
         round_index: int,
         previous_best: str,
         previous_judge: str,
+        drafting_mode: str = "best_guided",
+        previous_review: str = "",
+        previous_draft: str = "",
+        previous_revised: str = "",
     ) -> str:
         raise CloudFreeDailyQuotaExhausted(
             "Free-tier daily quota likely exhausted; safe to resume after reset."
@@ -168,6 +176,10 @@ class StopAfterDraftAgents(FakeAgents):
         round_index: int,
         previous_best: str,
         previous_judge: str,
+        drafting_mode: str = "best_guided",
+        previous_review: str = "",
+        previous_draft: str = "",
+        previous_revised: str = "",
     ) -> str:
         output = super().draft(
             task=task,
@@ -175,6 +187,10 @@ class StopAfterDraftAgents(FakeAgents):
             round_index=round_index,
             previous_best=previous_best,
             previous_judge=previous_judge,
+            drafting_mode=drafting_mode,
+            previous_review=previous_review,
+            previous_draft=previous_draft,
+            previous_revised=previous_revised,
         )
         self.draft_calls += 1
         if self.draft_calls == self.stop_after_draft:
@@ -195,6 +211,10 @@ class RecordingAgents(FakeAgents):
         round_index: int,
         previous_best: str,
         previous_judge: str,
+        drafting_mode: str = "best_guided",
+        previous_review: str = "",
+        previous_draft: str = "",
+        previous_revised: str = "",
     ) -> str:
         self.draft_rounds.append(round_index)
         return super().draft(
@@ -203,6 +223,52 @@ class RecordingAgents(FakeAgents):
             round_index=round_index,
             previous_best=previous_best,
             previous_judge=previous_judge,
+            drafting_mode=drafting_mode,
+            previous_review=previous_review,
+            previous_draft=previous_draft,
+            previous_revised=previous_revised,
+        )
+
+
+class DraftContextAgents(FakeAgents):
+    def __init__(self) -> None:
+        super().__init__([50, 60])
+        self.draft_contexts: list[dict[str, str]] = []
+
+    def draft(
+        self,
+        *,
+        task: str,
+        memory: str,
+        round_index: int,
+        previous_best: str,
+        previous_judge: str,
+        drafting_mode: str = "best_guided",
+        previous_review: str = "",
+        previous_draft: str = "",
+        previous_revised: str = "",
+    ) -> str:
+        self.draft_contexts.append(
+            {
+                "round": str(round_index),
+                "drafting_mode": drafting_mode,
+                "previous_best": previous_best,
+                "previous_judge": previous_judge,
+                "previous_review": previous_review,
+                "previous_draft": previous_draft,
+                "previous_revised": previous_revised,
+            }
+        )
+        return super().draft(
+            task=task,
+            memory=memory,
+            round_index=round_index,
+            previous_best=previous_best,
+            previous_judge=previous_judge,
+            drafting_mode=drafting_mode,
+            previous_review=previous_review,
+            previous_draft=previous_draft,
+            previous_revised=previous_revised,
         )
 
 
@@ -219,6 +285,10 @@ class DraftTimeoutAgents(FakeAgents):
         round_index: int,
         previous_best: str,
         previous_judge: str,
+        drafting_mode: str = "best_guided",
+        previous_review: str = "",
+        previous_draft: str = "",
+        previous_revised: str = "",
     ) -> str:
         self.draft_calls += 1
         raise RuntimeError(
@@ -239,6 +309,10 @@ class ProviderQuotaAgents(FakeAgents):
         round_index: int,
         previous_best: str,
         previous_judge: str,
+        drafting_mode: str = "best_guided",
+        previous_review: str = "",
+        previous_draft: str = "",
+        previous_revised: str = "",
     ) -> str:
         self.draft_calls += 1
         raise RuntimeError("PROVIDER_QUOTA_EXHAUSTED: Gemini provider quota or rate limit reached.")
@@ -273,6 +347,8 @@ class RoundLoopTests(unittest.TestCase):
                 "free_eval",
                 "--max-provider-quota-failures",
                 "2",
+                "--drafting-mode",
+                "continue_from_previous_draft",
             ]
         )
 
@@ -282,6 +358,7 @@ class RoundLoopTests(unittest.TestCase):
         self.assertEqual(args.model, "llama3.1:8b")
         self.assertEqual(args.benchmark_preset, "free_eval")
         self.assertEqual(args.max_provider_quota_failures, 2)
+        self.assertEqual(args.drafting_mode, "continue_from_previous_draft")
 
     def test_round_loop_writes_outputs_and_keeps_best_score(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -358,6 +435,77 @@ class RoundLoopTests(unittest.TestCase):
             self.assertIsNotNone(run_config["started_at"])
             self.assertIsNotNone(run_config["ended_at"])
             self.assertEqual(checkpoint["run_config"], str(run_root / "run_config.json"))
+
+    def test_drafting_modes_pass_expected_previous_context_to_draft_agent(self) -> None:
+        expectations = {
+            "best_guided": {
+                "previous_best": "Revised output from Draft round 1",
+                "previous_review": "",
+                "previous_draft": "",
+                "previous_revised": "",
+            },
+            "fresh_from_task_with_review": {
+                "previous_best": "",
+                "previous_review": "Review notes for Draft round 1",
+                "previous_draft": "",
+                "previous_revised": "",
+            },
+            "continue_from_previous_draft": {
+                "previous_best": "",
+                "previous_review": "Review notes for Draft round 1",
+                "previous_draft": "Draft round 1",
+                "previous_revised": "Revised output from Draft round 1",
+            },
+        }
+        for drafting_mode, expected in expectations.items():
+            with self.subTest(drafting_mode=drafting_mode):
+                with tempfile.TemporaryDirectory() as tmp:
+                    project_dir = Path(tmp) / "project"
+                    project_dir.mkdir()
+                    memory_path = project_dir / "memory.md"
+                    memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                    agents = DraftContextAgents()
+
+                    result = run_iterative_rounds(
+                        console=Console(),
+                        agents=agents,
+                        task_text="Design a privacy-aware memory adapter.",
+                        project_dir=project_dir,
+                        memory_path=memory_path,
+                        mode="test",
+                        model_name="fake-model",
+                        max_rounds=2,
+                        stop_if_no_improvement_rounds=10,
+                        global_max_runtime_seconds=60,
+                        per_agent_timeout_seconds=300,
+                        drafting_mode=drafting_mode,
+                    )
+
+                    run_root = Path(result["run_root"])
+                    checkpoint = json.loads(
+                        (project_dir / "checkpoint.json").read_text(encoding="utf-8")
+                    )
+                    score_history = json.loads(
+                        (project_dir / "score_history.json").read_text(encoding="utf-8")
+                    )
+                    run_config = json.loads(
+                        (run_root / "run_config.json").read_text(encoding="utf-8")
+                    )
+                    round_two = agents.draft_contexts[1]
+
+                    self.assertEqual(round_two["drafting_mode"], drafting_mode)
+                    self.assertIn("score", round_two["previous_judge"])
+                    for field, expected_text in expected.items():
+                        if expected_text:
+                            self.assertIn(expected_text, round_two[field])
+                        else:
+                            self.assertEqual(round_two[field], "")
+                    self.assertEqual(checkpoint["drafting_mode"], drafting_mode)
+                    self.assertEqual(run_config["drafting_mode"], drafting_mode)
+                    self.assertEqual(
+                        [entry["drafting_mode"] for entry in score_history],
+                        [drafting_mode, drafting_mode],
+                    )
 
     def test_round_loop_records_project_source_in_manifest_checkpoint_and_log(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

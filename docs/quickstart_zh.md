@@ -257,10 +257,12 @@ touch projects/example/STOP_REQUESTED
 - 退化：看分数下降、`non_improve_streak` 增长、best round 长期不更新。
 - 跑偏：需要人工打开 `01_draft.md`、`03_revised.md`、`04_judge.md` 判断，目前没有自动主题漂移检测。
 
-它能不能比较两种 drafting mode：
+它能不能切换 drafting mode：
 
-- 目前不能。`run_config.json` 已记录普通/diagnostic/continuous/session/resume 这类 workflow mode，但代码还没有显式 `drafting_mode` 配置。
-- 现在只能人工比较不同 run 或不同 round，不能做严格 A/B 实验。
+- 可以。`drafting_mode` 支持 `best_guided`、`fresh_from_task_with_review`、`continue_from_previous_draft`。
+- CLI 可用 `--drafting-mode <mode>` 覆盖，UI 的 Run controls 里也有选择器。
+- checkpoint、score_history、run_config 都会记录本次选择。
+- 目前还没有自动 run-to-run 对比视图，所以严格 A/B 分析仍需要人工比较多个 run。
 
 目前还缺的关键指标：
 
@@ -292,7 +294,7 @@ touch projects/example/STOP_REQUESTED
 
 `src/` 主要文件：
 
-- `src/cli.py`：解析 `--diagnostic`、`--continuous`、`--resume`、`--session`、`--survey`、`--provider`、`--model`、`--max-rounds` 等参数，分发运行模式。
+- `src/cli.py`：解析 `--diagnostic`、`--continuous`、`--resume`、`--session`、`--survey`、`--provider`、`--model`、`--max-rounds`、`--drafting-mode` 等参数，分发运行模式。
 - `src/main.py`：兼容入口，重新导出旧 API。
 - `src/config.py`：加载和校验 `config.yaml`，查询 Ollama 模型，保存默认 provider/model。
 - `src/llm.py`：Ollama `/api/chat` 和 Gemini 客户端封装。
@@ -320,7 +322,7 @@ touch projects/example/STOP_REQUESTED
 - 改输出结构：`src/storage.py`、`src/run_config.py`。
 - 加测试：`tests/`。
 
-## 9. 两种 drafting mode 的当前支持情况
+## 9. drafting mode 的当前支持情况
 
 目标模式 A：
 
@@ -330,40 +332,14 @@ touch projects/example/STOP_REQUESTED
 
 > 每一轮都基于上一轮 draft 继续改写，同时结合上一轮 review idea。
 
-当前是否已实现：
+当前已实现：
 
-- 没有显式实现 A/B 两种 drafting mode。
-- 当前配置 schema 里没有 `drafting_mode`。
-- CLI 没有 `--drafting-mode`。
-- checkpoint、score_history、run_config 还没有记录 drafting mode。
-
-当前实际行为更像一个混合模式：
-
-- `agents.draft()` 每轮输入包括原始 task、memory、round index、`previous_best`、`previous_judge`。
-- `previous_best` 来自当前最佳 `best_output.md`，不是严格的上一轮 draft。
-- `previous_judge` 是上一轮 judge，不是上一轮 review。
-- `agents.revise()` 只基于同一轮 draft 和同一轮 review 改写。
-- memory 会被每轮更新，也会影响下一轮 draft。
-
-所以当前既不是严格 A，也不是严格 B。
-
-最小改法：
-
-- 在配置 schema 加 `drafting_mode`，例如：
-  - `fresh_from_task_with_review`
-  - `continue_from_previous_draft`
-  - 可选第三种保留现状：`best_guided`
-- 在 `src/config.py` 增加枚举校验。
-- 在 `src/runner.py` 保存 `previous_draft_output`、`previous_review_output`、`previous_revised_output`。
-- 在 `src/agents.py` 给 `draft()` 增加明确字段：
-  - `drafting_mode`
-  - `previous_draft`
-  - `previous_review`
-  - `previous_revised`
-  - `previous_best`
-- 调整 draft prompt，让模型知道当前到底应该从原始 task 重新写，还是基于上一轮 draft 续写。
-- 把 `drafting_mode` 写入 `checkpoint.json`、`score_history.json`、run-level metadata。
-- 为两种模式各加一个 fake-agent 单元测试，验证 prompt 输入和输出落盘行为。
+- `best_guided`：默认值，保留旧行为；Draft 使用当前最佳输出和上一轮 Judge 反馈。
+- `fresh_from_task_with_review`：每轮从原始 task 重新起草，不传上一轮 draft/revised 文本，只传上一轮 Review/Judge 反馈。
+- `continue_from_previous_draft`：每轮基于上一轮 draft/revised 输出继续，并可参考上一轮反馈。
+- 配置 schema 会校验 `drafting_mode`，CLI 支持 `--drafting-mode`。
+- checkpoint、score_history、run_config 都记录 `drafting_mode`。
+- 单元测试覆盖三种模式传给 Draft agent 的上下文差异。
 
 哪个更适合做实验对比：
 
@@ -382,7 +358,6 @@ touch projects/example/STOP_REQUESTED
 
 ### 今天可以做
 
-- 把 `drafting_mode` 接入配置、CLI、checkpoint、score_history 和 `run_config.json`。
 - 把 `score_history.json` 扩展为保留 judge rubric 子分项。
 - 在 UI 里加一个简单 score history 表格或折线图。
 - 清理 UI 的 Streamlit deprecation warning，把 `use_container_width=True` 改成 `width='stretch'`。
@@ -390,7 +365,6 @@ touch projects/example/STOP_REQUESTED
 
 ### 之后 1-2 天做
 
-- 实现显式 `drafting_mode` A/B 开关。
 - 增加两个 run 的比较视图：模型、mode、轮数、最好分、平均分、超时数、重复数。
 - 记录每个 agent 的 elapsed seconds 到结构化 JSON，而不是只散落在 log。
 - 增加 token 估算或真实 token 统计，为成本/时间分析打基础。
@@ -409,4 +383,4 @@ touch projects/example/STOP_REQUESTED
 
 第一小时不要急着继续旧 checkpoint。先把项目恢复到“测试全绿 + UI 能看 + 一轮诊断能跑”的状态：创建本地配置，确认模型可用，然后跑 `make check`。接着打开 `best_output.md` 和最近一轮的四个文件，判断高分输出是否真有研究价值。
 
-今晚的目标建议设小一点：跑一个新的 1-round diagnostic，确认输出路径和 UI 都正常；然后实现或至少设计好 `drafting_mode` 的配置字段。不要陷入长时间 continuous，也不要先改大 prompt。这个项目现在最缺的不是更多轮数，而是可比较、可恢复、可解释的实验结构。
+今晚的目标建议设小一点：跑一个新的 1-round diagnostic，确认输出路径和 UI 都正常；然后用相同 task、相同模型、相同轮数各跑一个不同 `drafting_mode` 的短 run，人工比较 `run_config.json`、`score_history.json` 和最新 round 输出。不要陷入长时间 continuous，也不要先改大 prompt。这个项目现在最缺的不是更多轮数，而是可比较、可恢复、可解释的实验结构。

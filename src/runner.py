@@ -13,6 +13,12 @@ from rich.console import Console
 
 from .agents import ResearchAgents
 from .cloud_free import CloudFreeDailyQuotaExhausted, next_pacific_reset_heuristic
+from .config import (
+    DEFAULT_DRAFTING_MODE,
+    DRAFTING_MODE_BEST_GUIDED,
+    DRAFTING_MODE_CONTINUE_FROM_PREVIOUS,
+    DRAFTING_MODE_FRESH_WITH_REVIEW,
+)
 from .constants import (
     STOP_CLOUD_DAILY_QUOTA,
     STOP_EXCEPTION,
@@ -207,6 +213,7 @@ def run_iterative_rounds(
     topic_snapshot: Optional[Dict[str, Any]] = None,
     prompt_dir: Optional[Path] = None,
     repo_root: Optional[Path] = None,
+    drafting_mode: str = DEFAULT_DRAFTING_MODE,
     max_consecutive_draft_timeouts: int = 1,
     max_consecutive_provider_quota_failures: int = 2,
 ) -> Dict[str, Any]:
@@ -236,6 +243,7 @@ def run_iterative_rounds(
         "disable_timeout_stop": disable_timeout_stop,
         "max_consecutive_draft_timeouts": max_consecutive_draft_timeouts,
         "max_consecutive_provider_quota_failures": max_consecutive_provider_quota_failures,
+        "drafting_mode": drafting_mode,
     }
     run_config = build_initial_run_config(
         run_id=run_id,
@@ -266,6 +274,7 @@ def run_iterative_rounds(
             "run_root": str(run_root),
             "mode": mode,
             "model": model_name,
+            "drafting_mode": drafting_mode,
             "started_at": started_at_iso,
             "project": project_metadata or {},
             "run_config": str(run_config_path),
@@ -304,6 +313,7 @@ def run_iterative_rounds(
     stop_reason = STOP_MAX_ROUNDS
     completed_rounds = 0
     last_review_output = ""
+    last_draft_output = ""
     last_revised_output = ""
     last_judge_output = ""
     last_successful_agent = "none"
@@ -419,8 +429,24 @@ def run_iterative_rounds(
                             task=task_text,
                             memory=memory_text,
                             round_index=round_index,
-                            previous_best=best_output,
+                            previous_best=best_output
+                            if drafting_mode == DRAFTING_MODE_BEST_GUIDED
+                            else "",
                             previous_judge=previous_judge,
+                            drafting_mode=drafting_mode,
+                            previous_review=last_review_output
+                            if drafting_mode
+                            in {
+                                DRAFTING_MODE_FRESH_WITH_REVIEW,
+                                DRAFTING_MODE_CONTINUE_FROM_PREVIOUS,
+                            }
+                            else "",
+                            previous_draft=last_draft_output
+                            if drafting_mode == DRAFTING_MODE_CONTINUE_FROM_PREVIOUS
+                            else "",
+                            previous_revised=last_revised_output
+                            if drafting_mode == DRAFTING_MODE_CONTINUE_FROM_PREVIOUS
+                            else "",
                         ),
                     )
             if not draft_error and _stop_requested(stop_signal_path):
@@ -662,6 +688,7 @@ def run_iterative_rounds(
             break
 
         last_review_output = review_output
+        last_draft_output = draft_output
         last_revised_output = revised_output
         last_judge_output = judge_output
 
@@ -712,6 +739,7 @@ def run_iterative_rounds(
                 "successful_research_round": not round_errors and parsed_score is not None,
                 "invalid_score_this_round": parsed_score is None,
                 "model": model_name,
+                "drafting_mode": drafting_mode,
             }
         )
         write_score_history(score_history_path, score_history)
@@ -753,6 +781,7 @@ def run_iterative_rounds(
             "updated_at": datetime.now().isoformat(),
             "mode": mode,
             "model": model_name,
+            "drafting_mode": drafting_mode,
             "project": project_metadata or {},
             "cloud_free": _cloud_free_status(agents),
         }
@@ -882,6 +911,7 @@ def run_iterative_rounds(
         "updated_at": datetime.now().isoformat(),
         "mode": mode,
         "model": model_name,
+        "drafting_mode": drafting_mode,
         "project": project_metadata or {},
         "cloud_free": _cloud_free_status(agents),
         "provider_quota_failure_seen": provider_quota_failure_seen,

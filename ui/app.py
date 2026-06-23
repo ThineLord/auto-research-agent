@@ -29,12 +29,14 @@ from src.cloud_free import (
     save_profile_artifact,
 )
 from src.config import (
+    DEFAULT_DRAFTING_MODE,
     DEFAULT_GEMINI_API_KEY_ENV,
     DEFAULT_GEMINI_MODEL,
     DEFAULT_GEMINI_MODELS,
     DEFAULT_MODEL_NAME,
     MODEL_PROVIDER_GEMINI,
     MODEL_PROVIDER_OLLAMA,
+    SUPPORTED_DRAFTING_MODES,
     SUPPORTED_MODEL_PROVIDERS,
     ConfigValidationError,
     format_model_label,
@@ -84,6 +86,11 @@ BENCHMARK_PRESET_LABEL_KEYS = {
     "free_eval": "benchmark_preset_free_eval",
     "paid_benchmark": "benchmark_preset_paid_benchmark",
     "stress_test": "benchmark_preset_stress_test",
+}
+DRAFTING_MODE_LABEL_KEYS = {
+    "best_guided": "drafting_mode_best_guided",
+    "fresh_from_task_with_review": "drafting_mode_fresh_with_review",
+    "continue_from_previous_draft": "drafting_mode_continue_from_previous",
 }
 
 
@@ -247,6 +254,7 @@ def build_run_command(
     free_runner_preset: str | None = None,
     benchmark_preset: str | None = None,
     max_provider_quota_failures: int | None = None,
+    drafting_mode: str | None = None,
 ) -> list[str]:
     mode_flags = {
         "diagnostic": ["--diagnostic"],
@@ -277,6 +285,8 @@ def build_run_command(
         command.extend(["--benchmark-preset", benchmark_preset])
     if max_provider_quota_failures is not None:
         command.extend(["--max-provider-quota-failures", str(max(0, max_provider_quota_failures))])
+    if drafting_mode:
+        command.extend(["--drafting-mode", drafting_mode])
     return command
 
 
@@ -556,6 +566,7 @@ def infer_running_stage(
         "best_score": checkpoint.get("best_score", "N/A"),
         "stop_reason": checkpoint.get("stop_reason", "N/A"),
         "can_resume": bool(checkpoint.get("can_resume", False)),
+        "drafting_mode": run_meta.get("drafting_mode") or checkpoint.get("drafting_mode", "N/A"),
     }
 
 
@@ -784,6 +795,7 @@ def render_live_progress_and_logs(
     p4.metric(t("metric_best_score"), str(progress["best_score"]))
     st.write(t("pid_line", pid=progress["pid"]))
     st.write(t("model_line", model=progress["model"]))
+    st.write(t("drafting_mode_line", mode=progress["drafting_mode"]))
     st.write(t("last_successful_agent", agent=progress["last_successful_agent"]))
     st.write(t("stop_reason", reason=progress["stop_reason"]))
     st.write(t("stop_signal_present", present=stop_signal_path.exists()))
@@ -1265,6 +1277,19 @@ def main() -> None:
                 step=1,
             )
         )
+    configured_drafting_mode = (
+        app_config.drafting_mode
+        if app_config.drafting_mode in SUPPORTED_DRAFTING_MODES
+        else DEFAULT_DRAFTING_MODE
+    )
+    if st.session_state.get("drafting_mode") not in SUPPORTED_DRAFTING_MODES:
+        st.session_state["drafting_mode"] = configured_drafting_mode
+    selected_drafting_mode = st.selectbox(
+        t("drafting_mode"),
+        list(SUPPORTED_DRAFTING_MODES),
+        format_func=lambda mode: t(DRAFTING_MODE_LABEL_KEYS[mode]),
+        key="drafting_mode",
+    )
 
     def launch_run(mode: str, success_key: str) -> None:
         result = start_background_process(
@@ -1277,12 +1302,18 @@ def main() -> None:
                 selected_free_runner_preset if selected_provider == MODEL_PROVIDER_GEMINI else None,
                 selected_benchmark_preset if mode == "continuous" else None,
                 selected_max_provider_quota_failures if mode == "continuous" else None,
+                selected_drafting_mode,
             ),
             cwd=ROOT,
             log_path=run_log_path,
             meta_path=run_meta_path(proj_path),
             kind="run",
-            extra={"model": model_label, "mode": mode, "provider": selected_provider},
+            extra={
+                "model": model_label,
+                "mode": mode,
+                "provider": selected_provider,
+                "drafting_mode": selected_drafting_mode,
+            },
             env_overrides=provider_env_overrides,
         )
         render_process_result(result, success_key, model=model_label)

@@ -74,12 +74,26 @@ topic:
     - methods
     - evaluation
     - risks
+drafting_mode: best_guided
 ```
 
 旧写法 `model: qwen3:8b` 仍可用；旧的顶层 `temperature` 和 `timeout_seconds`
 也仍可作为 fallback。若同一项同时出现在顶层和 `model:` 里，以 `model:` 里的值为准。
 `model.max_prompt_chars` 用于在本地模型收到过长 prompt 前快速失败；`topic:` 会传给
 Draft / Review / Revise / Judge，让同一套提示词可以服务不同项目。
+
+`drafting_mode` 决定每轮 Draft 使用哪些上一轮上下文：
+
+- `best_guided`：默认值，保留当前行为，Draft 可看当前最佳输出和上一轮 Judge 反馈。
+- `fresh_from_task_with_review`：每轮从原始 task 重新起草，只参考上一轮 Review/Judge 反馈。
+- `continue_from_previous_draft`：每轮基于上一轮 draft/revised 输出继续，并可参考反馈。
+
+CLI 临时覆盖示例：
+
+```bash
+make run ARGS="--drafting-mode fresh_from_task_with_review"
+make run ARGS="--drafting-mode continue_from_previous_draft"
+```
 
 如果要用 Gemini，推荐通过环境变量提供 key：
 
