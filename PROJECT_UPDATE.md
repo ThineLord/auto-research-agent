@@ -1,7 +1,66 @@
+# Bug Audit Closeout
+
+Date: 2026-06-24
+Final Commit: c6cddcb (last bug-fix commit before closeout documentation)
+Branch: master
+
+## Summary
+
+Completed the autonomous post-v0.1.0-stable bug audit and repair loop across CLI flows, Makefile
+targets, mock/survey/analyze/compare flows, Streamlit helpers, config/path privacy, artifact
+compatibility, checkpoint/resume metadata, stale cleanup paths, and generated-output ignore safety.
+
+## Bugs Fixed
+
+* Hardened legacy analytics/comparison score parsing and stale JSON/text artifact readers.
+* Added diagnostic resume metadata compatibility and path-masked console/log/report displays.
+* Fixed verified path leaks in project input/config errors, survey artifacts, runtime process-start
+  failures, runner/diagnostic output, benchmark reports, and Streamlit helper displays.
+* Hardened session mode, UI process metadata, benchmark report analysis, run-lock cleanup,
+  stop-signal cleanup, UI stop-signal creation, and best-effort log append behavior against stale
+  non-file artifacts.
+
+## Validation
+
+* `git status --short --branch` clean before closeout edits
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make help`
+* `make check` (`137 passed, 43 subtests passed`)
+* `make mock ARGS="--project example --max-rounds 1"`
+* `.venv/bin/python -m src.main --mock --project example --max-rounds 1`
+* `.venv/bin/python -m src.main --analyze-run projects/example/runs/20260625_010038_084846`
+* `.venv/bin/python -m src.main --compare-runs projects/example/runs/20260625_010032_838179 projects/example/runs/20260625_010038_084846`
+* `.venv/bin/python -m src.main --survey --project example`
+
+## Remaining Known Risks
+
+* `--compare-runs` still accepts one run path even though help/docs say two or more; changing this is
+  a public CLI compatibility decision.
+* Stale non-file write targets such as `memory.md`, `best_output.md`, or directories replacing
+  required project inputs still require manual cleanup; automatic deletion would be destructive.
+* Stored checkpoint/run metadata intentionally retains absolute internal paths for legacy
+  resume/analytics compatibility, while UI/CLI display paths are masked or repo-relative.
+* Packaging remains optimized for cloned-repo/editable-install workflows; wheel-style distribution of
+  UI/prompts/projects should be reviewed as a product/release decision.
+
+## Recommended Human Review Items
+
+* Decide whether to enforce a minimum of two paths for `--compare-runs` in a future breaking/compat
+  cleanup.
+* Review package-data expectations if the project should support non-editable wheel installs outside
+  a cloned repository.
+* Run an optional real-provider diagnostic on the release machine if provider availability and model
+  selection need sign-off.
+
+## Suggested Next Phase
+
+Human release review and, if desired, a small follow-up release tag for the hardening commits.
+
 # Bug Audit 17 - Best-Effort Log Append Safety
 
 Date: 2026-06-24
-Commit: pending phase commit
+Commit: c6cddcb
 Branch: master
 
 ## Goal
