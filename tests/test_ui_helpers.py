@@ -853,6 +853,19 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertEqual(display_path, "<repo>/STOP_REQUESTED")
         self.assertNotIn(str(Path(tmp)), display_path)
 
+    def test_create_stop_signal_tolerates_stale_directory_path(self) -> None:
+        import ui.app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            stop_signal_path = Path(tmp) / "project" / "STOP_REQUESTED"
+            stop_signal_path.mkdir(parents=True)
+
+            self.assertFalse(ui_app.create_stop_signal(stop_signal_path))
+            display_path = ui_app.output_display_path(stop_signal_path)
+
+        self.assertEqual(display_path, "<repo>/STOP_REQUESTED")
+        self.assertNotIn(str(Path(tmp)), display_path)
+
     def test_ui_run_comparison_helpers_mask_paths_and_flatten_fields(self) -> None:
         import ui.app as ui_app
 

@@ -1,7 +1,58 @@
-# Bug Audit 14 - Stale Lock and Stop Signal Cleanup Safety
+# Bug Audit 15 - UI Stop Signal Stale Path Safety
 
 Date: 2026-06-24
 Commit: pending phase commit
+Branch: master
+
+## Goal
+
+Prevent the Streamlit Pause / Stop Safely button from crashing when the stop-signal path is a stale
+non-file artifact.
+
+## Bug / Fragility Found
+
+* The runner cleanup tolerated stale `STOP_REQUESTED` directories after Bug Audit 14, but the UI stop
+  button still wrote directly to the same path and raised `OSError` when the path was a directory.
+* Surfacing the raw `OSError` would expose local absolute paths, so the UI needed a masked fallback.
+
+## Reproduction
+
+* A temporary directory at `STOP_REQUESTED` reproduced a failed stop-signal write through the new UI
+  helper before rendering the masked fallback path.
+
+## Fix
+
+* Added `create_stop_signal`, a small UI helper that returns success/failure instead of raising on
+  stale non-file paths.
+* Updated the Pause / Stop Safely button to show either the existing masked success message or a new
+  masked localized failure message.
+
+## Tests Added or Updated
+
+* Added Streamlit helper coverage for stale directory stop-signal paths and masked display output.
+
+## Validation
+
+* `.venv/bin/python -m pytest tests/test_ui_helpers.py::SharedUiBackendHelperTests::test_create_stop_signal_tolerates_stale_directory_path tests/test_ui_helpers.py::SharedUiBackendHelperTests::test_stop_signal_display_path_is_masked -q` (`2 passed`)
+* `.venv/bin/python -m ruff check ui/app.py ui/i18n.py tests/test_ui_helpers.py`
+* Minimal stale `STOP_REQUESTED` directory UI helper smoke before and after the fix
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make check` (`135 passed, 43 subtests passed`)
+
+## Remaining Risks
+
+* The stale non-file stop-signal path still requires manual cleanup; the UI deliberately avoids
+  deleting directories.
+
+## Next Audit Target
+
+Final repository sweep and closeout once no further clear safe bugs remain.
+
+# Bug Audit 14 - Stale Lock and Stop Signal Cleanup Safety
+
+Date: 2026-06-24
+Commit: b65fbba
 Branch: master
 
 ## Goal

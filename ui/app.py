@@ -112,6 +112,14 @@ def output_display_path(path: Path) -> str:
     return relative_repo_path(path)
 
 
+def create_stop_signal(stop_signal_path: Path) -> bool:
+    try:
+        write_file_text(stop_signal_path, "STOP_REQUESTED\n")
+    except OSError:
+        return False
+    return True
+
+
 def load_ui_config() -> tuple[Any, bool]:
     try:
         return load_app_config(CONFIG_PATH), False
@@ -2003,8 +2011,11 @@ def main() -> None:
             launch_run("continuous", "started_continuous")
     with c4:
         if st.button(t("pause_stop_safely"), disabled=not run_active):
-            write_file_text(stop_signal_path, "STOP_REQUESTED\n")
-            st.warning(t("stop_signal_created", path=output_display_path(stop_signal_path)))
+            stop_signal_display = output_display_path(stop_signal_path)
+            if create_stop_signal(stop_signal_path):
+                st.warning(t("stop_signal_created", path=stop_signal_display))
+            else:
+                st.error(t("stop_signal_failed", path=stop_signal_display))
     resume_state = describe_resume_state(
         checkpoint=checkpoint,
         run_active=run_active,
