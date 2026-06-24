@@ -3,8 +3,12 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from argparse import Namespace
 from pathlib import Path
 
+from rich.console import Console
+
+from src.cli import _run_compare_cli
 from src.run_compare import compare_runs, load_run_summary, write_run_comparison
 
 
@@ -20,11 +24,26 @@ class RunCompareTests(unittest.TestCase):
                 json.dumps(
                     {
                         "run_id": "run-a",
+                        "model": "qwen3:8b",
                         "best_score": 72.0,
                         "completed_rounds": 2,
                         "drafting_mode": "best_guided",
+                        "timeout_rounds": [2],
                     }
                 ),
+                encoding="utf-8",
+            )
+            (run_a / "run_config.json").write_text(
+                json.dumps(
+                    {
+                        "model": {"provider": "ollama", "name": "qwen3:8b"},
+                        "runtime": {"max_rounds": 3},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (run_a / "round_metrics.json").write_text(
+                json.dumps([{"round": 1, "score": 70.0}, {"round": 2, "score": 72.0}]),
                 encoding="utf-8",
             )
             (run_b / "run_summary.json").write_text(
@@ -44,6 +63,11 @@ class RunCompareTests(unittest.TestCase):
 
             self.assertEqual(comparison["best_run_id"], "run-b")
             self.assertEqual(comparison["best_vs_baseline_delta"], 12.0)
+            self.assertEqual(comparison["runs"][0]["provider"], "ollama")
+            self.assertEqual(comparison["runs"][0]["max_rounds"], 3)
+            self.assertEqual(comparison["runs"][0]["average_score"], 71.0)
+            self.assertEqual(comparison["runs"][0]["timeout_count"], 1)
+            self.assertEqual(comparison["runs"][0]["metadata_status"], "ok")
             self.assertEqual(json.loads(output_path.read_text(encoding="utf-8")), comparison)
 
     def test_load_run_summary_falls_back_to_run_config_and_round_metrics(self) -> None:
@@ -77,7 +101,53 @@ class RunCompareTests(unittest.TestCase):
         self.assertEqual(summary["best_score"], 75.0)
         self.assertEqual(summary["successful_rounds"], [1])
         self.assertEqual(summary["timeout_rounds"], [2])
+        self.assertEqual(summary["average_score"], 72.5)
         self.assertEqual(comparison["best_run_id"], "legacy-run")
+
+    def test_missing_metadata_is_reported_without_failing_comparison(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            missing_run = Path(tmp) / "missing-run"
+            missing_run.mkdir()
+
+            summary = load_run_summary(missing_run)
+            comparison = compare_runs([missing_run])
+
+        self.assertEqual(summary["run_id"], "missing-run")
+        self.assertEqual(summary["metadata_status"], "missing")
+        self.assertIsNone(summary["best_score"])
+        self.assertEqual(comparison["run_count"], 1)
+        self.assertIsNone(comparison["best_vs_baseline_delta"])
+
+    def test_cli_compare_wrapper_resolves_repo_relative_paths_and_writes_output(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_a = root / "runs" / "a"
+            run_b = root / "runs" / "b"
+            run_a.mkdir(parents=True)
+            run_b.mkdir(parents=True)
+            (run_a / "run_summary.json").write_text(
+                json.dumps({"run_id": "a", "best_score": 60}),
+                encoding="utf-8",
+            )
+            (run_b / "run_summary.json").write_text(
+                json.dumps({"run_id": "b", "best_score": 80}),
+                encoding="utf-8",
+            )
+            output_path = root / "comparison.json"
+
+            comparison = _run_compare_cli(
+                Namespace(
+                    compare_runs=["runs/a", "runs/b"],
+                    compare_output="comparison.json",
+                ),
+                Console(record=True),
+                root,
+            )
+
+            self.assertEqual(comparison["best_run_id"], "b")
+            self.assertEqual(comparison["runs"][0]["run_path"], "runs/a")
+            self.assertEqual(comparison["runs"][0]["run_config_path"], "runs/a/run_config.json")
+            self.assertEqual(json.loads(output_path.read_text(encoding="utf-8")), comparison)
 
 
 if __name__ == "__main__":

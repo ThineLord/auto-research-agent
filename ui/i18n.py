@@ -259,6 +259,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "score_history_table": "Score history table",
         "score_history_trend": "Score trend",
         "score_history_empty": "No score history yet.",
+        "run_comparison": "Run comparison",
+        "run_comparison_empty": "At least two run directories are needed for comparison.",
+        "run_comparison_runs": "Runs to compare",
+        "run_comparison_select_two": "Select at least two runs to compare.",
+        "run_comparison_score_chart": "Best and average score comparison",
         "run_metadata_summary": "Latest run metadata",
         "run_metadata_empty": (
             "No run metadata yet. Start a run to generate run_config.json and run_summary.json."
@@ -518,6 +523,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "score_history_table": "评分历史表",
         "score_history_trend": "分数趋势",
         "score_history_empty": "暂无评分历史。",
+        "run_comparison": "运行对比",
+        "run_comparison_empty": "至少需要两个 run 目录才能对比。",
+        "run_comparison_runs": "选择要对比的 runs",
+        "run_comparison_select_two": "请选择至少两个 run。",
+        "run_comparison_score_chart": "最佳分数与平均分数对比",
         "run_metadata_summary": "最新运行元数据",
         "run_metadata_empty": "还没有运行元数据。启动一次运行后会生成 run_config.json 和 run_summary.json。",
         "missing_run_config": (

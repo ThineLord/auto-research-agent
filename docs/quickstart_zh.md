@@ -187,6 +187,15 @@ touch projects/example/STOP_REQUESTED
 - `projects/example/interrupted_report.md`：安全停止或中断后的恢复说明。
 - `projects/example/current_plan.md`：session 模式生成的计划。
 - `projects/example/final_session_report.md`：session 模式最终报告。
+
+比较多个 run：
+
+```bash
+.venv/bin/python -m src.main --compare-runs projects/example/runs/<run_a> projects/example/runs/<run_b>
+```
+
+也可以在 UI 的 `Run comparison` 区域选择多个 run，对比 provider、model、drafting mode、
+轮数、best/average score、stop reason、timeout/error counts 和 artifact 路径。
 - `projects/example/model_ops.log`：UI 拉取或删除模型时的日志。
 
 当前输出约定：
@@ -267,7 +276,7 @@ touch projects/example/STOP_REQUESTED
 - 可以。`drafting_mode` 支持 `best_guided`、`fresh_from_task_with_review`、`continue_from_previous_draft`。
 - CLI 可用 `--drafting-mode <mode>` 覆盖，UI 的 Run controls 里也有选择器。
 - checkpoint、score_history、run_config、run_summary 都会记录本次选择。
-- 目前有 `src/run_compare.py` helper 可比较多个 run summary，但 UI 还没有多 run 对比视图。
+- `--compare-runs` 和 UI 的 `Run comparison` 可以比较多个 run summary / run config / round metrics。
 
 目前还缺的关键指标：
 

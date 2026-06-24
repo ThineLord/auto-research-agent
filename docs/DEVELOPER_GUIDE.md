@@ -39,7 +39,8 @@ Core modules:
 - `src/runner.py` coordinates iterative rounds, checkpoints, scoring, safe stop, and resume data.
 - `src/run_config.py` builds run-level reproducibility metadata, hashes prompt files, records Git
   commit state when available, and reads legacy `run_manifest.json` metadata for old runs.
-- `src/run_compare.py` loads `run_summary.json` artifacts and compares two or more run roots.
+- `src/run_compare.py` merges `run_summary.json`, `run_config.json` or legacy manifests, and
+  `round_metrics.json` to compare two or more run roots.
 - `src/session.py` builds focused session objectives, current plans, and final session reports.
 - `src/literature_survey.py` implements local Literature Survey Mode: source collection, paper
   metadata parsing, deduplication, theme/gap extraction, survey report rendering, and related-work
@@ -110,6 +111,8 @@ Progress comes from:
 The Streamlit UI renders a compact latest-run metadata table from `run_config.json` and
 `run_summary.json`, keeps artifact paths repo-relative or masked, and gives artifact-specific
 messages when `run_config.json`, `run_summary.json`, or `round_metrics.json` has not been written.
+It also exposes a multi-run comparison table using the same `src.run_compare` helper as
+`--compare-runs`; missing or legacy metadata should produce partial rows instead of UI failures.
 
 The model health check is intentionally fast: it checks Ollama API availability and selected-model
 presence without sending a generation prompt.

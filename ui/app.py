@@ -46,6 +46,7 @@ from src.config import (
     save_default_model_selection,
 )
 from src.llm import GeminiClient
+from src.run_compare import compare_runs
 from src.runtime import (
     get_active_process_meta,
     model_job_meta_path,
@@ -768,6 +769,59 @@ def build_run_metadata_rows(project_dir: Path, checkpoint: dict[str, Any]) -> li
         ("run_meta_round_metrics_path", output_display_path(paths["round_metrics"])),
     ]
     return [{"field_key": field_key, "value": _display_value(value)} for field_key, value in values]
+
+
+def discover_project_run_roots(project_dir: Path, *, limit: int = 12) -> list[Path]:
+    runs_dir = project_dir / "runs"
+    if not runs_dir.exists():
+        return []
+    run_roots = [path for path in runs_dir.iterdir() if path.is_dir()]
+    return sorted(
+        run_roots,
+        key=lambda path: (path.stat().st_mtime, path.name),
+        reverse=True,
+    )[:limit]
+
+
+def _count_text(value: Any) -> str:
+    if isinstance(value, list):
+        return str(len(value))
+    return _display_value(value, "0")
+
+
+def _artifact_path_display(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "N/A"
+    return output_display_path(Path(text))
+
+
+def build_run_comparison_rows(run_roots: Sequence[Path]) -> list[dict[str, Any]]:
+    comparison = compare_runs([Path(run_root) for run_root in run_roots])
+    rows: list[dict[str, Any]] = []
+    for run in comparison.get("runs", []):
+        if not isinstance(run, dict):
+            continue
+        rows.append(
+            {
+                "run_id": _display_value(run.get("run_id")),
+                "run_path": _artifact_path_display(run.get("run_path") or run.get("run_root")),
+                "provider": _display_value(run.get("provider")),
+                "model": _display_value(run.get("model")),
+                "drafting_mode": _display_value(run.get("drafting_mode")),
+                "max_rounds": _display_value(run.get("max_rounds")),
+                "completed_rounds": _display_value(run.get("completed_rounds")),
+                "best_score": run.get("best_score"),
+                "average_score": run.get("average_score"),
+                "stop_reason": _display_value(run.get("stop_reason")),
+                "timeout_count": _count_text(run.get("timeout_count")),
+                "error_count": _count_text(run.get("error_count")),
+                "run_config_path": _artifact_path_display(run.get("run_config_path")),
+                "run_summary_path": _artifact_path_display(run.get("run_summary_path")),
+                "metadata_status": _display_value(run.get("metadata_status")),
+            }
+        )
+    return rows
 
 
 def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1706,6 +1760,39 @@ def main() -> None:
         st.line_chart(score_rows, x="round", y="score")
     else:
         st.info(t("score_history_empty"))
+
+    st.subheader(t("run_comparison"))
+    run_roots = discover_project_run_roots(proj_path)
+    if len(run_roots) < 2:
+        st.info(t("run_comparison_empty"))
+    else:
+        run_options = {
+            f"{run_root.name} - {output_display_path(run_root)}": run_root for run_root in run_roots
+        }
+        default_labels = list(run_options)[:2]
+        selected_run_labels = st.multiselect(
+            t("run_comparison_runs"),
+            list(run_options),
+            default=default_labels,
+        )
+        selected_run_roots = [run_options[label] for label in selected_run_labels]
+        if len(selected_run_roots) < 2:
+            st.info(t("run_comparison_select_two"))
+        else:
+            comparison_rows = build_run_comparison_rows(selected_run_roots)
+            st.dataframe(comparison_rows, width="stretch", hide_index=True)
+            chart_rows = [
+                {
+                    "run_id": row["run_id"],
+                    "best_score": row["best_score"],
+                    "average_score": row["average_score"],
+                }
+                for row in comparison_rows
+                if isinstance(row.get("best_score"), (int, float))
+            ]
+            if chart_rows:
+                st.caption(t("run_comparison_score_chart"))
+                st.bar_chart(chart_rows, x="run_id", y=["best_score", "average_score"])
 
     st.subheader(t("output_browser"))
     output_catalog = build_output_catalog(proj_path, checkpoint)

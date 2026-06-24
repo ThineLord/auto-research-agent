@@ -341,6 +341,11 @@ class RoundLoopTests(unittest.TestCase):
                 "--survey",
                 "--survey-output",
                 "custom_survey.md",
+                "--compare-runs",
+                "projects/example/runs/a",
+                "projects/example/runs/b",
+                "--compare-output",
+                "projects/example/run_comparison.json",
                 "--model",
                 "llama3.1:8b",
                 "--benchmark-preset",
@@ -355,6 +360,8 @@ class RoundLoopTests(unittest.TestCase):
         self.assertTrue(args.diagnostic)
         self.assertTrue(args.survey)
         self.assertEqual(args.survey_output, "custom_survey.md")
+        self.assertEqual(args.compare_runs, ["projects/example/runs/a", "projects/example/runs/b"])
+        self.assertEqual(args.compare_output, "projects/example/run_comparison.json")
         self.assertEqual(args.model, "llama3.1:8b")
         self.assertEqual(args.benchmark_preset, "free_eval")
         self.assertEqual(args.max_provider_quota_failures, 2)

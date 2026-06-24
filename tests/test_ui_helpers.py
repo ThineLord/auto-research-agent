@@ -571,6 +571,58 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         metrics_item = next(item for item in catalog if item["label"] == "Round metrics")
         self.assertEqual(metrics_item["path"], round_metrics_path)
 
+    def test_ui_run_comparison_helpers_mask_paths_and_flatten_fields(self) -> None:
+        import ui.app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            run_a = project_dir / "runs" / "run-a"
+            run_b = project_dir / "runs" / "run-b"
+            run_a.mkdir(parents=True)
+            run_b.mkdir(parents=True)
+            write_json_file(
+                run_a / "run_config.json",
+                {
+                    "run_id": "run-a",
+                    "drafting_mode": "best_guided",
+                    "model": {"provider": "ollama", "name": "qwen3:8b"},
+                    "runtime": {"max_rounds": 2},
+                },
+            )
+            write_json_file(
+                run_a / "round_metrics.json",
+                [
+                    {"round": 1, "score": 60.0, "timeout_this_round": True},
+                    {"round": 2, "score": 70.0, "errors": ["boom"]},
+                ],
+            )
+            write_json_file(
+                run_b / "run_summary.json",
+                {
+                    "run_id": "run-b",
+                    "model": "gemini-3.5-flash",
+                    "drafting_mode": "fresh_from_task_with_review",
+                    "best_score": 88.0,
+                    "completed_rounds": 1,
+                },
+            )
+
+            discovered = ui_app.discover_project_run_roots(project_dir)
+            rows = ui_app.build_run_comparison_rows([run_a, run_b])
+
+        self.assertEqual({path.name for path in discovered}, {"run-a", "run-b"})
+        by_id = {row["run_id"]: row for row in rows}
+        self.assertEqual(by_id["run-a"]["provider"], "ollama")
+        self.assertEqual(by_id["run-a"]["model"], "qwen3:8b")
+        self.assertEqual(by_id["run-a"]["max_rounds"], "2")
+        self.assertEqual(by_id["run-a"]["average_score"], 65.0)
+        self.assertEqual(by_id["run-a"]["timeout_count"], "1")
+        self.assertEqual(by_id["run-a"]["error_count"], "1")
+        self.assertEqual(by_id["run-a"]["run_path"], "<repo>/run-a")
+        self.assertNotIn(
+            str(Path(tmp)), "\n".join(str(value) for row in rows for value in row.values())
+        )
+
     def test_fast_model_health_check_uses_api_and_selected_model_presence(self) -> None:
         import ui.app as ui_app
 

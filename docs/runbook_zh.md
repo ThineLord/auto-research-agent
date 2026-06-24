@@ -233,6 +233,12 @@ sed -n '1,220p' projects/example/runs/<run_id>/run_config.json
 sed -n '1,220p' projects/example/runs/<run_id>/run_summary.json
 ```
 
+对比两个或多个 run：
+
+```bash
+.venv/bin/python -m src.main --compare-runs projects/example/runs/<run_a> projects/example/runs/<run_b>
+```
+
 优先阅读：
 
 ```bash
@@ -271,6 +277,7 @@ UI 中重点看：
 - `D. Progress panel`：看 Mode、Round、Stage、Best score、Model、Stop reason。
 - `E. Live logs panel`：看 `run.log` 和模型操作日志。
 - `Latest run metadata`：看 provider/model、drafting mode、Git commit、stop reason、best score。
+- `Run comparison`：选择多个 run，对比模型、起草模式、轮数、best/average score、timeout/error counts。
 - `F. Output browser`：看 best output、checkpoint、run config、run summary、round metrics、score history、latest round draft/review/revised/judge。
 
 ## 9. 如何停止 UI

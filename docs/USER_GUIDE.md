@@ -285,6 +285,16 @@ prompt 文件 SHA-256、Git commit、开始/结束时间、停止原因和是否
 - `projects/example/runs/<run_id>/run_summary.json`
 - `projects/example/runs/<run_id>/round_metrics.json`
 
+如果要比较多个 run：
+
+```bash
+.venv/bin/python -m src.main --compare-runs projects/example/runs/<run_a> projects/example/runs/<run_b>
+```
+
+也可以在 UI 的 `Run comparison` 区域选择多个 run。比较会显示 run path、provider、model、
+drafting mode、max/completed rounds、best/average score、stop reason、timeout/error counts，
+并保持路径为 repo-relative 或 masked。
+
 ## memory.md / best_output.md / score_history.json 怎么理解
 
 - `memory.md`：被持续维护的“研究状态记忆”，会影响下一轮输入。

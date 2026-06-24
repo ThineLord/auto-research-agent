@@ -160,6 +160,15 @@ Diagnostic。
 resume eligibility。
 同一 run 目录还会写 `run_summary.json` 和 `round_metrics.json`，用于查看总览、每轮耗时、
 错误标记和 Judge rubric 子项（如果 Judge 返回了结构化 JSON）。
+如果要对比多个 run，可用 CLI：
+
+```bash
+.venv/bin/python -m src.main --compare-runs projects/example/runs/<run_a> projects/example/runs/<run_b>
+.venv/bin/python -m src.main --compare-runs projects/example/runs/<run_a> projects/example/runs/<run_b> --compare-output projects/example/run_comparison.json
+```
+
+比较会读取 `run_config.json`、`run_summary.json`、`round_metrics.json`，并兼容旧
+`run_manifest.json`。
 
 ## 常用命令
 
@@ -267,6 +276,7 @@ make check
   - 点击 `Resume`（等价 `.venv/bin/python -m src.main --resume`）
 - 看结果：
   - UI 的 `Latest run metadata` 会汇总最近一次 run 的 provider/model、drafting mode、Git commit、stop reason、best score 和 artifact 路径
+  - UI 的 `Run comparison` 可选择多个 run，比较模型、drafting mode、轮数、最佳/平均分、停止原因、超时和错误数量
   - 先看 `projects/example/best_output.md`
   - 再看 `projects/example/runs/<run_id>/round_xx/`
   - 复现信息看 `projects/example/runs/<run_id>/run_config.json`

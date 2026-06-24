@@ -6,7 +6,7 @@ import argparse
 import os
 from dataclasses import asdict, replace
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from rich.console import Console
 
@@ -54,9 +54,11 @@ from .llm import create_llm_client
 from .logging_config import configure_logging
 from .project_input import ProjectInputError, load_project_input
 from .resume import run_resume_mode
+from .run_compare import compare_runs
 from .runner import run_iterative_rounds
 from .runtime import acquire_run_lock, release_run_lock
 from .session import run_session_mode
+from .storage import write_json_file
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
@@ -91,6 +93,19 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         type=str,
         default=None,
         help="Override survey report path. Relative paths resolve under the selected project.",
+    )
+    parser.add_argument(
+        "--compare-runs",
+        nargs="+",
+        default=None,
+        metavar="RUN_DIR",
+        help="Compare two or more run directories without provider calls.",
+    )
+    parser.add_argument(
+        "--compare-output",
+        type=str,
+        default=None,
+        help="Optional JSON output path for --compare-runs. Relative paths resolve from repo root.",
     )
     parser.add_argument(
         "--model",
@@ -247,11 +262,60 @@ def _apply_cloud_free_arg_overrides(config, args: argparse.Namespace):
     return cloud_free_config
 
 
+def _resolve_repo_relative_path(root: Path, value: str) -> Path:
+    path = Path(value).expanduser()
+    return path if path.is_absolute() else root / path
+
+
+def _display_repo_path(root: Path, value: object) -> str:
+    path = Path(str(value or ""))
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return f"<repo>/{path.name}"
+
+
+def _privacy_safe_comparison(comparison: dict[str, Any], root: Path) -> dict[str, Any]:
+    safe_comparison = dict(comparison)
+    safe_runs: list[dict[str, Any]] = []
+    for run in comparison.get("runs", []):
+        if not isinstance(run, dict):
+            continue
+        safe_run = dict(run)
+        for key in ("run_path", "run_root", "run_config_path", "run_summary_path"):
+            if safe_run.get(key):
+                safe_run[key] = _display_repo_path(root, safe_run[key])
+        safe_runs.append(safe_run)
+    safe_comparison["runs"] = safe_runs
+    return safe_comparison
+
+
+def _run_compare_cli(args: argparse.Namespace, console: Console, root: Path) -> dict[str, object]:
+    run_roots = [
+        _resolve_repo_relative_path(root, run_root)
+        for run_root in (getattr(args, "compare_runs", None) or [])
+    ]
+    comparison = _privacy_safe_comparison(compare_runs(run_roots), root)
+    output_arg = getattr(args, "compare_output", None)
+    if output_arg:
+        output_path = _resolve_repo_relative_path(root, output_arg)
+        write_json_file(output_path, comparison)
+        console.print(
+            f"[green]Saved run comparison:[/green] {_display_repo_path(root, output_path)}"
+        )
+    console.print_json(data=comparison)
+    return comparison
+
+
 def main() -> None:
     args = parse_args()
     configure_logging()
     console = Console()
     root = Path(__file__).resolve().parent.parent
+    if getattr(args, "compare_runs", None):
+        _run_compare_cli(args, console, root)
+        return
+
     try:
         config = load_app_config(root / "config.yaml")
     except (ConfigValidationError, FileNotFoundError) as exc:
