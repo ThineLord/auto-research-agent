@@ -6,6 +6,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from rich.console import Console
+
+import src.cli as cli_module
 from src.cloud_free import (
     FREE_RUNNER_QUALITY,
     FREE_RUNNER_VOLUME,
@@ -19,16 +22,58 @@ from src.cloud_free import (
     classify_gemini_error,
     classify_model,
     filter_safe_text_models,
+    load_discovery_artifact,
+    load_profile_artifact,
     model_info_from_sdk_model,
     profile_free_cloud_models,
     recommend_free_cloud_model,
     save_profile_artifact,
 )
-from src.config import MODEL_PROVIDER_OLLAMA, GeminiConfig
+from src.config import (
+    MODEL_PROVIDER_GEMINI,
+    MODEL_PROVIDER_OLLAMA,
+    AppConfig,
+    GeminiConfig,
+    ModelConfig,
+)
 from src.llm import OllamaClient, create_llm_client
 
 
 class CloudFreePolicyTests(unittest.TestCase):
+    def _cloud_free_cli_args(self, **overrides: object) -> SimpleNamespace:
+        values: dict[str, object] = {
+            "session": False,
+            "diagnostic": False,
+            "continuous": False,
+            "resume": False,
+            "survey": False,
+            "survey_output": None,
+            "mock": False,
+            "compare_runs": None,
+            "compare_output": None,
+            "analyze_run": None,
+            "analyze_output": None,
+            "model": None,
+            "provider": MODEL_PROVIDER_GEMINI,
+            "gemini_api_key_env": None,
+            "project": "demo",
+            "cloud_free_discover": False,
+            "cloud_free_profile": False,
+            "free_runner_preset": None,
+            "disable_cloud_free_mode": False,
+            "min_delay_seconds": None,
+            "max_delay_seconds": None,
+            "max_retries": None,
+            "prompt_budget_chars": None,
+            "max_prompt_chars": None,
+            "max_rounds": None,
+            "drafting_mode": None,
+            "benchmark_preset": None,
+            "max_provider_quota_failures": 2,
+        }
+        values.update(overrides)
+        return SimpleNamespace(**values)
+
     def test_model_filtering_excludes_paid_preview_live_tool_variants(self) -> None:
         raw = [
             classify_model(model_id="gemini-3.5-flash"),
@@ -231,6 +276,121 @@ class CloudFreePolicyTests(unittest.TestCase):
 
             self.assertNotIn(secret, path.read_text(encoding="utf-8"))
             self.assertNotIn("api_key", path.read_text(encoding="utf-8").lower())
+
+    def test_stale_cloud_free_artifact_paths_return_empty_lists(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            artifacts = project_dir / "artifacts"
+            artifacts.mkdir()
+            (artifacts / "cloud_free_profile.json").mkdir()
+            (artifacts / "cloud_free_models.json").mkdir()
+
+            self.assertEqual(load_profile_artifact(project_dir), [])
+            self.assertEqual(load_discovery_artifact(project_dir), [])
+
+    def test_cloud_free_discovery_cli_masks_project_and_artifact_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            project_dir = temp_root / "projects" / "demo"
+            project_dir.mkdir(parents=True)
+            artifact = project_dir / "artifacts" / "cloud_free_models.json"
+            console = Console(record=True, width=120)
+            args = self._cloud_free_cli_args(cloud_free_discover=True)
+            config = AppConfig(
+                model=ModelConfig(
+                    provider=MODEL_PROVIDER_GEMINI,
+                    gemini=GeminiConfig(api_key="local-key"),
+                )
+            )
+            project_input = SimpleNamespace(
+                project_name="demo",
+                project_dir=project_dir,
+                task_path=project_dir / "task.md",
+                task_text="# Demo",
+                project_title="Demo",
+                source_kind="explicit",
+                as_metadata=lambda: {"project_name": "demo"},
+            )
+
+            with (
+                patch.object(cli_module, "parse_args", return_value=args),
+                patch.object(cli_module, "Console", return_value=console),
+                patch.object(cli_module, "load_app_config", return_value=config),
+                patch.object(cli_module, "load_project_input", return_value=project_input),
+                patch.object(
+                    cli_module,
+                    "discover_free_cloud_models",
+                    return_value=([classify_model(model_id="gemini-3.5-flash")], ""),
+                ),
+                patch.object(cli_module, "save_discovery_artifact", return_value=artifact),
+            ):
+                cli_module.main()
+
+            output = console.export_text(styles=False)
+            self.assertIn("Saved discovery artifact:", output)
+            self.assertIn("<repo>/cloud_free_models.json", output)
+            self.assertIn("task=<repo>/task.md", output)
+            self.assertNotIn(str(project_dir), output)
+            self.assertNotIn(str(artifact), output)
+
+    def test_cloud_free_profile_cli_masks_project_and_artifact_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            project_dir = temp_root / "projects" / "demo"
+            project_dir.mkdir(parents=True)
+            artifact = project_dir / "artifacts" / "cloud_free_profile.json"
+            console = Console(record=True, width=120)
+            args = self._cloud_free_cli_args(cloud_free_profile=True)
+            config = AppConfig(
+                model=ModelConfig(
+                    provider=MODEL_PROVIDER_GEMINI,
+                    gemini=GeminiConfig(api_key="local-key"),
+                )
+            )
+            project_input = SimpleNamespace(
+                project_name="demo",
+                project_dir=project_dir,
+                task_path=project_dir / "task.md",
+                task_text="# Demo",
+                project_title="Demo",
+                source_kind="explicit",
+                as_metadata=lambda: {"project_name": "demo"},
+            )
+
+            with (
+                patch.object(cli_module, "parse_args", return_value=args),
+                patch.object(cli_module, "Console", return_value=console),
+                patch.object(cli_module, "load_app_config", return_value=config),
+                patch.object(cli_module, "load_project_input", return_value=project_input),
+                patch.object(
+                    cli_module,
+                    "discover_free_cloud_models",
+                    return_value=([classify_model(model_id="gemini-3.5-flash")], ""),
+                ),
+                patch.object(cli_module, "save_discovery_artifact"),
+                patch.object(
+                    cli_module,
+                    "profile_free_cloud_models",
+                    return_value=[
+                        CloudModelProfile(
+                            model_id="gemini-3.5-flash",
+                            reachable=True,
+                            structured_output_works=True,
+                            score_parsing_works=True,
+                            diagnostic_score=87,
+                        )
+                    ],
+                ),
+                patch.object(cli_module, "save_profile_artifact", return_value=artifact),
+            ):
+                cli_module.main()
+
+            output = console.export_text(styles=False)
+            self.assertIn("Saved profile artifact:", output)
+            self.assertIn("<repo>/cloud_free_profile.json", output)
+            self.assertIn("task=<repo>/task.md", output)
+            self.assertNotIn(str(project_dir), output)
+            self.assertNotIn(str(artifact), output)
 
     def test_ollama_path_ignores_cloud_free_config(self) -> None:
         client = create_llm_client(

@@ -830,7 +830,7 @@ def load_profile_artifact(project_dir: Path) -> list[CloudModelProfile]:
         return []
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError):
         return []
     profiles = payload.get("profiles", []) if isinstance(payload, Mapping) else []
     result: list[CloudModelProfile] = []
@@ -847,7 +847,7 @@ def load_discovery_artifact(project_dir: Path) -> list[CloudModelInfo]:
         return []
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError):
         return []
     models = payload.get("models", []) if isinstance(payload, Mapping) else []
     result: list[CloudModelInfo] = []

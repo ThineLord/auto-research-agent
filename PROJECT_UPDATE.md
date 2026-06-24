@@ -1,7 +1,75 @@
-# Bug Audit 1 - Artifact Compatibility and Path Display Hardening
+# Bug Audit 2 - Cloud-Free Artifact Resilience and CLI Path Display
 
 Date: 2026-06-24
 Commit: pending phase commit
+Branch: master
+
+## Goal
+
+Continue the post-stable bug audit on cloud-free artifact compatibility and user-facing CLI path
+display without changing provider behavior, prompt semantics, scoring semantics, benchmark behavior,
+or generated artifact schemas.
+
+## Bug / Fragility Found
+
+* `load_profile_artifact` and `load_discovery_artifact` handled malformed JSON but crashed if a
+  stale artifact path existed as a directory or could not be read.
+* `--cloud-free-discover` and `--cloud-free-profile` printed saved artifact paths as raw absolute
+  filesystem paths.
+* The common CLI project input banner printed `task.md` as a raw path, and stale lock guidance did
+  the same for `active_run.json`.
+
+## Reproduction
+
+* A temporary fixture with `artifacts/cloud_free_profile.json/` and
+  `artifacts/cloud_free_models.json/` directories reproduced `IsADirectoryError` from both loader
+  functions.
+* A patched provider-free `src.cli.main` fixture for `--cloud-free-discover` reproduced
+  `contains_absolute_artifact=True` and showed the raw temporary `task.md` path in console output.
+* A provider-free mock smoke showed the project input banner now renders `task=projects/example/task.md`.
+
+## Fix
+
+* Treat unreadable stale cloud-free artifacts the same as malformed JSON and return empty fallback
+  lists.
+* Render cloud-free discovery/profile artifact paths through the existing repo-relative display
+  helper.
+* Render the project input task path and stale lock cleanup hints through the same display helper.
+
+## Tests Added or Updated
+
+* Added cloud-free loader regression coverage for stale artifact paths that exist as directories.
+* Added cloud-free CLI fixture tests for masked discovery artifact, profile artifact, and project
+  task path display.
+
+## Validation
+
+* `.venv/bin/python -m pytest tests/test_cloud_free.py -q` (`16 passed`)
+* `.venv/bin/python -m ruff check src/cloud_free.py src/cli.py tests/test_cloud_free.py`
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make help`
+* `make check` (`119 passed, 43 subtests passed`)
+* `make mock ARGS="--project example --max-rounds 1"`
+* `.venv/bin/python -m src.main --mock --project example --max-rounds 1`
+
+## Remaining Risks
+
+* Runner and diagnostic progress logs still include raw artifact paths in several status lines. The
+  latest mock smoke reproduced this broader path-display issue, but it is separate from the
+  cloud-free artifact loader/display fix and should be handled as the next focused audit cluster.
+* The private local `config.yaml` still points at `pama`, which lacks `task.md`; provider-free mock
+  validation therefore uses `--project example`.
+
+## Next Audit Target
+
+Audit and fix raw absolute path display in runner, diagnostic, session/resume, and generated report
+console output where it can be changed without altering artifact schemas or research behavior.
+
+# Bug Audit 1 - Artifact Compatibility and Path Display Hardening
+
+Date: 2026-06-24
+Commit: 3f567ff
 Branch: master
 
 ## Goal

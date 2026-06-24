@@ -482,7 +482,8 @@ def main() -> None:
     console.print(
         "[bold cyan]Project input:[/bold cyan] "
         f"kind={project_input.source_kind} | name={project_input.project_name} | "
-        f"title={project_input.project_title} | task={project_input.task_path}"
+        f"title={project_input.project_title} | "
+        f"task={_display_repo_path(root, project_input.task_path)}"
     )
 
     if getattr(args, "survey", False):
@@ -498,7 +499,8 @@ def main() -> None:
         if lock_error:
             console.print(f"[red]{lock_error}[/red]")
             console.print(
-                f"[yellow]If this is stale, remove {project_dir / RUN_LOCK_FILENAME} and retry.[/yellow]"
+                "[yellow]If this is stale, remove "
+                f"{_display_repo_path(root, project_dir / RUN_LOCK_FILENAME)} and retry.[/yellow]"
             )
             return
         try:
@@ -540,7 +542,8 @@ def main() -> None:
         if lock_error:
             console.print(f"[red]{lock_error}[/red]")
             console.print(
-                f"[yellow]If this is stale, remove {project_dir / RUN_LOCK_FILENAME} and retry.[/yellow]"
+                "[yellow]If this is stale, remove "
+                f"{_display_repo_path(root, project_dir / RUN_LOCK_FILENAME)} and retry.[/yellow]"
             )
             return
         agents = build_mock_agents(topic_context=topic_context)
@@ -620,7 +623,9 @@ def main() -> None:
         console.print(f"[green]Discovered {len(discovered)} cloud models.[/green]")
         console.print(f"[green]Safe free-run candidates: {len(candidates)}[/green]")
         _print_cloud_model_table(console, candidates)
-        console.print(f"[cyan]Saved discovery artifact:[/cyan] {artifact}")
+        console.print(
+            f"[cyan]Saved discovery artifact:[/cyan] {_display_repo_path(root, artifact)}"
+        )
         return
 
     if args.cloud_free_profile:
@@ -660,7 +665,7 @@ def main() -> None:
                 "[cyan]Recommended model:[/cyan] "
                 f"{recommendation.model_id} ({recommendation.reason})"
             )
-        console.print(f"[cyan]Saved profile artifact:[/cyan] {artifact}")
+        console.print(f"[cyan]Saved profile artifact:[/cyan] {_display_repo_path(root, artifact)}")
         return
 
     if (
@@ -727,7 +732,8 @@ def main() -> None:
     if lock_error:
         console.print(f"[red]{lock_error}[/red]")
         console.print(
-            f"[yellow]If this is stale, remove {project_dir / RUN_LOCK_FILENAME} and retry.[/yellow]"
+            "[yellow]If this is stale, remove "
+            f"{_display_repo_path(root, project_dir / RUN_LOCK_FILENAME)} and retry.[/yellow]"
         )
         return
 
