@@ -1,3 +1,63 @@
+# Release Review - v0.1.0-stable
+
+Date: 2026-06-24
+Commit: release review commit for tag `v0.1.0-stable`
+Branch: master
+
+## Goal
+
+Review the Phase 16 stable milestone package and tag the repository if the release candidate is
+ready, without changing runtime behavior, provider behavior, prompt semantics, scoring semantics,
+benchmark behavior, or artifact schemas.
+
+## What Changed
+
+Reviewed the release docs and stable workflow coverage for bootstrap, mock demo, diagnostic, normal
+run, resume, survey, run comparison, single-run analytics, and the Streamlit analytics dashboard.
+The reviewed docs clearly distinguish mock mode from real research runs, estimated tokens from
+billing tokens, rubric summaries from benchmark scores, resume from new-run context reuse, and
+fail-safe partial next-round blocking.
+
+## Code
+
+* No runtime code changes.
+
+## UI
+
+* No UI code changes.
+
+## Tests
+
+* No new tests were needed because this was a release review and tagging pass.
+
+## Docs
+
+* Added this final release review entry to the canonical project progress log.
+* No additional documentation fixes were required after review.
+
+## Validation
+
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* Release documentation smoke check for stable workflow and distinction wording
+* `make check`
+* Optional `make mock` was not rerun during tagging to avoid creating fresh runtime outputs.
+
+## Risks / Limitations
+
+* The tag is a local repository milestone tag, not a hosted GitHub Release with uploaded binaries.
+* Estimated token fields remain estimate-only and should not be treated as provider billing data.
+
+## Recommended Next Phase
+
+Pause feature work and perform human release acceptance review. Future work should be scoped
+separately, with provider usage capture and richer dashboard visuals as likely candidates.
+
+## Suggested Codex Prompt
+
+Review the `v0.1.0-stable` tag and `PROJECT_UPDATE.md`, then decide whether to create a hosted
+GitHub Release or start a new scoped post-stable phase.
+
 # Phase 16 - Release Packaging and Stable Milestone
 
 Date: 2026-06-24
