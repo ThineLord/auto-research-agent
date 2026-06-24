@@ -60,6 +60,9 @@ class SharedUiBackendHelperTests(unittest.TestCase):
             log_path.write_text("one\ntwo\nthree\n", encoding="utf-8")
             self.assertEqual(tail_file_lines(log_path, max_lines=2), "two\nthree")
             self.assertEqual(tail_file_lines(root / "missing.log"), "")
+            stale_log_path = root / "stale.log"
+            stale_log_path.mkdir()
+            self.assertEqual(tail_file_lines(stale_log_path), "")
 
     def test_score_history_loader_tolerates_stale_directory_path(self) -> None:
         import ui.app as ui_app

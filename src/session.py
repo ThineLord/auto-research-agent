@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, Dict, Sequence
 
@@ -12,7 +11,7 @@ from .agents import ResearchAgents
 from .config import DEFAULT_DRAFTING_MODE
 from .llm import LLMClientProtocol
 from .runner import run_iterative_rounds
-from .storage import display_path, get_memory_for_prompt, write_text
+from .storage import display_path, get_memory_for_prompt, read_json_file, write_text
 
 
 def _clip_words(text: str, max_words: int) -> str:
@@ -281,12 +280,7 @@ def run_session_mode(
     )
 
     research_state_path = project_dir / "research_state.json"
-    research_state: Dict[str, Any] = {}
-    if research_state_path.exists():
-        try:
-            research_state = json.loads(research_state_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            research_state = {}
+    research_state = read_json_file(research_state_path)
 
     final_report_path = project_dir / "final_session_report.md"
     report_text = generate_final_session_report(

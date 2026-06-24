@@ -1,7 +1,63 @@
-# Bug Audit 10 - Run Config Stale Artifact Safety
+# Bug Audit 11 - Session and Log Stale Artifact Safety
 
 Date: 2026-06-24
 Commit: pending phase commit
+Branch: master
+
+## Goal
+
+Harden remaining user-facing stale text/state artifact reads without changing provider, prompt,
+scoring, or benchmark behavior.
+
+## Bug / Fragility Found
+
+* `tail_file_lines` returned an empty string for missing logs but crashed when the log path existed as
+  a directory or otherwise raised `OSError`.
+* Session mode handled malformed `research_state.json` but crashed after the session loop when that
+  artifact existed as a stale unreadable path.
+
+## Reproduction
+
+* A temporary directory at `run.log` reproduced `IsADirectoryError` from `tail_file_lines`.
+* A mocked session-mode run with a directory at `research_state.json` reproduced
+  `IsADirectoryError` after `run_iterative_rounds` completed.
+
+## Fix
+
+* Updated `tail_file_lines` to return an empty fallback on `OSError`, matching the helper's
+  missing-log behavior.
+* Reused `read_json_file` for session-mode `research_state.json`, preserving the existing empty-state
+  fallback for malformed state and extending it to stale unreadable state.
+
+## Tests Added or Updated
+
+* Added UI helper coverage for stale directory log paths.
+* Added session-mode regression coverage for stale directory `research_state.json` with the round loop
+  mocked out.
+
+## Validation
+
+* `.venv/bin/python -m pytest tests/test_ui_helpers.py::SharedUiBackendHelperTests::test_text_json_and_tail_helpers_handle_missing_and_invalid_files tests/test_session.py` (`2 passed`)
+* `.venv/bin/python -m ruff check src/session.py src/storage.py tests/test_session.py tests/test_ui_helpers.py`
+* Minimal stale `run.log` and `research_state.json` directory reproductions before and after the fix
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make check` (`130 passed, 43 subtests passed`)
+
+## Remaining Risks
+
+* These fixes intentionally treat stale unreadable artifacts as absent; they do not attempt deletion,
+  repair, or migration.
+
+## Next Audit Target
+
+Final broad sweep of docs/CLI contracts, generated artifact ignore rules, and remaining speculative
+risks.
+
+# Bug Audit 10 - Run Config Stale Artifact Safety
+
+Date: 2026-06-24
+Commit: 00df60f
 Branch: master
 
 ## Goal

@@ -73,7 +73,10 @@ def write_file_text(path: Path, content: str) -> None:
 def tail_file_lines(path: Path, max_lines: int = 200) -> str:
     if not path.exists():
         return ""
-    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return ""
     return "\n".join(lines[-max_lines:])
 
 
