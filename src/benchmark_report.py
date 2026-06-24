@@ -10,7 +10,7 @@ from pathlib import Path
 from statistics import mean
 from typing import Any
 
-from .storage import display_path, parse_score, read_text, write_text
+from .storage import display_path, parse_score, read_file_text, write_text
 
 
 @dataclass(frozen=True)
@@ -96,6 +96,10 @@ def _infer_repo_root(run_root: Path) -> Path | None:
     return None
 
 
+def _read_round_text(path: Path) -> str:
+    return read_file_text(path).strip()
+
+
 def analyze_benchmark_run(run_root: Path) -> BenchmarkReportAnalysis:
     round_dirs = sorted(
         [path for path in run_root.glob("round_*") if path.is_dir()],
@@ -110,10 +114,10 @@ def analyze_benchmark_run(run_root: Path) -> BenchmarkReportAnalysis:
 
     for round_dir in round_dirs:
         round_index = _round_index(round_dir)
-        draft = read_text(round_dir / "01_draft.md")
-        review = read_text(round_dir / "02_review.md")
-        revised = read_text(round_dir / "03_revised.md")
-        judge = read_text(round_dir / "04_judge.md")
+        draft = _read_round_text(round_dir / "01_draft.md")
+        review = _read_round_text(round_dir / "02_review.md")
+        revised = _read_round_text(round_dir / "03_revised.md")
+        judge = _read_round_text(round_dir / "04_judge.md")
         combined = "\n".join([draft, review, revised, judge])
         score = parse_score(judge)
         failed_provider = _provider_failure_text(combined)

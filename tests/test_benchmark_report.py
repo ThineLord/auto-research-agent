@@ -86,6 +86,27 @@ class BenchmarkReportTests(unittest.TestCase):
             self.assertEqual(analysis.failed_provider_rounds, [1])
             self.assertEqual(analysis.skipped_placeholder_rounds, [1])
 
+    def test_analysis_tolerates_stale_round_text_artifact_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "runs" / "run-1"
+            round_dir = run_root / "round_01"
+            round_dir.mkdir(parents=True)
+            (round_dir / "01_draft.md").mkdir()
+            (round_dir / "02_review.md").write_text("Review A", encoding="utf-8")
+            (round_dir / "03_revised.md").write_text(
+                "A concrete privacy benchmark.",
+                encoding="utf-8",
+            )
+            (round_dir / "04_judge.md").write_text(
+                '{"score": 80, "reasons": ["useful"], "blockers": []}',
+                encoding="utf-8",
+            )
+
+            analysis = analyze_benchmark_run(run_root)
+
+            self.assertEqual(analysis.successful_research_rounds, [1])
+            self.assertEqual(analysis.failed_provider_rounds, [])
+
     def test_written_report_masks_run_root_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)

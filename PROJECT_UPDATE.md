@@ -1,7 +1,59 @@
-# Bug Audit 11 - Session and Log Stale Artifact Safety
+# Bug Audit 12 - Benchmark Report Stale Round Artifact Safety
 
 Date: 2026-06-24
 Commit: pending phase commit
+Branch: master
+
+## Goal
+
+Keep read-only benchmark report analysis robust when old run directories contain stale unreadable
+round text artifacts.
+
+## Bug / Fragility Found
+
+* Benchmark report analysis read `01_draft.md`, `02_review.md`, `03_revised.md`, and `04_judge.md`
+  through a strict text helper, so a stale directory at one of those artifact paths crashed the
+  report with `IsADirectoryError`.
+
+## Reproduction
+
+* A temporary run fixture with `round_01/01_draft.md` as a directory reproduced
+  `IsADirectoryError` from `analyze_benchmark_run`.
+
+## Fix
+
+* Switched benchmark round artifact reads to the tolerant text reader and stripped the result to
+  preserve the previous analysis behavior for normal files.
+* Left global memory/best-output reads unchanged because some of those paths are later written back,
+  and stale write targets require manual cleanup rather than silent recovery.
+
+## Tests Added or Updated
+
+* Added benchmark-report coverage for stale directory round markdown artifacts.
+
+## Validation
+
+* `.venv/bin/python -m pytest tests/test_benchmark_report.py -q` (`4 passed`)
+* `.venv/bin/python -m ruff check src/benchmark_report.py tests/test_benchmark_report.py`
+* Minimal stale `round_01/01_draft.md` directory reproduction before and after the fix
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make check` (`131 passed, 43 subtests passed`)
+
+## Remaining Risks
+
+* Stale directories at write targets such as `memory.md` or `best_output.md` still require manual
+  cleanup; deleting or replacing those paths automatically would be destructive.
+
+## Next Audit Target
+
+Final repository sweep for CLI/docs mismatches, packaging/import safety, and remaining
+compatibility-only concerns.
+
+# Bug Audit 11 - Session and Log Stale Artifact Safety
+
+Date: 2026-06-24
+Commit: 67e83e3
 Branch: master
 
 ## Goal
