@@ -162,6 +162,22 @@ class RunCompareTests(unittest.TestCase):
         self.assertEqual(comparison["run_count"], 1)
         self.assertIsNone(comparison["best_vs_baseline_delta"])
 
+    def test_boolean_scores_are_not_treated_as_numeric_scores(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "bool-score-run"
+            run_root.mkdir()
+            (run_root / "round_metrics.json").write_text(
+                json.dumps([{"round": 1, "score": True}]),
+                encoding="utf-8",
+            )
+
+            summary = load_run_summary(run_root)
+            comparison = compare_runs([run_root])
+
+        self.assertIsNone(summary["best_score"])
+        self.assertIsNone(summary["average_score"])
+        self.assertIsNone(comparison["best_score"])
+
     def test_cli_compare_wrapper_resolves_repo_relative_paths_and_writes_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

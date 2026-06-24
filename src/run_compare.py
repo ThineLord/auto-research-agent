@@ -26,6 +26,8 @@ def _read_json_list(path: Path) -> list[dict[str, Any]]:
 
 
 def _as_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
     if isinstance(value, (int, float)):
         return float(value)
     try:

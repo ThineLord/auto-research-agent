@@ -1,7 +1,60 @@
-# Bug Audit 4 - Survey Artifact Path Privacy
+# Bug Audit 5 - Run Comparison Boolean Score Handling
 
 Date: 2026-06-24
 Commit: pending phase commit
+Branch: master
+
+## Goal
+
+Harden run comparison legacy metric parsing without changing scoring semantics or benchmark
+behavior.
+
+## Bug / Fragility Found
+
+* `load_run_summary` treated boolean `score` values in legacy `round_metrics.json` as numeric
+  scores (`True` -> `1.0`, `False` -> `0.0`).
+* Single-run analytics already rejected booleans as invalid scores, so compare-runs and analyze-run
+  could disagree on the same malformed legacy artifact.
+
+## Reproduction
+
+* A temporary run fixture with `round_metrics.json` containing `{"score": true}` produced
+  `best_score: 1.0` and `average_score: 1.0` from `src.run_compare.load_run_summary`.
+
+## Fix
+
+* Updated run comparison numeric coercion to reject booleans before accepting integers/floats.
+
+## Tests Added or Updated
+
+* Added a run comparison regression test that verifies boolean scores are ignored rather than
+  treated as numeric values.
+
+## Validation
+
+* `.venv/bin/python -m pytest tests/test_run_compare.py -q` (`5 passed`)
+* `.venv/bin/python -m ruff check src/run_compare.py tests/test_run_compare.py`
+* Minimal bool-score reproduction fixture before and after the fix
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make check` (`124 passed, 43 subtests passed`)
+
+## Remaining Risks
+
+* This phase intentionally does not reject other string-like numeric legacy scores; those remain
+  supported for artifact compatibility.
+* The CLI still accepts a single path for `--compare-runs` even though help text says two or more;
+  that behavior needs a separate compatibility decision.
+
+## Next Audit Target
+
+Continue reviewing CLI parser contracts, docs command accuracy, config validation edge cases, and
+UI helper behavior around stale artifacts.
+
+# Bug Audit 4 - Survey Artifact Path Privacy
+
+Date: 2026-06-24
+Commit: e0d0abc
 Branch: master
 
 ## Goal
