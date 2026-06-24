@@ -135,6 +135,10 @@ schema-additive and must not reinterpret or rescale the Judge's top-level score.
 The Streamlit UI renders a compact latest-run metadata table from `run_config.json` and
 `run_summary.json`, keeps artifact paths repo-relative or masked, and gives artifact-specific
 messages when `run_config.json`, `run_summary.json`, or `round_metrics.json` has not been written.
+The `Run analytics dashboard` uses existing `run_summary.json`, `round_metrics.json`, and
+`score_history.json` only. It displays compact score, rubric, similarity/evolution, timeout/error,
+agent timing, and estimated-token views, and should keep missing/legacy fields as empty partial
+states rather than failures.
 It also exposes a multi-run comparison table using the same `src.run_compare` helper as
 `--compare-runs`; missing or legacy metadata should produce partial rows instead of UI failures.
 Newer runs add aggregate agent elapsed seconds, estimated token totals, average revised similarity,

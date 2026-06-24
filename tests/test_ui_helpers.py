@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import tempfile
 import unittest
@@ -602,6 +603,141 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertEqual(rows[0]["revised_similarity_to_previous"], 0.81)
         self.assertEqual(rows[0]["rubric_evaluation_design_quality"], 11)
         self.assertEqual(rows[0]["rubric_tomorrow_actionability"], 14)
+
+    def test_ui_run_analytics_dashboard_summarizes_existing_artifacts(self) -> None:
+        import ui.app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            run_root = project_dir / "runs" / "run1"
+            run_root.mkdir(parents=True)
+            round_metrics = [
+                {
+                    "round": 1,
+                    "score": 80.0,
+                    "errors": [],
+                    "agent_timings_seconds": {
+                        "draft": 1.0,
+                        "review": 0.5,
+                        "revise": 0.4,
+                        "judge": 0.3,
+                    },
+                    "round_runtime_seconds": 2.2,
+                    "estimated_input_tokens": 100,
+                    "estimated_output_tokens": 30,
+                    "estimated_total_tokens": 130,
+                    "evolution_metrics": {
+                        "draft_to_revised_similarity": 0.72,
+                    },
+                    "judge_rubric": {
+                        "evaluation_design_quality": 11,
+                        "tomorrow_actionability": 13,
+                    },
+                },
+                {
+                    "round": 2,
+                    "score": 91.0,
+                    "timeout_this_round": True,
+                    "errors": ["timeout"],
+                    "agent_timings_seconds": {
+                        "draft": 1.5,
+                        "review": 0.7,
+                        "revise": 0.6,
+                        "judge": 0.4,
+                    },
+                    "round_runtime_seconds": 3.2,
+                    "estimated_input_tokens": 120,
+                    "estimated_output_tokens": 40,
+                    "estimated_total_tokens": 160,
+                    "evolution_metrics": {
+                        "score_delta_vs_previous": 11,
+                        "draft_to_revised_similarity": 0.75,
+                        "revised_similarity_to_previous": 0.82,
+                    },
+                    "judge_rubric": {
+                        "evaluation_design_quality": 14,
+                        "tomorrow_actionability": 15,
+                    },
+                },
+            ]
+            write_json_file(
+                run_root / "run_config.json",
+                {
+                    "run_id": "run1",
+                    "model": {"provider": "ollama", "name": "qwen3:8b"},
+                    "runtime": {"max_rounds": 2},
+                },
+            )
+            write_json_file(
+                run_root / "run_summary.json",
+                {
+                    "run_id": "run1",
+                    "completed_rounds": 2,
+                    "best_score": 91,
+                    "timeout_count": 1,
+                    "error_count": 1,
+                    "total_agent_elapsed_seconds": 5.4,
+                    "total_estimated_tokens": 290,
+                    "round_metrics_path": str(run_root / "round_metrics.json"),
+                },
+            )
+            (run_root / "round_metrics.json").write_text(
+                json.dumps(round_metrics),
+                encoding="utf-8",
+            )
+            (project_dir / "score_history.json").write_text(
+                json.dumps(round_metrics),
+                encoding="utf-8",
+            )
+            checkpoint = {
+                "run_root": str(run_root),
+                "run_summary": str(run_root / "run_summary.json"),
+            }
+
+            dashboard = ui_app.build_run_analytics_dashboard(project_dir, checkpoint)
+
+        self.assertTrue(dashboard["available"])
+        cards = {card["label_key"]: card["value"] for card in dashboard["cards"]}
+        self.assertEqual(cards["analytics_best_score"], 91.0)
+        self.assertEqual(cards["analytics_completed_rounds"], 2)
+        self.assertEqual(cards["analytics_timeout_errors"], "1 / 1")
+        self.assertEqual(cards["analytics_agent_elapsed"], "5.40s")
+        self.assertEqual(cards["analytics_estimated_tokens"], 290)
+        self.assertEqual(dashboard["score_rows"][-1]["score_delta"], 11)
+        self.assertEqual(dashboard["rubric_rows"][-1]["evaluation"], 14.0)
+        self.assertEqual(dashboard["similarity_rows"][-1]["revised_to_previous"], 0.82)
+        self.assertEqual(dashboard["agent_timing_rows"][-1]["judge_s"], 0.4)
+        self.assertEqual(dashboard["token_rows"][-1]["total_tokens"], 160)
+        self.assertNotIn(
+            str(Path(tmp)),
+            "\n".join(str(value) for value in dashboard["sources"]),
+        )
+
+    def test_ui_run_analytics_dashboard_tolerates_missing_legacy_metrics(self) -> None:
+        import ui.app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir(parents=True)
+            (project_dir / "score_history.json").write_text(
+                """
+[
+  {"round": 1, "score": 70, "errors": [], "round_runtime_seconds": 1.5},
+  {"round": 2, "score": 72, "errors": ["legacy warning"], "round_runtime_seconds": 1.7}
+]
+""",
+                encoding="utf-8",
+            )
+
+            dashboard = ui_app.build_run_analytics_dashboard(project_dir, {})
+
+        self.assertTrue(dashboard["available"])
+        self.assertEqual(dashboard["score_rows"][-1]["score"], 72.0)
+        self.assertEqual(dashboard["cards"][0]["value"], 72.0)
+        self.assertEqual(dashboard["cards"][1]["value"], 2)
+        self.assertEqual(dashboard["cards"][2]["value"], "0 / 1")
+        self.assertEqual(dashboard["rubric_rows"], [])
+        self.assertEqual(dashboard["similarity_rows"], [])
 
     def test_ui_run_metadata_rows_summarize_latest_run_without_absolute_paths(self) -> None:
         import ui.app as ui_app

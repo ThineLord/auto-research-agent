@@ -47,6 +47,7 @@ from src.config import (
 )
 from src.llm import GeminiClient
 from src.resume import inspect_next_round_directory
+from src.run_analytics import analyze_run
 from src.run_compare import compare_runs
 from src.runtime import (
     get_active_process_meta,
@@ -348,6 +349,29 @@ def _safe_int(value: Any, default: int = 0) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _safe_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _read_json_list_file(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    try:
+        payload = json.loads(read_file_text(path))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(payload, list):
+        return []
+    return [entry for entry in payload if isinstance(entry, dict)]
 
 
 def check_ollama_model_health(
@@ -928,6 +952,308 @@ def build_run_comparison_rows(run_roots: Sequence[Path]) -> list[dict[str, Any]]
             }
         )
     return rows
+
+
+def _has_run_artifacts(run_root: Path) -> bool:
+    return any(
+        (run_root / filename).exists()
+        for filename in ("run_config.json", "run_summary.json", "round_metrics.json")
+    )
+
+
+def build_run_analytics_dashboard(project_dir: Path, checkpoint: dict[str, Any]) -> dict[str, Any]:
+    paths = resolve_run_artifact_paths(project_dir, checkpoint)
+    run_root = paths["run_root"]
+    run_summary = read_json_file(paths["run_summary"]) if paths["run_summary"].exists() else {}
+    round_metric_entries = _read_json_list_file(paths["round_metrics"])
+    score_rows = load_score_history_rows(project_dir / "score_history.json")
+    if not score_rows and round_metric_entries:
+        score_rows = _flatten_metric_rows(round_metric_entries)
+
+    analysis: dict[str, Any] = {}
+    if run_root.exists() and _has_run_artifacts(run_root):
+        analysis = analyze_run(run_root)
+    rounds = analysis.get("rounds") if isinstance(analysis.get("rounds"), dict) else {}
+    score = analysis.get("score") if isinstance(analysis.get("score"), dict) else {}
+    robustness = analysis.get("robustness") if isinstance(analysis.get("robustness"), dict) else {}
+    cost_ready = analysis.get("cost_ready") if isinstance(analysis.get("cost_ready"), dict) else {}
+
+    completed_rounds = _first_present(
+        rounds.get("completed_rounds"),
+        run_summary.get("completed_rounds"),
+        checkpoint.get("last_completed_round"),
+        len(score_rows) if score_rows else None,
+    )
+    best_score = _first_present(
+        score.get("best_score"),
+        run_summary.get("best_score"),
+        _max_numeric(score_rows, "score"),
+    )
+    timeout_count = _first_present(
+        robustness.get("timeout_count"),
+        run_summary.get("timeout_count"),
+        sum(1 for row in score_rows if row.get("timeout")),
+    )
+    error_count = _first_present(
+        robustness.get("error_count"),
+        run_summary.get("error_count"),
+        sum(_safe_int(row.get("errors")) for row in score_rows),
+    )
+    total_agent_elapsed = _first_present(
+        cost_ready.get("total_agent_elapsed_seconds"),
+        run_summary.get("total_agent_elapsed_seconds"),
+        _sum_numeric(score_rows, "round_s"),
+    )
+    total_estimated_tokens = _first_present(
+        cost_ready.get("total_estimated_tokens"),
+        run_summary.get("total_estimated_tokens"),
+        _sum_numeric(score_rows, "estimated_total_tokens"),
+    )
+    cards = [
+        {"label_key": "analytics_best_score", "value": best_score},
+        {"label_key": "analytics_completed_rounds", "value": completed_rounds},
+        {
+            "label_key": "analytics_timeout_errors",
+            "value": f"{_display_value(timeout_count, '0')} / {_display_value(error_count, '0')}",
+        },
+        {"label_key": "analytics_agent_elapsed", "value": _format_seconds(total_agent_elapsed)},
+        {"label_key": "analytics_estimated_tokens", "value": total_estimated_tokens},
+    ]
+    source_paths = [
+        output_display_path(path)
+        for path in (
+            paths["run_summary"],
+            paths["round_metrics"],
+            project_dir / "score_history.json",
+        )
+        if path.exists()
+    ]
+    return {
+        "available": bool(score_rows or run_summary or round_metric_entries),
+        "cards": cards,
+        "score_rows": _score_trend_rows(score_rows),
+        "rubric_rows": _rubric_trend_rows(score_rows),
+        "similarity_rows": _similarity_trend_rows(score_rows),
+        "agent_timing_rows": _agent_timing_rows(score_rows),
+        "token_rows": _token_rows(score_rows),
+        "sources": source_paths,
+    }
+
+
+def _flatten_metric_rows(entries: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for entry in entries:
+        timings = entry.get("agent_timings_seconds")
+        timings = timings if isinstance(timings, dict) else {}
+        evolution = entry.get("evolution_metrics")
+        evolution = evolution if isinstance(evolution, dict) else {}
+        rubric = entry.get("judge_rubric")
+        rubric = rubric if isinstance(rubric, dict) else {}
+        rows.append(
+            {
+                "round": entry.get("round"),
+                "score": entry.get("score"),
+                "timeout": entry.get("timeout_this_round", False),
+                "errors": len(entry.get("errors") or []),
+                "draft_s": timings.get("draft", 0.0),
+                "review_s": timings.get("review", 0.0),
+                "revise_s": timings.get("revise", 0.0),
+                "judge_s": timings.get("judge", 0.0),
+                "round_s": entry.get("round_runtime_seconds", 0.0),
+                "estimated_input_tokens": entry.get("estimated_input_tokens"),
+                "estimated_output_tokens": entry.get("estimated_output_tokens"),
+                "estimated_total_tokens": entry.get("estimated_total_tokens"),
+                "score_delta_vs_previous": evolution.get("score_delta_vs_previous"),
+                "draft_to_revised_similarity": evolution.get("draft_to_revised_similarity"),
+                "revised_similarity_to_previous": evolution.get("revised_similarity_to_previous"),
+                "rubric_evaluation_design_quality": rubric.get("evaluation_design_quality"),
+                "rubric_tomorrow_actionability": rubric.get("tomorrow_actionability"),
+            }
+        )
+    return rows
+
+
+def _sum_numeric(rows: Sequence[dict[str, Any]], key: str) -> float | int | None:
+    values = [_safe_float(row.get(key)) for row in rows]
+    numbers = [value for value in values if value is not None]
+    if not numbers:
+        return None
+    total = sum(numbers)
+    return round(total, 3)
+
+
+def _max_numeric(rows: Sequence[dict[str, Any]], key: str) -> float | None:
+    values = [_safe_float(row.get(key)) for row in rows]
+    numbers = [value for value in values if value is not None]
+    if not numbers:
+        return None
+    return round(max(numbers), 3)
+
+
+def _format_seconds(value: Any) -> str:
+    numeric = _safe_float(value)
+    if numeric is None:
+        return "N/A"
+    return f"{numeric:.2f}s"
+
+
+def _score_trend_rows(rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    trend_rows: list[dict[str, Any]] = []
+    for row in rows:
+        score = _safe_float(row.get("score"))
+        if score is None:
+            continue
+        trend_rows.append(
+            {
+                "round": row.get("round"),
+                "score": score,
+                "score_delta": row.get("score_delta_vs_previous"),
+            }
+        )
+    return trend_rows
+
+
+def _rubric_trend_rows(rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    trend_rows: list[dict[str, Any]] = []
+    for row in rows:
+        evaluation = _safe_float(row.get("rubric_evaluation_design_quality"))
+        actionability = _safe_float(row.get("rubric_tomorrow_actionability"))
+        if evaluation is None and actionability is None:
+            continue
+        trend_rows.append(
+            {
+                "round": row.get("round"),
+                "evaluation": evaluation,
+                "actionability": actionability,
+            }
+        )
+    return trend_rows
+
+
+def _similarity_trend_rows(rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    trend_rows: list[dict[str, Any]] = []
+    for row in rows:
+        draft_revised = _safe_float(row.get("draft_to_revised_similarity"))
+        revised_previous = _safe_float(row.get("revised_similarity_to_previous"))
+        if draft_revised is None and revised_previous is None:
+            continue
+        trend_rows.append(
+            {
+                "round": row.get("round"),
+                "draft_to_revised": draft_revised,
+                "revised_to_previous": revised_previous,
+            }
+        )
+    return trend_rows
+
+
+def _agent_timing_rows(rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            "round": row.get("round"),
+            "draft_s": row.get("draft_s"),
+            "review_s": row.get("review_s"),
+            "revise_s": row.get("revise_s"),
+            "judge_s": row.get("judge_s"),
+            "round_s": row.get("round_s"),
+        }
+        for row in rows
+        if any(
+            _safe_float(row.get(key)) is not None
+            for key in ("draft_s", "review_s", "revise_s", "judge_s")
+        )
+    ]
+
+
+def _token_rows(rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            "round": row.get("round"),
+            "input_tokens": row.get("estimated_input_tokens"),
+            "output_tokens": row.get("estimated_output_tokens"),
+            "total_tokens": row.get("estimated_total_tokens"),
+        }
+        for row in rows
+        if _safe_float(row.get("estimated_total_tokens")) is not None
+    ]
+
+
+def render_run_analytics_dashboard(project_dir: Path, checkpoint: dict[str, Any]) -> None:
+    dashboard = build_run_analytics_dashboard(project_dir, checkpoint)
+    st.subheader(t("run_analytics_dashboard"))
+    if not dashboard["available"]:
+        st.info(t("run_analytics_empty"))
+        return
+
+    metric_columns = st.columns(len(dashboard["cards"]))
+    for column, card in zip(metric_columns, dashboard["cards"]):
+        column.metric(t(str(card["label_key"])), _display_value(card.get("value")))
+
+    score_tab, rubric_tab, similarity_tab, timing_tab, token_tab = st.tabs(
+        [
+            t("analytics_score_trend"),
+            t("analytics_rubric_trend"),
+            t("analytics_similarity_trend"),
+            t("analytics_agent_timing"),
+            t("analytics_token_estimates"),
+        ]
+    )
+    _render_dashboard_table_chart(
+        score_tab,
+        dashboard["score_rows"],
+        empty_key="analytics_score_empty",
+        x="round",
+        y=["score"],
+    )
+    _render_dashboard_table_chart(
+        rubric_tab,
+        dashboard["rubric_rows"],
+        empty_key="analytics_rubric_empty",
+        x="round",
+        y=["evaluation", "actionability"],
+    )
+    _render_dashboard_table_chart(
+        similarity_tab,
+        dashboard["similarity_rows"],
+        empty_key="analytics_similarity_empty",
+        x="round",
+        y=["draft_to_revised", "revised_to_previous"],
+    )
+    _render_dashboard_table_chart(
+        timing_tab,
+        dashboard["agent_timing_rows"],
+        empty_key="analytics_timing_empty",
+        x="round",
+        y=["draft_s", "review_s", "revise_s", "judge_s"],
+    )
+    _render_dashboard_table_chart(
+        token_tab,
+        dashboard["token_rows"],
+        empty_key="analytics_tokens_empty",
+        x="round",
+        y=["input_tokens", "output_tokens", "total_tokens"],
+    )
+    if dashboard["sources"]:
+        st.caption(t("analytics_artifact_sources"))
+        st.code("\n".join(dashboard["sources"]), language="text")
+
+
+def _render_dashboard_table_chart(
+    tab: Any,
+    rows: list[dict[str, Any]],
+    *,
+    empty_key: str,
+    x: str,
+    y: list[str],
+) -> None:
+    with tab:
+        if not rows:
+            st.info(t(empty_key))
+            return
+        st.dataframe(rows, width="stretch", hide_index=True)
+        chart_y = [key for key in y if any(_safe_float(row.get(key)) is not None for row in rows)]
+        if chart_y:
+            st.line_chart(rows, x=x, y=chart_y)
 
 
 def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1886,6 +2212,8 @@ def main() -> None:
         st.dataframe(run_metadata_rows, width="stretch", hide_index=True)
     else:
         st.info(t("run_metadata_empty"))
+
+    render_run_analytics_dashboard(proj_path, checkpoint)
 
     score_rows = load_score_history_rows(proj_path / "score_history.json")
     st.subheader(t("score_history_table"))

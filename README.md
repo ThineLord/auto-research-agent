@@ -299,6 +299,7 @@ make check
   - 点击 `Resume`（等价 `.venv/bin/python -m src.main --resume`）
 - 看结果：
   - UI 的 `Latest run metadata` 会汇总最近一次 run 的 provider/model、drafting mode、Git commit、stop reason、best score 和 artifact 路径
+  - UI 的 `Run analytics dashboard` 会用现有 artifacts 显示 score、rubric、相似度/evolution、timeout/error、agent 耗时和估算 token 趋势；缺少旧字段时显示部分状态而不是报错
   - UI 的 `Run comparison` 可选择多个 run，比较模型、drafting mode、轮数、最佳/平均分、停止原因、超时/错误数量、agent 耗时、估算 token 数、修订相似度和 rubric 子项均值
   - 先看 `projects/example/best_output.md`
   - 再看 `projects/example/runs/<run_id>/round_xx/`

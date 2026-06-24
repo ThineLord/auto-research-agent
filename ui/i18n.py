@@ -268,6 +268,27 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "run_metadata_empty": (
             "No run metadata yet. Start a run to generate run_config.json and run_summary.json."
         ),
+        "run_analytics_dashboard": "Run analytics dashboard",
+        "run_analytics_empty": (
+            "No analytics artifacts yet. Complete a run to generate score history, round metrics, "
+            "or run summary data."
+        ),
+        "analytics_best_score": "Best score",
+        "analytics_completed_rounds": "Completed rounds",
+        "analytics_timeout_errors": "Timeouts / errors",
+        "analytics_agent_elapsed": "Agent time",
+        "analytics_estimated_tokens": "Estimated tokens",
+        "analytics_score_trend": "Score",
+        "analytics_rubric_trend": "Rubric",
+        "analytics_similarity_trend": "Similarity",
+        "analytics_agent_timing": "Timing",
+        "analytics_token_estimates": "Tokens",
+        "analytics_score_empty": "No numeric score trend is available yet.",
+        "analytics_rubric_empty": "No structured rubric trend is available yet.",
+        "analytics_similarity_empty": "No evolution/similarity metrics are available yet.",
+        "analytics_timing_empty": "No per-agent timing metrics are available yet.",
+        "analytics_tokens_empty": "No estimated token metrics are available yet.",
+        "analytics_artifact_sources": "Analytics sources",
         "missing_run_config": (
             "run_config.json is missing. New runs write it under runs/<run_id>/; older runs may "
             "only have legacy run_manifest.json."
@@ -545,6 +566,24 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "run_comparison_score_chart": "最佳分数与平均分数对比",
         "run_metadata_summary": "最新运行元数据",
         "run_metadata_empty": "还没有运行元数据。启动一次运行后会生成 run_config.json 和 run_summary.json。",
+        "run_analytics_dashboard": "运行分析看板",
+        "run_analytics_empty": "暂无分析 artifact。完成一次运行后会生成评分历史、轮次指标或运行摘要。",
+        "analytics_best_score": "最佳分数",
+        "analytics_completed_rounds": "已完成轮数",
+        "analytics_timeout_errors": "超时 / 错误",
+        "analytics_agent_elapsed": "Agent 耗时",
+        "analytics_estimated_tokens": "估算 tokens",
+        "analytics_score_trend": "分数",
+        "analytics_rubric_trend": "Rubric",
+        "analytics_similarity_trend": "相似度",
+        "analytics_agent_timing": "耗时",
+        "analytics_token_estimates": "Tokens",
+        "analytics_score_empty": "暂无可用的数字分数趋势。",
+        "analytics_rubric_empty": "暂无结构化 rubric 趋势。",
+        "analytics_similarity_empty": "暂无 evolution/similarity 指标。",
+        "analytics_timing_empty": "暂无 per-agent 耗时指标。",
+        "analytics_tokens_empty": "暂无估算 token 指标。",
+        "analytics_artifact_sources": "分析来源",
         "missing_run_config": (
             "缺少 run_config.json。新运行会写入 runs/<run_id>/；旧运行可能只有 legacy run_manifest.json。"
         ),

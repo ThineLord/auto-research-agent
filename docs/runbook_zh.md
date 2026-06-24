@@ -295,6 +295,8 @@ UI 中重点看：
 - `D. Progress panel`：看 Mode、Round、Stage、Best score、Model、Stop reason。
 - `E. Live logs panel`：看 `run.log` 和模型操作日志。
 - `Latest run metadata`：看 provider/model、drafting mode、Git commit、stop reason、best score。
+- `Run analytics dashboard`：看最新 run 的 score、rubric、similarity/evolution、timeout/error、
+  agent timing 和 estimated tokens；旧 artifact 缺少字段时应显示部分状态而不是报错。
 - `Run comparison`：选择多个 run，对比模型、起草模式、轮数、best/average score、timeout/error counts、agent 总耗时、估算 token、平均 revised 相似度、低变化轮次数和 rubric 子项均值。
 - `F. Output browser`：看 best output、checkpoint、run config、run summary、round metrics、score history、latest round draft/review/revised/judge。
 

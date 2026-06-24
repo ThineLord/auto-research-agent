@@ -1,3 +1,69 @@
+# Phase 15 - UI Analytics Dashboard
+
+Date: 2026-06-24
+Commit: TBD
+Branch: master
+
+## Goal
+
+Add a compact Streamlit analytics dashboard for latest-run score, rubric, evolution/similarity,
+timeout/error, agent timing, and estimated-token trends using existing artifacts only.
+
+## What Changed
+
+The UI now shows a single-run `Run analytics dashboard` after latest-run metadata. It reads existing
+`run_summary.json`, `round_metrics.json`, and `score_history.json`, uses the provider-free
+single-run analytics helper where practical, and degrades to partial empty states for missing or
+legacy fields.
+
+## Code
+
+* Added UI helper functions that build compact dashboard cards and trend rows without writing or
+  changing run artifacts.
+* Reused existing artifact resolution, score-history flattening, and `src.run_analytics.analyze_run`
+  for summary fields.
+
+## UI
+
+* Added a latest-run analytics dashboard with cards for best score, completed rounds, timeout/error
+  counts, agent time, and estimated tokens.
+* Added compact tabs for score, rubric, similarity/evolution, timing, and token trends.
+* Kept artifact source paths repo-relative or masked.
+
+## Tests
+
+* Added focused UI helper tests for complete analytics artifacts and score-history-only legacy
+  fallback behavior.
+
+## Docs
+
+* Updated README, USER_GUIDE, DEVELOPER_GUIDE, quickstart_zh, and runbook_zh with dashboard behavior
+  and limitations.
+
+## Validation
+
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `.venv/bin/python -m pytest tests/test_ui_helpers.py::SharedUiBackendHelperTests::test_ui_run_analytics_dashboard_summarizes_existing_artifacts tests/test_ui_helpers.py::SharedUiBackendHelperTests::test_ui_run_analytics_dashboard_tolerates_missing_legacy_metrics -q`
+* `make check`
+
+## Risks / Limitations
+
+* The dashboard summarizes existing artifacts only; old runs without rubric or evolution fields show
+  empty tables for those tabs.
+* Token values remain conservative estimates and are not billing data.
+
+## Recommended Next Phase
+
+Phase 16 - Provider Usage Capture, if provider APIs expose real token usage safely; otherwise pause
+for release packaging and human review.
+
+## Suggested Codex Prompt
+
+Continue with Phase 16. Capture real provider token usage only when Ollama/Gemini expose it safely,
+preserve estimate-only fallbacks, avoid vendor pricing assumptions, update tests/docs/PROJECT_UPDATE.md,
+validate, commit, and push.
+
 # Phase 14 - Mock/Fake Run Mode
 
 Date: 2026-06-24

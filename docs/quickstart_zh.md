@@ -212,6 +212,10 @@ touch projects/example/STOP_REQUESTED
 也可以在 UI 的 `Run comparison` 区域选择多个 run，对比 provider、model、drafting mode、
 轮数、best/average score、stop reason、timeout/error counts、agent 总耗时、估算 token、平均 revised 相似度、低变化轮次数、rubric 子项均值和 artifact 路径。
 
+UI 的 `Run analytics dashboard` 会针对最新 run 显示更紧凑的单 run 趋势：score、rubric、
+similarity/evolution、timeout/error、agent timing 和 estimated tokens。它只读取已有
+`run_summary.json`、`round_metrics.json` 和 `score_history.json`；旧 run 缺少字段时会显示空表或部分图表。
+
 分析单个 run：
 
 ```bash

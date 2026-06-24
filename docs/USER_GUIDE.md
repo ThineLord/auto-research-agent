@@ -191,7 +191,10 @@ cp projects/example/memory.example.md projects/<project>/memory.md
 UI 会显示相对项目路径，例如 `projects/example`，避免把本机绝对路径展示到页面上。
 运行后，UI 的 `Latest run metadata` 会集中显示 run_config/run_summary 中的模型、drafting mode、
 Git commit、停止原因、最佳分数、修订稿相对上一轮的平均相似度和 artifact 路径；
-`Output browser` 也可直接打开 `round_metrics.json`。token 指标使用可见 prompt context
+`Run analytics dashboard` 会用现有 `run_summary.json`、`round_metrics.json` 和
+`score_history.json` 展示分数、rubric、相似度/evolution、timeout/error、agent 耗时和估算
+token 趋势；缺少旧字段时显示空表或部分图表，不会让 UI 失败。`Output browser` 也可直接打开
+`round_metrics.json`。token 指标使用可见 prompt context
 和输出长度做保守估算；字段名中的 `estimated_*_tokens` 表示估算值，不代表真实账单 token。
 相似度/低变化轮次是基于已生成文本的解释性指标，不改变评分或停止条件。
 
