@@ -29,6 +29,8 @@ class RunCompareTests(unittest.TestCase):
                         "completed_rounds": 2,
                         "drafting_mode": "best_guided",
                         "timeout_rounds": [2],
+                        "total_agent_elapsed_seconds": 5.25,
+                        "total_estimated_tokens": 123,
                     }
                 ),
                 encoding="utf-8",
@@ -67,6 +69,8 @@ class RunCompareTests(unittest.TestCase):
             self.assertEqual(comparison["runs"][0]["max_rounds"], 3)
             self.assertEqual(comparison["runs"][0]["average_score"], 71.0)
             self.assertEqual(comparison["runs"][0]["timeout_count"], 1)
+            self.assertEqual(comparison["runs"][0]["total_agent_elapsed_seconds"], 5.25)
+            self.assertEqual(comparison["runs"][0]["total_estimated_tokens"], 123)
             self.assertEqual(comparison["runs"][0]["metadata_status"], "ok")
             self.assertEqual(json.loads(output_path.read_text(encoding="utf-8")), comparison)
 
@@ -88,8 +92,21 @@ class RunCompareTests(unittest.TestCase):
             (run_root / "round_metrics.json").write_text(
                 json.dumps(
                     [
-                        {"round": 1, "score": 70.0, "successful_research_round": True},
-                        {"round": 2, "score": 75.0, "timeout_this_round": True},
+                        {
+                            "round": 1,
+                            "score": 70.0,
+                            "successful_research_round": True,
+                            "agent_timings_seconds": {"draft": 1.0, "review": 0.5},
+                            "estimated_input_tokens": 10,
+                            "estimated_output_tokens": 4,
+                            "estimated_total_tokens": 14,
+                        },
+                        {
+                            "round": 2,
+                            "score": 75.0,
+                            "timeout_this_round": True,
+                            "agent_timings_seconds": {"draft": 2.0},
+                        },
                     ]
                 ),
                 encoding="utf-8",
@@ -102,6 +119,8 @@ class RunCompareTests(unittest.TestCase):
         self.assertEqual(summary["successful_rounds"], [1])
         self.assertEqual(summary["timeout_rounds"], [2])
         self.assertEqual(summary["average_score"], 72.5)
+        self.assertEqual(summary["total_agent_elapsed_seconds"], 3.5)
+        self.assertEqual(summary["total_estimated_tokens"], 14)
         self.assertEqual(comparison["best_run_id"], "legacy-run")
 
     def test_missing_metadata_is_reported_without_failing_comparison(self) -> None:

@@ -450,8 +450,28 @@ class RoundLoopTests(unittest.TestCase):
             self.assertEqual(run_summary["best_score"], 50)
             self.assertEqual(run_summary["completed_rounds"], 2)
             self.assertEqual(run_summary["successful_rounds"], [1, 2])
+            self.assertEqual(
+                run_summary["total_elapsed_seconds"], run_summary["total_runtime_seconds"]
+            )
+            self.assertGreaterEqual(run_summary["total_agent_elapsed_seconds"], 0)
+            self.assertGreater(run_summary["total_estimated_input_tokens"], 0)
+            self.assertGreater(run_summary["total_estimated_output_tokens"], 0)
+            self.assertEqual(
+                run_summary["total_estimated_tokens"],
+                run_summary["total_estimated_input_tokens"]
+                + run_summary["total_estimated_output_tokens"],
+            )
+            self.assertEqual(run_summary["timeout_count"], 0)
+            self.assertEqual(run_summary["error_count"], 0)
+            self.assertIn("draft", run_summary["agent_metric_totals"])
             self.assertEqual(len(round_metrics), 2)
             self.assertIn("agent_timings_seconds", round_metrics[0])
+            self.assertIn("agent_io_metrics", round_metrics[0])
+            self.assertGreater(round_metrics[0]["estimated_total_tokens"], 0)
+            self.assertEqual(
+                round_metrics[0]["agent_io_metrics"]["draft"]["token_estimate_method"],
+                run_summary["token_estimate_method"],
+            )
             self.assertIn("judge_rubric", round_metrics[0])
             self.assertEqual(round_metrics[0]["judge_rubric"]["novelty_and_research_value"], 10.0)
 

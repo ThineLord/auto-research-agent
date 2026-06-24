@@ -503,7 +503,10 @@ class SharedUiBackendHelperTests(unittest.TestCase):
     "drafting_mode": "best_guided",
     "errors": [],
     "agent_timings_seconds": {"draft": 1.2, "review": 0.8, "revise": 0.7, "judge": 0.5},
-    "round_runtime_seconds": 3.2
+    "round_runtime_seconds": 3.2,
+    "estimated_input_tokens": 120,
+    "estimated_output_tokens": 35,
+    "estimated_total_tokens": 155
   }
 ]
 """,
@@ -516,6 +519,9 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertEqual(rows[0]["score"], 82)
         self.assertEqual(rows[0]["draft_s"], 1.2)
         self.assertEqual(rows[0]["errors"], 0)
+        self.assertEqual(rows[0]["estimated_input_tokens"], 120)
+        self.assertEqual(rows[0]["estimated_output_tokens"], 35)
+        self.assertEqual(rows[0]["estimated_total_tokens"], 155)
 
     def test_ui_run_metadata_rows_summarize_latest_run_without_absolute_paths(self) -> None:
         import ui.app as ui_app
@@ -592,8 +598,24 @@ class SharedUiBackendHelperTests(unittest.TestCase):
             write_json_file(
                 run_a / "round_metrics.json",
                 [
-                    {"round": 1, "score": 60.0, "timeout_this_round": True},
-                    {"round": 2, "score": 70.0, "errors": ["boom"]},
+                    {
+                        "round": 1,
+                        "score": 60.0,
+                        "timeout_this_round": True,
+                        "agent_timings_seconds": {"draft": 1.0},
+                        "estimated_input_tokens": 10,
+                        "estimated_output_tokens": 5,
+                        "estimated_total_tokens": 15,
+                    },
+                    {
+                        "round": 2,
+                        "score": 70.0,
+                        "errors": ["boom"],
+                        "agent_timings_seconds": {"draft": 2.0},
+                        "estimated_input_tokens": 20,
+                        "estimated_output_tokens": 5,
+                        "estimated_total_tokens": 25,
+                    },
                 ],
             )
             write_json_file(
@@ -618,6 +640,8 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertEqual(by_id["run-a"]["average_score"], 65.0)
         self.assertEqual(by_id["run-a"]["timeout_count"], "1")
         self.assertEqual(by_id["run-a"]["error_count"], "1")
+        self.assertEqual(by_id["run-a"]["agent_elapsed_s"], "3.0")
+        self.assertEqual(by_id["run-a"]["estimated_tokens"], "40")
         self.assertEqual(by_id["run-a"]["run_path"], "<repo>/run-a")
         self.assertNotIn(
             str(Path(tmp)), "\n".join(str(value) for row in rows for value in row.values())

@@ -177,8 +177,8 @@ touch projects/example/STOP_REQUESTED
 - `projects/example/runs/<run_id>/round_xx/03_revised.md`：每轮 revise 后的版本。
 - `projects/example/runs/<run_id>/round_xx/04_judge.md`：每轮 judge 输出。
 - `projects/example/runs/<run_id>/run_config.json`：复现实验所需的 provider/model、轮数/runtime、topic、prompt SHA-256、Git commit、开始/结束时间、停止原因和 resume 状态。
-- `projects/example/runs/<run_id>/round_metrics.json`：每轮 agent 耗时、错误/超时标记、分数和可解析 rubric 子项。
-- `projects/example/runs/<run_id>/run_summary.json`：本次 run 的总览、最佳分数、停止原因和指标文件路径。
+- `projects/example/runs/<run_id>/round_metrics.json`：每轮 agent 耗时、错误/超时标记、分数、可解析 rubric 子项，以及每个 agent 的字符数和估算 token。
+- `projects/example/runs/<run_id>/run_summary.json`：本次 run 的总览、最佳分数、停止原因、总耗时、agent 总耗时、估算 input/output/total tokens、timeout/error counts 和指标文件路径。
 - `projects/example/best_output.md`：目前最高 judge 分数对应的 revised 输出。
 - `projects/example/score_history.json`：每轮分数、是否提升、是否超时、是否重复、错误等。
 - `projects/example/research_state.json`：当前 strongest hypothesis、biggest blocker、next experiment、open question。
@@ -195,7 +195,7 @@ touch projects/example/STOP_REQUESTED
 ```
 
 也可以在 UI 的 `Run comparison` 区域选择多个 run，对比 provider、model、drafting mode、
-轮数、best/average score、stop reason、timeout/error counts 和 artifact 路径。
+轮数、best/average score、stop reason、timeout/error counts、agent 总耗时、估算 token 和 artifact 路径。
 - `projects/example/model_ops.log`：UI 拉取或删除模型时的日志。
 
 当前输出约定：
@@ -262,7 +262,7 @@ touch projects/example/STOP_REQUESTED
 
 - 分数只来自同一个 judge agent，缺少多 judge、一致性、人工标注或任务级指标。
 - 没有自动 diff、novelty drift、重复率、实验可执行度等指标。
-- 还没有完整实验 dashboard；当前只有 score history 表格和分数趋势。
+- 还没有完整实验 dashboard；当前有 score history 表格、分数趋势、run comparison 和基础估算 token/耗时指标。
 
 它能帮助发现卡顿、重复、退化、跑偏：
 
@@ -280,7 +280,7 @@ touch projects/example/STOP_REQUESTED
 
 目前还缺的关键指标：
 
-- 每个 agent 的 token 输入/输出、成本、耗时聚合。
+- 真实 provider token usage 和明确价格假设下的成本统计；当前只有 `estimated_*_tokens`，不等于账单 token。
 - judge rubric 子分项随 round 的趋势。
 - draft/revised 与上一轮的相似度、差异摘要、重复率。
 - 是否引用了上一轮 draft、上一轮 review、previous best 的可追踪 lineage。

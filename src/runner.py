@@ -32,6 +32,7 @@ from .constants import (
     STOP_USER_REQUESTED,
 )
 from .judge_output import parse_judge_rubric
+from .metrics import build_agent_io_metrics, summarize_agent_io_metrics, summarize_round_metrics
 from .run_config import build_initial_run_config, finalize_run_config, read_run_config
 from .runtime import log_run as _log
 from .runtime import stop_requested as _stop_requested
@@ -375,6 +376,10 @@ def run_iterative_rounds(
             "revise": 0.0,
             "judge": 0.0,
         }
+        draft_previous_review_output = last_review_output
+        draft_previous_draft_output = last_draft_output
+        draft_previous_revised_output = last_revised_output
+        draft_previous_best_output = best_output
 
         def _persist_round_outputs(stage: str) -> None:
             save_round_outputs(
@@ -738,6 +743,68 @@ def run_iterative_rounds(
         repetitive_judge = _is_repetitive_judge(judge_output, judge_history)
         judge_history.append(judge_output)
 
+        continuation_source = draft_previous_revised_output or draft_previous_draft_output
+        agent_topic_context = getattr(agents, "topic_context", "")
+        draft_input_context = [
+            getattr(agents, "draft_prompt", ""),
+            agent_topic_context,
+            round_index,
+            task_text,
+            memory_text,
+            draft_previous_best_output if drafting_mode == DRAFTING_MODE_BEST_GUIDED else "",
+            previous_judge,
+            (
+                draft_previous_review_output
+                if drafting_mode
+                in {
+                    DRAFTING_MODE_FRESH_WITH_REVIEW,
+                    DRAFTING_MODE_CONTINUE_FROM_PREVIOUS,
+                }
+                else ""
+            ),
+            continuation_source if drafting_mode == DRAFTING_MODE_CONTINUE_FROM_PREVIOUS else "",
+        ]
+        agent_io_metrics = build_agent_io_metrics(
+            agent_inputs={
+                "draft": draft_input_context,
+                "review": [
+                    getattr(agents, "review_prompt", ""),
+                    agent_topic_context,
+                    task_text,
+                    memory_text,
+                    draft_output,
+                ],
+                "revise": [
+                    getattr(agents, "revise_prompt", ""),
+                    agent_topic_context,
+                    task_text,
+                    memory_text,
+                    draft_output,
+                    review_output,
+                ],
+                "judge": [
+                    getattr(agents, "judge_prompt", ""),
+                    agent_topic_context,
+                    task_text,
+                    memory_text,
+                    revised_output,
+                ],
+            },
+            agent_outputs={
+                "draft": draft_output,
+                "review": review_output,
+                "revise": revised_output,
+                "judge": judge_output,
+            },
+            agent_timings_seconds=agent_timings_seconds,
+            agent_errors={
+                "draft": draft_error,
+                "review": review_error,
+                "revise": revise_error,
+                "judge": judge_error,
+            },
+        )
+        round_metric_totals = summarize_agent_io_metrics(agent_io_metrics)
         round_metric = {
             "round": round_index,
             "score": score,
@@ -755,6 +822,13 @@ def run_iterative_rounds(
                 agent: round(elapsed, 3) for agent, elapsed in agent_timings_seconds.items()
             },
             "round_runtime_seconds": round(sum(agent_timings_seconds.values()), 3),
+            "agent_io_metrics": agent_io_metrics,
+            "estimated_input_chars": round_metric_totals["total_estimated_input_chars"],
+            "output_chars": round_metric_totals["total_output_chars"],
+            "estimated_input_tokens": round_metric_totals["total_estimated_input_tokens"],
+            "estimated_output_tokens": round_metric_totals["total_estimated_output_tokens"],
+            "estimated_total_tokens": round_metric_totals["total_estimated_tokens"],
+            "token_estimate_method": round_metric_totals["token_estimate_method"],
             "timeout_this_round": timeout_this_round,
             "provider_failure_this_round": provider_failure_this_round,
             "provider_quota_this_round": provider_quota_this_round,
@@ -980,6 +1054,7 @@ def run_iterative_rounds(
     invalid_score_rounds = [
         entry["round"] for entry in round_metrics if entry.get("invalid_score_this_round")
     ]
+    metrics_totals = summarize_round_metrics(round_metrics)
     run_summary_path = run_root / "run_summary.json"
     write_json_file(
         run_summary_path,
@@ -995,6 +1070,17 @@ def run_iterative_rounds(
             "stop_reason": stop_reason,
             "can_resume": can_resume,
             "total_runtime_seconds": round(total_runtime, 3),
+            "total_elapsed_seconds": round(total_runtime, 3),
+            "total_agent_elapsed_seconds": metrics_totals["total_agent_elapsed_seconds"],
+            "total_estimated_input_tokens": metrics_totals["total_estimated_input_tokens"],
+            "total_estimated_output_tokens": metrics_totals["total_estimated_output_tokens"],
+            "total_estimated_tokens": metrics_totals["total_estimated_tokens"],
+            "total_estimated_input_chars": metrics_totals["total_estimated_input_chars"],
+            "total_output_chars": metrics_totals["total_output_chars"],
+            "token_estimate_method": metrics_totals["token_estimate_method"],
+            "agent_metric_totals": metrics_totals["agent_metric_totals"],
+            "timeout_count": metrics_totals["timeout_count"],
+            "error_count": metrics_totals["error_count"],
             "score_history_path": str(score_history_path),
             "round_metrics_path": str(round_metrics_path),
             "run_config_path": str(run_config_path),

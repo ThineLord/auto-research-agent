@@ -15,6 +15,7 @@ from .config import DEFAULT_DRAFTING_MODE
 from .constants import STOP_CLOUD_DAILY_QUOTA
 from .judge_output import parse_judge_rubric
 from .llm import LLMClientProtocol
+from .metrics import build_agent_io_metrics, summarize_agent_io_metrics, summarize_round_metrics
 from .run_config import build_initial_run_config, finalize_run_config
 from .runtime import log_run as _log
 from .runtime import shorten_text_by_words as _shorten_text_by_words
@@ -261,6 +262,8 @@ def run_diagnostic_mode(
             total_runtime_seconds=time.monotonic() - run_started,
         )
         write_json_file(run_config_path, run_config)
+        metrics_totals = summarize_round_metrics([])
+        total_runtime_seconds = round(time.monotonic() - run_started, 3)
         write_json_file(
             run_root / "run_summary.json",
             {
@@ -274,7 +277,18 @@ def run_diagnostic_mode(
                 "best_score": 0.0,
                 "stop_reason": STOP_CLOUD_DAILY_QUOTA,
                 "can_resume": True,
-                "total_runtime_seconds": round(time.monotonic() - run_started, 3),
+                "total_runtime_seconds": total_runtime_seconds,
+                "total_elapsed_seconds": total_runtime_seconds,
+                "total_agent_elapsed_seconds": metrics_totals["total_agent_elapsed_seconds"],
+                "total_estimated_input_tokens": metrics_totals["total_estimated_input_tokens"],
+                "total_estimated_output_tokens": metrics_totals["total_estimated_output_tokens"],
+                "total_estimated_tokens": metrics_totals["total_estimated_tokens"],
+                "total_estimated_input_chars": metrics_totals["total_estimated_input_chars"],
+                "total_output_chars": metrics_totals["total_output_chars"],
+                "token_estimate_method": metrics_totals["token_estimate_method"],
+                "agent_metric_totals": metrics_totals["agent_metric_totals"],
+                "timeout_count": metrics_totals["timeout_count"],
+                "error_count": metrics_totals["error_count"],
                 "round_count": 0,
                 "successful_rounds": [],
                 "timeout_rounds": [],
@@ -320,6 +334,54 @@ def run_diagnostic_mode(
         for e in [draft_error, review_error, revise_error, judge_error]
         if e
     )
+    agent_errors = {
+        "draft": draft_error,
+        "review": review_error,
+        "revise": revise_error,
+        "judge": judge_error,
+    }
+    agent_io_metrics = build_agent_io_metrics(
+        agent_inputs={
+            "draft": [
+                diagnostic_agents.draft_prompt,
+                diagnostic_agents.topic_context,
+                1,
+                diagnostic_task,
+                diagnostic_memory,
+            ],
+            "review": [
+                diagnostic_agents.review_prompt,
+                diagnostic_agents.topic_context,
+                diagnostic_task,
+                diagnostic_memory,
+                draft_output,
+            ],
+            "revise": [
+                diagnostic_agents.revise_prompt,
+                diagnostic_agents.topic_context,
+                diagnostic_task,
+                diagnostic_memory,
+                draft_output,
+                review_output,
+            ],
+            "judge": [
+                diagnostic_agents.judge_prompt,
+                diagnostic_agents.topic_context,
+                diagnostic_task,
+                diagnostic_memory,
+                revised_output,
+            ],
+        },
+        agent_outputs={
+            "draft": draft_output,
+            "review": review_output,
+            "revise": revised_output,
+            "judge": judge_output,
+        },
+        agent_timings_seconds=timings,
+        agent_errors=agent_errors,
+    )
+    round_metric_totals = summarize_agent_io_metrics(agent_io_metrics)
     round_metric = {
         "round": 1,
         "score": parsed_score,
@@ -327,14 +389,16 @@ def run_diagnostic_mode(
         "non_improve_streak": 0,
         "repetitive_judge": False,
         "errors": errors,
-        "agent_errors": {
-            "draft": draft_error,
-            "review": review_error,
-            "revise": revise_error,
-            "judge": judge_error,
-        },
+        "agent_errors": agent_errors,
         "agent_timings_seconds": {agent: round(elapsed, 3) for agent, elapsed in timings.items()},
         "round_runtime_seconds": round(sum(timings.values()), 3),
+        "agent_io_metrics": agent_io_metrics,
+        "estimated_input_chars": round_metric_totals["total_estimated_input_chars"],
+        "output_chars": round_metric_totals["total_output_chars"],
+        "estimated_input_tokens": round_metric_totals["total_estimated_input_tokens"],
+        "estimated_output_tokens": round_metric_totals["total_estimated_output_tokens"],
+        "estimated_total_tokens": round_metric_totals["total_estimated_tokens"],
+        "token_estimate_method": round_metric_totals["token_estimate_method"],
         "timeout_this_round": timeout_this_round,
         "invalid_score_this_round": parse_score(judge_output) is None,
         "successful_research_round": not errors and parse_score(judge_output) is not None,
@@ -387,6 +451,8 @@ def run_diagnostic_mode(
         total_runtime_seconds=time.monotonic() - run_started,
     )
     write_json_file(run_config_path, run_config)
+    metrics_totals = summarize_round_metrics([round_metric])
+    total_runtime_seconds = round(time.monotonic() - run_started, 3)
     write_json_file(
         run_root / "run_summary.json",
         {
@@ -400,7 +466,18 @@ def run_diagnostic_mode(
             "best_score": round(parsed_score, 2),
             "stop_reason": "MAX_ROUNDS",
             "can_resume": False,
-            "total_runtime_seconds": round(time.monotonic() - run_started, 3),
+            "total_runtime_seconds": total_runtime_seconds,
+            "total_elapsed_seconds": total_runtime_seconds,
+            "total_agent_elapsed_seconds": metrics_totals["total_agent_elapsed_seconds"],
+            "total_estimated_input_tokens": metrics_totals["total_estimated_input_tokens"],
+            "total_estimated_output_tokens": metrics_totals["total_estimated_output_tokens"],
+            "total_estimated_tokens": metrics_totals["total_estimated_tokens"],
+            "total_estimated_input_chars": metrics_totals["total_estimated_input_chars"],
+            "total_output_chars": metrics_totals["total_output_chars"],
+            "token_estimate_method": metrics_totals["token_estimate_method"],
+            "agent_metric_totals": metrics_totals["agent_metric_totals"],
+            "timeout_count": metrics_totals["timeout_count"],
+            "error_count": metrics_totals["error_count"],
             "score_history_path": str(score_history_path),
             "round_metrics_path": str(round_metrics_path),
             "run_config_path": str(run_config_path),

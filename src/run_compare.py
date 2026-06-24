@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any, Sequence
 
+from .metrics import summarize_round_metrics
 from .run_config import read_run_config
 from .storage import write_json_file
 
@@ -106,6 +107,25 @@ def load_run_summary(run_root: Path) -> dict[str, Any]:
     successful_rounds = _rounds_from_summary_or_metrics(
         summary, round_metrics, "successful_rounds", "successful_research_round"
     )
+    metrics_totals = summarize_round_metrics(round_metrics)
+    total_elapsed_seconds = _as_float(summary.get("total_elapsed_seconds"))
+    if total_elapsed_seconds is None:
+        total_elapsed_seconds = _as_float(summary.get("total_runtime_seconds"))
+    total_agent_elapsed_seconds = _as_float(summary.get("total_agent_elapsed_seconds"))
+    if total_agent_elapsed_seconds is None and metrics_totals["rounds_with_agent_timings"]:
+        total_agent_elapsed_seconds = metrics_totals["total_agent_elapsed_seconds"]
+    total_estimated_input_tokens = _as_int(summary.get("total_estimated_input_tokens"))
+    total_estimated_output_tokens = _as_int(summary.get("total_estimated_output_tokens"))
+    total_estimated_tokens = _as_int(summary.get("total_estimated_tokens"))
+    if total_estimated_tokens is None and metrics_totals["rounds_with_token_estimates"]:
+        total_estimated_input_tokens = metrics_totals["total_estimated_input_tokens"]
+        total_estimated_output_tokens = metrics_totals["total_estimated_output_tokens"]
+        total_estimated_tokens = metrics_totals["total_estimated_tokens"]
+    token_estimate_method = summary.get("token_estimate_method") or (
+        metrics_totals["token_estimate_method"]
+        if metrics_totals["rounds_with_token_estimates"]
+        else ""
+    )
     metadata_sources = []
     if summary:
         metadata_sources.append("run_summary")
@@ -135,6 +155,18 @@ def load_run_summary(run_root: Path) -> dict[str, Any]:
         "stop_reason": summary.get("stop_reason") or run_config.get("stop_reason", ""),
         "timeout_count": len(timeout_rounds),
         "error_count": len(error_rounds),
+        "total_elapsed_seconds": (
+            round(total_elapsed_seconds, 3) if total_elapsed_seconds is not None else None
+        ),
+        "total_agent_elapsed_seconds": (
+            round(total_agent_elapsed_seconds, 3)
+            if total_agent_elapsed_seconds is not None
+            else None
+        ),
+        "total_estimated_input_tokens": total_estimated_input_tokens,
+        "total_estimated_output_tokens": total_estimated_output_tokens,
+        "total_estimated_tokens": total_estimated_tokens,
+        "token_estimate_method": token_estimate_method,
         "round_count": summary.get("round_count", len(round_metrics)),
         "successful_rounds": successful_rounds,
         "timeout_rounds": timeout_rounds,

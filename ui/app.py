@@ -816,6 +816,8 @@ def build_run_comparison_rows(run_roots: Sequence[Path]) -> list[dict[str, Any]]
                 "stop_reason": _display_value(run.get("stop_reason")),
                 "timeout_count": _count_text(run.get("timeout_count")),
                 "error_count": _count_text(run.get("error_count")),
+                "agent_elapsed_s": _display_value(run.get("total_agent_elapsed_seconds")),
+                "estimated_tokens": _display_value(run.get("total_estimated_tokens")),
                 "run_config_path": _artifact_path_display(run.get("run_config_path")),
                 "run_summary_path": _artifact_path_display(run.get("run_summary_path")),
                 "metadata_status": _display_value(run.get("metadata_status")),
@@ -960,6 +962,9 @@ def load_score_history_rows(score_history_path: Path) -> list[dict[str, Any]]:
                 "revise_s": timings.get("revise", 0.0),
                 "judge_s": timings.get("judge", 0.0),
                 "round_s": entry.get("round_runtime_seconds", 0.0),
+                "estimated_input_tokens": entry.get("estimated_input_tokens"),
+                "estimated_output_tokens": entry.get("estimated_output_tokens"),
+                "estimated_total_tokens": entry.get("estimated_total_tokens"),
             }
         )
     return rows

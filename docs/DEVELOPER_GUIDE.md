@@ -41,6 +41,8 @@ Core modules:
   commit state when available, and reads legacy `run_manifest.json` metadata for old runs.
 - `src/run_compare.py` merges `run_summary.json`, `run_config.json` or legacy manifests, and
   `round_metrics.json` to compare two or more run roots.
+- `src/metrics.py` centralizes per-agent timing, character counts, and conservative token estimates
+  so runner, diagnostic mode, and comparison fallbacks use the same schema.
 - `src/session.py` builds focused session objectives, current plans, and final session reports.
 - `src/literature_survey.py` implements local Literature Survey Mode: source collection, paper
   metadata parsing, deduplication, theme/gap extraction, survey report rendering, and related-work
@@ -101,10 +103,15 @@ Progress comes from:
 - `runs/<run_id>/run_config.json` for reproducibility metadata: provider/model settings, runtime
   limits, topic snapshot, prompt hashes, Git commit, start/end timestamps, stop reason, and resume
   eligibility.
-- `runs/<run_id>/round_metrics.json` for per-round agent timings, error flags, scores, and rubric
-  subscores when Judge returns structured JSON.
-- `runs/<run_id>/run_summary.json` for run-level counts, best score, stop reason, and paths to
-  metrics/config artifacts.
+- `runs/<run_id>/round_metrics.json` for per-round agent timings, error flags, scores, rubric
+  subscores when Judge returns structured JSON, and per-agent `agent_io_metrics`.
+- `runs/<run_id>/run_summary.json` for run-level counts, best score, stop reason, total elapsed
+  seconds, total agent elapsed seconds, aggregate estimated tokens, and paths to metrics/config
+  artifacts.
+
+Token fields are deliberately named `estimated_*_tokens` and use
+`visible_context_chars_div_4_ceil`. They are cost-ready accounting foundations, not provider billing
+truth, and the project does not hardcode vendor prices.
 - `run.log` for the current running stage.
 - `STOP_REQUESTED` for safe user-initiated pause.
 
@@ -113,6 +120,7 @@ The Streamlit UI renders a compact latest-run metadata table from `run_config.js
 messages when `run_config.json`, `run_summary.json`, or `round_metrics.json` has not been written.
 It also exposes a multi-run comparison table using the same `src.run_compare` helper as
 `--compare-runs`; missing or legacy metadata should produce partial rows instead of UI failures.
+Newer runs add aggregate agent elapsed seconds and estimated token totals to that comparison output.
 
 The model health check is intentionally fast: it checks Ollama API availability and selected-model
 presence without sending a generation prompt.

@@ -277,7 +277,7 @@ UI 中重点看：
 - `D. Progress panel`：看 Mode、Round、Stage、Best score、Model、Stop reason。
 - `E. Live logs panel`：看 `run.log` 和模型操作日志。
 - `Latest run metadata`：看 provider/model、drafting mode、Git commit、stop reason、best score。
-- `Run comparison`：选择多个 run，对比模型、起草模式、轮数、best/average score、timeout/error counts。
+- `Run comparison`：选择多个 run，对比模型、起草模式、轮数、best/average score、timeout/error counts、agent 总耗时和估算 token。
 - `F. Output browser`：看 best output、checkpoint、run config、run summary、round metrics、score history、latest round draft/review/revised/judge。
 
 ## 9. 如何停止 UI
@@ -305,6 +305,8 @@ lsof -iTCP:8501 -sTCP:LISTEN -n -P || true
 - `projects/example/checkpoint.json` 里 `run_root` 指向的目录存在。
 - `projects/example/checkpoint.json` 里 `run_config` 指向的 `run_config.json` 存在。
 - `run_root/run_summary.json` 和 `run_root/round_metrics.json` 存在。
+- `run_summary.json` 里有 `total_elapsed_seconds`、`total_agent_elapsed_seconds`、
+  `total_estimated_tokens`、`timeout_count` 和 `error_count`；这些 token 是字符数估算，不是账单 token。
 - `run_root/round_01/01_draft.md`、`02_review.md`、`03_revised.md`、`04_judge.md` 都存在。
 - `projects/example/score_history.json` 有至少一条记录。
 - `04_judge.md` 能解析出分数，或 `score_history.json` 里 `invalid_score_this_round` 是 `false`。
