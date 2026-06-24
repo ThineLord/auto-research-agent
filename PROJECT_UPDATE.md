@@ -1,3 +1,92 @@
+# Phase 13 - Autonomous Cycle Closeout
+
+Date: 2026-06-24
+Commit: pending closeout commit
+Branch: master
+
+## Goal
+
+Close the current autonomous improvement cycle with a repository-level summary, explicit remaining risks, and a practical next roadmap while keeping `PROJECT_UPDATE.md` as the canonical progress log.
+
+## What Changed
+
+Added this closeout section summarizing the safe phases completed in the cycle and identifying where further work becomes lower-value or requires architectural, UX, or methodology decisions.
+
+## Code
+
+* No code changes in this phase.
+
+## UI
+
+* No UI changes in this phase.
+
+## Tests
+
+* No new tests in this phase because this is documentation-only.
+
+## Docs
+
+* Added the autonomous-cycle final summary below.
+
+## Validation
+
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `sed -n '1,140p' PROJECT_UPDATE.md`
+* `make check`
+
+## Risks / Limitations
+
+* Further dashboard work would benefit from a small UI design pass before adding more columns or charts.
+* Real provider token usage and pricing still require provider-level usage metadata or explicit pricing assumptions.
+* Any change to evaluation methodology, scoring semantics, prompt behavior, or benchmark interpretation should receive human review.
+
+## Recommended Next Phase
+
+Pause autonomous implementation. Next high-value work should be selected after human review of `PROJECT_UPDATE.md` and the pushed artifacts.
+
+## Suggested Codex Prompt
+
+Review `PROJECT_UPDATE.md`, inspect the current run metadata/analytics features, and decide whether the next safe priority is UI dashboard design, real provider token usage capture, mock run mode, or release packaging.
+
+## Autonomous Cycle Final Summary
+
+### Phases Completed
+
+* Phase 10 - Round Evolution Interpretability Metrics: added per-round text evolution metrics, run-level similarity summaries, comparison/UI fields, tests, and docs.
+* Phase 11 - Rubric Trend Summaries: aggregated structured Judge rubric subscores into averages/latest/best/deltas, exposed compact comparison/UI fields, and documented the non-semantic role of these summaries.
+* Phase 12 - Single-Run Analytics Export: added provider-free `--analyze-run` / `--analyze-output`, grouped score/robustness/cost/interpretability/rubric fields, and ignored generated analysis/comparison JSON artifacts.
+
+### Major Improvements
+
+* Experiment interpretability improved through text similarity, changed-line, score-delta, low-change, and rubric trend metadata.
+* Research reproducibility improved by making single-run and multi-run inspection possible without provider calls.
+* Run comparison quality improved with cost-ready, similarity, and rubric fields while preserving legacy metadata compatibility.
+* Runtime safety posture remained intact: no provider behavior, prompt semantics, scoring semantics, sanitizer logic, or benchmark assumptions were changed.
+* Documentation now points users to `round_metrics.json`, `run_summary.json`, `--compare-runs`, and `--analyze-run` for reproducible inspection.
+
+### Remaining Technical Debt
+
+* Real token usage and cost accounting still use estimates unless providers expose usage data.
+* UI comparison is useful but table-oriented; richer dashboard charts need a deliberate layout pass.
+* Mock/fake CLI run mode is still not implemented as a user-facing command.
+* Old run artifacts remain readable, but only newer runs include evolution/rubric analytics.
+* `PROJECT_UPDATE.md` records exact implementation commits, with small follow-up commits used only to fill hashes after commit creation.
+
+### Recommended Human Review Items
+
+* Confirm that the fixed low-change threshold is acceptable as a descriptive heuristic.
+* Review whether rubric average fields are the right UI/comparison subset or should be made configurable.
+* Decide whether `--analyze-run` output should become a UI panel, a release artifact, or remain CLI-only.
+* Decide whether future work should prioritize mock mode, real provider usage capture, or a dashboard redesign.
+
+### Recommended Future Roadmap
+
+* Phase 14 - Mock/Fake Run Mode: add a deterministic provider-free demo run that writes normal artifacts and is safe for CI/docs.
+* Phase 15 - UI Analytics Dashboard: design a compact dashboard for score, rubric, similarity, timeout/error, timing, and token estimate trends.
+* Phase 16 - Provider Usage Capture: record real token usage when providers expose it, while keeping estimate-only fallbacks.
+* Phase 17 - Release Packaging: consolidate changelog/release notes, update examples, and prepare a stable tagged release.
+
 # Phase 12 - Single-Run Analytics Export
 
 Date: 2026-06-24
