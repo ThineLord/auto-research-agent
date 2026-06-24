@@ -199,6 +199,15 @@ touch projects/example/STOP_REQUESTED
 
 也可以在 UI 的 `Run comparison` 区域选择多个 run，对比 provider、model、drafting mode、
 轮数、best/average score、stop reason、timeout/error counts、agent 总耗时、估算 token、平均 revised 相似度、低变化轮次数、rubric 子项均值和 artifact 路径。
+
+分析单个 run：
+
+```bash
+.venv/bin/python -m src.main --analyze-run projects/example/runs/<run_id>
+.venv/bin/python -m src.main --analyze-run projects/example/runs/<run_id> --analyze-output projects/example/run_analysis.json
+```
+
+`--analyze-run` 不调用模型，会输出分数首尾变化、超时/错误、估算 token、相似度和 rubric 摘要。
 - `projects/example/model_ops.log`：UI 拉取或删除模型时的日志。
 
 当前输出约定：
@@ -280,6 +289,7 @@ touch projects/example/STOP_REQUESTED
 - CLI 可用 `--drafting-mode <mode>` 覆盖，UI 的 Run controls 里也有选择器。
 - checkpoint、score_history、run_config、run_summary 都会记录本次选择。
 - `--compare-runs` 和 UI 的 `Run comparison` 可以比较多个 run summary / run config / round metrics。
+- `--analyze-run` 可以在没有对照 run 时导出单个 run 的 score、rubric、similarity、timeout/error 和 token estimate 摘要。
 
 目前还缺的关键指标：
 

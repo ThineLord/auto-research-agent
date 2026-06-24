@@ -41,6 +41,8 @@ Core modules:
   commit state when available, and reads legacy `run_manifest.json` metadata for old runs.
 - `src/run_compare.py` merges `run_summary.json`, `run_config.json` or legacy manifests, and
   `round_metrics.json` to compare two or more run roots.
+- `src/run_analytics.py` builds a provider-free single-run analytics export from the same metadata
+  foundations for diagnostics, docs, and CI-safe artifact inspection.
 - `src/metrics.py` centralizes per-agent timing, character counts, conservative token estimates,
   and per-round text evolution metrics so runner, diagnostic mode, UI tables, and comparison
   fallbacks use the same additive schema.
@@ -134,6 +136,9 @@ It also exposes a multi-run comparison table using the same `src.run_compare` he
 `--compare-runs`; missing or legacy metadata should produce partial rows instead of UI failures.
 Newer runs add aggregate agent elapsed seconds, estimated token totals, average revised similarity,
 low-change round counts, rubric round counts, and compact rubric averages to that comparison output.
+The CLI `--analyze-run` path uses `src.run_analytics` to summarize one run into score trend,
+robustness, cost-ready, interpretability, rubric, and artifact sections without loading config or
+calling providers.
 The Resume control uses checkpoint metadata to preview run id/root, last completed round, next
 round, stop reason, resume eligibility, completed-round preservation, and next-round directory
 status before launching `--resume`. A non-empty next-round directory is treated as partial or

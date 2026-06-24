@@ -242,6 +242,13 @@ sed -n '1,220p' projects/example/runs/<run_id>/run_summary.json
 .venv/bin/python -m src.main --compare-runs projects/example/runs/<run_a> projects/example/runs/<run_b>
 ```
 
+导出单个 run 的分析摘要：
+
+```bash
+.venv/bin/python -m src.main --analyze-run projects/example/runs/<run_id>
+.venv/bin/python -m src.main --analyze-run projects/example/runs/<run_id> --analyze-output projects/example/run_analysis.json
+```
+
 优先阅读：
 
 ```bash

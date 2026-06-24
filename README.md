@@ -170,6 +170,12 @@ resume eligibility。
 
 比较会读取 `run_config.json`、`run_summary.json`、`round_metrics.json`，并兼容旧
 `run_manifest.json`。
+如果只想汇总单个 run 的分数趋势、rubric、相似度、错误/超时和估算 token，可用：
+
+```bash
+.venv/bin/python -m src.main --analyze-run projects/example/runs/<run_id>
+.venv/bin/python -m src.main --analyze-run projects/example/runs/<run_id> --analyze-output projects/example/run_analysis.json
+```
 
 ## 常用命令
 

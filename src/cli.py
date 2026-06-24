@@ -54,6 +54,7 @@ from .llm import create_llm_client
 from .logging_config import configure_logging
 from .project_input import ProjectInputError, load_project_input
 from .resume import run_resume_mode
+from .run_analytics import analyze_run
 from .run_compare import compare_runs
 from .runner import run_iterative_rounds
 from .runtime import acquire_run_lock, release_run_lock
@@ -106,6 +107,19 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         type=str,
         default=None,
         help="Optional JSON output path for --compare-runs. Relative paths resolve from repo root.",
+    )
+    parser.add_argument(
+        "--analyze-run",
+        type=str,
+        default=None,
+        metavar="RUN_DIR",
+        help="Analyze one run directory without provider calls.",
+    )
+    parser.add_argument(
+        "--analyze-output",
+        type=str,
+        default=None,
+        help="Optional JSON output path for --analyze-run. Relative paths resolve from repo root.",
     )
     parser.add_argument(
         "--model",
@@ -290,6 +304,20 @@ def _privacy_safe_comparison(comparison: dict[str, Any], root: Path) -> dict[str
     return safe_comparison
 
 
+def _privacy_safe_run_analysis(analysis: dict[str, Any], root: Path) -> dict[str, Any]:
+    safe_analysis = dict(analysis)
+    if safe_analysis.get("run_path"):
+        safe_analysis["run_path"] = _display_repo_path(root, safe_analysis["run_path"])
+    artifacts = safe_analysis.get("artifacts")
+    if isinstance(artifacts, dict):
+        safe_artifacts = dict(artifacts)
+        for key in ("run_config_path", "run_summary_path"):
+            if safe_artifacts.get(key):
+                safe_artifacts[key] = _display_repo_path(root, safe_artifacts[key])
+        safe_analysis["artifacts"] = safe_artifacts
+    return safe_analysis
+
+
 def _run_compare_cli(args: argparse.Namespace, console: Console, root: Path) -> dict[str, object]:
     run_roots = [
         _resolve_repo_relative_path(root, run_root)
@@ -307,6 +335,18 @@ def _run_compare_cli(args: argparse.Namespace, console: Console, root: Path) -> 
     return comparison
 
 
+def _run_analyze_cli(args: argparse.Namespace, console: Console, root: Path) -> dict[str, object]:
+    run_root = _resolve_repo_relative_path(root, str(getattr(args, "analyze_run", "")))
+    analysis = _privacy_safe_run_analysis(analyze_run(run_root), root)
+    output_arg = getattr(args, "analyze_output", None)
+    if output_arg:
+        output_path = _resolve_repo_relative_path(root, output_arg)
+        write_json_file(output_path, analysis)
+        console.print(f"[green]Saved run analysis:[/green] {_display_repo_path(root, output_path)}")
+    console.print_json(data=analysis)
+    return analysis
+
+
 def main() -> None:
     args = parse_args()
     configure_logging()
@@ -314,6 +354,9 @@ def main() -> None:
     root = Path(__file__).resolve().parent.parent
     if getattr(args, "compare_runs", None):
         _run_compare_cli(args, console, root)
+        return
+    if getattr(args, "analyze_run", None):
+        _run_analyze_cli(args, console, root)
         return
 
     try:

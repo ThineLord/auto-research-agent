@@ -1,3 +1,56 @@
+# Phase 12 - Single-Run Analytics Export
+
+Date: 2026-06-24
+Commit: pending implementation commit
+Branch: master
+
+## Goal
+
+Add a CI-safe, provider-free way to inspect one run's score trend, robustness, cost-ready estimates, interpretability metrics, rubric summaries, and artifact paths without needing a comparison run.
+
+## What Changed
+
+Added a single-run analytics helper and CLI wrapper. `--analyze-run` reads existing run artifacts, tolerates missing or legacy metadata, prints privacy-safe JSON, and can save an ignored project-local analysis artifact.
+
+## Code
+
+* Added `src/run_analytics.py` for single-run analytics grouping.
+* Added CLI flags `--analyze-run` and `--analyze-output` that dispatch before config/provider validation.
+* Added narrow `.gitignore` rules for generated `run_analysis.json` and `run_comparison.json` project artifacts.
+
+## UI
+
+* No Streamlit UI changes in this phase; the feature is CLI/provider-free.
+
+## Tests
+
+* Added run analytics tests for score trend, robustness, cost-ready fields, interpretability, rubric summaries, missing metadata, and privacy-safe CLI output.
+* Extended CLI argument parsing tests for the new flags.
+
+## Docs
+
+* Updated README, USER_GUIDE, DEVELOPER_GUIDE, quickstart_zh, and runbook_zh with `--analyze-run` usage.
+
+## Validation
+
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `.venv/bin/python -m pytest tests/test_run_analytics.py tests/test_round_loop.py::RoundLoopTests::test_parse_args_accepts_mode_and_model_flags -q`
+* `make check`
+
+## Risks / Limitations
+
+* Analytics are derived summaries of existing artifacts; they do not add new evaluation semantics.
+* Missing or legacy artifacts produce partial JSON rather than a hard failure, so users should check `metadata_status` and `metadata_sources`.
+
+## Recommended Next Phase
+
+Phase 13 - Documentation and release polish, including a final autonomous-cycle summary.
+
+## Suggested Codex Prompt
+
+Continue with Phase 13. Polish release documentation, update PROJECT_UPDATE.md with an autonomous-cycle final summary, avoid new research semantics, validate, commit, push, and stop if remaining improvements are low-value or require architecture decisions.
+
 # Phase 11 - Rubric Trend Summaries
 
 Date: 2026-06-24

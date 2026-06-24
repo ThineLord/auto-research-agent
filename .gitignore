@@ -49,6 +49,8 @@ projects/*/memory.md
 projects/*/best_output.md
 projects/*/score_history.json
 projects/*/research_state.json
+projects/*/run_analysis.json
+projects/*/run_comparison.json
 projects/*/current_plan.md
 projects/*/final_session_report.md
 projects/*/survey/

@@ -318,6 +318,15 @@ drafting mode、max/completed rounds、best/average score、stop reason、timeou
 agent elapsed seconds、estimated tokens、平均 revised 相似度、低变化轮次数和 rubric 子项均值，
 并保持路径为 repo-relative 或 masked。
 
+如果只想检查一个 run，不需要提供对照 run：
+
+```bash
+.venv/bin/python -m src.main --analyze-run projects/example/runs/<run_id>
+```
+
+`--analyze-run` 不调用模型，会把分数首尾变化、超时/错误、估算 token、相似度和 rubric 摘要组合成一个 JSON。
+可加 `--analyze-output projects/example/run_analysis.json` 保存结果。
+
 ## memory.md / best_output.md / score_history.json 怎么理解
 
 - `memory.md`：被持续维护的“研究状态记忆”，会影响下一轮输入。
