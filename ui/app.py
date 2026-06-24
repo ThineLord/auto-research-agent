@@ -788,6 +788,8 @@ def build_run_metadata_rows(project_dir: Path, checkpoint: dict[str, Any]) -> li
     git_meta = run_config.get("git") if isinstance(run_config.get("git"), dict) else {}
     resume = run_config.get("resume_eligibility")
     resume = resume if isinstance(resume, dict) else {}
+    low_change_rounds = run_summary.get("low_previous_revised_change_rounds")
+    low_change_count = len(low_change_rounds) if isinstance(low_change_rounds, list) else None
 
     values = [
         ("run_meta_run_id", _first_present(run_config.get("run_id"), run_summary.get("run_id"))),
@@ -826,6 +828,14 @@ def build_run_metadata_rows(project_dir: Path, checkpoint: dict[str, Any]) -> li
         (
             "run_meta_best_score",
             _first_present(run_config.get("best_score"), run_summary.get("best_score")),
+        ),
+        (
+            "run_meta_avg_revised_similarity",
+            run_summary.get("avg_revised_similarity_to_previous"),
+        ),
+        (
+            "run_meta_low_change_rounds",
+            low_change_count,
         ),
         (
             "run_meta_stop_reason",
@@ -898,6 +908,10 @@ def build_run_comparison_rows(run_roots: Sequence[Path]) -> list[dict[str, Any]]
                 "error_count": _count_text(run.get("error_count")),
                 "agent_elapsed_s": _display_value(run.get("total_agent_elapsed_seconds")),
                 "estimated_tokens": _display_value(run.get("total_estimated_tokens")),
+                "avg_revised_similarity": _display_value(
+                    run.get("avg_revised_similarity_to_previous")
+                ),
+                "low_change_rounds": _display_value(run.get("low_previous_revised_change_count")),
                 "run_config_path": _artifact_path_display(run.get("run_config_path")),
                 "run_summary_path": _artifact_path_display(run.get("run_summary_path")),
                 "metadata_status": _display_value(run.get("metadata_status")),
@@ -1028,6 +1042,8 @@ def load_score_history_rows(score_history_path: Path) -> list[dict[str, Any]]:
             continue
         timings = entry.get("agent_timings_seconds")
         timings = timings if isinstance(timings, dict) else {}
+        evolution = entry.get("evolution_metrics")
+        evolution = evolution if isinstance(evolution, dict) else {}
         rows.append(
             {
                 "round": entry.get("round"),
@@ -1045,6 +1061,9 @@ def load_score_history_rows(score_history_path: Path) -> list[dict[str, Any]]:
                 "estimated_input_tokens": entry.get("estimated_input_tokens"),
                 "estimated_output_tokens": entry.get("estimated_output_tokens"),
                 "estimated_total_tokens": entry.get("estimated_total_tokens"),
+                "score_delta_vs_previous": evolution.get("score_delta_vs_previous"),
+                "draft_to_revised_similarity": evolution.get("draft_to_revised_similarity"),
+                "revised_similarity_to_previous": evolution.get("revised_similarity_to_previous"),
             }
         )
     return rows

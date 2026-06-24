@@ -190,9 +190,10 @@ cp projects/example/memory.example.md projects/<project>/memory.md
 
 UI 会显示相对项目路径，例如 `projects/example`，避免把本机绝对路径展示到页面上。
 运行后，UI 的 `Latest run metadata` 会集中显示 run_config/run_summary 中的模型、drafting mode、
-Git commit、停止原因、最佳分数和 artifact 路径；`Output browser` 也可直接打开
-`round_metrics.json`。这些指标使用可见 prompt context 和输出长度做保守估算；字段名中的
-`estimated_*_tokens` 表示估算值，不代表真实账单 token。
+Git commit、停止原因、最佳分数、修订稿相对上一轮的平均相似度和 artifact 路径；
+`Output browser` 也可直接打开 `round_metrics.json`。token 指标使用可见 prompt context
+和输出长度做保守估算；字段名中的 `estimated_*_tokens` 表示估算值，不代表真实账单 token。
+相似度/低变化轮次是基于已生成文本的解释性指标，不改变评分或停止条件。
 
 - `task.md`：你本次希望研究/回答的问题（必须有内容）
 - `memory.md`：历史上下文、限制、已知结论（可空，程序会自动更新）
@@ -298,9 +299,11 @@ stop reason、是否可 resume、下一轮目录状态和安全动作。UI 的 R
 
 `round_metrics.json` 每轮包含 `agent_io_metrics`，按 `draft`、`review`、`revise`、`judge`
 记录是否调用、是否出错、耗时、估算输入字符、输出字符和估算 input/output/total tokens。
+每轮还包含 `evolution_metrics`，记录 draft 到 revised 的相似度、revised/judge 相对上一轮的相似度、
+变动行数和相邻轮分数差，用于发现重复、低变化或大幅漂移。
 `run_summary.json` 汇总 `total_elapsed_seconds`、`total_agent_elapsed_seconds`、
 `total_estimated_input_tokens`、`total_estimated_output_tokens`、`total_estimated_tokens`、
-`timeout_count` 和 `error_count`。目前不会内置任何厂商价格表；如需成本估算，应在外部基于
+`timeout_count`、`error_count`、平均相似度和低变化轮次列表。当前不会内置任何厂商价格表；如需成本估算，应在外部基于
 这些 token estimate 明确标注价格假设。
 
 如果要比较多个 run：
@@ -311,14 +314,14 @@ stop reason、是否可 resume、下一轮目录状态和安全动作。UI 的 R
 
 也可以在 UI 的 `Run comparison` 区域选择多个 run。比较会显示 run path、provider、model、
 drafting mode、max/completed rounds、best/average score、stop reason、timeout/error counts、
-agent elapsed seconds 和 estimated tokens，
+agent elapsed seconds、estimated tokens、平均 revised 相似度和低变化轮次数，
 并保持路径为 repo-relative 或 masked。
 
 ## memory.md / best_output.md / score_history.json 怎么理解
 
 - `memory.md`：被持续维护的“研究状态记忆”，会影响下一轮输入。
 - `best_output.md`：当前最高分对应的输出，通常是你优先阅读的文件。
-- `score_history.json`：每轮评分轨迹、是否提升、是否超时、每个 agent 耗时、估算 token 和 Judge rubric 子项（如果可解析）。
+- `score_history.json`：每轮评分轨迹、是否提升、是否超时、每个 agent 耗时、估算 token、文本 evolution 指标和 Judge rubric 子项（如果可解析）。
 
 ## 哪些生成文件不要提交到 GitHub
 

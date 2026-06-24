@@ -108,6 +108,8 @@ def load_run_summary(run_root: Path) -> dict[str, Any]:
         summary, round_metrics, "successful_rounds", "successful_research_round"
     )
     metrics_totals = summarize_round_metrics(round_metrics)
+    evolution_totals = metrics_totals.get("evolution_metric_totals")
+    evolution_totals = evolution_totals if isinstance(evolution_totals, dict) else {}
     total_elapsed_seconds = _as_float(summary.get("total_elapsed_seconds"))
     if total_elapsed_seconds is None:
         total_elapsed_seconds = _as_float(summary.get("total_runtime_seconds"))
@@ -126,6 +128,35 @@ def load_run_summary(run_root: Path) -> dict[str, Any]:
         if metrics_totals["rounds_with_token_estimates"]
         else ""
     )
+    avg_draft_to_revised_similarity = _as_float(summary.get("avg_draft_to_revised_similarity"))
+    if avg_draft_to_revised_similarity is None:
+        avg_draft_to_revised_similarity = _as_float(
+            evolution_totals.get("avg_draft_to_revised_similarity")
+        )
+    avg_revised_similarity_to_previous = _as_float(
+        summary.get("avg_revised_similarity_to_previous")
+    )
+    if avg_revised_similarity_to_previous is None:
+        avg_revised_similarity_to_previous = _as_float(
+            evolution_totals.get("avg_revised_similarity_to_previous")
+        )
+    avg_judge_similarity_to_previous = _as_float(summary.get("avg_judge_similarity_to_previous"))
+    if avg_judge_similarity_to_previous is None:
+        avg_judge_similarity_to_previous = _as_float(
+            evolution_totals.get("avg_judge_similarity_to_previous")
+        )
+    low_revision_change_rounds = summary.get("low_revision_change_rounds")
+    if not isinstance(low_revision_change_rounds, list):
+        low_revision_change_rounds = evolution_totals.get("low_revision_change_rounds", [])
+    if not isinstance(low_revision_change_rounds, list):
+        low_revision_change_rounds = []
+    low_previous_revised_change_rounds = summary.get("low_previous_revised_change_rounds")
+    if not isinstance(low_previous_revised_change_rounds, list):
+        low_previous_revised_change_rounds = evolution_totals.get(
+            "low_previous_revised_change_rounds", []
+        )
+    if not isinstance(low_previous_revised_change_rounds, list):
+        low_previous_revised_change_rounds = []
     metadata_sources = []
     if summary:
         metadata_sources.append("run_summary")
@@ -167,6 +198,13 @@ def load_run_summary(run_root: Path) -> dict[str, Any]:
         "total_estimated_output_tokens": total_estimated_output_tokens,
         "total_estimated_tokens": total_estimated_tokens,
         "token_estimate_method": token_estimate_method,
+        "avg_draft_to_revised_similarity": avg_draft_to_revised_similarity,
+        "avg_revised_similarity_to_previous": avg_revised_similarity_to_previous,
+        "avg_judge_similarity_to_previous": avg_judge_similarity_to_previous,
+        "low_revision_change_count": len(low_revision_change_rounds),
+        "low_previous_revised_change_count": len(low_previous_revised_change_rounds),
+        "low_revision_change_rounds": low_revision_change_rounds,
+        "low_previous_revised_change_rounds": low_previous_revised_change_rounds,
         "round_count": summary.get("round_count", len(round_metrics)),
         "successful_rounds": successful_rounds,
         "timeout_rounds": timeout_rounds,

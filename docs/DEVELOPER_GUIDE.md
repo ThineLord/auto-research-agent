@@ -41,8 +41,9 @@ Core modules:
   commit state when available, and reads legacy `run_manifest.json` metadata for old runs.
 - `src/run_compare.py` merges `run_summary.json`, `run_config.json` or legacy manifests, and
   `round_metrics.json` to compare two or more run roots.
-- `src/metrics.py` centralizes per-agent timing, character counts, and conservative token estimates
-  so runner, diagnostic mode, and comparison fallbacks use the same schema.
+- `src/metrics.py` centralizes per-agent timing, character counts, conservative token estimates,
+  and per-round text evolution metrics so runner, diagnostic mode, UI tables, and comparison
+  fallbacks use the same additive schema.
 - `src/session.py` builds focused session objectives, current plans, and final session reports.
 - `src/literature_survey.py` implements local Literature Survey Mode: source collection, paper
   metadata parsing, deduplication, theme/gap extraction, survey report rendering, and related-work
@@ -104,7 +105,8 @@ Progress comes from:
   limits, topic snapshot, prompt hashes, Git commit, start/end timestamps, stop reason, and resume
   eligibility.
 - `runs/<run_id>/round_metrics.json` for per-round agent timings, error flags, scores, rubric
-  subscores when Judge returns structured JSON, and per-agent `agent_io_metrics`.
+  subscores when Judge returns structured JSON, per-agent `agent_io_metrics`, and
+  `evolution_metrics` for draft/revised/judge text similarity and adjacent score deltas.
 - `runs/<run_id>/run_summary.json` for run-level counts, best score, stop reason, total elapsed
   seconds, total agent elapsed seconds, aggregate estimated tokens, and paths to metrics/config
   artifacts.
@@ -112,6 +114,9 @@ Progress comes from:
 Token fields are deliberately named `estimated_*_tokens` and use
 `visible_context_chars_div_4_ceil`. They are cost-ready accounting foundations, not provider billing
 truth, and the project does not hardcode vendor prices.
+Evolution fields are deliberately descriptive rather than scoring fields. They are computed after
+agent outputs exist, use only stored text artifacts, and must not change prompts, provider calls,
+Judge parsing, stop conditions, or benchmark semantics.
 - `resume_metadata` appears in checkpoint, run config, and run summary. It distinguishes
   `start_new_run` from `resume_existing_run`, records checkpoint resume round, whether previous
   best output is only context for a new run, whether completed round files are preserved, and the
@@ -124,7 +129,8 @@ The Streamlit UI renders a compact latest-run metadata table from `run_config.js
 messages when `run_config.json`, `run_summary.json`, or `round_metrics.json` has not been written.
 It also exposes a multi-run comparison table using the same `src.run_compare` helper as
 `--compare-runs`; missing or legacy metadata should produce partial rows instead of UI failures.
-Newer runs add aggregate agent elapsed seconds and estimated token totals to that comparison output.
+Newer runs add aggregate agent elapsed seconds, estimated token totals, average revised similarity,
+and low-change round counts to that comparison output.
 The Resume control uses checkpoint metadata to preview run id/root, last completed round, next
 round, stop reason, resume eligibility, completed-round preservation, and next-round directory
 status before launching `--resume`. A non-empty next-round directory is treated as partial or

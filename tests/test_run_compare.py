@@ -31,6 +31,8 @@ class RunCompareTests(unittest.TestCase):
                         "timeout_rounds": [2],
                         "total_agent_elapsed_seconds": 5.25,
                         "total_estimated_tokens": 123,
+                        "avg_revised_similarity_to_previous": 0.82,
+                        "low_previous_revised_change_rounds": [2],
                     }
                 ),
                 encoding="utf-8",
@@ -71,6 +73,8 @@ class RunCompareTests(unittest.TestCase):
             self.assertEqual(comparison["runs"][0]["timeout_count"], 1)
             self.assertEqual(comparison["runs"][0]["total_agent_elapsed_seconds"], 5.25)
             self.assertEqual(comparison["runs"][0]["total_estimated_tokens"], 123)
+            self.assertEqual(comparison["runs"][0]["avg_revised_similarity_to_previous"], 0.82)
+            self.assertEqual(comparison["runs"][0]["low_previous_revised_change_count"], 1)
             self.assertEqual(comparison["runs"][0]["metadata_status"], "ok")
             self.assertEqual(json.loads(output_path.read_text(encoding="utf-8")), comparison)
 
@@ -106,6 +110,11 @@ class RunCompareTests(unittest.TestCase):
                             "score": 75.0,
                             "timeout_this_round": True,
                             "agent_timings_seconds": {"draft": 2.0},
+                            "evolution_metrics": {
+                                "draft_to_revised_similarity": 0.8,
+                                "revised_similarity_to_previous": 0.96,
+                                "judge_similarity_to_previous": 0.5,
+                            },
                         },
                     ]
                 ),
@@ -121,6 +130,8 @@ class RunCompareTests(unittest.TestCase):
         self.assertEqual(summary["average_score"], 72.5)
         self.assertEqual(summary["total_agent_elapsed_seconds"], 3.5)
         self.assertEqual(summary["total_estimated_tokens"], 14)
+        self.assertEqual(summary["avg_revised_similarity_to_previous"], 0.96)
+        self.assertEqual(summary["low_previous_revised_change_count"], 1)
         self.assertEqual(comparison["best_run_id"], "legacy-run")
 
     def test_missing_metadata_is_reported_without_failing_comparison(self) -> None:

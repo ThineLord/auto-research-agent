@@ -464,12 +464,25 @@ class RoundLoopTests(unittest.TestCase):
             self.assertEqual(run_summary["timeout_count"], 0)
             self.assertEqual(run_summary["error_count"], 0)
             self.assertIn("draft", run_summary["agent_metric_totals"])
+            self.assertIn("evolution_metric_totals", run_summary)
+            self.assertEqual(
+                run_summary["evolution_metric_totals"]["rounds_with_evolution_metrics"],
+                2,
+            )
+            self.assertIsNotNone(run_summary["avg_draft_to_revised_similarity"])
             self.assertEqual(run_summary["resume_metadata"]["lifecycle_action"], "start_new_run")
             self.assertFalse(run_summary["resume_metadata"]["resume_from_checkpoint"])
             self.assertFalse(run_summary["resume_metadata"]["new_run_from_previous_best"])
             self.assertEqual(len(round_metrics), 2)
             self.assertIn("agent_timings_seconds", round_metrics[0])
             self.assertIn("agent_io_metrics", round_metrics[0])
+            self.assertIn("evolution_metrics", round_metrics[0])
+            self.assertFalse(round_metrics[0]["evolution_metrics"]["has_previous_round"])
+            self.assertTrue(round_metrics[1]["evolution_metrics"]["has_previous_round"])
+            self.assertEqual(
+                round_metrics[1]["evolution_metrics"]["score_delta_vs_previous"],
+                -10.0,
+            )
             self.assertGreater(round_metrics[0]["estimated_total_tokens"], 0)
             self.assertEqual(
                 round_metrics[0]["agent_io_metrics"]["draft"]["token_estimate_method"],

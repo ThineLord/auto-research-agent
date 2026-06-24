@@ -1,3 +1,59 @@
+# Phase 10 - Round Evolution Interpretability Metrics
+
+Date: 2026-06-24
+Commit: pending in this phase commit
+Branch: master
+
+## Goal
+
+Add lightweight experiment interpretability metrics that help researchers see whether each round meaningfully changes draft/revised/judge text, without changing prompts, provider behavior, scoring semantics, or stop conditions.
+
+## What Changed
+
+New runs now write text evolution metrics into `score_history.json`, `round_metrics.json`, and `run_summary.json`. Run comparison and the Streamlit UI surface aggregate similarity and low-change indicators while preserving legacy metadata compatibility.
+
+## Code
+
+* Added standard-library similarity and changed-line metrics in `src/metrics.py`.
+* Recorded per-round `evolution_metrics` in the runner after each scored round.
+* Added run-level aggregate evolution totals and comparison fallbacks for legacy or partial metadata.
+
+## UI
+
+* Added average revised similarity and low-change round counts to latest run metadata and run comparison rows.
+* Added score delta and similarity fields to the score history table helper.
+
+## Tests
+
+* Added pure metrics tests for similarity, score deltas, and aggregate evolution summaries.
+* Extended round-loop tests to verify evolution metrics are written for first and later rounds.
+* Extended run comparison and UI helper tests for aggregate similarity fields and privacy-safe display.
+
+## Docs
+
+* Updated README, USER_GUIDE, DEVELOPER_GUIDE, quickstart_zh, and runbook_zh to describe the new interpretability fields and their limits.
+
+## Validation
+
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `.venv/bin/python -m pytest tests/test_metrics.py tests/test_round_loop.py::RoundLoopTests::test_round_loop_writes_outputs_and_keeps_best_score tests/test_run_compare.py tests/test_ui_helpers.py::SharedUiBackendHelperTests::test_ui_score_history_rows_flatten_metrics_for_display tests/test_ui_helpers.py::SharedUiBackendHelperTests::test_ui_run_metadata_rows_summarize_latest_run_without_absolute_paths tests/test_ui_helpers.py::SharedUiBackendHelperTests::test_ui_run_comparison_helpers_mask_paths_and_flatten_fields -q`
+* `make check`
+
+## Risks / Limitations
+
+* Similarity metrics are interpretability aids only. They do not prove research quality, novelty, or correctness.
+* The low-change threshold is a conservative fixed heuristic and should not be treated as a benchmark score.
+* Existing old runs remain readable but will only show these fields when round metrics include `evolution_metrics`.
+
+## Recommended Next Phase
+
+Phase 11 - Rubric trend preservation and comparison display.
+
+## Suggested Codex Prompt
+
+Continue with Phase 11. Add schema-additive rubric trend summaries from existing Judge rubric subscores, surface them in run comparison/UI where practical, preserve scoring semantics, update tests/docs/PROJECT_UPDATE.md, validate with `git diff --check`, `.venv/bin/python -m src.main --help`, targeted tests, and `make check`, then commit and push.
+
 # Phase 9 - Partial Next-Round Resume Safety
 
 Date: 2026-06-24

@@ -5,6 +5,7 @@ import unittest
 from src.metrics import (
     TOKEN_ESTIMATE_METHOD,
     build_agent_io_metrics,
+    build_round_evolution_metrics,
     estimate_tokens_from_chars,
     summarize_round_metrics,
 )
@@ -72,6 +73,42 @@ class MetricsTests(unittest.TestCase):
         self.assertEqual(summary["rounds_with_token_estimates"], 1)
         self.assertEqual(summary["total_agent_elapsed_seconds"], 3.0)
         self.assertEqual(summary["total_estimated_tokens"], 3)
+
+    def test_round_evolution_metrics_capture_similarity_and_aggregate(self) -> None:
+        first = build_round_evolution_metrics(
+            current_draft="Plan A\nRun baseline",
+            current_revised="Plan A\nRun baseline with ablation",
+            current_judge="Score: 70\nGood start",
+            current_score=70,
+        )
+        second = build_round_evolution_metrics(
+            current_draft="Plan A\nRun baseline with ablation",
+            current_revised="Plan A\nRun baseline with ablation and error analysis",
+            current_judge="Score: 75\nBetter validation",
+            previous_draft="Plan A\nRun baseline",
+            previous_revised="Plan A\nRun baseline with ablation",
+            previous_judge="Score: 70\nGood start",
+            current_score=75,
+            previous_score=70,
+        )
+        summary = summarize_round_metrics(
+            [
+                {"round": 1, "evolution_metrics": first},
+                {"round": 2, "evolution_metrics": second},
+            ]
+        )
+
+        self.assertFalse(first["has_previous_round"])
+        self.assertIsNone(first["revised_similarity_to_previous"])
+        self.assertTrue(second["has_previous_round"])
+        self.assertGreater(second["draft_to_revised_similarity"], 0.5)
+        self.assertEqual(second["score_delta_vs_previous"], 5)
+        self.assertEqual(summary["evolution_metric_totals"]["rounds_with_evolution_metrics"], 2)
+        self.assertEqual(
+            summary["evolution_metric_totals"]["rounds_with_previous_round_similarity"],
+            1,
+        )
+        self.assertIsNotNone(summary["evolution_metric_totals"]["avg_draft_to_revised_similarity"])
 
 
 if __name__ == "__main__":

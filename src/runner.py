@@ -32,7 +32,12 @@ from .constants import (
     STOP_USER_REQUESTED,
 )
 from .judge_output import parse_judge_rubric
-from .metrics import build_agent_io_metrics, summarize_agent_io_metrics, summarize_round_metrics
+from .metrics import (
+    build_agent_io_metrics,
+    build_round_evolution_metrics,
+    summarize_agent_io_metrics,
+    summarize_round_metrics,
+)
 from .run_config import build_initial_run_config, finalize_run_config, read_run_config
 from .runtime import log_run as _log
 from .runtime import stop_requested as _stop_requested
@@ -818,6 +823,7 @@ def run_iterative_rounds(
         repetitive_judge = _is_repetitive_judge(judge_output, judge_history)
         judge_history.append(judge_output)
 
+        previous_score = round_metrics[-1].get("score") if round_metrics else None
         continuation_source = draft_previous_revised_output or draft_previous_draft_output
         agent_topic_context = getattr(agents, "topic_context", "")
         draft_input_context = [
@@ -880,6 +886,16 @@ def run_iterative_rounds(
             },
         )
         round_metric_totals = summarize_agent_io_metrics(agent_io_metrics)
+        evolution_metrics = build_round_evolution_metrics(
+            current_draft=draft_output,
+            current_revised=revised_output,
+            current_judge=judge_output,
+            previous_draft=draft_previous_draft_output,
+            previous_revised=draft_previous_revised_output,
+            previous_judge=previous_judge,
+            current_score=score,
+            previous_score=previous_score if isinstance(previous_score, (int, float)) else None,
+        )
         round_metric = {
             "round": round_index,
             "score": score,
@@ -898,6 +914,7 @@ def run_iterative_rounds(
             },
             "round_runtime_seconds": round(sum(agent_timings_seconds.values()), 3),
             "agent_io_metrics": agent_io_metrics,
+            "evolution_metrics": evolution_metrics,
             "estimated_input_chars": round_metric_totals["total_estimated_input_chars"],
             "output_chars": round_metric_totals["total_output_chars"],
             "estimated_input_tokens": round_metric_totals["total_estimated_input_tokens"],
@@ -1166,6 +1183,22 @@ def run_iterative_rounds(
             "total_output_chars": metrics_totals["total_output_chars"],
             "token_estimate_method": metrics_totals["token_estimate_method"],
             "agent_metric_totals": metrics_totals["agent_metric_totals"],
+            "evolution_metric_totals": metrics_totals["evolution_metric_totals"],
+            "avg_draft_to_revised_similarity": metrics_totals["evolution_metric_totals"][
+                "avg_draft_to_revised_similarity"
+            ],
+            "avg_revised_similarity_to_previous": metrics_totals["evolution_metric_totals"][
+                "avg_revised_similarity_to_previous"
+            ],
+            "avg_judge_similarity_to_previous": metrics_totals["evolution_metric_totals"][
+                "avg_judge_similarity_to_previous"
+            ],
+            "low_revision_change_rounds": metrics_totals["evolution_metric_totals"][
+                "low_revision_change_rounds"
+            ],
+            "low_previous_revised_change_rounds": metrics_totals["evolution_metric_totals"][
+                "low_previous_revised_change_rounds"
+            ],
             "timeout_count": metrics_totals["timeout_count"],
             "error_count": metrics_totals["error_count"],
             "resume_metadata": checkpoint_final["resume_metadata"],

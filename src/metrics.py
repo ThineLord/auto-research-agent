@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from difflib import SequenceMatcher
 from typing import Any
 
 AGENT_STAGES: tuple[str, ...] = ("draft", "review", "revise", "judge")
 TOKEN_ESTIMATE_METHOD = "visible_context_chars_div_4_ceil"
 TOKEN_ESTIMATE_CHARS_PER_TOKEN = 4
+LOW_SIMILARITY_CHANGE_THRESHOLD = 0.95
 
 
 def estimate_tokens_from_chars(char_count: int) -> int:
@@ -48,6 +50,88 @@ def _as_int(value: Any) -> int:
         return int(str(value))
     except (TypeError, ValueError):
         return 0
+
+
+def _average(values: Sequence[float]) -> float | None:
+    if not values:
+        return None
+    return round(sum(values) / len(values), 3)
+
+
+def _normalize_similarity_text(text: str) -> str:
+    return " ".join(str(text or "").lower().split())
+
+
+def _similarity_ratio(left: str, right: str) -> float | None:
+    left_norm = _normalize_similarity_text(left)
+    right_norm = _normalize_similarity_text(right)
+    if not left_norm or not right_norm:
+        return None
+    return round(SequenceMatcher(None, left_norm, right_norm).ratio(), 3)
+
+
+def _changed_line_count(before: str, after: str) -> int | None:
+    if not before.strip() and not after.strip():
+        return None
+    before_lines = before.splitlines()
+    after_lines = after.splitlines()
+    matcher = SequenceMatcher(None, before_lines, after_lines)
+    changed = 0
+    for tag, before_start, before_end, after_start, after_end in matcher.get_opcodes():
+        if tag == "equal":
+            continue
+        changed += (before_end - before_start) + (after_end - after_start)
+    return changed
+
+
+def build_round_evolution_metrics(
+    *,
+    current_draft: str,
+    current_revised: str,
+    current_judge: str,
+    previous_draft: str = "",
+    previous_revised: str = "",
+    previous_judge: str = "",
+    current_score: float | None = None,
+    previous_score: float | None = None,
+) -> dict[str, Any]:
+    """Measure text evolution without changing prompts, scoring, or control flow."""
+    draft_chars = len(current_draft)
+    revised_chars = len(current_revised)
+    judge_chars = len(current_judge)
+    previous_revised_chars = len(previous_revised)
+    score_delta = None
+    if current_score is not None and previous_score is not None:
+        score_delta = round(current_score - previous_score, 2)
+    revised_delta_chars = None
+    if previous_revised.strip():
+        revised_delta_chars = revised_chars - previous_revised_chars
+
+    draft_to_revised_similarity = _similarity_ratio(current_draft, current_revised)
+    revised_similarity_to_previous = _similarity_ratio(previous_revised, current_revised)
+    draft_similarity_to_previous = _similarity_ratio(previous_draft, current_draft)
+    judge_similarity_to_previous = _similarity_ratio(previous_judge, current_judge)
+
+    return {
+        "metric_version": 1,
+        "has_previous_round": bool(
+            previous_draft.strip() or previous_revised.strip() or previous_judge.strip()
+        ),
+        "draft_chars": draft_chars,
+        "revised_chars": revised_chars,
+        "judge_chars": judge_chars,
+        "previous_revised_chars": previous_revised_chars if previous_revised.strip() else None,
+        "revised_delta_chars": revised_delta_chars,
+        "draft_to_revised_similarity": draft_to_revised_similarity,
+        "draft_similarity_to_previous": draft_similarity_to_previous,
+        "revised_similarity_to_previous": revised_similarity_to_previous,
+        "judge_similarity_to_previous": judge_similarity_to_previous,
+        "draft_to_revised_changed_lines": _changed_line_count(current_draft, current_revised),
+        "revised_changed_lines_vs_previous": _changed_line_count(previous_revised, current_revised)
+        if previous_revised.strip()
+        else None,
+        "score_delta_vs_previous": score_delta,
+    }
 
 
 def build_agent_io_metrics(
@@ -144,7 +228,23 @@ def summarize_round_metrics(round_metrics: Sequence[Mapping[str, Any]]) -> dict[
             for agent in AGENT_STAGES
         },
         "token_estimate_method": TOKEN_ESTIMATE_METHOD,
+        "evolution_metric_totals": {
+            "rounds_with_evolution_metrics": 0,
+            "rounds_with_previous_round_similarity": 0,
+            "avg_draft_to_revised_similarity": None,
+            "avg_revised_similarity_to_previous": None,
+            "avg_judge_similarity_to_previous": None,
+            "avg_score_delta_vs_previous": None,
+            "low_revision_change_rounds": [],
+            "low_previous_revised_change_rounds": [],
+        },
     }
+    draft_to_revised_similarities: list[float] = []
+    revised_previous_similarities: list[float] = []
+    judge_previous_similarities: list[float] = []
+    score_deltas: list[float] = []
+    low_revision_change_rounds: list[Any] = []
+    low_previous_revised_change_rounds: list[Any] = []
     for entry in round_metrics:
         if entry.get("timeout_this_round"):
             aggregate["timeout_count"] += 1
@@ -205,7 +305,36 @@ def summarize_round_metrics(round_metrics: Sequence[Mapping[str, Any]]) -> dict[
             target["estimated_output_tokens"] += _as_int(source.get("estimated_output_tokens"))
             target["estimated_total_tokens"] += _as_int(source.get("estimated_total_tokens"))
 
+        evolution_metrics = entry.get("evolution_metrics")
+        if isinstance(evolution_metrics, Mapping):
+            aggregate["evolution_metric_totals"]["rounds_with_evolution_metrics"] += 1
+            round_number = entry.get("round")
+            draft_to_revised = evolution_metrics.get("draft_to_revised_similarity")
+            revised_previous = evolution_metrics.get("revised_similarity_to_previous")
+            judge_previous = evolution_metrics.get("judge_similarity_to_previous")
+            score_delta = evolution_metrics.get("score_delta_vs_previous")
+            if isinstance(draft_to_revised, (int, float)):
+                draft_to_revised_similarities.append(float(draft_to_revised))
+                if draft_to_revised >= LOW_SIMILARITY_CHANGE_THRESHOLD:
+                    low_revision_change_rounds.append(round_number)
+            if isinstance(revised_previous, (int, float)):
+                revised_previous_similarities.append(float(revised_previous))
+                aggregate["evolution_metric_totals"]["rounds_with_previous_round_similarity"] += 1
+                if revised_previous >= LOW_SIMILARITY_CHANGE_THRESHOLD:
+                    low_previous_revised_change_rounds.append(round_number)
+            if isinstance(judge_previous, (int, float)):
+                judge_previous_similarities.append(float(judge_previous))
+            if isinstance(score_delta, (int, float)):
+                score_deltas.append(float(score_delta))
+
     aggregate["total_agent_elapsed_seconds"] = round(aggregate["total_agent_elapsed_seconds"], 3)
     for agent_totals in aggregate["agent_metric_totals"].values():
         agent_totals["elapsed_seconds"] = round(agent_totals["elapsed_seconds"], 3)
+    evolution_totals = aggregate["evolution_metric_totals"]
+    evolution_totals["avg_draft_to_revised_similarity"] = _average(draft_to_revised_similarities)
+    evolution_totals["avg_revised_similarity_to_previous"] = _average(revised_previous_similarities)
+    evolution_totals["avg_judge_similarity_to_previous"] = _average(judge_previous_similarities)
+    evolution_totals["avg_score_delta_vs_previous"] = _average(score_deltas)
+    evolution_totals["low_revision_change_rounds"] = low_revision_change_rounds
+    evolution_totals["low_previous_revised_change_rounds"] = low_previous_revised_change_rounds
     return aggregate
