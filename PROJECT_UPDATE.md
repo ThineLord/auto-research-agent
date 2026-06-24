@@ -1,3 +1,69 @@
+# Phase 14 - Mock/Fake Run Mode
+
+Date: 2026-06-24
+Commit: fd9f0f88b64cb778aa8d55772a31724dacc51fda
+Branch: master
+
+## Goal
+
+Add a deterministic provider-free demo run mode that writes normal run artifacts for CI/docs smoke
+coverage without changing real provider behavior, prompt semantics, scoring semantics, or evaluation
+logic.
+
+## What Changed
+
+Added `--mock` and `make mock`. Mock mode injects deterministic fake Draft/Review/Revise/Judge
+agents into the existing runner, defaults to two rounds unless `--max-rounds` is provided, and marks
+artifacts with provider/model metadata `mock` / `mock-deterministic`.
+
+## Code
+
+* Added `src/mock_run.py` with provider-free fake agents and explicit deterministic metadata.
+* Wired `--mock` into `src/cli.py` before provider validation so no Ollama, Gemini, network, or API
+  key checks are required.
+* Added a `make mock` convenience target.
+
+## UI
+
+* No Streamlit UI changes in this phase.
+
+## Tests
+
+* Added focused mock-run tests for CLI parsing, normal artifact writing, and skipped provider client
+  creation/discovery.
+* Extended CLI argument parsing coverage for `--mock`.
+
+## Docs
+
+* Updated README, USER_GUIDE, DEVELOPER_GUIDE, quickstart_zh, and runbook_zh with mock mode usage
+  and limitations.
+
+## Validation
+
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `.venv/bin/python -m pytest tests/test_mock_run.py tests/test_round_loop.py::RoundLoopTests::test_parse_args_accepts_mode_and_model_flags -q`
+* `make check`
+
+## Risks / Limitations
+
+* Mock scores and rubric fields are synthetic demo signals and must not be interpreted as research
+  evaluation results.
+* Mock mode writes ignored project runtime artifacts like a normal run; users should inspect outputs
+  locally and avoid committing generated run directories.
+
+## Recommended Next Phase
+
+Phase 15 - UI Analytics Dashboard, if a human review agrees that additional dashboard visualization
+is more valuable than pausing for release packaging.
+
+## Suggested Codex Prompt
+
+Continue with Phase 15. Design a compact Streamlit analytics dashboard for score, rubric,
+similarity, timeout/error, timing, and estimated-token trends using existing artifacts only. Preserve
+scoring semantics, keep paths privacy-safe, update tests/docs/PROJECT_UPDATE.md, validate, commit,
+and push.
+
 # Phase 13 - Autonomous Cycle Closeout
 
 Date: 2026-06-24
