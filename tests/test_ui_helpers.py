@@ -803,6 +803,17 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         metrics_item = next(item for item in catalog if item["label"] == "Round metrics")
         self.assertEqual(metrics_item["path"], round_metrics_path)
 
+    def test_stop_signal_display_path_is_masked(self) -> None:
+        import ui.app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            stop_signal_path = Path(tmp) / "project" / "STOP_REQUESTED"
+
+            display_path = ui_app.output_display_path(stop_signal_path)
+
+        self.assertEqual(display_path, "<repo>/STOP_REQUESTED")
+        self.assertNotIn(str(Path(tmp)), display_path)
+
     def test_ui_run_comparison_helpers_mask_paths_and_flatten_fields(self) -> None:
         import ui.app as ui_app
 

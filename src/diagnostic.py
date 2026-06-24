@@ -12,7 +12,7 @@ from rich.console import Console
 from .agents import ResearchAgents
 from .cloud_free import CloudFreeDailyQuotaExhausted, next_pacific_reset_heuristic
 from .config import DEFAULT_DRAFTING_MODE
-from .constants import STOP_CLOUD_DAILY_QUOTA
+from .constants import STOP_CLOUD_DAILY_QUOTA, STOP_MAX_ROUNDS
 from .judge_output import parse_judge_rubric
 from .llm import LLMClientProtocol
 from .metrics import build_agent_io_metrics, summarize_agent_io_metrics, summarize_round_metrics
@@ -29,6 +29,28 @@ from .storage import (
     write_json_file,
     write_score_history,
 )
+
+
+def _diagnostic_resume_metadata(
+    *,
+    completed_rounds: int,
+    can_resume: bool,
+    stop_reason: str,
+) -> dict[str, object]:
+    return {
+        "lifecycle_action": "start_new_run",
+        "resume_from_checkpoint": False,
+        "resume_source": "none",
+        "resumed_run_id": None,
+        "resume_from_round": None,
+        "new_run_from_previous_best": False,
+        "previous_best_output_path": "",
+        "completed_round_files_preserved": False,
+        "next_round": completed_rounds + 1 if can_resume else None,
+        "can_resume": can_resume,
+        "last_completed_round": completed_rounds,
+        "stop_reason": stop_reason,
+    }
 
 
 def run_diagnostic_mode(
@@ -114,6 +136,11 @@ def run_diagnostic_mode(
         prompt_dir=prompt_dir,
         repo_root=repo_root,
         started_at=started_at_iso,
+        resume_metadata=_diagnostic_resume_metadata(
+            completed_rounds=0,
+            can_resume=False,
+            stop_reason="",
+        ),
     )
     write_json_file(run_config_path, run_config)
     write_json_file(
@@ -228,6 +255,11 @@ def run_diagnostic_mode(
     except CloudFreeDailyQuotaExhausted as exc:
         message = str(exc)
         console.print(f"[yellow]{message}[/yellow]")
+        resume_metadata = _diagnostic_resume_metadata(
+            completed_rounds=0,
+            can_resume=True,
+            stop_reason=STOP_CLOUD_DAILY_QUOTA,
+        )
         write_json_file(
             project_dir / "checkpoint.json",
             {
@@ -250,6 +282,7 @@ def run_diagnostic_mode(
                 "paused_until_reset": True,
                 "pause_message": message,
                 "reset_heuristic": next_pacific_reset_heuristic(),
+                "resume_metadata": resume_metadata,
             },
         )
         run_config = finalize_run_config(
@@ -289,6 +322,7 @@ def run_diagnostic_mode(
                 "agent_metric_totals": metrics_totals["agent_metric_totals"],
                 "timeout_count": metrics_totals["timeout_count"],
                 "error_count": metrics_totals["error_count"],
+                "resume_metadata": resume_metadata,
                 "round_count": 0,
                 "successful_rounds": [],
                 "timeout_rounds": [],
@@ -439,6 +473,11 @@ def run_diagnostic_mode(
             "model": model_name,
             "drafting_mode": drafting_mode,
             "project": project_metadata or {},
+            "resume_metadata": _diagnostic_resume_metadata(
+                completed_rounds=1,
+                can_resume=False,
+                stop_reason=STOP_MAX_ROUNDS,
+            ),
         },
     )
     run_config = finalize_run_config(
@@ -464,7 +503,7 @@ def run_diagnostic_mode(
             "completed_rounds": 1,
             "best_round": 1,
             "best_score": round(parsed_score, 2),
-            "stop_reason": "MAX_ROUNDS",
+            "stop_reason": STOP_MAX_ROUNDS,
             "can_resume": False,
             "total_runtime_seconds": total_runtime_seconds,
             "total_elapsed_seconds": total_runtime_seconds,
@@ -478,6 +517,11 @@ def run_diagnostic_mode(
             "agent_metric_totals": metrics_totals["agent_metric_totals"],
             "timeout_count": metrics_totals["timeout_count"],
             "error_count": metrics_totals["error_count"],
+            "resume_metadata": _diagnostic_resume_metadata(
+                completed_rounds=1,
+                can_resume=False,
+                stop_reason=STOP_MAX_ROUNDS,
+            ),
             "score_history_path": str(score_history_path),
             "round_metrics_path": str(round_metrics_path),
             "run_config_path": str(run_config_path),

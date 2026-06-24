@@ -86,6 +86,27 @@ class RunAnalyticsTests(unittest.TestCase):
         self.assertEqual(analysis["score"]["trend"], "unknown")
         self.assertIsNone(analysis["score"]["best_score"])
 
+    def test_analyze_run_score_trend_accepts_legacy_numeric_strings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "runs" / "legacy-string-score"
+            run_root.mkdir(parents=True)
+            (run_root / "round_metrics.json").write_text(
+                json.dumps(
+                    [
+                        {"round": 1, "score": "60.5"},
+                        {"round": 2, "score": "72.0"},
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            analysis = analyze_run(run_root)
+
+        self.assertEqual(analysis["score"]["first_score"], 60.5)
+        self.assertEqual(analysis["score"]["latest_score"], 72.0)
+        self.assertEqual(analysis["score"]["score_delta_first_to_latest"], 11.5)
+        self.assertEqual(analysis["score"]["trend"], "improved")
+
     def test_cli_analyze_wrapper_masks_paths_and_writes_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -2004,7 +2004,7 @@ def main() -> None:
     with c4:
         if st.button(t("pause_stop_safely"), disabled=not run_active):
             write_file_text(stop_signal_path, "STOP_REQUESTED\n")
-            st.warning(t("stop_signal_created", path=stop_signal_path))
+            st.warning(t("stop_signal_created", path=output_display_path(stop_signal_path)))
     resume_state = describe_resume_state(
         checkpoint=checkpoint,
         run_active=run_active,

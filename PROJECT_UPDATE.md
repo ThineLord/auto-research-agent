@@ -1,3 +1,73 @@
+# Bug Audit 1 - Artifact Compatibility and Path Display Hardening
+
+Date: 2026-06-24
+Commit: pending phase commit
+Branch: master
+
+## Goal
+
+Run the first post-v0.1.0-stable bug audit pass across provider-free artifact readers, diagnostic
+metadata, and UI path display behavior without changing prompt, scoring, provider, or benchmark
+semantics.
+
+## Bug / Fragility Found
+
+* `--analyze-run` reported `trend: unknown` for legacy `round_metrics.json` files whose score values
+  were numeric strings, even though run comparison already tolerated the same legacy shape.
+* Diagnostic runs wrote `resume_metadata` to finalized `run_config.json` but omitted it from
+  `checkpoint.json` and `run_summary.json`, despite docs and UI expectations describing the field
+  across all run metadata artifacts.
+* The Streamlit `Pause / Stop Safely` confirmation rendered the absolute `STOP_REQUESTED` path
+  instead of a repo-relative or masked path.
+
+## Reproduction
+
+* Temporary legacy fixture with `"score": "60.5"` and `"score": "72.0"` reproduced
+  `trend: unknown` from `src.run_analytics.analyze_run`.
+* Temporary diagnostic fixture with a fake provider-free LLM reproduced missing
+  `resume_metadata` in `checkpoint.json` and `run_summary.json`.
+* `rg -n "stop_signal_created" ui/app.py ui/i18n.py tests/test_ui_helpers.py` showed the UI passing
+  the raw `Path` object to the localized stop-signal message.
+
+## Fix
+
+* Reused numeric-string coercion in single-run analytics score trend parsing while still rejecting
+  booleans.
+* Added additive diagnostic `resume_metadata` to checkpoint and run summary outputs, including the
+  cloud-free quota pause path.
+* Masked the UI stop-signal confirmation with the existing `output_display_path` helper.
+
+## Tests Added or Updated
+
+* Added a single-run analytics regression test for legacy numeric string scores.
+* Added a provider-free diagnostic artifact test that asserts checkpoint, run config, and run summary
+  all expose compatible `resume_metadata`.
+* Added a UI helper regression test for masked stop-signal path display.
+
+## Validation
+
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make help`
+* `make check` (`116 passed, 43 subtests passed`)
+* `make mock ARGS="--project example --max-rounds 1"`
+* `.venv/bin/python -m src.main --mock --project example --max-rounds 1`
+* `.venv/bin/python -m src.main --analyze-run projects/example/runs/20260625_000300_779811`
+* `.venv/bin/python -m src.main --compare-runs projects/example/runs/20260625_000300_779811 projects/example/runs/20260625_000300_661988`
+
+## Remaining Risks
+
+* The local private `config.yaml` points at `pama`, which currently lacks `task.md`; unqualified
+  `make mock ARGS="--max-rounds 1"` therefore fails before provider-free execution. This was not
+  changed because local config is intentionally private.
+* Diagnostic console output still prints local artifact paths, matching existing CLI behavior; this
+  audit only fixed the verified UI path display leak.
+
+## Next Audit Target
+
+Continue with CLI/Makefile/config/survey/runtime edge cases, especially provider-free command
+accuracy, run metadata compatibility, and additional repo-relative path display surfaces.
+
 # Release Review - v0.1.0-stable
 
 Date: 2026-06-24

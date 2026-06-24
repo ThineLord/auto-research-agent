@@ -20,14 +20,23 @@ def _read_json_list(path: Path) -> list[dict[str, Any]]:
     return [entry for entry in payload if isinstance(entry, dict)]
 
 
+def _as_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
 def _numeric_scores(round_metrics: list[dict[str, Any]]) -> list[tuple[Any, float]]:
     scores: list[tuple[Any, float]] = []
     for entry in round_metrics:
-        score = entry.get("score")
-        if isinstance(score, bool):
-            continue
-        if isinstance(score, (int, float)):
-            scores.append((entry.get("round"), float(score)))
+        score = _as_float(entry.get("score"))
+        if score is not None:
+            scores.append((entry.get("round"), score))
     return scores
 
 
