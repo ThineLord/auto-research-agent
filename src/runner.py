@@ -1259,7 +1259,10 @@ def run_iterative_rounds(
             repo_root=repo_root,
         )
         if stop_signal_path.exists():
-            stop_signal_path.unlink()
+            try:
+                stop_signal_path.unlink()
+            except OSError:
+                pass
 
     if best_output:
         console.print(f"[bold cyan]Best score:[/bold cyan] {best_score:.2f}")

@@ -204,7 +204,14 @@ def acquire_run_lock(
                 "Another run is already active. "
                 f"pid={lock_pid} mode={lock_mode} model={lock_model} started_at={lock_started}.",
             )
-        lock_path.unlink(missing_ok=True)
+        try:
+            lock_path.unlink(missing_ok=True)
+        except OSError:
+            return (
+                None,
+                f"Stale run lock could not be cleared: {RUN_LOCK_FILENAME} is not removable. "
+                "Move it aside manually and retry.",
+            )
 
     write_json_file(
         lock_path,
@@ -221,4 +228,7 @@ def acquire_run_lock(
 def release_run_lock(lock_path: Optional[Path]) -> None:
     if lock_path is None:
         return
-    lock_path.unlink(missing_ok=True)
+    try:
+        lock_path.unlink(missing_ok=True)
+    except OSError:
+        pass

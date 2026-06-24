@@ -21,7 +21,9 @@ from src.config import (
     save_default_model_name,
 )
 from src.runtime import (
+    acquire_run_lock,
     get_active_process_meta,
+    release_run_lock,
     run_project_tests,
     start_background_process,
 )
@@ -161,6 +163,20 @@ class SharedUiBackendHelperTests(unittest.TestCase):
 
             self.assertIsNone(result.pid)
             self.assertIn("Failed to start run process", result.error or "")
+
+    def test_run_lock_reports_stale_directory_without_deleting_it(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            lock_path = project_dir / "active_run.json"
+            lock_path.mkdir()
+
+            acquired_path, error = acquire_run_lock(project_dir, mode="run", model_name="mock")
+
+            self.assertIsNone(acquired_path)
+            self.assertIn("Stale run lock could not be cleared", error or "")
+            self.assertTrue(lock_path.is_dir())
+            release_run_lock(lock_path)
+            self.assertTrue(lock_path.is_dir())
 
     def test_parse_ollama_list_output_sorts_dedupes_and_handles_empty_list(self) -> None:
         output = (

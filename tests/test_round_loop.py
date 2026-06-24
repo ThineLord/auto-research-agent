@@ -831,6 +831,33 @@ class RoundLoopTests(unittest.TestCase):
             self.assertEqual([entry["score"] for entry in score_history], [91.0, 92.0, 93.0])
             self.assertFalse((run_root / "round_04").exists())
 
+    def test_stale_stop_signal_directory_does_not_crash_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            stop_path = project_dir / "STOP_REQUESTED"
+            stop_path.mkdir()
+
+            result = run_iterative_rounds(
+                console=Console(),
+                agents=FakeAgents(),
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="test",
+                model_name="fake-model",
+                max_rounds=1,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+            )
+
+            self.assertEqual(result["completed_rounds"], 0)
+            self.assertEqual(result["stop_reason"], STOP_USER_REQUESTED)
+            self.assertTrue(stop_path.is_dir())
+
     def test_stopped_partial_round_does_not_append_zero_score_or_advance_checkpoint(
         self,
     ) -> None:

@@ -1,7 +1,61 @@
-# Bug Audit 13 - UI Process Metadata Stale Path Safety
+# Bug Audit 14 - Stale Lock and Stop Signal Cleanup Safety
 
 Date: 2026-06-24
 Commit: pending phase commit
+Branch: master
+
+## Goal
+
+Make remaining non-destructive cleanup paths fail safely when runtime sentinel paths are stale
+directories or otherwise not removable as files.
+
+## Bug / Fragility Found
+
+* `acquire_run_lock` handled stale inactive lock files, but crashed when `active_run.json` existed as
+  a directory or another non-removable path.
+* `release_run_lock` and final stop-signal cleanup also assumed their sentinel paths were removable
+  files.
+
+## Reproduction
+
+* A temporary directory at `active_run.json` reproduced `PermissionError` from `acquire_run_lock`.
+* A runner fixture with `STOP_REQUESTED` as a directory exercised final stop cleanup without deleting
+  the stale directory.
+
+## Fix
+
+* `acquire_run_lock` now returns a clear stale-lock error instead of crashing or deleting non-file
+  paths.
+* `release_run_lock` and stop-signal cleanup now tolerate `OSError` and leave non-file paths in place
+  for manual cleanup.
+
+## Tests Added or Updated
+
+* Added runtime/UI helper coverage for stale directory run locks.
+* Added runner coverage for stale directory `STOP_REQUESTED` cleanup.
+
+## Validation
+
+* `.venv/bin/python -m pytest tests/test_ui_helpers.py::SharedUiBackendHelperTests::test_run_lock_reports_stale_directory_without_deleting_it tests/test_round_loop.py::RoundLoopTests::test_stale_stop_signal_directory_does_not_crash_cleanup -q` (`2 passed`)
+* `.venv/bin/python -m ruff check src/runtime.py src/runner.py tests/test_ui_helpers.py tests/test_round_loop.py`
+* Minimal stale `active_run.json` directory reproduction before and after the fix
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make check` (`134 passed, 43 subtests passed`)
+
+## Remaining Risks
+
+* Stale sentinel directories still require manual cleanup; this phase deliberately avoids recursive
+  deletion.
+
+## Next Audit Target
+
+Final repository sweep and closeout once no further clear safe bugs remain.
+
+# Bug Audit 13 - UI Process Metadata Stale Path Safety
+
+Date: 2026-06-24
+Commit: 72524fa
 Branch: master
 
 ## Goal
