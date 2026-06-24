@@ -10,6 +10,13 @@ AGENT_STAGES: tuple[str, ...] = ("draft", "review", "revise", "judge")
 TOKEN_ESTIMATE_METHOD = "visible_context_chars_div_4_ceil"
 TOKEN_ESTIMATE_CHARS_PER_TOKEN = 4
 LOW_SIMILARITY_CHANGE_THRESHOLD = 0.95
+JUDGE_RUBRIC_KEYS: tuple[str, ...] = (
+    "novelty_and_research_value",
+    "technical_clarity_and_correctness",
+    "feasibility_and_implementation_realism",
+    "evaluation_design_quality",
+    "tomorrow_actionability",
+)
 
 
 def estimate_tokens_from_chars(char_count: int) -> int:
@@ -50,6 +57,17 @@ def _as_int(value: Any) -> int:
         return int(str(value))
     except (TypeError, ValueError):
         return 0
+
+
+def _optional_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(str(value))
+    except (TypeError, ValueError):
+        return None
 
 
 def _average(values: Sequence[float]) -> float | None:
@@ -131,6 +149,48 @@ def build_round_evolution_metrics(
         if previous_revised.strip()
         else None,
         "score_delta_vs_previous": score_delta,
+    }
+
+
+def summarize_judge_rubric_metrics(
+    round_metrics: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Aggregate structured Judge rubric subscores without changing scoring semantics."""
+    values_by_key: dict[str, list[float]] = {}
+    rounds_with_rubric = 0
+    for entry in round_metrics:
+        rubric = entry.get("judge_rubric")
+        if not isinstance(rubric, Mapping):
+            continue
+        normalized: dict[str, float] = {}
+        for key, value in rubric.items():
+            numeric = _optional_float(value)
+            if numeric is not None:
+                normalized[str(key)] = numeric
+        if not normalized:
+            continue
+        rounds_with_rubric += 1
+        for key, value in normalized.items():
+            values_by_key.setdefault(key, []).append(value)
+
+    rubric_keys = sorted(values_by_key)
+    averages = {
+        key: round(sum(values) / len(values), 3) for key, values in values_by_key.items() if values
+    }
+    latest = {key: values[-1] for key, values in values_by_key.items() if values}
+    best = {key: max(values) for key, values in values_by_key.items() if values}
+    delta_first_to_latest = {
+        key: round(values[-1] - values[0], 3)
+        for key, values in values_by_key.items()
+        if len(values) >= 2
+    }
+    return {
+        "rounds_with_rubric": rounds_with_rubric,
+        "rubric_keys": rubric_keys,
+        "rubric_averages": averages,
+        "rubric_latest": latest,
+        "rubric_best": best,
+        "rubric_delta_first_to_latest": delta_first_to_latest,
     }
 
 
@@ -238,6 +298,14 @@ def summarize_round_metrics(round_metrics: Sequence[Mapping[str, Any]]) -> dict[
             "low_revision_change_rounds": [],
             "low_previous_revised_change_rounds": [],
         },
+        "rubric_metric_totals": {
+            "rounds_with_rubric": 0,
+            "rubric_keys": [],
+            "rubric_averages": {},
+            "rubric_latest": {},
+            "rubric_best": {},
+            "rubric_delta_first_to_latest": {},
+        },
     }
     draft_to_revised_similarities: list[float] = []
     revised_previous_similarities: list[float] = []
@@ -337,4 +405,5 @@ def summarize_round_metrics(round_metrics: Sequence[Mapping[str, Any]]) -> dict[
     evolution_totals["avg_score_delta_vs_previous"] = _average(score_deltas)
     evolution_totals["low_revision_change_rounds"] = low_revision_change_rounds
     evolution_totals["low_previous_revised_change_rounds"] = low_previous_revised_change_rounds
+    aggregate["rubric_metric_totals"] = summarize_judge_rubric_metrics(round_metrics)
     return aggregate

@@ -303,7 +303,8 @@ stop reason、是否可 resume、下一轮目录状态和安全动作。UI 的 R
 变动行数和相邻轮分数差，用于发现重复、低变化或大幅漂移。
 `run_summary.json` 汇总 `total_elapsed_seconds`、`total_agent_elapsed_seconds`、
 `total_estimated_input_tokens`、`total_estimated_output_tokens`、`total_estimated_tokens`、
-`timeout_count`、`error_count`、平均相似度和低变化轮次列表。当前不会内置任何厂商价格表；如需成本估算，应在外部基于
+`timeout_count`、`error_count`、平均相似度、低变化轮次列表和 Judge rubric 子项均值/最新值/首尾变化。
+这些 rubric 汇总只复用 Judge 已返回的结构化子项，不改变总分解析或评分语义。当前不会内置任何厂商价格表；如需成本估算，应在外部基于
 这些 token estimate 明确标注价格假设。
 
 如果要比较多个 run：
@@ -314,7 +315,7 @@ stop reason、是否可 resume、下一轮目录状态和安全动作。UI 的 R
 
 也可以在 UI 的 `Run comparison` 区域选择多个 run。比较会显示 run path、provider、model、
 drafting mode、max/completed rounds、best/average score、stop reason、timeout/error counts、
-agent elapsed seconds、estimated tokens、平均 revised 相似度和低变化轮次数，
+agent elapsed seconds、estimated tokens、平均 revised 相似度、低变化轮次数和 rubric 子项均值，
 并保持路径为 repo-relative 或 masked。
 
 ## memory.md / best_output.md / score_history.json 怎么理解

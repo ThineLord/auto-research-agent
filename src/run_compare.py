@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any, Sequence
 
-from .metrics import summarize_round_metrics
+from .metrics import JUDGE_RUBRIC_KEYS, summarize_round_metrics
 from .run_config import read_run_config
 from .storage import write_json_file
 
@@ -52,6 +52,26 @@ def _score_values(round_metrics: Sequence[dict[str, Any]]) -> list[float]:
         if score is not None:
             scores.append(score)
     return scores
+
+
+def _rubric_short_name(key: str) -> str:
+    return {
+        "novelty_and_research_value": "novelty",
+        "technical_clarity_and_correctness": "clarity",
+        "feasibility_and_implementation_realism": "feasibility",
+        "evaluation_design_quality": "evaluation",
+        "tomorrow_actionability": "actionability",
+    }.get(key, key)
+
+
+def _rubric_average_fields(rubric_averages: dict[str, Any]) -> dict[str, float | None]:
+    fields: dict[str, float | None] = {}
+    for key in JUDGE_RUBRIC_KEYS:
+        value = _as_float(rubric_averages.get(key))
+        fields[f"rubric_avg_{_rubric_short_name(key)}"] = (
+            round(value, 3) if value is not None else None
+        )
+    return fields
 
 
 def _rounds_from_summary_or_metrics(
@@ -110,6 +130,11 @@ def load_run_summary(run_root: Path) -> dict[str, Any]:
     metrics_totals = summarize_round_metrics(round_metrics)
     evolution_totals = metrics_totals.get("evolution_metric_totals")
     evolution_totals = evolution_totals if isinstance(evolution_totals, dict) else {}
+    rubric_totals = summary.get("rubric_metric_totals")
+    rubric_totals = rubric_totals if isinstance(rubric_totals, dict) else {}
+    if not rubric_totals:
+        rubric_totals = metrics_totals.get("rubric_metric_totals")
+        rubric_totals = rubric_totals if isinstance(rubric_totals, dict) else {}
     total_elapsed_seconds = _as_float(summary.get("total_elapsed_seconds"))
     if total_elapsed_seconds is None:
         total_elapsed_seconds = _as_float(summary.get("total_runtime_seconds"))
@@ -157,6 +182,15 @@ def load_run_summary(run_root: Path) -> dict[str, Any]:
         )
     if not isinstance(low_previous_revised_change_rounds, list):
         low_previous_revised_change_rounds = []
+    rubric_averages = summary.get("rubric_subscore_averages")
+    if not isinstance(rubric_averages, dict):
+        rubric_averages = rubric_totals.get("rubric_averages", {})
+    if not isinstance(rubric_averages, dict):
+        rubric_averages = {}
+    rubric_round_count = _as_int(summary.get("rubric_round_count"))
+    if rubric_round_count is None:
+        rubric_round_count = _as_int(rubric_totals.get("rounds_with_rubric"))
+    rubric_average_fields = _rubric_average_fields(rubric_averages)
     metadata_sources = []
     if summary:
         metadata_sources.append("run_summary")
@@ -205,6 +239,9 @@ def load_run_summary(run_root: Path) -> dict[str, Any]:
         "low_previous_revised_change_count": len(low_previous_revised_change_rounds),
         "low_revision_change_rounds": low_revision_change_rounds,
         "low_previous_revised_change_rounds": low_previous_revised_change_rounds,
+        "rubric_round_count": rubric_round_count,
+        "rubric_subscore_averages": rubric_averages,
+        **rubric_average_fields,
         "round_count": summary.get("round_count", len(round_metrics)),
         "successful_rounds": successful_rounds,
         "timeout_rounds": timeout_rounds,

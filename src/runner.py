@@ -1184,6 +1184,13 @@ def run_iterative_rounds(
             "token_estimate_method": metrics_totals["token_estimate_method"],
             "agent_metric_totals": metrics_totals["agent_metric_totals"],
             "evolution_metric_totals": metrics_totals["evolution_metric_totals"],
+            "rubric_metric_totals": metrics_totals["rubric_metric_totals"],
+            "rubric_round_count": metrics_totals["rubric_metric_totals"]["rounds_with_rubric"],
+            "rubric_subscore_averages": metrics_totals["rubric_metric_totals"]["rubric_averages"],
+            "rubric_subscore_latest": metrics_totals["rubric_metric_totals"]["rubric_latest"],
+            "rubric_subscore_delta_first_to_latest": metrics_totals["rubric_metric_totals"][
+                "rubric_delta_first_to_latest"
+            ],
             "avg_draft_to_revised_similarity": metrics_totals["evolution_metric_totals"][
                 "avg_draft_to_revised_similarity"
             ],

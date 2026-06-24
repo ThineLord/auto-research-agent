@@ -790,6 +790,8 @@ def build_run_metadata_rows(project_dir: Path, checkpoint: dict[str, Any]) -> li
     resume = resume if isinstance(resume, dict) else {}
     low_change_rounds = run_summary.get("low_previous_revised_change_rounds")
     low_change_count = len(low_change_rounds) if isinstance(low_change_rounds, list) else None
+    rubric_averages = run_summary.get("rubric_subscore_averages")
+    rubric_averages = rubric_averages if isinstance(rubric_averages, dict) else {}
 
     values = [
         ("run_meta_run_id", _first_present(run_config.get("run_id"), run_summary.get("run_id"))),
@@ -836,6 +838,11 @@ def build_run_metadata_rows(project_dir: Path, checkpoint: dict[str, Any]) -> li
         (
             "run_meta_low_change_rounds",
             low_change_count,
+        ),
+        ("run_meta_rubric_rounds", run_summary.get("rubric_round_count")),
+        (
+            "run_meta_rubric_avg_evaluation",
+            rubric_averages.get("evaluation_design_quality"),
         ),
         (
             "run_meta_stop_reason",
@@ -912,6 +919,9 @@ def build_run_comparison_rows(run_roots: Sequence[Path]) -> list[dict[str, Any]]
                     run.get("avg_revised_similarity_to_previous")
                 ),
                 "low_change_rounds": _display_value(run.get("low_previous_revised_change_count")),
+                "rubric_rounds": _display_value(run.get("rubric_round_count")),
+                "rubric_avg_evaluation": _display_value(run.get("rubric_avg_evaluation")),
+                "rubric_avg_actionability": _display_value(run.get("rubric_avg_actionability")),
                 "run_config_path": _artifact_path_display(run.get("run_config_path")),
                 "run_summary_path": _artifact_path_display(run.get("run_summary_path")),
                 "metadata_status": _display_value(run.get("metadata_status")),
@@ -1044,6 +1054,8 @@ def load_score_history_rows(score_history_path: Path) -> list[dict[str, Any]]:
         timings = timings if isinstance(timings, dict) else {}
         evolution = entry.get("evolution_metrics")
         evolution = evolution if isinstance(evolution, dict) else {}
+        rubric = entry.get("judge_rubric")
+        rubric = rubric if isinstance(rubric, dict) else {}
         rows.append(
             {
                 "round": entry.get("round"),
@@ -1064,6 +1076,8 @@ def load_score_history_rows(score_history_path: Path) -> list[dict[str, Any]]:
                 "score_delta_vs_previous": evolution.get("score_delta_vs_previous"),
                 "draft_to_revised_similarity": evolution.get("draft_to_revised_similarity"),
                 "revised_similarity_to_previous": evolution.get("revised_similarity_to_previous"),
+                "rubric_evaluation_design_quality": rubric.get("evaluation_design_quality"),
+                "rubric_tomorrow_actionability": rubric.get("tomorrow_actionability"),
             }
         )
     return rows

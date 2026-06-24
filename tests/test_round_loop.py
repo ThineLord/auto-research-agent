@@ -470,6 +470,15 @@ class RoundLoopTests(unittest.TestCase):
                 2,
             )
             self.assertIsNotNone(run_summary["avg_draft_to_revised_similarity"])
+            self.assertEqual(run_summary["rubric_round_count"], 2)
+            self.assertEqual(
+                run_summary["rubric_subscore_averages"]["evaluation_design_quality"],
+                10.0,
+            )
+            self.assertEqual(
+                run_summary["rubric_subscore_latest"]["tomorrow_actionability"],
+                10.0,
+            )
             self.assertEqual(run_summary["resume_metadata"]["lifecycle_action"], "start_new_run")
             self.assertFalse(run_summary["resume_metadata"]["resume_from_checkpoint"])
             self.assertFalse(run_summary["resume_metadata"]["new_run_from_previous_best"])

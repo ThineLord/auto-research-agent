@@ -7,6 +7,7 @@ from src.metrics import (
     build_agent_io_metrics,
     build_round_evolution_metrics,
     estimate_tokens_from_chars,
+    summarize_judge_rubric_metrics,
     summarize_round_metrics,
 )
 
@@ -109,6 +110,55 @@ class MetricsTests(unittest.TestCase):
             1,
         )
         self.assertIsNotNone(summary["evolution_metric_totals"]["avg_draft_to_revised_similarity"])
+
+    def test_rubric_metrics_preserve_subscore_trends_without_required_schema(self) -> None:
+        summary = summarize_judge_rubric_metrics(
+            [
+                {
+                    "round": 1,
+                    "judge_rubric": {
+                        "evaluation_design_quality": 8,
+                        "tomorrow_actionability": 9,
+                    },
+                },
+                {
+                    "round": 2,
+                    "judge_rubric": {
+                        "evaluation_design_quality": 12,
+                        "tomorrow_actionability": 15,
+                        "legacy_extra": "6",
+                    },
+                },
+                {"round": 3, "judge_rubric": {}},
+            ]
+        )
+        aggregate = summarize_round_metrics(
+            [
+                {
+                    "round": 1,
+                    "judge_rubric": {
+                        "evaluation_design_quality": 8,
+                        "tomorrow_actionability": 9,
+                    },
+                },
+                {
+                    "round": 2,
+                    "judge_rubric": {
+                        "evaluation_design_quality": 12,
+                        "tomorrow_actionability": 15,
+                    },
+                },
+            ]
+        )
+
+        self.assertEqual(summary["rounds_with_rubric"], 2)
+        self.assertEqual(summary["rubric_averages"]["evaluation_design_quality"], 10)
+        self.assertEqual(summary["rubric_latest"]["tomorrow_actionability"], 15.0)
+        self.assertEqual(
+            summary["rubric_delta_first_to_latest"]["evaluation_design_quality"],
+            4,
+        )
+        self.assertEqual(aggregate["rubric_metric_totals"]["rounds_with_rubric"], 2)
 
 
 if __name__ == "__main__":

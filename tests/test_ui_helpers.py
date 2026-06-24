@@ -577,6 +577,10 @@ class SharedUiBackendHelperTests(unittest.TestCase):
       "score_delta_vs_previous": 4.5,
       "draft_to_revised_similarity": 0.72,
       "revised_similarity_to_previous": 0.81
+    },
+    "judge_rubric": {
+      "evaluation_design_quality": 11,
+      "tomorrow_actionability": 14
     }
   }
 ]
@@ -596,6 +600,8 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertEqual(rows[0]["score_delta_vs_previous"], 4.5)
         self.assertEqual(rows[0]["draft_to_revised_similarity"], 0.72)
         self.assertEqual(rows[0]["revised_similarity_to_previous"], 0.81)
+        self.assertEqual(rows[0]["rubric_evaluation_design_quality"], 11)
+        self.assertEqual(rows[0]["rubric_tomorrow_actionability"], 14)
 
     def test_ui_run_metadata_rows_summarize_latest_run_without_absolute_paths(self) -> None:
         import ui.app as ui_app
@@ -631,6 +637,10 @@ class SharedUiBackendHelperTests(unittest.TestCase):
                     "round_metrics_path": str(round_metrics_path),
                     "avg_revised_similarity_to_previous": 0.84,
                     "low_previous_revised_change_rounds": [2],
+                    "rubric_round_count": 2,
+                    "rubric_subscore_averages": {
+                        "evaluation_design_quality": 12,
+                    },
                 },
             )
             checkpoint = {
@@ -649,6 +659,8 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertEqual(by_key["run_meta_git_commit"], "abcdef123456")
         self.assertEqual(by_key["run_meta_avg_revised_similarity"], "0.84")
         self.assertEqual(by_key["run_meta_low_change_rounds"], "1")
+        self.assertEqual(by_key["run_meta_rubric_rounds"], "2")
+        self.assertEqual(by_key["run_meta_rubric_avg_evaluation"], "12")
         self.assertEqual(by_key["run_meta_round_metrics_path"], "<repo>/round_metrics.json")
         self.assertNotIn(str(Path(tmp)), "\n".join(by_key.values()))
 
@@ -697,6 +709,10 @@ class SharedUiBackendHelperTests(unittest.TestCase):
                             "draft_to_revised_similarity": 0.6,
                             "revised_similarity_to_previous": 0.97,
                         },
+                        "judge_rubric": {
+                            "evaluation_design_quality": 13,
+                            "tomorrow_actionability": 16,
+                        },
                     },
                 ],
             )
@@ -726,6 +742,9 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertEqual(by_id["run-a"]["estimated_tokens"], "40")
         self.assertEqual(by_id["run-a"]["avg_revised_similarity"], "0.97")
         self.assertEqual(by_id["run-a"]["low_change_rounds"], "1")
+        self.assertEqual(by_id["run-a"]["rubric_rounds"], "1")
+        self.assertEqual(by_id["run-a"]["rubric_avg_evaluation"], "13.0")
+        self.assertEqual(by_id["run-a"]["rubric_avg_actionability"], "16.0")
         self.assertEqual(by_id["run-a"]["run_path"], "<repo>/run-a")
         self.assertNotIn(
             str(Path(tmp)), "\n".join(str(value) for row in rows for value in row.values())

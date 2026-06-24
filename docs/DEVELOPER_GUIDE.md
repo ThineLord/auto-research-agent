@@ -117,6 +117,9 @@ truth, and the project does not hardcode vendor prices.
 Evolution fields are deliberately descriptive rather than scoring fields. They are computed after
 agent outputs exist, use only stored text artifacts, and must not change prompts, provider calls,
 Judge parsing, stop conditions, or benchmark semantics.
+Rubric trend fields follow the same rule: they aggregate already-parsed `judge_rubric` dictionaries
+into averages, latest values, best values, and first-to-latest deltas. They must stay
+schema-additive and must not reinterpret or rescale the Judge's top-level score.
 - `resume_metadata` appears in checkpoint, run config, and run summary. It distinguishes
   `start_new_run` from `resume_existing_run`, records checkpoint resume round, whether previous
   best output is only context for a new run, whether completed round files are preserved, and the
@@ -130,7 +133,7 @@ messages when `run_config.json`, `run_summary.json`, or `round_metrics.json` has
 It also exposes a multi-run comparison table using the same `src.run_compare` helper as
 `--compare-runs`; missing or legacy metadata should produce partial rows instead of UI failures.
 Newer runs add aggregate agent elapsed seconds, estimated token totals, average revised similarity,
-and low-change round counts to that comparison output.
+low-change round counts, rubric round counts, and compact rubric averages to that comparison output.
 The Resume control uses checkpoint metadata to preview run id/root, last completed round, next
 round, stop reason, resume eligibility, completed-round preservation, and next-round directory
 status before launching `--resume`. A non-empty next-round directory is treated as partial or

@@ -1,3 +1,58 @@
+# Phase 11 - Rubric Trend Summaries
+
+Date: 2026-06-24
+Commit: pending implementation commit
+Branch: master
+
+## Goal
+
+Preserve and summarize structured Judge rubric subscores across rounds so researchers can compare quality dimensions without changing score parsing, scoring semantics, prompts, providers, or benchmark behavior.
+
+## What Changed
+
+Runs now aggregate existing `judge_rubric` dictionaries into rubric averages, latest values, best values, and first-to-latest deltas. Run comparison and the Streamlit UI expose compact rubric fields while continuing to tolerate missing or legacy metadata.
+
+## Code
+
+* Added rubric aggregation helpers in `src/metrics.py`.
+* Wrote rubric trend summaries into `run_summary.json`.
+* Added run comparison fallback logic for runs that only have `round_metrics.json`.
+
+## UI
+
+* Added rubric round count and evaluation/actionability averages to run comparison rows.
+* Added rubric round count and average evaluation rubric to latest run metadata.
+* Added per-round evaluation/actionability rubric fields to the score history helper.
+
+## Tests
+
+* Added metrics tests for rubric averages, latest values, and first-to-latest deltas.
+* Extended round-loop, run comparison, and UI helper tests for rubric summary fields.
+
+## Docs
+
+* Updated README, USER_GUIDE, DEVELOPER_GUIDE, quickstart_zh, and runbook_zh to explain rubric trend summaries and their non-semantic role.
+
+## Validation
+
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `.venv/bin/python -m pytest tests/test_metrics.py tests/test_round_loop.py::RoundLoopTests::test_round_loop_writes_outputs_and_keeps_best_score tests/test_run_compare.py tests/test_ui_helpers.py::SharedUiBackendHelperTests::test_ui_score_history_rows_flatten_metrics_for_display tests/test_ui_helpers.py::SharedUiBackendHelperTests::test_ui_run_metadata_rows_summarize_latest_run_without_absolute_paths tests/test_ui_helpers.py::SharedUiBackendHelperTests::test_ui_run_comparison_helpers_mask_paths_and_flatten_fields -q`
+* `make check`
+
+## Risks / Limitations
+
+* Rubric summaries depend on Judge returning structured JSON with a `rubric` object; legacy text-only Judge outputs will show missing or empty rubric fields.
+* Rubric averages are descriptive summaries and should not be treated as independent benchmark scores.
+
+## Recommended Next Phase
+
+Phase 12 - Run analytics export and diagnostics polish.
+
+## Suggested Codex Prompt
+
+Continue with Phase 12. Add a small schema-additive run analytics export or diagnostics helper that summarizes score, rubric, similarity, timeout/error, and token estimate fields for one run without provider calls. Update tests/docs/PROJECT_UPDATE.md, validate, commit, and push.
+
 # Phase 10 - Round Evolution Interpretability Metrics
 
 Date: 2026-06-24

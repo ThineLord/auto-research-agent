@@ -159,7 +159,7 @@ Diagnostic。
 轮数和运行时配置、topic 快照、prompt 文件 SHA-256、Git commit、开始/结束时间、停止原因和
 resume eligibility。
 同一 run 目录还会写 `run_summary.json` 和 `round_metrics.json`，用于查看总览、每轮耗时、
-错误标记、每个 agent 的输入/输出字符统计、估算 token 数、Judge rubric 子项（如果 Judge 返回了结构化 JSON），
+错误标记、每个 agent 的输入/输出字符统计、估算 token 数、Judge rubric 子项与趋势汇总（如果 Judge 返回了结构化 JSON），
 以及 draft/revised/judge 文本相对上一轮的相似度和低变化轮次提示。
 如果要对比多个 run，可用 CLI：
 
@@ -277,7 +277,7 @@ make check
   - 点击 `Resume`（等价 `.venv/bin/python -m src.main --resume`）
 - 看结果：
   - UI 的 `Latest run metadata` 会汇总最近一次 run 的 provider/model、drafting mode、Git commit、stop reason、best score 和 artifact 路径
-  - UI 的 `Run comparison` 可选择多个 run，比较模型、drafting mode、轮数、最佳/平均分、停止原因、超时/错误数量、agent 耗时、估算 token 数和修订相似度
+  - UI 的 `Run comparison` 可选择多个 run，比较模型、drafting mode、轮数、最佳/平均分、停止原因、超时/错误数量、agent 耗时、估算 token 数、修订相似度和 rubric 子项均值
   - 先看 `projects/example/best_output.md`
   - 再看 `projects/example/runs/<run_id>/round_xx/`
   - 复现信息看 `projects/example/runs/<run_id>/run_config.json`
