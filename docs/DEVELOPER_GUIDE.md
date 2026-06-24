@@ -27,6 +27,24 @@ make check
 Use `make check` before committing. It matches the CI sequence: Ruff format check, Ruff lint,
 import smoke check, and `pytest -q`.
 
+## Stable Milestone Workflow
+
+The release-facing workflow is intentionally small:
+
+1. `make bootstrap`
+2. `make mock`
+3. `make diagnostic`
+4. `make run`
+5. `make resume`
+6. `make survey`
+7. `python -m src.main --compare-runs ...`
+8. `python -m src.main --analyze-run ...`
+9. `make ui`
+
+Keep release documentation aligned with `README.md`, `CHANGELOG.md`, `docs/USER_GUIDE.md`,
+`docs/quickstart_zh.md`, and `docs/runbook_zh.md`. Release packaging should not change provider
+behavior, prompt semantics, scoring semantics, benchmark behavior, or artifact schemas.
+
 ## Architecture
 
 The command-line entry point is `src.cli:main`, exposed as both `python -m src.main` and the

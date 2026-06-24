@@ -5,6 +5,7 @@
 
 详细新手说明请先看：`docs/USER_GUIDE.md`。
 开发、测试和架构说明请看：`docs/DEVELOPER_GUIDE.md`。
+稳定里程碑能力摘要请看：`CHANGELOG.md`。
 
 ## 你只需要知道这几件事
 
@@ -49,6 +50,37 @@ make mock ARGS="--max-rounds 1"
 Mock mode 会复用正常 round runner，写入 `run_config.json`、`round_metrics.json`、
 `run_summary.json`、`checkpoint.json` 和 `score_history.json`，但 provider 记录为 `mock`，
 不会调用 Ollama、Gemini、网络或 API key。默认只跑 2 轮；需要时用 `--max-rounds` 覆盖。
+
+## Stable Workflow
+
+当前稳定里程碑的推荐工作流：
+
+1. `make bootstrap`：准备新 checkout，安装依赖，并跑一次真实 diagnostic smoke。
+2. `make mock`：不调用 provider，确定性写出正常 run artifacts，适合 CI/docs/demo。
+3. `make diagnostic`：调用真实 provider 跑 1 轮，验证模型、prompt 和落盘路径。
+4. `make run`：按 `config.yaml` / CLI override 启动普通有界研究 run。
+5. `make resume`：只在 checkpoint 可恢复且下一轮目录安全时继续同一个旧 run。
+6. `make survey`：本地 deterministic 文献综述模式，不调用 Ollama/Gemini/API key。
+7. `.venv/bin/python -m src.main --compare-runs ...`：比较两个或多个 run。
+8. `.venv/bin/python -m src.main --analyze-run ...`：无 provider 调用地检查单个 run。
+9. `make ui`：用 Streamlit 查看输入、进度、latest metadata、analytics dashboard、run comparison 和 outputs。
+
+稳定里程碑的几个边界：
+
+- Mock mode 只是 demo/CI/docs smoke；真实研究结论请用 `make diagnostic` / `make run`。
+- `estimated_*_tokens` 是基于可见字符数的保守估算，不是 provider 账单 token。
+- Rubric summaries 只是 Judge 已返回结构化子项的趋势汇总，不是新的 benchmark 分数。
+- `make resume` 会继续 checkpoint 指向的旧 run；`make run` 会新建 run，即使旧 `best_output.md` 可作为上下文。
+- 如果下一轮目录已经存在且非空，resume 会 fail-safe 阻塞，避免覆盖 partial/uncheckpointed 输出。
+
+## What To Demo First
+
+给新用户演示时建议按这个顺序：
+
+1. `make bootstrap`
+2. `make mock`
+3. `make ui`
+4. 在 UI 里查看 `Latest run metadata`、`Run analytics dashboard`、`Run comparison` 和 `Output browser`
 
 ## Friend Quickstart / 朋友快速开始
 

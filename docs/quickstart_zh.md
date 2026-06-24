@@ -26,7 +26,8 @@ Auto Research Agent 是一个本地优先的研究计划迭代助手：读取 `p
 - 首次运行需要复制 `config.example.yaml` 到本地 `config.yaml`。
 - `config.yaml`、`projects/*/memory.md` 和运行输出默认不提交。
 - resume 依赖本地已有 `checkpoint.json`；新 clone 通常没有可恢复状态。
-- 当前可视化主要是运行控制和输出浏览，不是完整实验分析 dashboard。
+- 当前 UI 已包含运行控制、输出浏览、latest metadata、Run analytics dashboard 和 run comparison；
+  它读取已有 artifacts，旧 run 缺少字段时会显示部分状态。
 
 ## 3. 我现在可以做什么
 
@@ -42,6 +43,24 @@ Auto Research Agent 是一个本地优先的研究计划迭代助手：读取 `p
 - 改本地 `config.yaml` 切换模型、轮数、runtime 上限、项目名和 topic。
 
 ## 4. 快速启动命令
+
+稳定里程碑推荐顺序：
+
+```bash
+make bootstrap
+make mock
+make diagnostic
+make run
+make resume
+make survey
+.venv/bin/python -m src.main --compare-runs projects/example/runs/<run_a> projects/example/runs/<run_b>
+.venv/bin/python -m src.main --analyze-run projects/example/runs/<run_id>
+make ui
+```
+
+给新用户演示时先跑 `make bootstrap`，再跑 `make mock`，然后 `make ui`，最后看
+`Run analytics dashboard`。Mock mode 是确定性 demo，不代表真实研究；真实研究请用
+`make diagnostic` 或 `make run`。
 
 ```bash
 git clone <repo-url>

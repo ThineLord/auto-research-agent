@@ -29,6 +29,32 @@ ollama list
 `GEMINI_API_KEY` 或 `GOOGLE_API_KEY` 已设置；若只跑 `make survey` 或 `make mock`，不需要
 Ollama 或 Gemini。
 
+## 1.1 稳定里程碑 demo 顺序
+
+新用户演示优先走：
+
+```bash
+make bootstrap
+make mock
+make ui
+```
+
+然后在 UI 里看 `Latest run metadata`、`Run analytics dashboard`、`Run comparison` 和
+`Output browser`。`make mock` 只验证 artifact 生命周期，不调用 provider，也不代表真实研究质量。
+真实研究 smoke 用 `make diagnostic`；正式有界运行用 `make run`。
+
+当前稳定命令集合：
+
+- `make bootstrap`
+- `make mock`
+- `make diagnostic`
+- `make run`
+- `make resume`
+- `make survey`
+- `.venv/bin/python -m src.main --compare-runs ...`
+- `.venv/bin/python -m src.main --analyze-run ...`
+- `make ui`
+
 ## 2. 如何跑 fake/mock 模式
 
 当前项目有正式 CLI mock 参数：

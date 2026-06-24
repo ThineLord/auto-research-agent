@@ -1,3 +1,67 @@
+# Phase 16 - Release Packaging and Stable Milestone
+
+Date: 2026-06-24
+Commit: TBD
+Branch: master
+
+## Goal
+
+Prepare a stable milestone release package after Phases 9-15 by consolidating user-facing workflow
+documentation, demo guidance, and release notes without changing runtime behavior or artifact
+schemas.
+
+## What Changed
+
+Added stable milestone documentation around the current workflow: bootstrap, mock demo, diagnostic,
+normal run, resume, survey, run comparison, single-run analytics, and the Streamlit analytics
+dashboard.
+
+## Code
+
+* No source code changes in this phase.
+
+## UI
+
+* No UI code changes in this phase.
+
+## Tests
+
+* No new tests were needed because this phase is documentation-only.
+
+## Docs
+
+* Added `CHANGELOG.md` with stable milestone capabilities, workflow, distinctions, and validation
+  baseline.
+* Added README sections for `Stable Workflow` and `What To Demo First`.
+* Updated USER_GUIDE, DEVELOPER_GUIDE, quickstart_zh, and runbook_zh to align around the stable
+  workflow and release boundaries.
+
+## Validation
+
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `test -f CHANGELOG.md`
+* `rg -n "Stable Workflow|What To Demo First|make mock|Run analytics dashboard" README.md CHANGELOG.md docs/USER_GUIDE.md docs/DEVELOPER_GUIDE.md docs/quickstart_zh.md docs/runbook_zh.md`
+* `make check`
+
+## Risks / Limitations
+
+* This release packaging phase does not add real provider token usage; estimated token fields remain
+  estimate-only.
+* Human review should confirm the milestone language matches intended release positioning before
+  tagging an external release.
+
+## Recommended Next Phase
+
+Pause feature work for human release review, then decide whether to tag a release or start provider
+usage capture in a separate, scoped phase.
+
+## Suggested Codex Prompt
+
+Review `CHANGELOG.md`, `README.md`, and `PROJECT_UPDATE.md` for stable milestone readiness. If the
+release language is acceptable, run final validation, create a release tag, and push it without
+changing runtime behavior.
+
 # Phase 15 - UI Analytics Dashboard
 
 Date: 2026-06-24

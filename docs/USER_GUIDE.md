@@ -35,6 +35,32 @@ make install-dev
 这会先创建本地配置，再用 `python3` 创建 `.venv`，并安装运行和测试所需依赖。
 `config.yaml` 是本地文件，不应该提交到 Git。
 
+## 稳定工作流
+
+稳定里程碑推荐按下面顺序使用：
+
+1. `make bootstrap`：准备新 checkout，并跑一次真实 diagnostic smoke。
+2. `make mock`：不调用 provider，写一份确定性 demo run artifacts。
+3. `make diagnostic`：调用真实 provider 跑 1 轮 smoke。
+4. `make run`：启动普通有界研究 run。
+5. `make resume`：从 checkpoint 继续同一个旧 run。
+6. `make survey`：不调用模型地生成本地文献综述 artifacts。
+7. `--compare-runs`：比较多个 run。
+8. `--analyze-run`：检查单个 run。
+9. `make ui`：查看 latest metadata、Run analytics dashboard、Run comparison 和 outputs。
+
+新用户第一次演示建议先跑：
+
+```bash
+make bootstrap
+make mock
+make ui
+```
+
+然后在 UI 中检查 `Latest run metadata`、`Run analytics dashboard`、`Run comparison` 和
+`Output browser`。Mock mode 只适合 demo/CI/docs smoke；真实研究请用 `make diagnostic` 或
+`make run`。
+
 命令行切换模型：
 
 ```bash
