@@ -1,5 +1,44 @@
 # Changelog
 
+## v0.1.1-hardening - Post-Audit Hardening Release
+
+Date: 2026-06-25
+
+This release tags the post-v0.1.0-stable hardening pass. It does not change prompt semantics,
+provider behavior, scoring semantics, benchmark behavior, or add new features.
+
+### Hardened
+
+* Path privacy hardening for config/project input errors, survey artifacts, runner and diagnostic
+  output, benchmark reports, UI helper displays, and Streamlit process-start failures.
+* Stale artifact robustness for JSON/text readers, run metadata readers, session state, benchmark
+  round artifacts, process metadata, run locks, stop signals, and best-effort log appends.
+* Metadata compatibility for diagnostic resume metadata and legacy analytics/comparison artifacts.
+* UI/CLI masking so displayed paths are repo-relative or masked while legacy internal metadata paths
+  remain compatible with resume and artifact analysis.
+
+### Validation
+
+Provider-free smoke validation covered:
+
+```bash
+make mock ARGS="--project example --max-rounds 1"
+.venv/bin/python -m src.main --mock --project example --max-rounds 1
+.venv/bin/python -m src.main --analyze-run <mock_run_path>
+.venv/bin/python -m src.main --compare-runs <mock_run_a> <mock_run_b>
+.venv/bin/python -m src.main --survey --project example
+```
+
+Final validation:
+
+```bash
+git diff --check
+.venv/bin/python -m src.main --help
+make check
+```
+
+`make check` passed with `137 passed, 43 subtests passed`.
+
 ## Stable Milestone - Phases 9-16
 
 Date: 2026-06-24

@@ -1,3 +1,44 @@
+# Post-Audit Release Review - v0.1.1-hardening
+
+Date: 2026-06-25
+Commit: release documentation commit for `v0.1.1-hardening`
+Branch: master
+Tag: v0.1.1-hardening
+
+## Goal
+
+Prepare a small post-v0.1.0-stable hardening release tag after the autonomous bug audit.
+
+## Review
+
+Reviewed `PROJECT_UPDATE.md`, `CHANGELOG.md`, `README.md`, `docs/USER_GUIDE.md`,
+`docs/DEVELOPER_GUIDE.md`, `docs/quickstart_zh.md`, and `docs/runbook_zh.md` for release-note
+consistency.
+
+## Release Summary
+
+* Path privacy hardening across CLI errors, survey artifacts, runner/diagnostic output, benchmark
+  reports, and Streamlit helper displays.
+* Stale artifact robustness for JSON/text artifacts, run metadata, session state, benchmark round
+  files, UI process metadata, run locks, stop signals, and log appends.
+* Metadata compatibility improvements for diagnostic resume metadata and legacy analytics/comparison
+  artifacts.
+* UI/CLI masking preserved repo-relative or masked display paths while leaving internal checkpoint
+  paths compatible with existing resume/run metadata.
+* Provider-free mock/analyze/compare/survey smoke validation completed after the audit.
+
+## Validation
+
+* `git status --short --branch`
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make help`
+* `make check` (`137 passed, 43 subtests passed`)
+
+## Release Decision
+
+Proceed with annotated tag `v0.1.1-hardening` if final validation remains green.
+
 # Bug Audit Closeout
 
 Date: 2026-06-24
