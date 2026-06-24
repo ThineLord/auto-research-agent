@@ -182,6 +182,57 @@ Topics: agent memory
             self.assertEqual(manifest["source_summary"]["by_kind"]["run_output"], 1)
             self.assertTrue(manifest["representative_groups"])
 
+    def test_survey_outputs_mask_local_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project_dir = root / "projects" / "survey_demo"
+            project_dir.mkdir(parents=True)
+            (project_dir / "task.md").write_text(
+                """# Survey
+
+| Title | Authors | Year | URL |
+|---|---|---:|---|
+| Path Privacy Paper | Example Team | 2024 | https://example.org/path-privacy |
+""",
+                encoding="utf-8",
+            )
+            project_input = load_project_input(
+                root=root,
+                project_name="survey_demo",
+                explicit_project=True,
+            )
+            console = Console(record=True, width=200)
+
+            result = run_literature_survey_mode(
+                console=console,
+                project_input=project_input,
+                config=LiteratureSurveyConfig(),
+            )
+
+            output = console.export_text(styles=False)
+            metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+            manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+            serialized_artifacts = json.dumps(metadata) + json.dumps(manifest)
+            raw_root = str(project_input.project_dir.parent.parent)
+
+            self.assertIn(
+                "Saved survey report: projects/survey_demo/survey/survey_report.md",
+                output,
+            )
+            self.assertEqual(metadata["project"]["project_dir"], "projects/survey_demo")
+            self.assertEqual(metadata["project"]["task_path"], "projects/survey_demo/task.md")
+            self.assertEqual(
+                metadata["papers"][0]["source_paths"],
+                ["projects/survey_demo/task.md"],
+            )
+            self.assertEqual(manifest["source_files"], ["projects/survey_demo/task.md"])
+            self.assertEqual(
+                manifest["outputs"]["report"],
+                "projects/survey_demo/survey/survey_report.md",
+            )
+            self.assertNotIn(raw_root, output)
+            self.assertNotIn(raw_root, serialized_artifacts)
+
 
 if __name__ == "__main__":
     unittest.main()

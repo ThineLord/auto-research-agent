@@ -1,7 +1,70 @@
-# Bug Audit 3 - Runtime Path Display Privacy
+# Bug Audit 4 - Survey Artifact Path Privacy
 
 Date: 2026-06-24
 Commit: pending phase commit
+Branch: master
+
+## Goal
+
+Fix verified survey-mode raw path exposure in console output and generated survey artifacts without
+changing paper collection, deduplication, scoring, prompt, provider, or benchmark behavior.
+
+## Bug / Fragility Found
+
+* Survey console output printed absolute paths for `survey_report.md`, `paper_metadata.json`, and
+  `related_work.md`.
+* `paper_metadata.json` serialized raw project `project_dir`, `task_path`, and per-paper
+  `source_paths`.
+* `survey_manifest.json` serialized raw project paths, scanned source files, and output paths.
+
+## Reproduction
+
+* A temporary provider-free survey fixture reproduced `console_has_raw_root=True`,
+  `metadata_has_raw_root=True`, and `manifest_has_raw_root=True`.
+* `.venv/bin/python -m src.main --survey --project example` reproduced the same console path class
+  before the fix.
+
+## Fix
+
+* Reused the shared `display_path` helper for survey console paths.
+* Serialized survey project metadata, paper `source_paths`, manifest `source_files`, and manifest
+  output paths as repo-relative or masked display-safe strings.
+* Kept internal collection paths and returned `SurveyResult` path objects unchanged for callers.
+
+## Tests Added or Updated
+
+* Added a survey regression test that asserts console output, `paper_metadata.json`, and
+  `survey_manifest.json` avoid temporary absolute roots and use repo-relative path strings.
+
+## Validation
+
+* `.venv/bin/python -m pytest tests/test_literature_survey.py -q` (`4 passed`)
+* `.venv/bin/python -m ruff check src/literature_survey.py tests/test_literature_survey.py`
+* Minimal survey reproduction fixture with console/metadata/manifest raw-root checks
+* `.venv/bin/python -m src.main --survey --project example` with local absolute path grep
+* `rg` check over generated `projects/example/survey` artifacts for local absolute paths
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make check` (`123 passed, 43 subtests passed`)
+
+## Remaining Risks
+
+* Older survey artifacts may still contain absolute paths; this phase fixes newly generated survey
+  artifacts.
+* Run checkpoint/config/summary JSON path fields remain absolute for legacy resume and analytics
+  compatibility.
+* The private local `config.yaml` still points at `pama`, which lacks `task.md`; provider-free
+  validation uses `--project example`.
+
+## Next Audit Target
+
+Continue with documentation command accuracy, config validation edge cases, CLI parser edge cases,
+and UI helper behavior around stale or partial artifacts.
+
+# Bug Audit 3 - Runtime Path Display Privacy
+
+Date: 2026-06-24
+Commit: e1b99d2
 Branch: master
 
 ## Goal

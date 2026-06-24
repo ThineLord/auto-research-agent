@@ -19,7 +19,7 @@ from rich.console import Console
 
 from .config import LiteratureSurveyConfig
 from .project_input import ProjectInput
-from .storage import write_json_file, write_text
+from .storage import display_path, write_json_file, write_text
 
 COMMON_WORDS = {
     "about",
@@ -1037,8 +1037,28 @@ def generate_survey_report(
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _serialize_paper(paper: PaperMetadata) -> dict[str, Any]:
-    return asdict(paper)
+def _survey_repo_root(project_dir: Path) -> Path | None:
+    if project_dir.parent.name == "projects":
+        return project_dir.parent.parent
+    return None
+
+
+def _serialize_paper_for_artifact(paper: PaperMetadata, repo_root: Path | None) -> dict[str, Any]:
+    payload = asdict(paper)
+    payload["source_paths"] = [
+        display_path(path, repo_root) for path in payload.get("source_paths", [])
+    ]
+    return payload
+
+
+def _project_metadata_for_artifact(
+    project_input: ProjectInput,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    metadata = project_input.as_metadata()
+    metadata["project_dir"] = display_path(project_input.project_dir, repo_root)
+    metadata["task_path"] = display_path(project_input.task_path, repo_root)
+    return metadata
 
 
 def run_literature_survey_mode(
@@ -1054,6 +1074,8 @@ def run_literature_survey_mode(
     )
 
     project_dir = project_input.project_dir
+    repo_root = _survey_repo_root(project_dir)
+    artifact_project_metadata = _project_metadata_for_artifact(project_input, repo_root)
     generated_at = datetime.now().isoformat()
     output_dir = project_dir / config.output_dir
     report_path = output_path or (output_dir / "survey_report.md")
@@ -1082,11 +1104,11 @@ def run_literature_survey_mode(
         metadata_path,
         {
             "generated_at": generated_at,
-            "project": project_input.as_metadata(),
+            "project": artifact_project_metadata,
             "paper_count": len(papers),
             "metadata_quality": metadata_quality,
             "representative_groups": representative_groups,
-            "papers": [_serialize_paper(paper) for paper in papers],
+            "papers": [_serialize_paper_for_artifact(paper, repo_root) for paper in papers],
         },
     )
     write_json_file(
@@ -1094,26 +1116,28 @@ def run_literature_survey_mode(
         {
             "generated_at": generated_at,
             "mode": "literature_survey",
-            "project": project_input.as_metadata(),
+            "project": artifact_project_metadata,
             "config": asdict(config),
-            "source_files": [str(path) for path in source_files],
+            "source_files": [display_path(path, repo_root) for path in source_files],
             "source_summary": source_summary,
             "paper_count": len(papers),
             "metadata_quality": metadata_quality,
             "representative_groups": representative_groups,
             "outputs": {
-                "report": str(report_path),
-                "paper_metadata": str(metadata_path),
-                "related_work": str(related_work_path),
+                "report": display_path(report_path, repo_root),
+                "paper_metadata": display_path(metadata_path, repo_root),
+                "related_work": display_path(related_work_path, repo_root),
             },
         },
     )
 
     console.print(f"[green]Scanned source files:[/green] {len(source_files)}")
     console.print(f"[green]Unique papers collected:[/green] {len(papers)}")
-    console.print(f"[green]Saved survey report:[/green] {report_path}")
-    console.print(f"[green]Saved paper metadata:[/green] {metadata_path}")
-    console.print(f"[green]Saved related work draft:[/green] {related_work_path}")
+    console.print(f"[green]Saved survey report:[/green] {display_path(report_path, repo_root)}")
+    console.print(f"[green]Saved paper metadata:[/green] {display_path(metadata_path, repo_root)}")
+    console.print(
+        f"[green]Saved related work draft:[/green] {display_path(related_work_path, repo_root)}"
+    )
     return SurveyResult(
         papers=papers,
         source_files=list(source_files),
