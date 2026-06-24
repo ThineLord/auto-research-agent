@@ -1,7 +1,58 @@
-# Bug Audit 7 - Stale JSON Artifact Read Safety
+# Bug Audit 8 - Stale Text Artifact UI Safety
 
 Date: 2026-06-24
 Commit: pending phase commit
+Branch: master
+
+## Goal
+
+Make UI text artifact helpers robust to stale unreadable paths without changing run behavior or
+artifact schemas.
+
+## Bug / Fragility Found
+
+* `read_file_text` returned an empty string for missing files but crashed when the path existed as a
+  directory.
+* `ui.app.load_score_history_rows` uses `read_file_text`, so a stale directory named
+  `score_history.json` crashed the UI analytics helper.
+
+## Reproduction
+
+* A temporary fixture with a directory at `score_history.json` reproduced `IsADirectoryError` from
+  both `read_file_text` and `load_score_history_rows`.
+
+## Fix
+
+* Updated `read_file_text` to return an empty string on `OSError`, matching its missing-file
+  fallback.
+
+## Tests Added or Updated
+
+* Added storage/UI helper coverage for stale directory text paths.
+* Added `load_score_history_rows` coverage for stale directory `score_history.json`.
+
+## Validation
+
+* Targeted pytest for UI/storage stale text path tests (`3 passed`)
+* `.venv/bin/python -m ruff check src/storage.py tests/test_ui_helpers.py`
+* Minimal stale `score_history.json` directory reproduction before and after the fix
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make check` (`127 passed, 43 subtests passed`)
+
+## Remaining Risks
+
+* This fix intentionally treats unreadable UI text artifacts as empty/missing; it does not attempt
+  recovery or deletion.
+
+## Next Audit Target
+
+Continue with CLI parser contracts, docs command accuracy, and config validation edge cases.
+
+# Bug Audit 7 - Stale JSON Artifact Read Safety
+
+Date: 2026-06-24
+Commit: 206dc52
 Branch: master
 
 ## Goal

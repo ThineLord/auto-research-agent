@@ -45,7 +45,10 @@ def read_file_text(path: Path) -> str:
     """Read a text file exactly as stored, returning an empty string if missing."""
     if not path.exists():
         return ""
-    return path.read_text(encoding="utf-8")
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
 
 
 def display_path(path: Path | str | None, root: Path | None = None, default: str = "N/A") -> str:

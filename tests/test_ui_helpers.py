@@ -42,10 +42,13 @@ class SharedUiBackendHelperTests(unittest.TestCase):
             json_path = root / "state.json"
             invalid_json_path = root / "invalid.json"
             log_path = root / "run.log"
+            stale_text_path = root / "stale.txt"
 
             self.assertEqual(read_file_text(text_path), "")
             write_file_text(text_path, "hello\n")
             self.assertEqual(read_file_text(text_path), "hello\n")
+            stale_text_path.mkdir()
+            self.assertEqual(read_file_text(stale_text_path), "")
 
             self.assertEqual(read_json_file(json_path), {})
             write_json_file(json_path, {"round": 3})
@@ -57,6 +60,15 @@ class SharedUiBackendHelperTests(unittest.TestCase):
             log_path.write_text("one\ntwo\nthree\n", encoding="utf-8")
             self.assertEqual(tail_file_lines(log_path, max_lines=2), "two\nthree")
             self.assertEqual(tail_file_lines(root / "missing.log"), "")
+
+    def test_score_history_loader_tolerates_stale_directory_path(self) -> None:
+        import ui.app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            score_history_path = Path(tmp) / "score_history.json"
+            score_history_path.mkdir()
+
+            self.assertEqual(ui_app.load_score_history_rows(score_history_path), [])
 
     def test_get_active_process_meta_returns_live_process_and_removes_stale_meta(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
