@@ -24,6 +24,7 @@ from .constants import (
     DEFAULT_CONTINUOUS_MAX_RUNTIME_SECONDS,
     DEFAULT_NORMAL_MAX_RUNTIME_SECONDS,
 )
+from .storage import display_path
 
 DEFAULT_MODEL_NAME = "qwen3:8b"
 DEFAULT_MODEL_TEMPERATURE = 0.4
@@ -395,12 +396,13 @@ def _validate_gemini_config(raw_gemini: Any) -> GeminiConfig:
 
 
 def _read_yaml_mapping(config_path: Path) -> Dict[str, Any]:
+    config_display_path = display_path(config_path, config_path.parent)
     if not config_path.exists():
-        raise FileNotFoundError(f"Config file not found: {config_path}")
+        raise FileNotFoundError(f"Config file not found: {config_display_path}")
     try:
         raw_config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     except YAML_ERROR as exc:
-        raise ConfigValidationError(f"{config_path}: failed to parse YAML: {exc}") from exc
+        raise ConfigValidationError(f"{config_display_path}: failed to parse YAML: {exc}") from exc
     if raw_config is None:
         return {}
     if not isinstance(raw_config, Mapping):

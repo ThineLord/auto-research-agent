@@ -222,6 +222,23 @@ model:
         with self.assertRaisesRegex(ConfigValidationError, "top-level YAML must be a mapping"):
             load_app_config(list_path)
 
+    def test_config_read_errors_mask_local_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            missing_path = root / "config.yaml"
+            malformed_path = root / "malformed.yaml"
+            malformed_path.write_text("model: [\n", encoding="utf-8")
+
+            with self.assertRaises(FileNotFoundError) as missing_context:
+                load_app_config(missing_path)
+            with self.assertRaises(ConfigValidationError) as malformed_context:
+                load_app_config(malformed_path)
+
+            self.assertIn("config.yaml", str(missing_context.exception))
+            self.assertIn("malformed.yaml: failed to parse YAML", str(malformed_context.exception))
+            self.assertNotIn(str(root.resolve()), str(missing_context.exception))
+            self.assertNotIn(str(root.resolve()), str(malformed_context.exception))
+
     def test_rejects_unknown_keys_at_each_config_level(self) -> None:
         cases = [
             ("unexpected: true\n", "config: unknown key"),

@@ -1,7 +1,55 @@
-# Bug Audit 8 - Stale Text Artifact UI Safety
+# Bug Audit 9 - Config Error Path Privacy
 
 Date: 2026-06-24
 Commit: pending phase commit
+Branch: master
+
+## Goal
+
+Mask config read/parse error paths without changing config validation semantics.
+
+## Bug / Fragility Found
+
+* Missing config errors printed the raw local config file path.
+* Malformed YAML errors prefixed the parse failure with the raw local config file path.
+
+## Reproduction
+
+* Temporary missing and malformed config fixtures reproduced raw temporary paths in
+  `load_app_config` exception messages.
+
+## Fix
+
+* Rendered config file paths through `display_path` before constructing missing-file and YAML parse
+  errors.
+
+## Tests Added or Updated
+
+* Added config validation coverage that asserts missing/malformed config errors include only the
+  filename and not the temporary root path.
+
+## Validation
+
+* `.venv/bin/python -m pytest tests/test_config.py -q` (`15 passed, 36 subtests passed`)
+* `.venv/bin/python -m ruff check src/config.py tests/test_config.py`
+* Minimal missing/malformed config reproduction before and after the fix
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make check` (`128 passed, 43 subtests passed`)
+
+## Remaining Risks
+
+* Validation errors about bad values still include field names and values where already designed;
+  this phase only masks config file path prefixes.
+
+## Next Audit Target
+
+Continue with CLI parser contracts, docs command accuracy, and remaining speculative-risk triage.
+
+# Bug Audit 8 - Stale Text Artifact UI Safety
+
+Date: 2026-06-24
+Commit: a7fe400
 Branch: master
 
 ## Goal
