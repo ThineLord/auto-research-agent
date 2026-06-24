@@ -227,6 +227,18 @@ Survey mode 会扫描 `projects/<project>/task.md`、可选 `memory.md`、项目
 `paper_metadata.json`、`related_work.md` 和 `survey_manifest.json`。
 输出会规范化 DOI/arXiv 标识并在 JSON 中记录缺失作者、年份、venue、URL/DOI/arXiv 的质量计数。
 
+如果你只想做 CI/docs 友好的 demo run，不想安装 Ollama 或配置 Gemini key，运行：
+
+```bash
+make mock
+make mock ARGS="--max-rounds 1"
+```
+
+Mock mode 是确定性的 provider-free workflow：它不会调用 Ollama、Gemini、网络或 API key，
+但会写正常 run artifacts，包括 `run_config.json`、`round_metrics.json`、`run_summary.json`、
+`checkpoint.json` 和 `score_history.json`。默认只跑 2 轮；传 `--max-rounds` 可以覆盖。
+这些 score 和 rubric 是合成 demo 信号，不应当当作真实研究评估。
+
 ## 连续运行用哪个命令
 
 ```bash

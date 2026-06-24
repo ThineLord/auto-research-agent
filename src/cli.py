@@ -52,6 +52,13 @@ from .diagnostic import run_diagnostic_mode
 from .literature_survey import run_literature_survey_mode
 from .llm import create_llm_client
 from .logging_config import configure_logging
+from .mock_run import (
+    MOCK_DEFAULT_ROUNDS,
+    MOCK_MODEL_NAME,
+    MOCK_MODEL_PROVIDER,
+    build_mock_agents,
+    mock_model_parameters,
+)
 from .project_input import ProjectInputError, load_project_input
 from .resume import run_resume_mode
 from .run_analytics import analyze_run
@@ -88,6 +95,14 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         "--survey",
         action="store_true",
         help="Run local Literature Survey Mode without provider calls.",
+    )
+    parser.add_argument(
+        "--mock",
+        action="store_true",
+        help=(
+            "Run a deterministic provider-free demo workflow that writes normal run artifacts. "
+            "Defaults to 2 rounds unless --max-rounds is provided."
+        ),
     )
     parser.add_argument(
         "--survey-output",
@@ -359,11 +374,24 @@ def main() -> None:
         _run_analyze_cli(args, console, root)
         return
 
+    config_path = root / "config.yaml"
     try:
-        config = load_app_config(root / "config.yaml")
+        config = load_app_config(config_path)
     except (ConfigValidationError, FileNotFoundError) as exc:
-        console.print(f"[red]Config error: {exc}[/red]")
-        return
+        if getattr(args, "mock", False) and isinstance(exc, FileNotFoundError):
+            config_path = root / "config.example.yaml"
+            try:
+                config = load_app_config(config_path)
+            except (ConfigValidationError, FileNotFoundError) as fallback_exc:
+                console.print(f"[red]Config error: {fallback_exc}[/red]")
+                return
+            console.print(
+                "[yellow]config.yaml not found; mock mode is using config.example.yaml "
+                "without creating local config.[/yellow]"
+            )
+        else:
+            console.print(f"[red]Config error: {exc}[/red]")
+            return
 
     (
         config_provider,
@@ -397,6 +425,8 @@ def main() -> None:
         max_rounds = preset_rounds
     if max_rounds_override is not None:
         max_rounds = max(1, max_rounds_override)
+    if getattr(args, "mock", False) and max_rounds_override is None:
+        max_rounds = min(max_rounds, MOCK_DEFAULT_ROUNDS)
     continuous_max_rounds = 9999
     if preset_rounds is not None:
         continuous_max_rounds = preset_rounds
@@ -477,6 +507,69 @@ def main() -> None:
                 project_input=project_input,
                 config=config.literature_survey,
                 output_path=survey_output_path,
+            )
+        finally:
+            release_run_lock(run_lock_path)
+        return
+
+    if getattr(args, "mock", False):
+        provider = MOCK_MODEL_PROVIDER
+        model_name = MOCK_MODEL_NAME
+        model_label = MOCK_MODEL_NAME
+        model_parameters = mock_model_parameters(max_prompt_chars=max_prompt_chars)
+        project_metadata["mock_mode"] = {
+            "provider_free": True,
+            "deterministic": True,
+            "config_path": _display_repo_path(root, config_path),
+            "default_rounds": MOCK_DEFAULT_ROUNDS,
+            "rounds_limited_by_default": max_rounds_override is None,
+        }
+        console.print(
+            "[bold cyan]Mock mode:[/bold cyan] deterministic provider-free run; "
+            "no Ollama, Gemini, network, or API key calls will be made."
+        )
+        console.print(
+            f"[cyan]Mock mode will write normal run artifacts for {max_rounds} round(s).[/cyan]"
+        )
+        requested_mode = "mock"
+        run_lock_path, lock_error = acquire_run_lock(
+            project_dir,
+            mode=requested_mode,
+            model_name=model_label,
+        )
+        if lock_error:
+            console.print(f"[red]{lock_error}[/red]")
+            console.print(
+                f"[yellow]If this is stale, remove {project_dir / RUN_LOCK_FILENAME} and retry.[/yellow]"
+            )
+            return
+        agents = build_mock_agents(topic_context=topic_context)
+        try:
+            run_iterative_rounds(
+                console=console,
+                agents=agents,
+                task_text=task_text,
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode=requested_mode,
+                model_name=model_label,
+                max_rounds=max_rounds,
+                stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
+                global_max_runtime_seconds=normal_max_runtime_seconds,
+                per_agent_timeout_seconds=1,
+                topic_keywords=topic_keywords,
+                project_metadata=project_metadata,
+                model_provider=provider,
+                model_parameters=model_parameters,
+                topic_snapshot=topic_snapshot,
+                prompt_dir=prompts_dir,
+                repo_root=root,
+                drafting_mode=drafting_mode,
+                max_consecutive_provider_quota_failures=max_provider_quota_failures,
+            )
+        except KeyboardInterrupt:
+            console.print(
+                "[red]Manual interrupt detected in mock loop. Stop reason: MANUAL_INTERRUPT[/red]"
             )
         finally:
             release_run_lock(run_lock_path)

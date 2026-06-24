@@ -339,6 +339,7 @@ class RoundLoopTests(unittest.TestCase):
             [
                 "--diagnostic",
                 "--survey",
+                "--mock",
                 "--survey-output",
                 "custom_survey.md",
                 "--compare-runs",
@@ -363,6 +364,7 @@ class RoundLoopTests(unittest.TestCase):
 
         self.assertTrue(args.diagnostic)
         self.assertTrue(args.survey)
+        self.assertTrue(args.mock)
         self.assertEqual(args.survey_output, "custom_survey.md")
         self.assertEqual(args.compare_runs, ["projects/example/runs/a", "projects/example/runs/b"])
         self.assertEqual(args.compare_output, "projects/example/run_comparison.json")

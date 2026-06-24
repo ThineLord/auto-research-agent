@@ -26,31 +26,39 @@ ollama list
 ```
 
 确认 Ollama 可用，并确认你想用的本地模型已经安装。若只跑 Gemini 模式，改为确认
-`GEMINI_API_KEY` 或 `GOOGLE_API_KEY` 已设置；若只跑 `make survey`，不需要 Ollama 或 Gemini。
+`GEMINI_API_KEY` 或 `GOOGLE_API_KEY` 已设置；若只跑 `make survey` 或 `make mock`，不需要
+Ollama 或 Gemini。
 
 ## 2. 如何跑 fake/mock 模式
 
-当前项目没有正式 CLI mock 参数，例如没有：
+当前项目有正式 CLI mock 参数：
 
 ```bash
-python -m src.main --mock
+make mock
+.venv/bin/python -m src.main --mock
 ```
 
-现有 fake/mock 覆盖在测试里，适合验证“循环能写文件、best score 能更新、UI helper 能读状态”，不会调用 Ollama：
+Mock mode 是确定性的 provider-free demo workflow，默认 2 轮，可用 `--max-rounds` 覆盖：
 
 ```bash
-.venv/bin/python -m pytest tests/test_round_loop.py::RoundLoopTests::test_round_loop_writes_outputs_and_keeps_best_score -q
+make mock ARGS="--max-rounds 1"
 ```
 
-验证 round loop 用 fake agents 落盘。
+它复用正常 runner，写 `run_config.json`、`round_metrics.json`、`run_summary.json`、
+`checkpoint.json` 和 `score_history.json`，provider 记录为 `mock`。它不会调用 Ollama、
+Gemini、网络或 API key。score/rubric 是合成 demo 信号，只用于 CI/docs smoke，不代表真实研究评估。
+
+相关测试：
+
+```bash
+.venv/bin/python -m pytest tests/test_mock_run.py -q
+```
 
 ```bash
 .venv/bin/python -m pytest tests/test_ui_helpers.py::SharedUiBackendHelperTests::test_ui_progress_resume_and_output_helpers -q
 ```
 
 验证 UI progress/resume/output catalog helper。
-
-如果之后要加真正 mock run，最小方向是在 `src/cli.py` 增加 `--mock`，在 `src/runner.py` 复用现有 round loop，注入 fake `ResearchAgents`。
 
 ## 3. 如何跑一次最小真实模型模式
 

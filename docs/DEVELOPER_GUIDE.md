@@ -43,6 +43,9 @@ Core modules:
   `round_metrics.json` to compare two or more run roots.
 - `src/run_analytics.py` builds a provider-free single-run analytics export from the same metadata
   foundations for diagnostics, docs, and CI-safe artifact inspection.
+- `src/mock_run.py` provides deterministic fake Draft/Review/Revise/Judge agents for `--mock`
+  demo runs. It reuses the normal runner and writes normal artifacts without creating a provider
+  client.
 - `src/metrics.py` centralizes per-agent timing, character counts, conservative token estimates,
   and per-round text evolution metrics so runner, diagnostic mode, UI tables, and comparison
   fallbacks use the same additive schema.
@@ -139,6 +142,10 @@ low-change round counts, rubric round counts, and compact rubric averages to tha
 The CLI `--analyze-run` path uses `src.run_analytics` to summarize one run into score trend,
 robustness, cost-ready, interpretability, rubric, and artifact sections without loading config or
 calling providers.
+The CLI `--mock` path dispatches after project input resolution and before provider validation. It
+must remain deterministic, provider-free, and schema-additive: no Ollama discovery, Gemini key
+checks, network calls, prompt changes, or scoring-semantic changes. The synthetic Judge score exists
+only to exercise normal artifact writing for CI/docs smoke runs.
 The Resume control uses checkpoint metadata to preview run id/root, last completed round, next
 round, stop reason, resume eligibility, completed-round preservation, and next-round directory
 status before launching `--resume`. A non-empty next-round directory is treated as partial or

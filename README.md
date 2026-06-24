@@ -15,6 +15,8 @@
   - `make run`
 - 文献综述模式（本地确定性，不调用模型）：
   - `make survey`
+- Mock demo 模式（确定性、不调用模型、适合 CI/docs）：
+  - `make mock`
 - 推荐默认模型：
   - `qwen3:8b`
 - 稳定回退模型：
@@ -36,6 +38,17 @@ ollama pull llama3.1:8b
 make diagnostic
 make run
 ```
+
+如果只想验证 artifact 写入而不安装 Ollama、不设置 Gemini key，可以跑确定性的 mock demo：
+
+```bash
+make mock
+make mock ARGS="--max-rounds 1"
+```
+
+Mock mode 会复用正常 round runner，写入 `run_config.json`、`round_metrics.json`、
+`run_summary.json`、`checkpoint.json` 和 `score_history.json`，但 provider 记录为 `mock`，
+不会调用 Ollama、Gemini、网络或 API key。默认只跑 2 轮；需要时用 `--max-rounds` 覆盖。
 
 ## Friend Quickstart / 朋友快速开始
 
@@ -193,6 +206,8 @@ resume eligibility。
   - `make session`
 - 文献综述模式（收集、去重、主题/缺口分析、相关工作草稿）
   - `make survey`
+- Mock demo（确定性、不调用模型、写正常 run artifacts）
+  - `make mock`
 - 连续运行
   - `make continuous`
 - 从检查点恢复
@@ -206,6 +221,7 @@ resume eligibility。
 ```bash
 .venv/bin/python -m src.main --diagnostic
 .venv/bin/python -m src.main --survey
+.venv/bin/python -m src.main --mock
 .venv/bin/auto-research-agent --diagnostic
 ```
 

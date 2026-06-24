@@ -2,7 +2,7 @@
 
 ## 1. 项目一句话说明
 
-Auto Research Agent 是一个本地优先的研究计划迭代助手：读取 `projects/<project>/task.md` 和 `memory.md`，用本地 Ollama 或云端 Gemini 循环执行 `Draft -> Review -> Revise -> Judge`，把每轮草稿、审查、改写、评分和检查点保存到项目目录里。它也提供不调用模型的 Literature Survey Mode，用于整理项目里的论文元数据和相关工作草稿。
+Auto Research Agent 是一个本地优先的研究计划迭代助手：读取 `projects/<project>/task.md` 和 `memory.md`，用本地 Ollama 或云端 Gemini 循环执行 `Draft -> Review -> Revise -> Judge`，把每轮草稿、审查、改写、评分和检查点保存到项目目录里。它也提供不调用模型的 Literature Survey Mode 和确定性 mock demo mode，用于整理资料或在 CI/docs 中验证 artifact 写入。
 
 ## 2. 项目状态
 
@@ -15,6 +15,7 @@ Auto Research Agent 是一个本地优先的研究计划迭代助手：读取 `p
 - 四阶段研究循环：draft、review、revise、judge。
 - 一轮诊断模式、普通有界模式、连续模式、session 模式、resume 模式。
 - 本地确定性的 Literature Survey Mode：扫描项目 markdown、run 输出和可选资料，生成 survey 报告与 related work 草稿。
+- 确定性的 mock demo mode：不调用 Ollama/Gemini/网络/API key，但写正常 run artifacts。
 - 每轮输出落盘到 `projects/example/runs/<run_id>/round_xx/`。
 - 每个 run 都会写 `projects/example/runs/<run_id>/run_config.json`，记录模型、runtime、topic、prompt hash、Git commit 和停止原因。
 - `checkpoint.json`、`score_history.json`、`research_state.json`、`best_output.md` 等运行状态文件。
@@ -35,6 +36,7 @@ Auto Research Agent 是一个本地优先的研究计划迭代助手：读取 `p
 - 修改 `projects/<project>/task.md` 和 `projects/<project>/memory.md`，然后从 UI 或 CLI 启动新 run。
 - 用 `make resume` 从已有 checkpoint 继续；这会调用当前 provider（Ollama 或 Gemini）。
 - 用 `make survey` 整理项目里的论文和相关工作；这不会调用 Ollama 或 Gemini。
+- 用 `make mock` 写一次确定性 demo run；这不会调用 Ollama、Gemini、网络或 API key。
 - 比较不同 round 的 `01_draft.md`、`02_review.md`、`03_revised.md`、`04_judge.md`。
 - 用 `score_history.json` 粗看评分、超时、重复 judge、无效分数、错误轮次。
 - 改本地 `config.yaml` 切换模型、轮数、runtime 上限、项目名和 topic。
@@ -144,6 +146,16 @@ make survey
 
 运行不调用模型的 Literature Survey Mode，输出到 `projects/<project>/survey/`。
 该模式会规范化 DOI/arXiv 去重，并在 JSON 输出中标出缺失作者、年份、venue 和持久标识符的记录数。
+
+```bash
+make mock
+make mock ARGS="--max-rounds 1"
+```
+
+运行确定性的 provider-free demo workflow。Mock mode 默认只跑 2 轮，会写正常
+`run_config.json`、`round_metrics.json`、`run_summary.json`、`checkpoint.json` 和
+`score_history.json`，但 provider 记录为 `mock`，不会调用 Ollama、Gemini、网络或 API key。
+其中 score/rubric 是合成 demo 信号，不代表真实研究评估。
 
 ```bash
 make ui
@@ -321,11 +333,12 @@ touch projects/example/STOP_REQUESTED
 
 `src/` 主要文件：
 
-- `src/cli.py`：解析 `--diagnostic`、`--continuous`、`--resume`、`--session`、`--survey`、`--provider`、`--model`、`--max-rounds`、`--drafting-mode` 等参数，分发运行模式。
+- `src/cli.py`：解析 `--diagnostic`、`--continuous`、`--resume`、`--session`、`--survey`、`--mock`、`--provider`、`--model`、`--max-rounds`、`--drafting-mode` 等参数，分发运行模式。
 - `src/main.py`：兼容入口，重新导出旧 API。
 - `src/config.py`：加载和校验 `config.yaml`，查询 Ollama 模型，保存默认 provider/model。
 - `src/llm.py`：Ollama `/api/chat` 和 Gemini 客户端封装。
 - `src/agents.py`：Draft、Review、Revise、Judge agent 封装和 prompt 组装。
+- `src/mock_run.py`：提供 `--mock` 使用的确定性 fake agents，复用正常 runner 写 artifacts。
 - `src/runner.py`：普通/连续/resume 的核心 round loop、停止条件、checkpoint、score history。
 - `src/diagnostic.py`：一轮轻量诊断流程，不更新 memory。
 - `src/session.py`：session 模式，先生成 objective 和 plan，再跑迭代，最后生成 report。
