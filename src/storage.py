@@ -386,7 +386,7 @@ def read_json_file(path: Path) -> Dict[str, Any]:
         return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError):
         return {}
     if isinstance(data, dict):
         return data

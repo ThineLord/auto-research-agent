@@ -42,10 +42,13 @@ class StorageTests(unittest.TestCase):
             root = Path(tmp)
             missing = root / "missing.json"
             invalid = root / "invalid.json"
+            stale_directory = root / "checkpoint.json"
             invalid.write_text("{not json", encoding="utf-8")
+            stale_directory.mkdir()
 
             self.assertEqual(read_json_file(missing), {})
             self.assertEqual(read_json_file(invalid), {})
+            self.assertEqual(read_json_file(stale_directory), {})
 
             target = root / "nested" / "state.json"
             write_json_file(target, {"round": 2, "score": 91})

@@ -1,7 +1,59 @@
-# Bug Audit 6 - Project Input Error Path Privacy
+# Bug Audit 7 - Stale JSON Artifact Read Safety
 
 Date: 2026-06-24
 Commit: pending phase commit
+Branch: master
+
+## Goal
+
+Make shared JSON artifact reads robust to stale unreadable paths so CLI/UI helpers degrade cleanly
+instead of crashing.
+
+## Bug / Fragility Found
+
+* `read_json_file` returned `{}` for missing files and malformed JSON, but crashed when the target
+  path existed as a directory or otherwise raised an `OSError`.
+* UI helpers and resume/status paths call `read_json_file` for `checkpoint.json`, run metadata, and
+  process metadata, so a stale directory named like a JSON artifact could crash those flows.
+
+## Reproduction
+
+* A temporary fixture with a directory at `checkpoint.json` reproduced `IsADirectoryError` from
+  `src.storage.read_json_file`.
+
+## Fix
+
+* Extended `read_json_file` to catch `OSError` along with `json.JSONDecodeError` and return `{}`.
+
+## Tests Added or Updated
+
+* Added stale-directory coverage to the storage JSON helper test.
+
+## Validation
+
+* `.venv/bin/python -m pytest tests/test_storage.py -q` (`8 passed`)
+* `.venv/bin/python -m ruff check src/storage.py tests/test_storage.py`
+* Minimal stale-directory reproduction fixture before and after the fix
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make check` (`126 passed, 43 subtests passed`)
+
+## Remaining Risks
+
+* This fix intentionally treats unreadable JSON artifacts as absent/empty; it does not attempt
+  recovery or deletion.
+* Callers that need to distinguish unreadable files from malformed JSON would need a separate API,
+  but current helper semantics already collapse missing and malformed files to `{}`.
+
+## Next Audit Target
+
+Continue with CLI parser contracts, docs command accuracy, config validation edge cases, and
+additional UI helper stale-artifact scenarios.
+
+# Bug Audit 6 - Project Input Error Path Privacy
+
+Date: 2026-06-24
+Commit: 172b85f
 Branch: master
 
 ## Goal
