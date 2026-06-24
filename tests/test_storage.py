@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from src.storage import (
+    append_log_line,
     get_memory_for_prompt,
     parse_score,
     read_json_file,
@@ -53,6 +54,15 @@ class StorageTests(unittest.TestCase):
             target = root / "nested" / "state.json"
             write_json_file(target, {"round": 2, "score": 91})
             self.assertEqual(json.loads(target.read_text(encoding="utf-8"))["score"], 91)
+
+    def test_append_log_line_tolerates_stale_directory_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            log_path = Path(tmp) / "run.log"
+            log_path.mkdir()
+
+            append_log_line(log_path, "hello")
+
+            self.assertTrue(log_path.is_dir())
 
     def test_update_project_memory_preserves_manual_notes_and_limits_auto_entries(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

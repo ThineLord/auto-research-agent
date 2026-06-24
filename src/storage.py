@@ -405,10 +405,13 @@ def write_json_file(path: Path, data: Dict[str, Any]) -> None:
 
 
 def append_log_line(log_path: Path, message: str) -> None:
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with log_path.open("a", encoding="utf-8") as f:
-        f.write(f"{ts} | {message}\n")
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with log_path.open("a", encoding="utf-8") as f:
+            f.write(f"{ts} | {message}\n")
+    except OSError:
+        return
 
 
 def write_interrupted_report(

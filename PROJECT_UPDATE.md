@@ -1,7 +1,56 @@
-# Bug Audit 16 - UI Process Start Error Path Privacy
+# Bug Audit 17 - Best-Effort Log Append Safety
 
 Date: 2026-06-24
 Commit: pending phase commit
+Branch: master
+
+## Goal
+
+Prevent stale or non-writable log paths from crashing otherwise recoverable CLI/runner progress
+logging.
+
+## Bug / Fragility Found
+
+* `append_log_line` was used for best-effort run/diagnostic progress logging, but it raised
+  `IsADirectoryError` when `run.log` existed as a stale directory.
+* Because logging happens during normal progress/error paths, a stale log artifact could abort the
+  workflow even when console output and core artifacts were otherwise available.
+
+## Reproduction
+
+* A temporary directory at `run.log` reproduced `IsADirectoryError` from `append_log_line`.
+
+## Fix
+
+* Made `append_log_line` best-effort by catching `OSError` around parent creation and append writes.
+* Left core artifact writes unchanged; only non-essential log append failures are ignored.
+
+## Tests Added or Updated
+
+* Added storage helper coverage for stale directory log paths.
+
+## Validation
+
+* `.venv/bin/python -m pytest tests/test_storage.py::StorageTests::test_append_log_line_tolerates_stale_directory_path -q` (`1 passed`)
+* `.venv/bin/python -m ruff check src/storage.py tests/test_storage.py`
+* Minimal stale `run.log` directory reproduction before and after the fix
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make check` (`137 passed, 43 subtests passed`)
+
+## Remaining Risks
+
+* If a log path is stale or non-writable, log lines may be omitted; core artifacts and console output
+  remain the source of truth.
+
+## Next Audit Target
+
+Final repository sweep and closeout once no further clear safe bugs remain.
+
+# Bug Audit 16 - UI Process Start Error Path Privacy
+
+Date: 2026-06-24
+Commit: 1b7063e
 Branch: master
 
 ## Goal
