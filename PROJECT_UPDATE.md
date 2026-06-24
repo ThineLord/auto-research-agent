@@ -1,7 +1,57 @@
-# Bug Audit 15 - UI Stop Signal Stale Path Safety
+# Bug Audit 16 - UI Process Start Error Path Privacy
 
 Date: 2026-06-24
 Commit: pending phase commit
+Branch: master
+
+## Goal
+
+Remove a verified local absolute path leak from Streamlit background process start failures.
+
+## Bug / Fragility Found
+
+* `start_background_process` returned `str(exc)` for process-start failures. When the run log path was
+  a stale directory, the returned `IsADirectoryError` included the raw local temporary/project path,
+  and the UI displayed that error.
+
+## Reproduction
+
+* A temporary directory at `run.log` reproduced an error containing the temporary root path from
+  `start_background_process`.
+
+## Fix
+
+* Added a sanitized error formatter that keeps the exception class and OS reason while omitting
+  exception filenames/paths.
+* Updated process-start failures to use the sanitized formatter.
+
+## Tests Added or Updated
+
+* Added UI/runtime helper coverage asserting stale log path process-start errors do not include the
+  temporary root path.
+
+## Validation
+
+* `.venv/bin/python -m pytest tests/test_ui_helpers.py::SharedUiBackendHelperTests::test_start_background_process_masks_stale_log_path_errors tests/test_ui_helpers.py::SharedUiBackendHelperTests::test_start_background_process_writes_meta_and_reports_errors -q` (`2 passed`)
+* `.venv/bin/python -m ruff check src/runtime.py tests/test_ui_helpers.py`
+* Minimal stale `run.log` directory reproduction before and after the fix
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make check` (`136 passed, 43 subtests passed`)
+
+## Remaining Risks
+
+* This sanitizes process-start exception details; debugging exact local filesystem paths now requires
+  local inspection rather than UI error text.
+
+## Next Audit Target
+
+Final repository sweep and closeout once no further clear safe bugs remain.
+
+# Bug Audit 15 - UI Stop Signal Stale Path Safety
+
+Date: 2026-06-24
+Commit: a0694bc
 Branch: master
 
 ## Goal

@@ -164,6 +164,25 @@ class SharedUiBackendHelperTests(unittest.TestCase):
             self.assertIsNone(result.pid)
             self.assertIn("Failed to start run process", result.error or "")
 
+    def test_start_background_process_masks_stale_log_path_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            log_path = root / "run.log"
+            log_path.mkdir()
+
+            result = start_background_process(
+                command=["python", "-c", "print(1)"],
+                cwd=root,
+                log_path=log_path,
+                meta_path=root / "ui_run_process.json",
+                kind="run",
+            )
+
+            self.assertIsNone(result.pid)
+            self.assertIn("Failed to start run process", result.error or "")
+            self.assertIn("IsADirectoryError", result.error or "")
+            self.assertNotIn(str(root), result.error or "")
+
     def test_run_lock_reports_stale_directory_without_deleting_it(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_dir = Path(tmp)

@@ -88,6 +88,14 @@ def get_active_process_meta(meta_path: Path) -> Dict[str, Any]:
     return {}
 
 
+def _safe_start_error(exc: Exception) -> str:
+    if isinstance(exc, OSError) and exc.strerror:
+        detail = exc.strerror
+    else:
+        detail = exc.__class__.__name__
+    return f"{exc.__class__.__name__}: {detail}"
+
+
 def start_background_process(
     *,
     command: Sequence[str],
@@ -126,7 +134,10 @@ def start_background_process(
         write_json_file(meta_path, meta)
         return BackgroundProcessResult(pid=process.pid)
     except Exception as exc:  # noqa: BLE001
-        return BackgroundProcessResult(pid=None, error=f"Failed to start {kind} process: {exc}")
+        return BackgroundProcessResult(
+            pid=None,
+            error=f"Failed to start {kind} process: {_safe_start_error(exc)}",
+        )
 
 
 def _timeout_output_text(value: object) -> str:
