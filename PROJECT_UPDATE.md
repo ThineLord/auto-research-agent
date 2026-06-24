@@ -1,7 +1,55 @@
-# Bug Audit 9 - Config Error Path Privacy
+# Bug Audit 10 - Run Config Stale Artifact Safety
 
 Date: 2026-06-24
 Commit: pending phase commit
+Branch: master
+
+## Goal
+
+Harden run metadata compatibility readers against stale unreadable `run_config.json` and
+`run_manifest.json` paths.
+
+## Bug / Fragility Found
+
+* `read_run_config` handled malformed JSON but crashed when `run_config.json` existed as a directory
+  or otherwise raised an `OSError`.
+* The legacy `run_manifest.json` fallback reader had the same stale directory/unreadable path gap.
+
+## Reproduction
+
+* A temporary run fixture with a directory at `run_config.json` reproduced `IsADirectoryError` from
+  `src.run_config.read_run_config`.
+
+## Fix
+
+* Extended `read_run_config` to catch `OSError` alongside `json.JSONDecodeError` for both
+  `run_config.json` and legacy `run_manifest.json`.
+
+## Tests Added or Updated
+
+* Added run-config coverage for stale directory `run_config.json` and `run_manifest.json` paths.
+
+## Validation
+
+* `.venv/bin/python -m pytest tests/test_run_config.py -q` (`3 passed`)
+* `.venv/bin/python -m ruff check src/run_config.py tests/test_run_config.py`
+* Minimal stale `run_config.json` directory reproduction before and after the fix
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make check` (`129 passed, 43 subtests passed`)
+
+## Remaining Risks
+
+* This fix treats unreadable run metadata as absent rather than attempting recovery.
+
+## Next Audit Target
+
+Continue with CLI parser contracts, docs command accuracy, and remaining speculative-risk triage.
+
+# Bug Audit 9 - Config Error Path Privacy
+
+Date: 2026-06-24
+Commit: 39d9c9d
 Branch: master
 
 ## Goal

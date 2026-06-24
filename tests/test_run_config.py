@@ -53,6 +53,21 @@ class RunConfigTests(unittest.TestCase):
         self.assertEqual(config["model"]["name"], "qwen3:8b")
         self.assertEqual(config["project"]["project_name"], "example")
 
+    def test_read_run_config_tolerates_stale_directory_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "runs" / "stale-run-config"
+            run_root.mkdir(parents=True)
+            (run_root / "run_config.json").mkdir()
+
+            self.assertEqual(read_run_config(run_root), {})
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "runs" / "stale-manifest"
+            run_root.mkdir(parents=True)
+            (run_root / "run_manifest.json").mkdir()
+
+            self.assertEqual(read_run_config(run_root), {})
+
 
 if __name__ == "__main__":
     unittest.main()

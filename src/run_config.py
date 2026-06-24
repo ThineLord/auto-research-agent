@@ -198,7 +198,7 @@ def read_run_config(run_root: Path) -> dict[str, Any]:
     if run_config_path.exists():
         try:
             data = json.loads(run_config_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
+        except (OSError, json.JSONDecodeError):
             return {}
         return data if isinstance(data, dict) else {}
 
@@ -207,7 +207,7 @@ def read_run_config(run_root: Path) -> dict[str, Any]:
         return {}
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError):
         return {}
     if not isinstance(manifest, dict):
         return {}
