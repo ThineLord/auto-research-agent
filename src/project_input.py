@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import DEFAULT_PROJECT_NAME
+from .storage import display_path
 
 
 class ProjectInputError(ValueError):
@@ -65,29 +66,34 @@ def load_project_input(
 ) -> ProjectInput:
     project_dir = (root / "projects" / project_name).resolve()
     task_path = project_dir / "task.md"
+    project_display_path = display_path(project_dir, root)
+    task_display_path = display_path(task_path, root)
 
     if not project_dir.exists():
         raise ProjectInputError(
-            f"Project '{project_name}' was not found at {project_dir}. "
-            f"Create {task_path} or pass --project with an existing folder under projects/."
+            f"Project '{project_name}' was not found at {project_display_path}. "
+            f"Create {task_display_path} or pass --project with an existing folder under projects/."
         )
     if not project_dir.is_dir():
-        raise ProjectInputError(f"Project path is not a directory: {project_dir}")
+        raise ProjectInputError(f"Project path is not a directory: {project_display_path}")
     if not task_path.exists():
         raise ProjectInputError(
-            f"Task file not found for project '{project_name}': {task_path}. "
+            f"Task file not found for project '{project_name}': {task_display_path}. "
             "Create task.md for this project before running."
         )
     if not task_path.is_file():
-        raise ProjectInputError(f"Task path is not a file: {task_path}")
+        raise ProjectInputError(f"Task path is not a file: {task_display_path}")
 
     try:
         task_text = task_path.read_text(encoding="utf-8").strip()
     except OSError as exc:
-        raise ProjectInputError(f"Task file is not readable: {task_path}: {exc}") from exc
+        reason = getattr(exc, "strerror", None) or exc.__class__.__name__
+        raise ProjectInputError(
+            f"Task file is not readable: {task_display_path}: {reason}"
+        ) from exc
 
     if not task_text:
-        raise ProjectInputError(f"Task file is empty: {task_path}")
+        raise ProjectInputError(f"Task file is empty: {task_display_path}")
 
     return ProjectInput(
         project_name=project_name,

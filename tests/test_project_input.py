@@ -6,6 +6,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from rich.console import Console
+
 import src.cli as cli_module
 from src.agents import ResearchAgents
 from src.config import AppConfig
@@ -92,6 +94,68 @@ class ProjectInputTests(unittest.TestCase):
                     project_name="missing_project",
                     explicit_project=True,
                 )
+
+    def test_missing_project_error_masks_repo_root_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "projects" / "example").mkdir(parents=True)
+            (root / "projects" / "example" / "task.md").write_text("# Example\n", encoding="utf-8")
+
+            with self.assertRaises(ProjectInputError) as context:
+                load_project_input(
+                    root=root,
+                    project_name="missing_project",
+                    explicit_project=True,
+                )
+
+            message = str(context.exception)
+            self.assertIn("projects/missing_project", message)
+            self.assertNotIn(str(root.resolve()), message)
+
+    def test_cli_project_input_error_masks_repo_root_path(self) -> None:
+        args = SimpleNamespace(
+            session=False,
+            diagnostic=False,
+            continuous=False,
+            resume=False,
+            survey=False,
+            survey_output=None,
+            mock=True,
+            compare_runs=None,
+            compare_output=None,
+            analyze_run=None,
+            analyze_output=None,
+            model=None,
+            provider=None,
+            gemini_api_key_env=None,
+            project="missing_project_for_test",
+            cloud_free_discover=False,
+            cloud_free_profile=False,
+            free_runner_preset=None,
+            disable_cloud_free_mode=False,
+            min_delay_seconds=None,
+            max_delay_seconds=None,
+            max_retries=None,
+            prompt_budget_chars=None,
+            max_prompt_chars=None,
+            max_rounds=None,
+            drafting_mode=None,
+            benchmark_preset=None,
+            max_provider_quota_failures=2,
+        )
+        console = Console(record=True, width=120)
+        repo_root = Path(cli_module.__file__).resolve().parent.parent
+
+        with (
+            patch.object(cli_module, "parse_args", return_value=args),
+            patch.object(cli_module, "Console", return_value=console),
+            patch.object(cli_module, "load_app_config", return_value=AppConfig()),
+        ):
+            cli_module.main()
+
+        output = console.export_text(styles=False)
+        self.assertIn("projects/missing_project_for_test", output)
+        self.assertNotIn(str(repo_root), output)
 
     def test_cli_project_input_error_happens_before_ollama_model_discovery(self) -> None:
         args = SimpleNamespace(

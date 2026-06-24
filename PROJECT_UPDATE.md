@@ -1,7 +1,65 @@
-# Bug Audit 5 - Run Comparison Boolean Score Handling
+# Bug Audit 6 - Project Input Error Path Privacy
 
 Date: 2026-06-24
 Commit: pending phase commit
+Branch: master
+
+## Goal
+
+Mask user-facing project input failure paths without changing project resolution behavior or
+fallback rules.
+
+## Bug / Fragility Found
+
+* Missing-project CLI errors printed the absolute local repository path for the missing project
+  folder and suggested `task.md` path.
+* Other project input errors used the same raw path construction for not-a-directory, missing task,
+  non-file task, unreadable task, and empty task cases.
+
+## Reproduction
+
+* `.venv/bin/python -m src.main --mock --project missing_project_for_audit` printed local absolute
+  repo paths in the `Project input error` message before the fix.
+
+## Fix
+
+* Rendered project input error paths through the shared `display_path` helper, using the CLI root as
+  the relative base.
+* Replaced unreadable-file exception text with a short reason so OS errors do not reintroduce raw
+  absolute paths.
+
+## Tests Added or Updated
+
+* Added direct `load_project_input` coverage for masked missing-project errors.
+* Added CLI coverage for masked project input error output and preserved pre-provider-discovery
+  behavior.
+
+## Validation
+
+* `.venv/bin/python -m pytest tests/test_project_input.py -q` (`5 passed`)
+* `.venv/bin/python -m ruff check src/project_input.py tests/test_project_input.py`
+* `.venv/bin/python -m src.main --mock --project missing_project_for_audit` with local absolute path
+  grep
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make check` (`126 passed, 43 subtests passed`)
+
+## Remaining Risks
+
+* This phase masks project input error display; it does not change existing project metadata stored
+  in run artifacts.
+* The private local `config.yaml` still points at `pama`, which lacks `task.md`; provider-free
+  validation uses explicit project names.
+
+## Next Audit Target
+
+Continue with CLI parser contracts, docs command accuracy, config validation edge cases, and UI
+helper stale-artifact behavior.
+
+# Bug Audit 5 - Run Comparison Boolean Score Handling
+
+Date: 2026-06-24
+Commit: 0903774
 Branch: master
 
 ## Goal
