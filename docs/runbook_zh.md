@@ -109,7 +109,8 @@ make resume
 
 - `continuous` 设计上会持续跑。
 - `session` 会先生成 objective/plan，再跑迭代，再生成 report，调用次数更多。
-- `resume` 会从本地 `projects/example/checkpoint.json` 继续旧 run。
+- `resume` 会从本地 `projects/example/checkpoint.json` 继续旧 run，并在启动前显示 resume
+  preview；它不是新建 run 后使用 `best_output.md` 作为 previous-best context。
 
 如果误启动了长任务：
 
@@ -304,6 +305,8 @@ lsof -iTCP:8501 -sTCP:LISTEN -n -P || true
 - `projects/example/checkpoint.json` 存在且 `last_completed_round >= 1`。
 - `projects/example/checkpoint.json` 里 `run_root` 指向的目录存在。
 - `projects/example/checkpoint.json` 里 `run_config` 指向的 `run_config.json` 存在。
+- `checkpoint.json` / `run_config.json` / `run_summary.json` 里有 `resume_metadata`，能区分
+  `resume_existing_run` 和 `start_new_run`。
 - `run_root/run_summary.json` 和 `run_root/round_metrics.json` 存在。
 - `run_summary.json` 里有 `total_elapsed_seconds`、`total_agent_elapsed_seconds`、
   `total_estimated_tokens`、`timeout_count` 和 `error_count`；这些 token 是字符数估算，不是账单 token。

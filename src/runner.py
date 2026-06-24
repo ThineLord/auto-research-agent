@@ -195,6 +195,59 @@ def _set_provider_context(
         )
 
 
+def _base_resume_metadata(
+    *,
+    mode: str,
+    run_id: str,
+    start_round: int,
+    run_root_override: Optional[Path],
+    best_output_path: Path,
+    initial_best_output: str,
+    checkpoint_preview: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    resumes_existing_run = mode == "resume" or start_round > 1 or run_root_override is not None
+    previous_best_available = bool(initial_best_output.strip())
+    metadata: Dict[str, Any] = {
+        "lifecycle_action": "resume_existing_run" if resumes_existing_run else "start_new_run",
+        "resume_from_checkpoint": resumes_existing_run,
+        "resume_source": "checkpoint"
+        if resumes_existing_run
+        else "previous_best_context"
+        if previous_best_available
+        else "none",
+        "resumed_run_id": run_id if resumes_existing_run else None,
+        "resume_from_round": start_round if resumes_existing_run else None,
+        "new_run_from_previous_best": (not resumes_existing_run) and previous_best_available,
+        "previous_best_output_path": str(best_output_path) if previous_best_available else "",
+        "completed_round_files_preserved": resumes_existing_run,
+        "next_round": start_round,
+    }
+    if checkpoint_preview:
+        metadata["checkpoint_preview"] = checkpoint_preview
+    return metadata
+
+
+def _resume_metadata_for_checkpoint(
+    *,
+    base_metadata: Dict[str, Any],
+    completed_rounds: int,
+    can_resume: bool,
+    stop_reason: str,
+) -> Dict[str, Any]:
+    metadata = dict(base_metadata)
+    metadata.update(
+        {
+            "can_resume": can_resume,
+            "last_completed_round": completed_rounds,
+            "next_round": completed_rounds + 1 if can_resume else None,
+            "stop_reason": stop_reason,
+            "completed_round_files_preserved": can_resume
+            or base_metadata.get("lifecycle_action") == "resume_existing_run",
+        }
+    )
+    return metadata
+
+
 def run_iterative_rounds(
     *,
     console: Console,
@@ -223,6 +276,7 @@ def run_iterative_rounds(
     drafting_mode: str = DEFAULT_DRAFTING_MODE,
     max_consecutive_draft_timeouts: int = 1,
     max_consecutive_provider_quota_failures: int = 2,
+    resume_metadata: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     # Termination guarantee:
     # 1) The only round loop is a bounded for-loop over [1..max_rounds].
@@ -239,6 +293,16 @@ def run_iterative_rounds(
     run_id = run_root.name
     run_config_path = run_root / "run_config.json"
     started_at_iso = datetime.now().astimezone().isoformat()
+    initial_best_output = read_text(best_output_path)
+    base_resume_metadata = _base_resume_metadata(
+        mode=mode,
+        run_id=run_id,
+        start_round=start_round,
+        run_root_override=run_root_override,
+        best_output_path=best_output_path,
+        initial_best_output=initial_best_output,
+        checkpoint_preview=resume_metadata,
+    )
     existing_run_config = read_run_config(run_root)
     runtime_snapshot = {
         "max_rounds": max_rounds,
@@ -266,6 +330,7 @@ def run_iterative_rounds(
         repo_root=repo_root,
         started_at=started_at_iso,
         existing_run_config=existing_run_config,
+        resume_metadata=base_resume_metadata,
     )
     write_json_file(run_config_path, run_config)
     _log(
@@ -285,6 +350,7 @@ def run_iterative_rounds(
             "started_at": started_at_iso,
             "project": project_metadata or {},
             "run_config": str(run_config_path),
+            "resume_metadata": base_resume_metadata,
         },
     )
     if project_metadata:
@@ -309,7 +375,7 @@ def run_iterative_rounds(
     )
 
     best_score = initial_best_score
-    best_output = read_text(best_output_path)
+    best_output = initial_best_output
     best_round: Optional[int] = None
     previous_judge = ""
     judge_history: List[str] = []
@@ -886,6 +952,12 @@ def run_iterative_rounds(
             "drafting_mode": drafting_mode,
             "project": project_metadata or {},
             "cloud_free": _cloud_free_status(agents),
+            "resume_metadata": _resume_metadata_for_checkpoint(
+                base_metadata=base_resume_metadata,
+                completed_rounds=round_index,
+                can_resume=True,
+                stop_reason="",
+            ),
         }
         write_json_file(checkpoint_path, checkpoint_data)
 
@@ -1018,6 +1090,12 @@ def run_iterative_rounds(
         "project": project_metadata or {},
         "cloud_free": _cloud_free_status(agents),
         "provider_quota_failure_seen": provider_quota_failure_seen,
+        "resume_metadata": _resume_metadata_for_checkpoint(
+            base_metadata=base_resume_metadata,
+            completed_rounds=completed_rounds,
+            can_resume=can_resume,
+            stop_reason=stop_reason,
+        ),
     }
     if stop_reason == STOP_CLOUD_DAILY_QUOTA:
         checkpoint_final.update(
@@ -1081,6 +1159,7 @@ def run_iterative_rounds(
             "agent_metric_totals": metrics_totals["agent_metric_totals"],
             "timeout_count": metrics_totals["timeout_count"],
             "error_count": metrics_totals["error_count"],
+            "resume_metadata": checkpoint_final["resume_metadata"],
             "score_history_path": str(score_history_path),
             "round_metrics_path": str(round_metrics_path),
             "run_config_path": str(run_config_path),

@@ -88,6 +88,7 @@ def build_initial_run_config(
     repo_root: Path | None = None,
     started_at: str | None = None,
     existing_run_config: Mapping[str, Any] | None = None,
+    resume_metadata: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     existing = dict(existing_run_config or {})
     start_time = str(existing.get("started_at") or started_at or utc_now_iso())
@@ -139,6 +140,7 @@ def build_initial_run_config(
             "commit": git_commit_hash(repo_root),
         },
         "project": _json_safe(project_metadata or {}),
+        "resume_metadata": _json_safe(resume_metadata or {}),
         "resume_sessions": resume_sessions,
         "compatibility": {
             "legacy_run_manifest_supported": True,
@@ -160,6 +162,16 @@ def finalize_run_config(
 ) -> dict[str, Any]:
     finalized = dict(run_config)
     end_time = ended_at or utc_now_iso()
+    resume_metadata = finalized.get("resume_metadata")
+    resume_metadata = dict(resume_metadata) if isinstance(resume_metadata, Mapping) else {}
+    resume_metadata.update(
+        {
+            "can_resume": can_resume,
+            "last_completed_round": completed_rounds,
+            "next_round": completed_rounds + 1 if can_resume else None,
+            "stop_reason": stop_reason,
+        }
+    )
     finalized.update(
         {
             "status": "completed",
@@ -174,6 +186,7 @@ def finalize_run_config(
             "best_score": round(best_score, 2),
             "best_round": best_round,
             "total_runtime_seconds": round(total_runtime_seconds, 3),
+            "resume_metadata": _json_safe(resume_metadata),
             "updated_at": end_time,
         }
     )

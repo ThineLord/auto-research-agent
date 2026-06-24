@@ -67,7 +67,7 @@ from src.constants import (
     STOP_PROVIDER_QUOTA_EXHAUSTED,
     STOP_USER_REQUESTED,
 )
-from src.resume import run_resume_mode
+from src.resume import build_resume_preview, run_resume_mode
 from src.runner import run_iterative_rounds
 
 
@@ -464,6 +464,9 @@ class RoundLoopTests(unittest.TestCase):
             self.assertEqual(run_summary["timeout_count"], 0)
             self.assertEqual(run_summary["error_count"], 0)
             self.assertIn("draft", run_summary["agent_metric_totals"])
+            self.assertEqual(run_summary["resume_metadata"]["lifecycle_action"], "start_new_run")
+            self.assertFalse(run_summary["resume_metadata"]["resume_from_checkpoint"])
+            self.assertFalse(run_summary["resume_metadata"]["new_run_from_previous_best"])
             self.assertEqual(len(round_metrics), 2)
             self.assertIn("agent_timings_seconds", round_metrics[0])
             self.assertIn("agent_io_metrics", round_metrics[0])
@@ -819,9 +822,10 @@ class RoundLoopTests(unittest.TestCase):
                 encoding="utf-8",
             )
             agents = RecordingAgents()
+            console = Console(record=True)
 
             run_resume_mode(
-                console=Console(),
+                console=console,
                 agents=agents,
                 task_text="Design a privacy-aware memory adapter.",
                 project_dir=project_dir,
@@ -834,8 +838,49 @@ class RoundLoopTests(unittest.TestCase):
             )
 
             checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
+            run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+            run_summary = json.loads((run_root / "run_summary.json").read_text(encoding="utf-8"))
             self.assertEqual(agents.draft_rounds, [4])
             self.assertEqual(checkpoint["last_completed_round"], 4)
+            if hasattr(console, "export_text"):
+                output = " ".join(console.export_text().split())
+                self.assertIn("Resume preview", output)
+                self.assertIn("completed round files are preserved", output)
+            for artifact in (checkpoint, run_config, run_summary):
+                resume_metadata = artifact["resume_metadata"]
+                self.assertEqual(resume_metadata["lifecycle_action"], "resume_existing_run")
+                self.assertTrue(resume_metadata["resume_from_checkpoint"])
+                self.assertEqual(resume_metadata["resume_from_round"], 4)
+                self.assertTrue(resume_metadata["completed_round_files_preserved"])
+            self.assertEqual(run_config["resume_sessions"][0]["start_round"], 4)
+
+    def test_resume_preview_reports_missing_and_stale_checkpoints(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "project"
+            project_dir.mkdir()
+            missing_preview = build_resume_preview(
+                project_dir=project_dir,
+                checkpoint={},
+                repo_root=repo_root,
+            )
+            stale_preview = build_resume_preview(
+                project_dir=project_dir,
+                checkpoint={
+                    "can_resume": True,
+                    "run_root": str(project_dir / "runs" / "missing-run"),
+                    "last_completed_round": "2",
+                    "stop_reason": "USER_REQUESTED",
+                },
+                repo_root=repo_root,
+            )
+
+        self.assertFalse(missing_preview["can_resume"])
+        self.assertEqual(missing_preview["blocked_reason"], "missing_checkpoint")
+        self.assertFalse(stale_preview["can_resume"])
+        self.assertEqual(stale_preview["blocked_reason"], "stale_run_root")
+        self.assertEqual(stale_preview["next_round"], 3)
+        self.assertEqual(stale_preview["run_root_display"], "project/runs/missing-run")
 
 
 if __name__ == "__main__":

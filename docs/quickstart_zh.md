@@ -133,7 +133,9 @@ make continuous
 make resume
 ```
 
-读取 `projects/example/checkpoint.json` 继续；会调用 Ollama。
+读取 `projects/example/checkpoint.json` 继续同一个 run；CLI 会先显示 resume preview，包括
+run id/root、上一轮、下一轮、stop reason 和 can_resume。已完成轮次文件会保留；这不同于新开
+一个 run 后把 `best_output.md` 当 previous-best context 使用。
 
 ```bash
 make survey
@@ -376,14 +378,14 @@ touch projects/example/STOP_REQUESTED
 - 为 run comparison helper 增加 CLI 包装命令。
 - 在 UI 里加一个多 run 对比视图。
 - 清理 UI 的 Streamlit deprecation warning，把 `use_container_width=True` 改成 `width='stretch'`。
-- 明确已有 checkpoint 是否还要继续，还是新开一个 clean run。
+- 用 UI/CLI 的 resume preview 明确已有 checkpoint 是否还要继续，还是新开一个 clean run。
 
 ### 之后 1-2 天做
 
 - 增加两个 run 的比较视图：模型、mode、轮数、最好分、平均分、超时数、重复数。
 - 记录每个 agent 的 elapsed seconds 到结构化 JSON，而不是只散落在 log。
 - 增加 token 估算或真实 token 统计，为成本/时间分析打基础。
-- 让 resume 更清楚地区分“继续旧 run”和“从旧 best 开新 run”。
+- 在实际实验中验证 `resume_metadata` 是否足够解释“继续旧 run”和“从旧 best 开新 run”的差异。
 
 ### 更长期做
 

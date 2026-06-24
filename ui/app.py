@@ -584,6 +584,7 @@ def describe_resume_state(
             "message": "No checkpoint exists yet. Run a workflow before resuming.",
             "message_key": "resume_no_checkpoint",
             "message_args": {},
+            "details": {},
         }
     if run_active:
         return {
@@ -592,6 +593,7 @@ def describe_resume_state(
             "message": "A run is active. Resume is blocked until the current run exits.",
             "message_key": "resume_blocked_active",
             "message_args": {},
+            "details": {},
         }
 
     checkpoint_model = str(checkpoint.get("model", "")).strip()
@@ -605,8 +607,51 @@ def describe_resume_state(
             f" Checkpoint model was `{checkpoint_model}`; selected model is `{selected_model}`."
         )
 
+    run_root_text = str(checkpoint.get("run_root", "")).strip()
+    run_root = Path(run_root_text) if run_root_text else None
+    run_id = str(checkpoint.get("run_id") or (run_root.name if run_root else "") or "N/A")
+    last_completed_round = _safe_int(checkpoint.get("last_completed_round"))
+    next_round = last_completed_round + 1
+    stop_reason = str(checkpoint.get("stop_reason", "unknown") or "unknown")
+    details = {
+        "run_id": run_id,
+        "run_root": output_display_path(run_root) if run_root else "N/A",
+        "last_completed_round": last_completed_round,
+        "next_round": next_round,
+        "stop_reason": stop_reason,
+        "can_resume": bool(checkpoint.get("can_resume")),
+        "completed_round_files_preserved": bool(checkpoint.get("can_resume")),
+    }
+    if checkpoint.get("can_resume") and not run_root:
+        details["can_resume"] = False
+        details["completed_round_files_preserved"] = False
+        return {
+            "can_resume": False,
+            "level": "warning",
+            "message": "Resume checkpoint is missing run_root.",
+            "message_key": "resume_missing_run_root",
+            "message_args": {},
+            "model_mismatch": model_mismatch,
+            "checkpoint_model": checkpoint_model,
+            "selected_model": selected_model,
+            "details": details,
+        }
+    if run_root and checkpoint.get("can_resume") and not run_root.exists():
+        details["can_resume"] = False
+        details["completed_round_files_preserved"] = False
+        return {
+            "can_resume": False,
+            "level": "warning",
+            "message": f"Resume checkpoint is stale. Run root is missing: {details['run_root']}.",
+            "message_key": "resume_stale_checkpoint",
+            "message_args": {"run_root": details["run_root"]},
+            "model_mismatch": model_mismatch,
+            "checkpoint_model": checkpoint_model,
+            "selected_model": selected_model,
+            "details": details,
+        }
+
     if checkpoint.get("can_resume"):
-        next_round = _safe_int(checkpoint.get("last_completed_round")) + 1
         return {
             "can_resume": True,
             "level": "success",
@@ -616,9 +661,9 @@ def describe_resume_state(
             "model_mismatch": model_mismatch,
             "checkpoint_model": checkpoint_model,
             "selected_model": selected_model,
+            "details": details,
         }
 
-    stop_reason = checkpoint.get("stop_reason", "unknown")
     return {
         "can_resume": False,
         "level": "info",
@@ -628,6 +673,7 @@ def describe_resume_state(
         "model_mismatch": model_mismatch,
         "checkpoint_model": checkpoint_model,
         "selected_model": selected_model,
+        "details": details,
     }
 
 
@@ -1587,6 +1633,20 @@ def main() -> None:
         st.warning(localized_message(resume_state))
     else:
         st.info(localized_message(resume_state))
+    resume_details = resume_state.get("details")
+    if isinstance(resume_details, dict) and resume_details:
+        st.caption(
+            t(
+                "resume_details",
+                run_id=resume_details.get("run_id", "N/A"),
+                run_root=resume_details.get("run_root", "N/A"),
+                last_completed_round=resume_details.get("last_completed_round", "N/A"),
+                next_round=resume_details.get("next_round", "N/A"),
+                stop_reason=resume_details.get("stop_reason", "N/A"),
+                can_resume=resume_details.get("can_resume", False),
+                preserved=resume_details.get("completed_round_files_preserved", False),
+            )
+        )
 
     st.subheader(t("project_tests"))
     st.caption(t("project_tests_help"))

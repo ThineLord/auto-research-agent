@@ -455,15 +455,53 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertEqual(ui_app.live_refresh_interval(True), "2s")
         self.assertIsNone(ui_app.live_refresh_interval(False))
 
-        resume = ui_app.describe_resume_state(
-            checkpoint={"can_resume": True, "last_completed_round": 2, "model": "qwen3:8b"},
-            run_active=False,
-            selected_model="llama3.1:8b",
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "project" / "runs" / "run1"
+            run_root.mkdir(parents=True)
+            resume = ui_app.describe_resume_state(
+                checkpoint={
+                    "run_id": "run1",
+                    "run_root": str(run_root),
+                    "can_resume": True,
+                    "last_completed_round": 2,
+                    "stop_reason": "USER_REQUESTED",
+                    "model": "qwen3:8b",
+                },
+                run_active=False,
+                selected_model="llama3.1:8b",
+            )
 
         self.assertTrue(resume["can_resume"])
         self.assertIn("round 3", resume["message"])
         self.assertIn("Checkpoint model", resume["message"])
+        self.assertEqual(resume["details"]["run_id"], "run1")
+        self.assertEqual(resume["details"]["last_completed_round"], 2)
+        self.assertEqual(resume["details"]["next_round"], 3)
+        self.assertEqual(resume["details"]["stop_reason"], "USER_REQUESTED")
+        self.assertTrue(resume["details"]["completed_round_files_preserved"])
+
+        stale_resume = ui_app.describe_resume_state(
+            checkpoint={
+                "run_id": "stale",
+                "run_root": str(Path("/tmp") / "definitely-missing-auto-research-run"),
+                "can_resume": True,
+                "last_completed_round": 4,
+            },
+            run_active=False,
+            selected_model="qwen3:8b",
+        )
+        missing_root_resume = ui_app.describe_resume_state(
+            checkpoint={"can_resume": True, "last_completed_round": 1},
+            run_active=False,
+            selected_model="qwen3:8b",
+        )
+
+        self.assertFalse(stale_resume["can_resume"])
+        self.assertEqual(stale_resume["message_key"], "resume_stale_checkpoint")
+        self.assertFalse(stale_resume["details"]["can_resume"])
+        self.assertFalse(missing_root_resume["can_resume"])
+        self.assertEqual(missing_root_resume["message_key"], "resume_missing_run_root")
+        self.assertFalse(missing_root_resume["details"]["can_resume"])
 
         with tempfile.TemporaryDirectory() as tmp:
             project_dir = Path(tmp)

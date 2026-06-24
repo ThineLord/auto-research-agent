@@ -280,6 +280,14 @@ make resume
 它记录 provider/model、temperature/top_p/timeout、max rounds 和 runtime 限制、topic 快照、
 prompt 文件 SHA-256、Git commit、开始/结束时间、停止原因和是否可 resume。旧 run 如果只有
 `run_manifest.json`，工具会以兼容方式读取旧 metadata。
+`checkpoint.json`、`run_config.json` 和 `run_summary.json` 还会写 `resume_metadata`：
+
+- `lifecycle_action=start_new_run`：新建 run 目录；如果 `best_output.md` 已存在，当前默认流程可把它作为 previous-best context。
+- `lifecycle_action=resume_existing_run`：从 checkpoint 继续同一个 run；下一轮是 `last_completed_round + 1`，已完成轮次文件会保留。
+
+CLI `--resume` 会先打印 resume preview，包括 run id/root、last completed round、next round、
+stop reason 和是否可 resume。UI 的 Resume 区域也显示同样信息，并会提示缺失或 stale
+checkpoint。
 
 如果要看本次 run 总览和每轮指标，查看：
 
