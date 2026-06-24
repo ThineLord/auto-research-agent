@@ -46,6 +46,7 @@ from src.config import (
     save_default_model_selection,
 )
 from src.llm import GeminiClient
+from src.resume import inspect_next_round_directory
 from src.run_compare import compare_runs
 from src.runtime import (
     get_active_process_meta,
@@ -645,6 +646,39 @@ def describe_resume_state(
             "message": f"Resume checkpoint is stale. Run root is missing: {details['run_root']}.",
             "message_key": "resume_stale_checkpoint",
             "message_args": {"run_root": details["run_root"]},
+            "model_mismatch": model_mismatch,
+            "checkpoint_model": checkpoint_model,
+            "selected_model": selected_model,
+            "details": details,
+        }
+
+    next_round_info = inspect_next_round_directory(
+        run_root / f"round_{next_round:02d}" if run_root else None,
+        ROOT,
+    )
+    details.update(
+        {
+            "next_round_status": next_round_info["status"],
+            "next_round_safety_action": next_round_info["safety_action"],
+            "next_round_path": next_round_info["display_path"],
+            "next_round_blocks_resume": next_round_info["blocks_resume"],
+            "next_round_existing_files": ", ".join(next_round_info["existing_files"]) or "none",
+        }
+    )
+    if checkpoint.get("can_resume") and next_round_info["blocks_resume"]:
+        details["can_resume"] = False
+        return {
+            "can_resume": False,
+            "level": "warning",
+            "message": (
+                "Resume is blocked because the next round directory already contains files."
+            ),
+            "message_key": "resume_partial_next_round",
+            "message_args": {
+                "next_round_path": details["next_round_path"],
+                "status": details["next_round_status"],
+                "action": details["next_round_safety_action"],
+            },
             "model_mismatch": model_mismatch,
             "checkpoint_model": checkpoint_model,
             "selected_model": selected_model,
@@ -1645,6 +1679,9 @@ def main() -> None:
                 stop_reason=resume_details.get("stop_reason", "N/A"),
                 can_resume=resume_details.get("can_resume", False),
                 preserved=resume_details.get("completed_round_files_preserved", False),
+                next_round_status=resume_details.get("next_round_status", "N/A"),
+                next_round_action=resume_details.get("next_round_safety_action", "N/A"),
+                next_round_path=resume_details.get("next_round_path", "N/A"),
             )
         )
 

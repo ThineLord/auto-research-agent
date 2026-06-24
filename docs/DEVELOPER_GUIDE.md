@@ -114,7 +114,8 @@ Token fields are deliberately named `estimated_*_tokens` and use
 truth, and the project does not hardcode vendor prices.
 - `resume_metadata` appears in checkpoint, run config, and run summary. It distinguishes
   `start_new_run` from `resume_existing_run`, records checkpoint resume round, whether previous
-  best output is only context for a new run, and whether completed round files are preserved.
+  best output is only context for a new run, whether completed round files are preserved, and the
+  next-round directory status/safety action.
 - `run.log` for the current running stage.
 - `STOP_REQUESTED` for safe user-initiated pause.
 
@@ -125,8 +126,10 @@ It also exposes a multi-run comparison table using the same `src.run_compare` he
 `--compare-runs`; missing or legacy metadata should produce partial rows instead of UI failures.
 Newer runs add aggregate agent elapsed seconds and estimated token totals to that comparison output.
 The Resume control uses checkpoint metadata to preview run id/root, last completed round, next
-round, stop reason, resume eligibility, and completed-round preservation before launching
-`--resume`.
+round, stop reason, resume eligibility, completed-round preservation, and next-round directory
+status before launching `--resume`. A non-empty next-round directory is treated as partial or
+uncheckpointed output and blocks resume with `fail_safe_require_user_action`; the app does not
+move or delete that directory automatically.
 
 The model health check is intentionally fast: it checks Ollama API availability and selected-model
 presence without sending a generation prompt.

@@ -304,6 +304,7 @@ make check
   - 或创建 `projects/example/STOP_REQUESTED`（UI 按钮会自动创建）
 - 恢复：`make resume`（读取 `projects/example/checkpoint.json`）
 - `make resume` 会继续 checkpoint 指向的旧 run，从下一轮开始写入同一个 run 目录；已完成轮次文件会保留。
+- 如果下一轮目录已经存在且非空，resume 会 fail-safe 停止，避免覆盖 partial/uncheckpointed 输出；先人工检查、移动或删除该目录后再恢复。
 - 普通 `make run` 会新建一个 run；如果 `best_output.md` 已存在，默认 drafting mode 可能把它作为 previous-best context，但这不是 resume。
 - 进度不会丢：每轮都会写入 `runs/round_xx`，并更新 checkpoint、run_config 和 run_summary 中的 `resume_metadata`
 

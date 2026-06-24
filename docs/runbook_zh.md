@@ -111,6 +111,8 @@ make resume
 - `session` 会先生成 objective/plan，再跑迭代，再生成 report，调用次数更多。
 - `resume` 会从本地 `projects/example/checkpoint.json` 继续旧 run，并在启动前显示 resume
   preview；它不是新建 run 后使用 `best_output.md` 作为 previous-best context。
+- 如果下一轮目录已经存在且非空，`resume` 会 fail-safe 停止，不会覆盖 partial 输出；先人工检查、
+  移动或删除该目录，再重新运行 `make resume`。
 
 如果误启动了长任务：
 
@@ -307,6 +309,8 @@ lsof -iTCP:8501 -sTCP:LISTEN -n -P || true
 - `projects/example/checkpoint.json` 里 `run_config` 指向的 `run_config.json` 存在。
 - `checkpoint.json` / `run_config.json` / `run_summary.json` 里有 `resume_metadata`，能区分
   `resume_existing_run` 和 `start_new_run`。
+- `resume_metadata` 里有下一轮目录状态；非空下一轮目录会记录/显示
+  `fail_safe_require_user_action`。
 - `run_root/run_summary.json` 和 `run_root/round_metrics.json` 存在。
 - `run_summary.json` 里有 `total_elapsed_seconds`、`total_agent_elapsed_seconds`、
   `total_estimated_tokens`、`timeout_count` 和 `error_count`；这些 token 是字符数估算，不是账单 token。

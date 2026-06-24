@@ -479,6 +479,8 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertEqual(resume["details"]["next_round"], 3)
         self.assertEqual(resume["details"]["stop_reason"], "USER_REQUESTED")
         self.assertTrue(resume["details"]["completed_round_files_preserved"])
+        self.assertEqual(resume["details"]["next_round_status"], "missing")
+        self.assertEqual(resume["details"]["next_round_safety_action"], "proceed_create_round_dir")
 
         stale_resume = ui_app.describe_resume_state(
             checkpoint={
@@ -502,6 +504,32 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertFalse(missing_root_resume["can_resume"])
         self.assertEqual(missing_root_resume["message_key"], "resume_missing_run_root")
         self.assertFalse(missing_root_resume["details"]["can_resume"])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "project" / "runs" / "partial"
+            partial_round = run_root / "round_03"
+            partial_round.mkdir(parents=True)
+            (partial_round / "01_draft.md").write_text("partial", encoding="utf-8")
+            partial_resume = ui_app.describe_resume_state(
+                checkpoint={
+                    "run_id": "partial",
+                    "run_root": str(run_root),
+                    "can_resume": True,
+                    "last_completed_round": 2,
+                    "stop_reason": "USER_REQUESTED",
+                },
+                run_active=False,
+                selected_model="qwen3:8b",
+            )
+
+        self.assertFalse(partial_resume["can_resume"])
+        self.assertEqual(partial_resume["message_key"], "resume_partial_next_round")
+        self.assertEqual(partial_resume["details"]["next_round_status"], "partial")
+        self.assertTrue(partial_resume["details"]["next_round_blocks_resume"])
+        self.assertEqual(
+            partial_resume["details"]["next_round_safety_action"],
+            "fail_safe_require_user_action",
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             project_dir = Path(tmp)

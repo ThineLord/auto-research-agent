@@ -807,6 +807,10 @@ class RoundLoopTests(unittest.TestCase):
             project_dir.mkdir()
             run_root = project_dir / "runs" / "resume-run"
             run_root.mkdir(parents=True)
+            completed_round_dir = run_root / "round_03"
+            completed_round_dir.mkdir()
+            completed_judge_path = completed_round_dir / "04_judge.md"
+            completed_judge_path.write_text("completed round 3 judge\n", encoding="utf-8")
             memory_path = project_dir / "memory.md"
             memory_path.write_text("Manual memory.\n", encoding="utf-8")
             (project_dir / "checkpoint.json").write_text(
@@ -842,6 +846,10 @@ class RoundLoopTests(unittest.TestCase):
             run_summary = json.loads((run_root / "run_summary.json").read_text(encoding="utf-8"))
             self.assertEqual(agents.draft_rounds, [4])
             self.assertEqual(checkpoint["last_completed_round"], 4)
+            self.assertEqual(
+                completed_judge_path.read_text(encoding="utf-8"),
+                "completed round 3 judge\n",
+            )
             if hasattr(console, "export_text"):
                 output = " ".join(console.export_text().split())
                 self.assertIn("Resume preview", output)
@@ -852,7 +860,75 @@ class RoundLoopTests(unittest.TestCase):
                 self.assertTrue(resume_metadata["resume_from_checkpoint"])
                 self.assertEqual(resume_metadata["resume_from_round"], 4)
                 self.assertTrue(resume_metadata["completed_round_files_preserved"])
+                self.assertEqual(resume_metadata["next_round_status"], "missing")
+                self.assertEqual(
+                    resume_metadata["next_round_safety_action"], "proceed_create_round_dir"
+                )
             self.assertEqual(run_config["resume_sessions"][0]["start_round"], 4)
+
+    def test_resume_blocks_partial_next_round_without_overwriting(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            partial_round_dir = run_root / "round_04"
+            partial_round_dir.mkdir()
+            partial_draft_path = partial_round_dir / "01_draft.md"
+            partial_draft_path.write_text("partial draft should stay\n", encoding="utf-8")
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            checkpoint = {
+                "run_id": "resume-run",
+                "run_root": str(run_root),
+                "last_completed_round": 3,
+                "best_score": 93.0,
+                "can_resume": True,
+            }
+            (project_dir / "checkpoint.json").write_text(
+                json.dumps(checkpoint),
+                encoding="utf-8",
+            )
+            preview = build_resume_preview(
+                project_dir=project_dir,
+                checkpoint=checkpoint,
+                repo_root=Path(tmp),
+            )
+            agents = RecordingAgents()
+            console = Console(record=True)
+
+            run_resume_mode(
+                console=console,
+                agents=agents,
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                model_name="fake-model",
+                max_rounds=4,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+                repo_root=Path(tmp),
+            )
+
+            self.assertFalse(preview["can_resume"])
+            self.assertEqual(preview["blocked_reason"], "partial_next_round_exists")
+            self.assertEqual(preview["next_round_status"], "partial")
+            self.assertEqual(preview["next_round_safety_action"], "fail_safe_require_user_action")
+            self.assertEqual(agents.draft_rounds, [])
+            self.assertEqual(
+                partial_draft_path.read_text(encoding="utf-8"),
+                "partial draft should stay\n",
+            )
+            self.assertFalse((run_root / "run_config.json").exists())
+            checkpoint_after = json.loads(
+                (project_dir / "checkpoint.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(checkpoint_after["last_completed_round"], 3)
+            if hasattr(console, "export_text"):
+                output = " ".join(console.export_text().split())
+                self.assertIn("Cannot resume", output)
+                self.assertIn("already contains files", output)
 
     def test_resume_preview_reports_missing_and_stale_checkpoints(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -874,6 +950,21 @@ class RoundLoopTests(unittest.TestCase):
                 },
                 repo_root=repo_root,
             )
+            run_root = project_dir / "runs" / "partial-run"
+            run_root.mkdir(parents=True)
+            partial_dir = run_root / "round_03"
+            partial_dir.mkdir()
+            (partial_dir / "01_draft.md").write_text("partial", encoding="utf-8")
+            partial_preview = build_resume_preview(
+                project_dir=project_dir,
+                checkpoint={
+                    "can_resume": True,
+                    "run_root": str(run_root),
+                    "last_completed_round": 2,
+                    "stop_reason": "USER_REQUESTED",
+                },
+                repo_root=repo_root,
+            )
 
         self.assertFalse(missing_preview["can_resume"])
         self.assertEqual(missing_preview["blocked_reason"], "missing_checkpoint")
@@ -881,6 +972,9 @@ class RoundLoopTests(unittest.TestCase):
         self.assertEqual(stale_preview["blocked_reason"], "stale_run_root")
         self.assertEqual(stale_preview["next_round"], 3)
         self.assertEqual(stale_preview["run_root_display"], "project/runs/missing-run")
+        self.assertFalse(partial_preview["can_resume"])
+        self.assertEqual(partial_preview["blocked_reason"], "partial_next_round_exists")
+        self.assertEqual(partial_preview["next_round_status"], "partial")
 
 
 if __name__ == "__main__":

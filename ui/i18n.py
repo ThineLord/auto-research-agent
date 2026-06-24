@@ -311,10 +311,14 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         "resume_stale_checkpoint": "Resume checkpoint is stale. Run root is missing: {run_root}.",
         "resume_missing_run_root": "Resume checkpoint is missing run_root.",
+        "resume_partial_next_round": (
+            "Resume is blocked because `{next_round_path}` is `{status}`. Safety action: {action}."
+        ),
         "resume_details": (
             "Resume target: run `{run_id}` at `{run_root}`; last completed round "
             "{last_completed_round}, next round {next_round}; stop reason `{stop_reason}`; "
-            "can_resume={can_resume}; completed round files preserved={preserved}."
+            "can_resume={can_resume}; completed round files preserved={preserved}; "
+            "next round `{next_round_path}` status={next_round_status}, action={next_round_action}."
         ),
         "health_no_model": "No model selected.",
         "health_timeout": "Ollama API timed out at {base_url}.",
@@ -569,10 +573,14 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "resume_unavailable": "当前不能恢复。上次停止原因：`{stop_reason}`。{model_note}",
         "resume_stale_checkpoint": "恢复检查点已失效：找不到运行目录 {run_root}。",
         "resume_missing_run_root": "恢复检查点缺少 run_root。",
+        "resume_partial_next_round": (
+            "恢复已阻止：`{next_round_path}` 状态为 `{status}`。安全动作：{action}。"
+        ),
         "resume_details": (
             "恢复目标：运行 `{run_id}`，路径 `{run_root}`；上次完成第 {last_completed_round} 轮，"
             "下一轮 {next_round}；停止原因 `{stop_reason}`；can_resume={can_resume}；"
-            "已完成轮次文件会保留={preserved}。"
+            "已完成轮次文件会保留={preserved}；下一轮 `{next_round_path}` "
+            "状态={next_round_status}，动作={next_round_action}。"
         ),
         "health_no_model": "还没有选择模型。",
         "health_timeout": "Ollama API 在 {base_url} 超时。",

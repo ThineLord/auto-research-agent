@@ -224,6 +224,15 @@ def _base_resume_metadata(
     }
     if checkpoint_preview:
         metadata["checkpoint_preview"] = checkpoint_preview
+        for key in (
+            "next_round_status",
+            "next_round_blocks_resume",
+            "next_round_safety_action",
+            "next_round_existing_files",
+            "next_round_missing_expected_files",
+        ):
+            if key in checkpoint_preview:
+                metadata[key] = checkpoint_preview[key]
     return metadata
 
 

@@ -134,8 +134,9 @@ make resume
 ```
 
 读取 `projects/example/checkpoint.json` 继续同一个 run；CLI 会先显示 resume preview，包括
-run id/root、上一轮、下一轮、stop reason 和 can_resume。已完成轮次文件会保留；这不同于新开
-一个 run 后把 `best_output.md` 当 previous-best context 使用。
+run id/root、上一轮、下一轮、stop reason、can_resume、下一轮目录状态和安全动作。已完成轮次文件会保留；
+如果下一轮目录已存在且非空，resume 会 fail-safe 停止，要求先人工检查/移动/删除该目录。
+这不同于新开一个 run 后把 `best_output.md` 当 previous-best context 使用。
 
 ```bash
 make survey

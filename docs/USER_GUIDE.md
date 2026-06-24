@@ -255,7 +255,9 @@ make resume
 恢复会读取 `projects/example/checkpoint.json`：
 
 - 从 `last_completed_round + 1` 继续
-- 不覆盖已有 round 文件
+- 不覆盖已完成 round 文件
+- 如果下一轮目录不存在或为空，可以继续；如果下一轮目录已存在且非空，会 fail-safe 停止，
+  避免覆盖 partial/uncheckpointed 输出
 - 只有更高分时才更新 `best_output.md`
 
 ## 输出文件怎么读（先看哪个）
@@ -286,8 +288,8 @@ prompt 文件 SHA-256、Git commit、开始/结束时间、停止原因和是否
 - `lifecycle_action=resume_existing_run`：从 checkpoint 继续同一个 run；下一轮是 `last_completed_round + 1`，已完成轮次文件会保留。
 
 CLI `--resume` 会先打印 resume preview，包括 run id/root、last completed round、next round、
-stop reason 和是否可 resume。UI 的 Resume 区域也显示同样信息，并会提示缺失或 stale
-checkpoint。
+stop reason、是否可 resume、下一轮目录状态和安全动作。UI 的 Resume 区域也显示同样信息，
+并会提示缺失、stale checkpoint 或 partial next-round directory。
 
 如果要看本次 run 总览和每轮指标，查看：
 
