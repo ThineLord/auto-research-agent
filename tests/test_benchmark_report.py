@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.benchmark_report import analyze_benchmark_run
+from src.benchmark_report import analyze_benchmark_run, write_benchmark_report
 
 
 def _write_round(
@@ -85,6 +85,32 @@ class BenchmarkReportTests(unittest.TestCase):
             self.assertEqual(analysis.successful_research_rounds, [])
             self.assertEqual(analysis.failed_provider_rounds, [1])
             self.assertEqual(analysis.skipped_placeholder_rounds, [1])
+
+    def test_written_report_masks_run_root_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "projects" / "demo"
+            run_root = project_dir / "runs" / "run-1"
+            run_root.mkdir(parents=True)
+            (project_dir / "checkpoint.json").write_text(
+                '{"stop_reason": "MAX_ROUNDS"}',
+                encoding="utf-8",
+            )
+            _write_round(
+                run_root,
+                1,
+                draft="Draft A",
+                review="Review A",
+                revised="A concrete privacy benchmark.",
+                judge='{"score": 80, "reasons": ["useful"], "blockers": []}',
+            )
+            output_path = project_dir / "benchmark_report.md"
+
+            write_benchmark_report(run_root=run_root, output_path=output_path)
+
+            content = output_path.read_text(encoding="utf-8")
+            self.assertIn("- Run root: `projects/demo/runs/run-1`", content)
+            self.assertNotIn(str(repo_root), content)
 
 
 if __name__ == "__main__":

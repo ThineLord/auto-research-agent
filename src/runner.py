@@ -43,6 +43,7 @@ from .runtime import log_run as _log
 from .runtime import stop_requested as _stop_requested
 from .storage import (
     append_log_line,
+    display_path,
     get_memory_for_prompt,
     make_round_dir,
     make_run_root,
@@ -57,6 +58,11 @@ from .storage import (
     write_score_history,
     write_text,
 )
+
+
+def _display_metadata_path(value: object, repo_root: Path | None) -> str:
+    text = str(value or "").strip()
+    return display_path(text, repo_root, default="") if text else ""
 
 
 def _normalize_judge_text(text: str) -> str:
@@ -351,7 +357,8 @@ def run_iterative_rounds(
         console,
         log_path,
         mode,
-        f"run_start run_id={run_id} run_root={run_root} model={model_name}",
+        f"run_start run_id={run_id} run_root={display_path(run_root, repo_root)} "
+        f"model={model_name}",
     )
     write_json_file(
         run_root / "run_manifest.json",
@@ -376,8 +383,8 @@ def run_iterative_rounds(
             f"kind={project_metadata.get('source_kind', 'unknown')} "
             f"name={project_metadata.get('project_name', '')} "
             f"title={project_metadata.get('project_title', '')} "
-            f"project_dir={project_metadata.get('project_dir', '')} "
-            f"task_path={project_metadata.get('task_path', '')}",
+            f"project_dir={_display_metadata_path(project_metadata.get('project_dir'), repo_root)} "
+            f"task_path={_display_metadata_path(project_metadata.get('task_path'), repo_root)}",
         )
     _log(
         console,
@@ -774,7 +781,12 @@ def run_iterative_rounds(
             revised=revised_output,
             judge=judge_output,
         )
-        _log(console, log_path, mode, f"round_saved round={round_index} path={round_dir}")
+        _log(
+            console,
+            log_path,
+            mode,
+            f"round_saved round={round_index} path={display_path(round_dir, repo_root)}",
+        )
 
         if any(_is_user_stop_error(err) for err in round_errors):
             stop_reason = STOP_USER_REQUESTED
@@ -1073,7 +1085,10 @@ def run_iterative_rounds(
 
     best_round_text = "N/A" if best_round is None else str(best_round)
     best_score_text = "N/A" if best_score < 0 else f"{best_score:.2f}"
-    best_output_path_text = str(best_output_path) if best_output_path.exists() else "N/A"
+    best_output_path_text = (
+        display_path(best_output_path, repo_root) if best_output_path.exists() else "N/A"
+    )
+    score_history_path_text = display_path(score_history_path, repo_root)
     total_runtime = time.monotonic() - started_at
 
     console.rule("Run Summary")
@@ -1084,7 +1099,7 @@ def run_iterative_rounds(
     console.print(f"[bold]Total runtime:[/bold] {total_runtime:.2f}s")
     console.print(f"[bold]Last successful agent:[/bold] {last_successful_agent}")
     console.print(f"[bold]Best output path:[/bold] {best_output_path_text}")
-    console.print(f"[bold]Score history path:[/bold] {score_history_path}")
+    console.print(f"[bold]Score history path:[/bold] {score_history_path_text}")
     _log(
         console,
         log_path,
@@ -1241,6 +1256,7 @@ def run_iterative_rounds(
             best_output_path=best_output_path,
             resume_command=".venv/bin/python -m src.main --resume",
             stop_time=datetime.now().isoformat(),
+            repo_root=repo_root,
         )
         if stop_signal_path.exists():
             stop_signal_path.unlink()

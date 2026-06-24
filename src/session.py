@@ -12,7 +12,7 @@ from .agents import ResearchAgents
 from .config import DEFAULT_DRAFTING_MODE
 from .llm import LLMClientProtocol
 from .runner import run_iterative_rounds
-from .storage import get_memory_for_prompt, write_text
+from .storage import display_path, get_memory_for_prompt, write_text
 
 
 def _clip_words(text: str, max_words: int) -> str:
@@ -244,7 +244,9 @@ def run_session_mode(
         topic_context=topic_context,
         topic_title=topic_title,
     )
-    console.print(f"[green]Saved current plan:[/green] {current_plan_path}")
+    console.print(
+        f"[green]Saved current plan:[/green] {display_path(current_plan_path, repo_root)}"
+    )
 
     session_task = (
         f"{task_text}\n\n"
@@ -299,7 +301,9 @@ def run_session_mode(
         topic_context=topic_context,
         topic_title=topic_title,
     )
-    console.print(f"[green]Saved final session report:[/green] {final_report_path}")
+    console.print(
+        f"[green]Saved final session report:[/green] {display_path(final_report_path, repo_root)}"
+    )
 
     if not report_text.strip():
         write_text(

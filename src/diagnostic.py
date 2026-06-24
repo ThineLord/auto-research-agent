@@ -21,6 +21,7 @@ from .runtime import log_run as _log
 from .runtime import shorten_text_by_words as _shorten_text_by_words
 from .storage import (
     append_log_line,
+    display_path,
     get_memory_for_prompt,
     make_round_dir,
     make_run_root,
@@ -29,6 +30,11 @@ from .storage import (
     write_json_file,
     write_score_history,
 )
+
+
+def _display_metadata_path(value: object, repo_root: Path | None) -> str:
+    text = str(value or "").strip()
+    return display_path(text, repo_root, default="") if text else ""
 
 
 def _diagnostic_resume_metadata(
@@ -88,8 +94,8 @@ def run_diagnostic_mode(
             f"kind={project_metadata.get('source_kind', 'unknown')} "
             f"name={project_metadata.get('project_name', '')} "
             f"title={project_metadata.get('project_title', '')} "
-            f"project_dir={project_metadata.get('project_dir', '')} "
-            f"task_path={project_metadata.get('task_path', '')}",
+            f"project_dir={_display_metadata_path(project_metadata.get('project_dir'), repo_root)} "
+            f"task_path={_display_metadata_path(project_metadata.get('task_path'), repo_root)}",
         )
 
     # Allow slower local machines/model warm-up while keeping a sane upper bound.
@@ -340,7 +346,9 @@ def run_diagnostic_mode(
         revised=revised_output,
         judge=judge_output,
     )
-    console.print(f"[green]Saved diagnostic round outputs:[/green] {round_dir}")
+    console.print(
+        f"[green]Saved diagnostic round outputs:[/green] {display_path(round_dir, repo_root)}"
+    )
 
     expected_files = [
         round_dir / "01_draft.md",
@@ -348,11 +356,11 @@ def run_diagnostic_mode(
         round_dir / "03_revised.md",
         round_dir / "04_judge.md",
     ]
-    missing = [str(path) for path in expected_files if not path.exists()]
+    missing = [path for path in expected_files if not path.exists()]
     if missing:
         console.print("[red]Diagnostic file check failed. Missing files:[/red]")
         for path in missing:
-            console.print(f"- {path}")
+            console.print(f"- {display_path(path, repo_root)}")
     else:
         console.print("[green]Diagnostic file check passed (all round files saved).[/green]")
 
@@ -534,8 +542,8 @@ def run_diagnostic_mode(
         },
     )
     console.rule("Diagnostic Summary")
-    console.print(f"[bold]Run root:[/bold] {run_root}")
-    console.print(f"[bold]Round saved:[/bold] {round_dir}")
+    console.print(f"[bold]Run root:[/bold] {display_path(run_root, repo_root)}")
+    console.print(f"[bold]Round saved:[/bold] {display_path(round_dir, repo_root)}")
     console.print(f"[bold]Draft timing:[/bold] {timings.get('draft', 0.0):.2f}s")
     console.print(f"[bold]Review timing:[/bold] {timings.get('review', 0.0):.2f}s")
     console.print(f"[bold]Revise timing:[/bold] {timings.get('revise', 0.0):.2f}s")

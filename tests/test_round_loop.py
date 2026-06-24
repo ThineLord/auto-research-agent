@@ -620,6 +620,48 @@ class RoundLoopTests(unittest.TestCase):
             self.assertEqual(checkpoint["project"]["task_path"], str(project_dir / "task.md"))
             self.assertIn("project_source kind=user_provided", run_log)
 
+    def test_round_loop_masks_paths_in_console_and_run_log(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "projects" / "demo"
+            project_dir.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            metadata = {
+                "project_name": "demo",
+                "project_dir": str(project_dir),
+                "task_path": str(project_dir / "task.md"),
+                "project_title": "Demo",
+                "source_kind": "user_provided",
+            }
+            console = Console(record=True, width=200)
+
+            run_iterative_rounds(
+                console=console,
+                agents=FakeAgents([50]),
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="test",
+                model_name="fake-model",
+                max_rounds=1,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+                project_metadata=metadata,
+                repo_root=repo_root,
+            )
+
+            output = console.export_text(styles=False)
+            run_log = (project_dir / "run.log").read_text(encoding="utf-8")
+            self.assertIn("run_root=projects/demo/runs/", output)
+            self.assertIn("project_dir=projects/demo", run_log)
+            self.assertIn("task_path=projects/demo/task.md", run_log)
+            self.assertIn("Best output path: projects/demo/best_output.md", output)
+            self.assertIn("Score history path: projects/demo/score_history.json", output)
+            self.assertNotIn(str(project_dir), output)
+            self.assertNotIn(str(project_dir), run_log)
+
     def test_continuous_mode_stops_after_first_draft_timeout_even_when_timeout_stop_disabled(
         self,
     ) -> None:

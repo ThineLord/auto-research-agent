@@ -10,7 +10,7 @@ from pathlib import Path
 from statistics import mean
 from typing import Any
 
-from .storage import parse_score, read_text, write_text
+from .storage import display_path, parse_score, read_text, write_text
 
 
 @dataclass(frozen=True)
@@ -87,6 +87,13 @@ def _read_json(path: Path) -> Any:
 def _round_index(round_dir: Path) -> int:
     match = re.search(r"round_(\d+)$", round_dir.name)
     return int(match.group(1)) if match else 0
+
+
+def _infer_repo_root(run_root: Path) -> Path | None:
+    project_dir = run_root.parent.parent
+    if project_dir.parent.name == "projects":
+        return project_dir.parent.parent
+    return None
 
 
 def analyze_benchmark_run(run_root: Path) -> BenchmarkReportAnalysis:
@@ -189,7 +196,7 @@ def write_benchmark_report(*, run_root: Path, output_path: Path) -> BenchmarkRep
         "",
         "## Experiment Overview",
         "",
-        f"- Run root: `{run_root}`",
+        f"- Run root: `{display_path(run_root, _infer_repo_root(run_root))}`",
         f"- Stop reason: `{checkpoint.get('stop_reason', 'unknown')}`",
         f"- Successful research rounds: {len(analysis.successful_research_rounds)}",
         f"- Failed provider rounds: {len(analysis.failed_provider_rounds)}",

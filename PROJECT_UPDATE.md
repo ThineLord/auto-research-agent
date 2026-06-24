@@ -1,7 +1,79 @@
-# Bug Audit 2 - Cloud-Free Artifact Resilience and CLI Path Display
+# Bug Audit 3 - Runtime Path Display Privacy
 
 Date: 2026-06-24
 Commit: pending phase commit
+Branch: master
+
+## Goal
+
+Fix the raw absolute path display reproduced during provider-free mock validation while preserving
+legacy JSON artifact path fields and run metadata compatibility.
+
+## Bug / Fragility Found
+
+* Runner console output and `run.log` exposed absolute `run_root`, `project_dir`, `task_path`, and
+  saved round paths.
+* Runner summaries exposed absolute `best_output.md` and `score_history.json` paths.
+* Diagnostic output and diagnostic `run.log` exposed absolute project and run paths.
+* Session-mode saved-plan/report messages, interrupted reports, and generated benchmark reports had
+  the same user-facing raw path display pattern.
+
+## Reproduction
+
+* `.venv/bin/python -m src.main --mock --project example --max-rounds 1` printed local absolute
+  home-directory paths in runner status lines and summary output before the fix.
+* The latest `projects/example/run.log` block from the same mock smoke reproduced raw saved-round
+  paths before the fix.
+* Focused temporary fixtures reproduced the same issue in recorded runner console output,
+  diagnostic console output, diagnostic `run.log`, and benchmark report content.
+
+## Fix
+
+* Added a shared `display_path` helper for repo-relative or masked path rendering.
+* Applied it to runner and diagnostic console/log messages without changing checkpoint, manifest,
+  run summary, or run config path fields.
+* Applied it to session saved-file messages, interrupted report best-output path display, and
+  benchmark report run-root display.
+
+## Tests Added or Updated
+
+* Added a runner regression test that asserts recorded console output and `run.log` avoid temporary
+  absolute project paths.
+* Added a diagnostic regression test for masked console and `run.log` paths.
+* Added a benchmark report regression test for masked run-root display.
+* Updated interrupted-report storage coverage to assert masked best-output path display.
+
+## Validation
+
+* Targeted pytest for the four new/updated path-display tests (`4 passed`)
+* `.venv/bin/python -m ruff check` on touched source and tests
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make help`
+* `make check` (`122 passed, 43 subtests passed`)
+* `make mock ARGS="--project example --max-rounds 1"`
+* `.venv/bin/python -m src.main --mock --project example --max-rounds 1` with grep check for no
+  local absolute home-directory path in console output
+* Latest `projects/example/run.log` block check for no local absolute home-directory path
+
+## Remaining Risks
+
+* Stored JSON metadata still contains absolute paths for legacy compatibility; this phase only
+  changes user-facing display/log/report text.
+* Literature survey manifests and reports still need separate review for source path display and
+  schema compatibility before any safe change.
+* The private local `config.yaml` still points at `pama`, which lacks `task.md`; provider-free mock
+  validation uses `--project example`.
+
+## Next Audit Target
+
+Audit survey-mode path display and source metadata compatibility, then continue through docs command
+accuracy, config edge cases, and UI helper stale-artifact behavior.
+
+# Bug Audit 2 - Cloud-Free Artifact Resilience and CLI Path Display
+
+Date: 2026-06-24
+Commit: 7aec2f9
 Branch: master
 
 ## Goal

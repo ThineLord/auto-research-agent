@@ -48,6 +48,19 @@ def read_file_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def display_path(path: Path | str | None, root: Path | None = None, default: str = "N/A") -> str:
+    text = str(path or "").strip()
+    if not text:
+        return default
+    resolved_path = Path(text).expanduser()
+    if root is not None:
+        try:
+            return resolved_path.resolve().relative_to(root.resolve()).as_posix()
+        except (OSError, ValueError):
+            pass
+    return f"<repo>/{resolved_path.name}"
+
+
 def write_file_text(path: Path, content: str) -> None:
     """Write text exactly as provided, creating parent directories as needed."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -401,13 +414,14 @@ def write_interrupted_report(
     best_output_path: Path,
     resume_command: str,
     stop_time: str,
+    repo_root: Path | None = None,
 ) -> None:
     content = (
         "# Interrupted Report\n\n"
         f"- last completed round: {last_completed_round}\n"
         f"- last successful agent: {last_successful_agent}\n"
         f"- best score so far: {best_score:.2f}\n"
-        f"- best output path: {best_output_path}\n"
+        f"- best output path: {display_path(best_output_path, repo_root)}\n"
         f"- safe resume command: `{resume_command}`\n"
         f"- stop time: {stop_time}\n"
     )

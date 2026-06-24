@@ -71,6 +71,43 @@ class DiagnosticTests(unittest.TestCase):
             self.assertEqual(resume_metadata["last_completed_round"], 1)
             self.assertIsNone(resume_metadata["next_round"])
 
+    def test_diagnostic_masks_paths_in_console_and_run_log(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "projects" / "demo"
+            project_dir.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("memory", encoding="utf-8")
+            metadata = {
+                "project_name": "demo",
+                "project_dir": str(project_dir),
+                "task_path": str(project_dir / "task.md"),
+                "project_title": "Demo",
+                "source_kind": "user_provided",
+            }
+            console = Console(record=True, width=200)
+
+            run_diagnostic_mode(
+                console=console,
+                llm=FakeDiagnosticLLM(),
+                task_text="diagnostic task",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                model_name="fake-model",
+                model_provider="ollama",
+                project_metadata=metadata,
+                repo_root=repo_root,
+            )
+
+            output = console.export_text(styles=False)
+            run_log = (project_dir / "run.log").read_text(encoding="utf-8")
+            self.assertIn("Saved diagnostic round outputs: projects/demo/runs/", output)
+            self.assertIn("Run root: projects/demo/runs/", output)
+            self.assertIn("project_dir=projects/demo", run_log)
+            self.assertIn("task_path=projects/demo/task.md", run_log)
+            self.assertNotIn(str(project_dir), output)
+            self.assertNotIn(str(project_dir), run_log)
+
 
 if __name__ == "__main__":
     unittest.main()

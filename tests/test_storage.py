@@ -139,6 +139,7 @@ class StorageTests(unittest.TestCase):
             self.assertIn("last completed round: 3", content)
             self.assertIn("last successful agent: revise", content)
             self.assertIn("best score so far: 72.25", content)
+            self.assertIn("best output path: <repo>/best_output.md", content)
             self.assertIn(".venv/bin/python -m src.main --resume", content)
 
 
