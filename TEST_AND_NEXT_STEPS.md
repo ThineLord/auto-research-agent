@@ -381,12 +381,15 @@ methodology changes until after the release candidate has been tried by humans.
 * Effort: Small to medium
 * Why now / why not: Provider-free checks passed. Before a hosted release or user testing, the next
   highest-value unknown is whether a real diagnostic still works end to end on this machine.
-* Suggested scope: Run one local Ollama diagnostic with `qwen3:8b`; if a Gemini key is available,
-  run one Gemini diagnostic. Do not change prompts, scoring, provider behavior, or benchmark logic.
+* Suggested scope: Run one local Ollama diagnostic with
+  `make diagnostic ARGS="--project example --provider ollama --model qwen3:8b"`; if a Gemini key is
+  available, run one Gemini diagnostic. Do not change prompts, scoring, provider behavior, or
+  benchmark logic.
 * Suggested Codex prompt: Run a release-candidate real-provider smoke validation for
-  `v0.1.1-hardening`: first local Ollama diagnostic with `qwen3:8b`, then Gemini diagnostic only if a
-  key is already configured. Capture exact commands, outputs, generated run IDs, and any failures in
-  a short report. Do not modify code or prompts.
+  `v0.1.1-hardening`: first local Ollama diagnostic with
+  `make diagnostic ARGS="--project example --provider ollama --model qwen3:8b"`, then Gemini
+  diagnostic only if a key is already configured. Capture exact commands, outputs, generated run
+  IDs, and any failures in a short report. Do not modify code or prompts.
 
 ### Option B - Compare-runs compatibility decision
 
@@ -500,8 +503,8 @@ made.
 * Run one provider-free `make mock ARGS="--project example --max-rounds 1"` and inspect the latest
   run directory.
 * Run one provider-free `make survey ARGS="--project example"` and inspect survey outputs.
-* Run one real `make diagnostic ARGS="--project example --model qwen3:8b"` on a machine with Ollama
-  ready.
+* Run one real `make diagnostic ARGS="--project example --provider ollama --model qwen3:8b"` on a
+  machine with Ollama ready.
 * Open `make ui`, verify latest metadata, analytics dashboard, run comparison, and output browser.
 * Decide whether `--compare-runs` should require two paths or support one-run self-baseline output.
 * Decide whether `v0.1.1-hardening` should also bump package metadata before hosted release.

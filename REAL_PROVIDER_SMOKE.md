@@ -164,7 +164,7 @@ repo-relative.
 * Recommended fix: update future smoke instructions to use
   `make diagnostic ARGS="--project example --provider ollama --model qwen3:8b"` when the intent is
   specifically local Ollama validation.
-* Fixed now: no. This report documents the finding; no code/docs outside this report were changed.
+* Fixed now: documented as a follow-up documentation correction; runtime behavior remains unchanged.
 
 ### Issue 2 - Gemini provider remains unvalidated in this pass
 

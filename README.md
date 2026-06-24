@@ -36,7 +36,7 @@ ollama pull qwen3:14b
 ollama pull deepseek-r1:8b
 # 保留稳定回退
 ollama pull llama3.1:8b
-make diagnostic
+make diagnostic ARGS="--provider ollama --model qwen3:8b"
 make run
 ```
 
@@ -151,7 +151,7 @@ make run ARGS="--drafting-mode continue_from_previous_draft"
 
 ```bash
 make run ARGS="--model qwen3:8b"
-make diagnostic ARGS="--model llama3.2:3b"
+make diagnostic ARGS="--provider ollama --model llama3.2:3b"
 make run ARGS="--model phi3:mini"
 ```
 

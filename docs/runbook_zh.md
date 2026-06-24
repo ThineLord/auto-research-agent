@@ -91,7 +91,7 @@ Gemini、网络或 API key。score/rubric 是合成 demo 信号，只用于 CI/d
 最安全的一轮真实实验是 diagnostic：
 
 ```bash
-make diagnostic ARGS="--model qwen3:8b"
+make diagnostic ARGS="--provider ollama --model qwen3:8b"
 ```
 
 或使用本地配置里的默认模型：
@@ -112,7 +112,7 @@ Diagnostic 的特点：
 如果你想明确指定另一个已安装模型，例如 `deepseek-r1:8b`：
 
 ```bash
-make diagnostic ARGS="--model deepseek-r1:8b"
+make diagnostic ARGS="--provider ollama --model deepseek-r1:8b"
 ```
 
 如果要跑 Gemini 诊断：
@@ -128,7 +128,7 @@ make diagnostic ARGS="--provider gemini --model gemini-3.5-flash"
 优先用：
 
 ```bash
-make diagnostic ARGS="--model qwen3:8b"
+make diagnostic ARGS="--provider ollama --model qwen3:8b"
 ```
 
 避免在今天的 smoke test 里直接用：
@@ -197,7 +197,7 @@ UI 的 `C. Run controls` 里也可以选择起草模式。每次运行会把 `dr
 CLI 支持 `--model` 覆盖配置：
 
 ```bash
-make diagnostic ARGS="--model qwen3:8b"
+make diagnostic ARGS="--provider ollama --model qwen3:8b"
 make run ARGS="--model deepseek-r1:8b"
 make resume ARGS="--model llama3.1:8b"
 ```

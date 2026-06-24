@@ -1,3 +1,32 @@
+# Documentation Correction - Explicit Provider Smoke Commands
+
+Date: 2026-06-25
+Commit: documentation correction commit
+Branch: master
+
+## Goal
+
+Align release-smoke and local Ollama diagnostic examples with the real-provider smoke finding that
+`--model qwen3:8b` does not switch providers when local config selects Gemini.
+
+## What Changed
+
+Updated release-smoke and local Ollama diagnostic documentation to use explicit provider overrides,
+for example:
+
+```bash
+make diagnostic ARGS="--project example --provider ollama --model qwen3:8b"
+```
+
+Generic `make diagnostic` references remain where they intentionally mean "use the configured
+provider".
+
+## Validation
+
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make check`
+
 # Post-Audit Release Review - v0.1.1-hardening
 
 Date: 2026-06-25
