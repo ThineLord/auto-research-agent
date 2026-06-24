@@ -1,7 +1,56 @@
-# Bug Audit 12 - Benchmark Report Stale Round Artifact Safety
+# Bug Audit 13 - UI Process Metadata Stale Path Safety
 
 Date: 2026-06-24
 Commit: pending phase commit
+Branch: master
+
+## Goal
+
+Prevent Streamlit progress helpers from crashing when process metadata paths are stale non-file
+artifacts.
+
+## Bug / Fragility Found
+
+* `get_active_process_meta` used the tolerant JSON reader, but still unconditionally tried to unlink
+  stale inactive metadata. If `ui_run_process.json` or `ui_model_job_process.json` existed as a
+  directory, cleanup raised `PermissionError`/`OSError` and could crash the UI helper path.
+
+## Reproduction
+
+* A temporary directory at `ui_run_process.json` reproduced `PermissionError` from
+  `get_active_process_meta`.
+
+## Fix
+
+* Wrapped stale metadata unlink cleanup in `OSError` handling. The helper now returns no active
+  process while leaving non-file stale paths untouched for manual cleanup.
+
+## Tests Added or Updated
+
+* Added UI/runtime helper coverage for stale directory process metadata paths.
+
+## Validation
+
+* `.venv/bin/python -m pytest tests/test_ui_helpers.py::SharedUiBackendHelperTests::test_get_active_process_meta_returns_live_process_and_removes_stale_meta tests/test_ui_helpers.py::SharedUiBackendHelperTests::test_get_active_process_meta_tolerates_stale_directory_path -q` (`2 passed`)
+* `.venv/bin/python -m ruff check src/runtime.py tests/test_ui_helpers.py`
+* Minimal stale `ui_run_process.json` directory reproduction before and after the fix
+* `git diff --check`
+* `.venv/bin/python -m src.main --help`
+* `make check` (`132 passed, 43 subtests passed`)
+
+## Remaining Risks
+
+* Non-file process metadata artifacts are left in place because deleting directories automatically
+  would be destructive.
+
+## Next Audit Target
+
+Final repository sweep and closeout once no further clear safe bugs remain.
+
+# Bug Audit 12 - Benchmark Report Stale Round Artifact Safety
+
+Date: 2026-06-24
+Commit: 2d112e7
 Branch: master
 
 ## Goal

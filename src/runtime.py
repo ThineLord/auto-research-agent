@@ -81,7 +81,10 @@ def get_active_process_meta(meta_path: Path) -> Dict[str, Any]:
         pid = 0
     if pid and is_pid_running(pid):
         return meta
-    meta_path.unlink(missing_ok=True)
+    try:
+        meta_path.unlink(missing_ok=True)
+    except OSError:
+        pass
     return {}
 
 

@@ -87,6 +87,14 @@ class SharedUiBackendHelperTests(unittest.TestCase):
 
             self.assertFalse(meta_path.exists())
 
+    def test_get_active_process_meta_tolerates_stale_directory_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            meta_path = Path(tmp) / "ui_run_process.json"
+            meta_path.mkdir()
+
+            self.assertEqual(get_active_process_meta(meta_path), {})
+            self.assertTrue(meta_path.exists())
+
     def test_is_pid_running_treats_zombie_process_as_stale(self) -> None:
         with (
             patch.object(runtime_module.os, "kill"),
