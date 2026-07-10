@@ -1,50 +1,55 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T02:07:38+08:00",
+  "recorded_at": "2026-07-11T02:37:18+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "e93aa773daafaae690a3e25737b04c27752e5519",
-  "last_known_stable_commit": "e93aa773daafaae690a3e25737b04c27752e5519",
-  "status": "passed_pushed_ci_verified",
+  "head_commit": "8845adfc2a6f53e1ef0084ad8f2dcbffff39bea4",
+  "last_known_stable_commit": "8845adfc2a6f53e1ef0084ad8f2dcbffff39bea4",
+  "status": "passed_committed_push_pending",
   "commands": [
     {
       "command": "make check",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "ruff_format_files": 51,
+        "ruff_format_files": 52,
         "ruff_lint": "passed",
         "import_smoke": "passed",
-        "pytest_tests_passed": 189,
-        "pytest_subtests_passed": 110,
-        "pytest_duration_seconds": 0.87
+        "pytest_tests_passed": 203,
+        "pytest_subtests_passed": 128,
+        "pytest_duration_seconds": 2.18
       }
     },
     {
-      "command": ".venv/bin/python -m pytest -q tests/test_ui_helpers.py tests/test_mock_run.py tests/test_round_loop.py",
+      "command": ".venv/bin/python -m pytest -q tests/test_cloud_free.py tests/test_config.py tests/test_storage.py tests/test_project_input.py tests/test_cli_exit_codes.py tests/test_round_loop.py tests/test_mock_run.py",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "pytest_tests_passed": 94,
-        "pytest_subtests_passed": 68,
-        "pytest_duration_seconds": 0.75
+        "pytest_tests_passed": 103,
+        "pytest_subtests_passed": 103,
+        "pytest_duration_seconds": 1.79
       }
     },
     {
-      "command": ".venv/bin/python -m pytest -q tests/test_ui_helpers.py -k 'pid or lock'",
+      "command": "module, editable console, and isolated-root CLI exit-status smoke matrix",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "pytest_tests_passed": 17,
-        "pytest_subtests_passed": 17,
-        "pytest_duration_seconds": 0.24
+        "help_and_provider_free_analysis": 0,
+        "explicit_cloud_discovery_failure": 1,
+        "config_project_provider_lock_and_resume_refusals": 2
       }
     },
     {
-      "command": "repeat synchronized thread lock contention regression 25 times",
+      "command": "malformed config, task, checkpoint, resume-history, and cloud-cache adversarial probes",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "successful_repetitions": 25
+        "invalid_utf8": "passed",
+        "oversized_numbers": "passed",
+        "deep_json_and_yaml": "passed",
+        "invalid_cache_schema_and_numeric_bounds": "passed",
+        "resume_history_depth_128_accepted": true,
+        "resume_history_depth_129_rejected": true
       }
     },
     {
@@ -53,34 +58,14 @@
       "result": "passed"
     },
     {
-      "command": "independent design, compatibility, adversarial, platform, and post-fix re-review",
+      "command": "independent CLI return-path, malformed-input, cache-schema, and delta-only re-review",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "malformed_metadata": "passed",
-        "thread_and_process_contention": "passed",
-        "guard_recreation_and_fork": "passed",
-        "posix_native_paths": "passed",
-        "windows_mocked_static_paths": "passed"
-      }
-    },
-    {
-      "command": "exact local, remote-tracking, and git ls-remote SHA comparison",
-      "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "verified_commit": "e93aa773daafaae690a3e25737b04c27752e5519"
-      }
-    },
-    {
-      "command": "gh pr checks 13 --repo ThineLord/auto-research-agent",
-      "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "python_3_10_push": "passed",
-        "python_3_13_push": "passed",
-        "python_3_10_pull_request": "passed",
-        "python_3_13_pull_request": "passed"
+        "handled_startup_false_success": "passed",
+        "malformed_input_tracebacks": "passed",
+        "valid_cache_compatibility": "passed",
+        "final_delta_review": "green"
       }
     }
   ],
@@ -88,23 +73,21 @@
   "not_run": [
     {
       "check": "real provider smoke",
-      "reason": "Run-lock ownership and constructor cleanup are fully exercised with provider-free helpers and subprocesses; no paid or network model call is required."
+      "reason": "CLI status and malformed-input behavior are fully exercised with provider-free subprocesses, mocks, and temporary filesystems; no paid or network model call is required."
     },
     {
-      "check": "native Windows host validation",
-      "reason": "No native Windows host is available; Windows-specific process liveness and locking branches received mocked/static regression coverage."
+      "check": "GitHub Actions",
+      "reason": "Implementation commit is local and the push is the next checkpoint action."
     }
   ],
   "notes": [
-    "Pre-fix regressions proved malformed PID metadata could raise, synchronized contenders could both acquire, and an old release could delete replacement-owner metadata.",
-    "The authority is now a long-held project-root OS guard; diagnostic metadata carries an unforgeable owner token, PID, and guard device/inode identity and is atomically replaced.",
-    "Crash recovery uses kernel lock release, live legacy PID-only locks remain blocking, and dead or malformed legacy metadata is recovered only after acquiring the guard.",
-    "Invalid UTF-8, oversized or deeply nested JSON, oversized PID values, non-regular nodes, POSIX permission probes, Windows liveness probes, guard recreation, and fork inheritance are covered.",
-    "Mock, client, and agent construction now occur inside the lock-owning try/finally boundary.",
-    "General CLI startup failure exit status remains ARA-017; active non-cooperating filesystem replacement remains ARA-022.",
-    "Implementation commit 55e7287865bad016874981a071cb19afb0871e1d and recovery checkpoint e93aa773daafaae690a3e25737b04c27752e5519 were pushed; exact SHA equality and all four GitHub checks were verified.",
-    "Transient TLS timeouts affected the first fetch, one ls-remote check, and the first gh watch poll; bounded retries succeeded without changing commits or repository configuration.",
-    "Draft PR 13 is updated, open, draft, and mergeable; no merge was attempted.",
+    "Pre-fix module, console, and isolated-root probes proved handled config, project, provider prerequisite, and lock errors printed a diagnostic but returned status 0.",
+    "Handled startup refusals now terminate with status 2, explicit failed cloud discovery with status 1, and help, successful provider-free analysis, and profile fallback with status 0.",
+    "Unreadable or non-UTF-8 config and task files produce privacy-safe diagnostics without traceback.",
+    "Checkpoint, optional cloud-cache, and resume-history readers safely classify invalid UTF-8, parser size/depth, structure, record schema, and unsafe numeric provenance before downstream use or writes.",
+    "Valid cache records retain defaults, ignore unknown fields, and remain compatible; invalid records are skipped without discarding other valid records.",
+    "Direct and runner-consumed KeyboardInterrupt status remains separately queued as ARA-023; package resource completeness remains ARA-004.",
+    "Implementation commit 8845adfc2a6f53e1ef0084ad8f2dcbffff39bea4 is locally validated; exact remote SHA and GitHub CI verification are pending.",
     "Ignored runtime artifacts and local configuration remain outside the validation diff."
   ]
 }

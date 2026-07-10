@@ -40,19 +40,18 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-`ARA-013` should be `DONE` at implementation commit `55e7287` and remotely verified checkpoint
-`e93aa77`. Its final local validation command was:
+`ARA-017` should be `DONE` at implementation commit `8845adf`. Its final local validation command was:
 
 ```bash
 make check
 ```
 
-If the branch is ahead of origin by only a final ARA-013 state closeout, inspect and push it without
-force, then verify exact remote SHA and CI; do not repeat the implementation. After synchronization,
-the next recommended P1 is general CLI startup status (`ARA-017`). Keep project-level
-symlink/TOCTOU policy (`ARA-022`), packaging (`ARA-004`), and manifest provenance/identity
-(`ARA-020`) separate. If another task is active, run its exact validation command first. Understand
-any uncommitted diff before editing it.
+If the branch is ahead of origin, inspect and commit only the ARA-017 recovery-state files, then
+push without force and verify the exact remote SHA plus draft PR 13 checks. Do not repeat the
+implementation. After synchronization, choose the next P1 from `.codex/TASK_QUEUE.md`; keep
+interrupt status (`ARA-023`), package assets (`ARA-004`), project-level symlink policy (`ARA-022`),
+and manifest provenance (`ARA-020`) separate. If another task is active, run its exact validation
+command first. Understand any uncommitted diff before editing it.
 
 ## 5. Safety boundaries
 

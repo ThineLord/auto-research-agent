@@ -148,6 +148,22 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Commit required: yes if behavior changes.
 - Dependencies: owner input only if external artifact storage is intended; otherwise higher-priority P1 work.
 
+## ARA-023 - Define interrupt-to-process-status propagation
+
+- Status: `TODO`
+- Priority: P2
+- Risk: medium
+- Description: CLI-level `KeyboardInterrupt` handlers print a manual-interrupt stop reason and then
+  return status 0, while interrupts already consumed by the runner are represented only in run
+  artifacts. Changing either behavior requires a single explicit process-status contract.
+- Related files: `src/cli.py`, `src/runner.py`, CLI subprocess tests
+- Acceptance criteria: direct CLI interrupts use a documented nonzero status (normally 130), runner
+  safe-stop artifacts remain complete, and successful user-requested checkpoint stops are not
+  accidentally reclassified.
+- Validation command: fault-injected interrupt and safe-stop subprocess tests followed by `make check`.
+- Commit required: yes if behavior changes.
+- Dependencies: complete ARA-017 without widening its startup-error scope.
+
 ## ARA-013 - Make run-lock acquisition and release ownership-safe
 
 - Status: `DONE`
@@ -198,7 +214,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-017 - Return nonzero status for CLI startup and validation errors
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P1
 - Risk: medium
 - Description: several config/project/provider startup failures print an error and return normally, so automation and clean-install smoke tests can report false success.

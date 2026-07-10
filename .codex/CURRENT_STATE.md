@@ -4,15 +4,15 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: record the remotely verified owner-safe run-lock checkpoint (`ARA-013`) before
-  beginning the next P1 task.
+- Current goal: publish and remotely verify the completed CLI startup exit-status checkpoint
+  (`ARA-017`).
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `e93aa773daafaae690a3e25737b04c27752e5519`
-- Last known stable commit: `e93aa773daafaae690a3e25737b04c27752e5519` (exact local,
-  remote-tracking, and GitHub branch equality plus all Python 3.10/3.13 push/PR checks passed)
-- Active task: ARA-013 is `DONE`, pushed, and CI-verified; its final state-only closeout is in
-  progress.
-- Uncommitted changes: yes; only the remotely verified `.codex` recovery-state closeout remains.
+- Current HEAD at state snapshot: `8845adfc2a6f53e1ef0084ad8f2dcbffff39bea4`
+- Last known stable commit: `8845adfc2a6f53e1ef0084ad8f2dcbffff39bea4` (local full gate and
+  independent adversarial re-review passed; remote push and CI verification are pending)
+- Active task: ARA-017 implementation is `DONE`; recovery-state and remote-verification closeout is
+  in progress.
+- Uncommitted changes: yes; only the reviewed `.codex` recovery-state update remains.
 
 ## Modified Files
 
@@ -130,13 +130,37 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Committed recovery state as `e93aa77`, pushed both commits, and verified exact local,
   remote-tracking, and GitHub branch SHA equality.
 - Updated draft PR 13; all four Python 3.10/3.13 push and pull-request checks passed.
+- Pushed the final ARA-013 state-only closeout as `4269056`, verified exact remote SHA equality,
+  updated draft PR 13, and confirmed all four Python 3.10/3.13 checks passed again.
+- Marked ARA-017 in progress and started parallel read-only CLI return-path and regression-matrix
+  audits from a clean, synchronized branch.
+- Reproduced module, editable console, and isolated missing-config/project failures printing errors
+  while returning status 0; the success controls remained status 0 and argparse/resume refusals 2.
+- Replaced every handled config/project/provider/lock startup return with status 2 and made explicit
+  cloud discovery failure status 1, while preserving help, analysis, and profile fallback success.
+- Normalized unreadable/non-UTF-8 config and task input into privacy-safe startup errors.
+- Hardened tolerant checkpoint/cloud-cache JSON reads for invalid UTF-8, oversized integers, deep
+  nesting, invalid top-level or record schema, non-finite/negative/oversized cached numbers, and
+  missing/unknown fields without breaking valid cached defaults.
+- Added an iterative resume-history nesting limit so semantic comparison and later persistence
+  cannot overflow after parsing a deeply nested but otherwise valid JSON history.
+- Added subprocess and direct-main coverage across both entrypoints, config/project/provider/lock,
+  cloud discovery/profile, malformed resume/history/cache data, constructor boundaries, and success
+  controls. Direct interrupt process status remains separately queued as ARA-023.
+- Independent pre-fix and post-fix audits reproduced decoding, parser, schema, numeric overflow, and
+  depth gaps; the final delta-only review reported green.
+- Final `make check` passed with Ruff format/lint, import smoke, and pytest (`203 passed, 128
+  subtests passed`). Focused startup/input/cache/resume regression passed (`103 passed, 103
+  subtests passed`).
+- `git diff --check`, staged diff checks, and staged personal-path/credential/private-key scans passed.
+- Committed implementation, tests, changelog, and developer documentation as `8845adf`.
 
 ## Remaining Steps
 
-- Commit and push this final remotely verified state-only closeout.
-- Reverify exact remote SHA and the state-only GitHub Actions run.
-- Mark `ARA-017` `IN_PROGRESS` only after the branch is clean and synchronized, then reproduce
-  startup failures returning status 0 without widening into packaging or provider changes.
+- Commit this recovery-state checkpoint without staging ignored runtime artifacts.
+- Push `8845adf` plus the state checkpoint, verify exact remote SHA equality, update draft PR 13,
+  and wait for all Python 3.10/3.13 push and pull-request checks.
+- Record the remotely verified SHA in a final state-only closeout before selecting the next P1 task.
 
 ## Test Status
 
@@ -205,6 +229,20 @@ Updated: 2026-07-11 (Asia/Shanghai)
   both push and pull-request triggers.
 - GitHub sync: local, remote-tracking, and GitHub branch SHAs match at
   `e93aa773daafaae690a3e25737b04c27752e5519`; draft PR 13 is updated and mergeable.
+- ARA-017 pre-fix process probes: missing/invalid config, invalid/missing project, provider
+  prerequisites, and all three lock entrypoints printed a diagnostic but returned status 0.
+- Final ARA-017 focused startup/input/cache/resume regression: `103 passed, 103 subtests passed`.
+- Final ARA-017 `make check`: Ruff format (52 files), Ruff lint, import smoke, and pytest
+  (`203 passed, 128 subtests passed in 2.18s`).
+- Process smoke after the fix: module and editable console invalid-project paths returned 2;
+  isolated missing/invalid UTF-8/huge/deep config and invalid task/checkpoint paths returned 2
+  without traceback; `--help` and provider-free analysis returned 0.
+- Malformed cloud caches returned empty safe records for invalid UTF-8, huge/deep JSON, wrong
+  top-level/record types, non-finite/negative/over-64-bit numeric values, and the valid-cache
+  compatibility controls passed.
+- Independent final delta-only review: green; no remaining non-interrupt ARA-017 startup
+  false-success or traceback gap was confirmed.
+- Real provider smoke: not run; all changes are provider-free startup/input boundary behavior.
 
 ## Recent Failed Command
 
@@ -232,11 +270,18 @@ Updated: 2026-07-11 (Asia/Shanghai)
   handshake errors; command-scoped proxy retries succeeded without changing commits or Git config.
 - The first `gh pr checks --watch` poll hit a TLS handshake timeout; a non-watching retry returned
   all four completed successful jobs.
+- Initial ARA-017 subprocess probes and new regression assertions failed because handled startup
+  errors returned 0; these were the expected pre-fix reproductions.
+- The first post-fix `make check` found two existing project-input tests that still expected the old
+  normal-return contract; they now assert status 2 while preserving path-masking/order checks.
+- Independent adversarial probes successively found invalid UTF-8/OSError input, huge/deep parser,
+  cloud-cache schema/numeric, and deep semantic-history gaps; each received a focused regression
+  before the final green review and full gate.
 
 ## Next Command
 
 ```bash
-git add .codex/CURRENT_STATE.md .codex/COMPLETED.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
+git add .codex/CURRENT_STATE.md .codex/TASK_QUEUE.md .codex/COMPLETED.md .codex/DECISIONS.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
 ```
 
 ## Interruption Recovery
@@ -251,6 +296,7 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - Do not change prompts, scoring semantics, provider behavior, benchmark results, or artifact interpretation as part of a maintenance-only fix.
 - Do not widen the completed `ARA-021` checkpoint into project-level output/log symlink or active
   filesystem-swap policy; those remain `ARA-022`.
-- Keep ARA-013 scoped to lock ownership/lifecycle. General CLI startup failures returning status 0
-  remain `ARA-017`; active non-cooperating filesystem replacement remains `ARA-022`.
+- Keep ARA-017 scoped to non-interrupt startup/input failures. Direct and runner-consumed
+  `KeyboardInterrupt` process status remains `ARA-023`; wheel asset completeness remains `ARA-004`.
+- Active non-cooperating filesystem replacement remains `ARA-022`.
 - Do not stage with `git add -A`; stage only reviewed paths.

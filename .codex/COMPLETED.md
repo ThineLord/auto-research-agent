@@ -150,3 +150,23 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed implementation, tests, ignore policy, changelog, and developer docs as `55e7287` and
   recovery state as `e93aa77`; pushed both and verified exact local/remote SHA equality.
 - Updated draft PR 13 and confirmed Python 3.10/3.13 passed for both push and pull-request triggers.
+
+## 2026-07-11 - Reliable CLI startup exit status and malformed-input boundaries
+
+- Reproduced config, project, provider prerequisite, and survey/mock/normal lock errors printing a
+  diagnostic but returning process status 0 through both supported CLI entrypoints.
+- Made handled startup refusals status 2 and explicit failed cloud discovery status 1 while keeping
+  help, successful provider-free analysis, and documented profile fallback status 0.
+- Converted invalid/unreadable config and task input into privacy-safe errors and made tolerant
+  checkpoint/cloud-cache readers handle invalid UTF-8, parser size/depth failures, wrong structure,
+  invalid record fields, and bounded numeric provenance without traceback.
+- Added an iterative resume-history depth guard so parsed histories fail before writes rather than
+  overflowing during semantic comparison or persistence.
+- Added entrypoint subprocess, direct-main, input privacy, provider/lock, cache compatibility, and
+  resume no-write regression coverage; kept constructor exceptions as status 1 with lock cleanup.
+- Focused regression passed with `103 passed, 103 subtests passed`; final `make check` passed with
+  `203 passed, 128 subtests passed`.
+- Multiple independent adversarial reviews found and verified the decode/parser/schema/numeric/depth
+  corrections; the final delta review was green.
+- Committed implementation, tests, changelog, and developer documentation as `8845adf`; push and CI
+  verification remain the next checkpoint action.

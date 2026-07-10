@@ -82,3 +82,19 @@
   `OpenProcess` liveness probe. Static non-regular guard/metadata paths fail closed.
 - Boundary: general CLI startup error exit codes remain `ARA-017`; active non-cooperating path swaps
   outside the token/PID/guard-identity defense remain `ARA-022`.
+
+## 2026-07-11 - Classify handled CLI startup refusals separately from operation failures
+
+- Decision: handled argument/config/project/provider/run-lock/resume startup refusals terminate with
+  status 2; an explicit operation such as failed cloud model discovery terminates with status 1;
+  help, completed commands, and documented cloud-profile fallback remain status 0.
+- Reason: returning `None` made both `python -m src.main` and the console script report false
+  success. The split preserves existing argparse/resume status 2 and ordinary runtime status 1.
+- Input boundary: config/task reads produce privacy-safe validation errors; fail-soft checkpoint and
+  optional cloud-cache readers reject malformed encoding, parser depth/size, structure, and unsafe
+  numeric fields before downstream use. Unknown cache fields remain forward-compatible and missing
+  fields keep dataclass defaults.
+- Compatibility: valid provider-free analysis, valid cached artifacts, and successful profile seed
+  fallback remain unchanged. The fix does not make wheel resources self-contained.
+- Boundary: direct and runner-consumed interrupt status is deferred to ARA-023; package asset/root
+  behavior remains ARA-004; prompts, provider requests, scoring, and experiment artifacts are unchanged.

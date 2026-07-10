@@ -109,10 +109,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-015 - Some CLI startup failures exit successfully
 
-- Status: reproduced in isolated packaging smoke
+- Status: fixed, validated, and committed locally; remote push pending
 - Severity: P1 automation/release reliability
 - Impact: missing config/resources can print an error while returning status 0, allowing a smoke check to pass falsely.
-- Current action: task `ARA-017`.
+- Current action: task `ARA-017` completed at local commit `8845adf`; publish the recovery-state
+  checkpoint and verify GitHub CI. Wheel asset completeness remains separate task `ARA-004`.
 
 ## KI-016 - Public distribution license is absent
 
@@ -155,3 +156,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Severity: P2 under the project's local single-user threat model
 - Impact: renaming a validated run directory and replacing its path with a symlink between checks and stage persistence can redirect later writes; project-level artifact symlinks also remain broader than checkpoint scope.
 - Current action: task `ARA-022`; document the trust boundary before considering descriptor-based no-follow I/O or a repository-wide symlink policy.
+
+## KI-022 - Manual interrupts can still produce process status 0
+
+- Status: confirmed by CLI return-path audit; not changed in startup-status task ARA-017
+- Severity: P2 automation semantics
+- Impact: direct interrupts caught by the CLI and runner-consumed safe interrupts do not yet share a
+  documented process-status contract, so changing only one path could make automation inconsistent.
+- Current action: task `ARA-023`; preserve safe-stop artifacts while defining the status boundary.
