@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-10T18:48:18+08:00",
+  "recorded_at": "2026-07-10T18:52:28+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "e47ba449cff0351706014b04083d141f47d33b2d",
-  "last_known_stable_commit": "e47ba449cff0351706014b04083d141f47d33b2d",
-  "status": "passed_local_commit_pending_state_push",
+  "head_commit": "31db3f8286b3cbe0874d6ab0e938bd496e5d3730",
+  "last_known_stable_commit": "31db3f8286b3cbe0874d6ab0e938bd496e5d3730",
+  "status": "passed_pushed_ci_verified",
   "commands": [
     {
       "command": "make check",
@@ -38,6 +38,17 @@
       "command": "scoped staged personal-path, credential-pattern, and private-key scan",
       "exit_code": 0,
       "result": "passed"
+    },
+    {
+      "command": "gh pr checks 13 --repo ThineLord/auto-research-agent",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed"
+      }
     }
   ],
   "failures": [],
@@ -52,6 +63,7 @@
     "Validation covers canonical and legacy roots, configured runs-storage symlinks, relative/nested/cross-project/prefix/NUL/file roots, previous/next/future round links, state artifacts, access failures, privacy-safe errors, UI disablement, CLI exit 2, and run-lock release.",
     "All planned resume rounds are preflighted and each current round is rechecked before directory creation; active filesystem-swap resistance remains separately queued as ARA-022.",
     "Independent bounded adversarial review reported no remaining confirmed defect within the static ARA-012 scope.",
+    "Local, remote-tracking, and GitHub branch SHAs were verified equal at 31db3f8286b3cbe0874d6ab0e938bd496e5d3730 before this final state-only closeout commit.",
     "UI raw checkpoint artifact references remain separately queued as ARA-021; project-level paths and TOCTOU remain ARA-022.",
     "Ignored runtime artifacts and local configuration remain outside the validation diff."
   ]

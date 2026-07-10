@@ -107,3 +107,4 @@ Validation and implementation outcomes will be appended only after they are actu
 - Focused consumer regression passed with `80 passed, 43 subtests passed`; final `make check` passed with `165 passed, 87 subtests passed`.
 - Independent bounded adversarial review found no remaining confirmed defect within the static ARA-012 scope.
 - Committed the implementation, regression matrix, UI integration, translations, changelog, and public docs as `e47ba44`.
+- Committed recovery state as `31db3f8`, pushed both commits, verified exact local/remote SHA equality, updated draft PR 13, and confirmed Python 3.10/3.13 passed for both push and pull-request triggers.

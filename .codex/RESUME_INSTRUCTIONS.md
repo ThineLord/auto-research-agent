@@ -40,7 +40,7 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-`ARA-012` should be `DONE`. If the maintenance branch is ahead of origin, inspect the local containment commit and state-only closeout before pushing; do not repeat the implementation. Its final local validation command was:
+`ARA-012` should be `DONE`, pushed, and CI-verified. If the maintenance branch is ahead of origin, inspect any final state-only closeout before pushing; do not repeat the implementation. Its final local validation command was:
 
 ```bash
 make check

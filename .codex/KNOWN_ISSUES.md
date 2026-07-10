@@ -80,10 +80,10 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-011 - Resume roots are not constrained to the project runs directory
 
-- Status: fixed, validated, and committed locally
+- Status: fixed, validated, committed, pushed, and CI-verified
 - Severity: P1
 - Impact: a crafted or stale checkpoint can direct resumed artifact writes outside the selected project's run tree.
-- Current action: task `ARA-012` completed at local commit `e47ba44`; remote push pending.
+- Current action: task `ARA-012` completed at remote checkpoint `31db3f8`.
 
 ## KI-012 - Run locks are not atomic or owner-safe
 
