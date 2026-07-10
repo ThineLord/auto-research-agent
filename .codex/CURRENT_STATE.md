@@ -4,14 +4,15 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: publish and remotely verify the completed owner-safe run-lock checkpoint (`ARA-013`).
+- Current goal: record the remotely verified owner-safe run-lock checkpoint (`ARA-013`) before
+  beginning the next P1 task.
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `55e7287865bad016874981a071cb19afb0871e1d`
-- Last known stable commit: `55e7287865bad016874981a071cb19afb0871e1d` (local full gate and
-  independent reviews passed; remote push and CI verification are pending)
-- Active task: ARA-013 implementation is `DONE`; only its recovery-state and remote-verification
-  closeout is in progress.
-- Uncommitted changes: yes; only the reviewed `.codex` recovery-state update remains.
+- Current HEAD at state snapshot: `e93aa773daafaae690a3e25737b04c27752e5519`
+- Last known stable commit: `e93aa773daafaae690a3e25737b04c27752e5519` (exact local,
+  remote-tracking, and GitHub branch equality plus all Python 3.10/3.13 push/PR checks passed)
+- Active task: ARA-013 is `DONE`, pushed, and CI-verified; its final state-only closeout is in
+  progress.
+- Uncommitted changes: yes; only the remotely verified `.codex` recovery-state closeout remains.
 
 ## Modified Files
 
@@ -126,14 +127,16 @@ Updated: 2026-07-11 (Asia/Shanghai)
   subtests passed`). Staged diff and sensitive-pattern scans passed.
 - Committed the owner-safe lock implementation, regression matrix, ignore policy, changelog, and
   developer documentation as `55e7287`.
+- Committed recovery state as `e93aa77`, pushed both commits, and verified exact local,
+  remote-tracking, and GitHub branch SHA equality.
+- Updated draft PR 13; all four Python 3.10/3.13 push and pull-request checks passed.
 
 ## Remaining Steps
 
-- Commit this recovery-state checkpoint without staging ignored runtime artifacts.
-- Push `55e7287` plus the state checkpoint, verify exact remote SHA equality, update draft PR 13,
-  and wait for all Python 3.10/3.13 push and pull-request checks.
-- Record the remotely verified SHA in a final state-only closeout, push it, and reverify CI before
-  selecting the next P1 task.
+- Commit and push this final remotely verified state-only closeout.
+- Reverify exact remote SHA and the state-only GitHub Actions run.
+- Mark `ARA-017` `IN_PROGRESS` only after the branch is clean and synchronized, then reproduce
+  startup failures returning status 0 without widening into packaging or provider changes.
 
 ## Test Status
 
@@ -198,6 +201,10 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Independent final adversarial and platform re-review: green; native Windows was not available,
   so Windows-specific process probes were covered by mocked/static tests.
 - Provider-backed tests: not planned; locking and constructor cleanup require no model/network call.
+- GitHub Actions for pushed ARA-013 checkpoint `e93aa77`: Python 3.10 and Python 3.13 passed for
+  both push and pull-request triggers.
+- GitHub sync: local, remote-tracking, and GitHub branch SHAs match at
+  `e93aa773daafaae690a3e25737b04c27752e5519`; draft PR 13 is updated and mergeable.
 
 ## Recent Failed Command
 
@@ -221,11 +228,15 @@ Updated: 2026-07-11 (Asia/Shanghai)
   expected. Interim reviews then found invalid bytes/deep JSON, oversized PID, fork release,
   disposable/symlink guard, POSIX EPERM, and Windows probe gaps; each now has code and regression
   coverage.
+- The first post-push `fetch` and one independent `ls-remote` verification hit transient GitHub TLS
+  handshake errors; command-scoped proxy retries succeeded without changing commits or Git config.
+- The first `gh pr checks --watch` poll hit a TLS handshake timeout; a non-watching retry returned
+  all four completed successful jobs.
 
 ## Next Command
 
 ```bash
-git add .codex/CURRENT_STATE.md .codex/TASK_QUEUE.md .codex/COMPLETED.md .codex/DECISIONS.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
+git add .codex/CURRENT_STATE.md .codex/COMPLETED.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
 ```
 
 ## Interruption Recovery

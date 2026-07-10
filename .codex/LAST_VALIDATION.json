@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T02:03:34+08:00",
+  "recorded_at": "2026-07-11T02:07:38+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "55e7287865bad016874981a071cb19afb0871e1d",
-  "last_known_stable_commit": "55e7287865bad016874981a071cb19afb0871e1d",
-  "status": "passed_committed_push_pending",
+  "head_commit": "e93aa773daafaae690a3e25737b04c27752e5519",
+  "last_known_stable_commit": "e93aa773daafaae690a3e25737b04c27752e5519",
+  "status": "passed_pushed_ci_verified",
   "commands": [
     {
       "command": "make check",
@@ -63,6 +63,25 @@
         "posix_native_paths": "passed",
         "windows_mocked_static_paths": "passed"
       }
+    },
+    {
+      "command": "exact local, remote-tracking, and git ls-remote SHA comparison",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "e93aa773daafaae690a3e25737b04c27752e5519"
+      }
+    },
+    {
+      "command": "gh pr checks 13 --repo ThineLord/auto-research-agent",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed"
+      }
     }
   ],
   "failures": [],
@@ -74,10 +93,6 @@
     {
       "check": "native Windows host validation",
       "reason": "No native Windows host is available; Windows-specific process liveness and locking branches received mocked/static regression coverage."
-    },
-    {
-      "check": "GitHub Actions",
-      "reason": "Implementation commit is local and the push is the next checkpoint action."
     }
   ],
   "notes": [
@@ -87,7 +102,9 @@
     "Invalid UTF-8, oversized or deeply nested JSON, oversized PID values, non-regular nodes, POSIX permission probes, Windows liveness probes, guard recreation, and fork inheritance are covered.",
     "Mock, client, and agent construction now occur inside the lock-owning try/finally boundary.",
     "General CLI startup failure exit status remains ARA-017; active non-cooperating filesystem replacement remains ARA-022.",
-    "Implementation commit 55e7287865bad016874981a071cb19afb0871e1d is locally validated; exact remote SHA and GitHub CI verification are pending.",
+    "Implementation commit 55e7287865bad016874981a071cb19afb0871e1d and recovery checkpoint e93aa773daafaae690a3e25737b04c27752e5519 were pushed; exact SHA equality and all four GitHub checks were verified.",
+    "Transient TLS timeouts affected the first fetch, one ls-remote check, and the first gh watch poll; bounded retries succeeded without changing commits or repository configuration.",
+    "Draft PR 13 is updated, open, draft, and mergeable; no merge was attempted.",
     "Ignored runtime artifacts and local configuration remain outside the validation diff."
   ]
 }

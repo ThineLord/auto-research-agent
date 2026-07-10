@@ -87,11 +87,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-012 - Run locks are not atomic or owner-safe
 
-- Status: fixed, validated, and committed locally; remote push pending
+- Status: fixed, pushed, and CI-verified
 - Severity: P1
 - Impact: concurrent acquisition can race, an old owner can remove a newer lock, and malformed PID metadata can raise.
-- Current action: task `ARA-013` completed at local commit `55e7287`; publish the recovery-state
-  checkpoint and verify GitHub CI.
+- Current action: task `ARA-013` completed at implementation commit `55e7287` and remotely verified
+  checkpoint `e93aa77`.
 
 ## KI-013 - Wheel-installed mock workflow cannot find repository assets
 

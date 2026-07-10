@@ -147,5 +147,6 @@ Validation and implementation outcomes will be appended only after they are actu
   passed with `189 passed, 110 subtests passed`; the synchronized thread test passed 25 repeats.
 - Multiple independent design/adversarial/platform/post-fix reviews reported green after all
   reproduced P1/P2 protocol gaps were corrected.
-- Committed implementation, tests, ignore policy, changelog, and developer docs as `55e7287`; push
-  and CI verification remain the next checkpoint action.
+- Committed implementation, tests, ignore policy, changelog, and developer docs as `55e7287` and
+  recovery state as `e93aa77`; pushed both and verified exact local/remote SHA equality.
+- Updated draft PR 13 and confirmed Python 3.10/3.13 passed for both push and pull-request triggers.
