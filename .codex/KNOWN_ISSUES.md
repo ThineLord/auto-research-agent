@@ -16,7 +16,7 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Severity: P1
 - Evidence source: tracked `TEST_AND_NEXT_STEPS.md` reports that one run was accepted while CLI help and docs require two or more.
 - Impact: users cannot tell whether a one-run self-baseline is supported or accidental.
-- Current action: task `ARA-002` completed; pending commit and remote push.
+- Current action: task `ARA-002` completed at remote commit `033ed01`.
 
 ## KI-003 - Non-positive max-round override may be silently coerced
 
@@ -66,17 +66,17 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-009 - Resume can discard historical metrics
 
-- Status: reproduced by read-only audit
+- Status: fixed, validated, and committed locally
 - Severity: P1
 - Impact: appending a resumed round can rewrite metrics and summaries with only the new round, corrupting longitudinal interpretation.
-- Current action: task `ARA-010`.
+- Current action: task `ARA-010` completed at local commit `6d56d09`; remote push pending.
 
 ## KI-010 - Failed rounds can replace prior best output
 
-- Status: fixed and validated in the current uncommitted checkpoint
+- Status: fixed, validated, committed, pushed, and CI-verified
 - Severity: P1
 - Impact: synthetic failure output can beat the internal sentinel score and overwrite trusted prior content.
-- Current action: task `ARA-011` completed; pending remote push.
+- Current action: task `ARA-011` completed at remote checkpoint `7e9a1f5`.
 
 ## KI-011 - Resume roots are not constrained to the project runs directory
 
@@ -133,3 +133,10 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Severity: P2
 - Impact: a historical target run can be mislabeled from the project's latest checkpoint.
 - Current action: task `ARA-014`.
+
+## KI-019 - Resume can rewrite original run-manifest provenance
+
+- Status: confirmed by read-only audit; separate from history-array integrity
+- Severity: P2
+- Impact: rebuilding `run_manifest.json` during resume can replace original start/mode provenance and discard unknown legacy fields, even though `run_config.json` retains resume sessions.
+- Current action: task `ARA-020`; preserve existing fields with additive resume metadata before changing manifest behavior.

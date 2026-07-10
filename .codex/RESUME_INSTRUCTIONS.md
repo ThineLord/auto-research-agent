@@ -40,13 +40,13 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-No task should be `IN_PROGRESS` at this checkpoint. After confirming a clean tree, start `ARA-010` and run:
+`ARA-010` should be `DONE`. If the maintenance branch is ahead of origin, inspect the local commits and state-only diff before pushing; do not repeat the implementation. Its final local validation command was:
 
 ```bash
-.venv/bin/python -m pytest tests/test_round_loop.py -q
+make check
 ```
 
-If another task is active, run its exact validation command from `.codex/TASK_QUEUE.md` first. Understand any uncommitted diff before editing it.
+After the branch is clean and synchronized, the next task is `ARA-012`. Mark it `IN_PROGRESS` before editing and begin with focused resume path-containment tests in `tests/test_round_loop.py`. If another task is active, run its exact validation command from `.codex/TASK_QUEUE.md` first. Understand any uncommitted diff before editing it.
 
 ## 5. Safety boundaries
 
@@ -58,5 +58,5 @@ If another task is active, run its exact validation command from `.codex/TASK_QU
 ## Suggested immediate command
 
 ```bash
-git status --short --branch
+git status --short --branch && git rev-list --left-right --count origin/codex/sol-autonomous-hardening...HEAD
 ```

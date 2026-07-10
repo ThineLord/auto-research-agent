@@ -4,16 +4,17 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: stable remote checkpoint reached; resume with `ARA-010` (preserve run history across resume).
+- Current goal: publish the validated `ARA-010` resume-integrity fix, then continue with `ARA-012`.
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD commit at snapshot start: `5ab7119b925b7c9c1281c7d942c9da6b0b410463` (use `git rev-parse HEAD` after the state-only closeout commit)
-- Last known stable commit: `5ab7119b925b7c9c1281c7d942c9da6b0b410463` (`make check`, remote SHA, and GitHub Actions verified)
-- Active task: none; next task is `ARA-010` in `.codex/TASK_QUEUE.md`
-- Uncommitted changes: expected none after this state-only closeout commit; inspect any difference before resuming.
+- Current HEAD at state snapshot: `6d56d097a9f8881828109de2380f98929633acce` (use `git rev-parse HEAD` after the state-only closeout commit)
+- Last known stable commit: `6d56d097a9f8881828109de2380f98929633acce` (`make check` and independent adversarial review passed locally; remote push pending)
+- Active task: closeout for completed task `ARA-010` in `.codex/TASK_QUEUE.md`
+- Uncommitted changes: yes; maintenance-state closeout files only.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
+- `.codex/TASK_QUEUE.md`
 - `.codex/COMPLETED.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
@@ -56,12 +57,17 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Preserved append-only best-effort logging behavior outside the atomic replacement helper.
 - Committed the atomic state-write fix as `7d226f8`.
 - Committed state checkpoint `5ab7119`, pushed both commits, verified local/remote equality, and confirmed all Python 3.10/3.13 push and PR checks passed.
+- Reproduced resume truncating both history files to the newly completed round, losing best-round metadata and previous-round context.
+- Added fail-before-write validation for malformed, divergent, misattributed, or internally inconsistent histories and best-score metadata.
+- Preserved prior history records byte-semantically, cumulative aggregates, best score/round, no-improvement state, last successful agent, and drafting-mode context.
+- Added strict round-number validation and nonzero CLI status for any blocked resume preview/history condition.
+- Verified normal, legacy fallback, partial-history, stop-before-round, stale/outlier metadata, recursive JSON-conflict, and analytics/compare paths.
+- Committed the implementation, tests, and docs as `6d56d09`.
 
 ## Remaining Steps
 
-- Start `ARA-010` by first reproducing resume history loss against the preserved remote checkpoint.
-- Restore existing round metrics, score history, best-round metadata, and prior-round context without altering completed round files.
-- Keep `ARA-012` path-containment work separate from the history-preservation change.
+- Commit this state closeout, push `6d56d09` plus the state commit, update draft PR 13, and verify the exact remote SHA and CI.
+- Begin `ARA-012` only from a clean synchronized checkpoint; keep run-root containment separate from history semantics.
 
 ## Test Status
 
@@ -89,6 +95,10 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Runner target validation: `17 passed, 3 subtests passed`.
 - Full regression after the integrity fix: `make check` passed (`142 passed, 43 subtests passed`).
 - `git diff --check` passed.
+- ARA-010 focused resume/consumer regression passed (`70 passed, 23 subtests passed`).
+- Final ARA-010 `make check` passed: Ruff format (50 files), Ruff lint, import smoke, and pytest (`153 passed, 67 subtests passed`).
+- Independent adversarial and code reviews reproduced the pre-fix failures, challenged cross-artifact conflicts, and reported no remaining confirmed P1/P2 issue after the final corrections.
+- Final `git diff --check` and staged sensitive-pattern scans passed.
 - Provider-backed tests: not planned for this checkpoint; no paid or network model calls are needed.
 
 ## Recent Failed Command
@@ -96,6 +106,8 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - `git show --no-patch --format='%H %P %s' REBASE_HEAD` failed with `fatal: bad object REBASE_HEAD` because the stale file references an unavailable object. This is not an active Git operation.
 - The first unproxied push hung without output and was interrupted safely; the command-scoped proxy retry succeeded.
 - One post-push GitHub API verification hit a TLS handshake timeout; scoped `git ls-remote` independently verified the exact remote SHA.
+- The new resume-integrity regression initially failed because both histories were truncated to the new round; this was the expected pre-fix reproduction.
+- An interim `make check` stopped at Ruff formatting while implementation was still in progress; formatting was applied and the final full gate passed.
 
 ## Next Command
 
@@ -113,4 +125,5 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.
 - Do not change prompts, scoring semantics, provider behavior, benchmark results, or artifact interpretation as part of a maintenance-only fix.
+- Do not start `ARA-012` until the `ARA-010` commits are pushed and remote CI is verified.
 - Do not stage with `git add -A`; stage only reviewed paths.

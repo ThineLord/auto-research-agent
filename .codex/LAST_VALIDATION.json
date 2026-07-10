@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-10T17:13:58+08:00",
+  "recorded_at": "2026-07-10T18:08:23+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "5ab7119b925b7c9c1281c7d942c9da6b0b410463",
-  "last_known_stable_commit": "5ab7119b925b7c9c1281c7d942c9da6b0b410463",
-  "status": "passed_clean_remote_checkpoint",
+  "head_commit": "6d56d097a9f8881828109de2380f98929633acce",
+  "last_known_stable_commit": "6d56d097a9f8881828109de2380f98929633acce",
+  "status": "passed_local_commit_pending_push",
   "commands": [
     {
       "command": "make check",
@@ -14,33 +14,19 @@
         "ruff_format_files": 50,
         "ruff_lint": "passed",
         "import_smoke": "passed",
-        "pytest_tests_passed": 145,
-        "pytest_subtests_passed": 49,
-        "pytest_duration_seconds": 0.54
+        "pytest_tests_passed": 153,
+        "pytest_subtests_passed": 67,
+        "pytest_duration_seconds": 0.61
       }
     },
     {
-      "command": ".venv/bin/python -m pytest tests/test_storage.py tests/test_round_loop.py tests/test_diagnostic.py tests/test_ui_helpers.py tests/test_session.py tests/test_mock_run.py -q",
+      "command": ".venv/bin/python -m pytest tests/test_round_loop.py tests/test_metrics.py tests/test_run_compare.py tests/test_run_analytics.py tests/test_ui_helpers.py -q",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "pytest_tests_passed": 63,
-        "pytest_subtests_passed": 9,
-        "pytest_duration_seconds": 0.45
-      }
-    },
-    {
-      "command": ".venv/bin/python -m src.main --compare-runs /tmp/auto-research-agent-one-run-contract",
-      "exit_code": 2,
-      "result": "expected_argument_rejection"
-    },
-    {
-      "command": ".venv/bin/python -m src.main --compare-runs /tmp/auto-research-agent-run-a /tmp/auto-research-agent-run-b",
-      "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "run_count": 2,
-        "metadata_status": "missing_test_paths"
+        "pytest_tests_passed": 70,
+        "pytest_subtests_passed": 23,
+        "pytest_duration_seconds": 0.44
       }
     },
     {
@@ -53,17 +39,14 @@
   "not_run": [
     {
       "check": "real provider smoke",
-      "reason": "Not required for the provider-free maintenance baseline."
+      "reason": "Resume integrity is fully exercised with provider-free fake agents and temporary artifacts; no paid or network model call is required."
     }
   ],
   "notes": [
-    "The new compare-runs regression test failed before the fix because the parser accepted one path.",
-    "The new credential regression failed before the fix because provider events contained the configured key.",
-    "The new best-output regression failed before the fix because a failed round was marked improved.",
-    "The round-limit regression tests failed before the fix because the CLI and runner accepted non-positive values.",
-    "The atomic-write regression failed before the fix because storage never called fsync or replace.",
-    "Local and remote maintenance branch HEAD matched at the recorded commit before this state-only closeout.",
-    "GitHub Actions passed on Python 3.10 and Python 3.13 for both push and pull-request triggers.",
-    "Ignored runtime artifacts and local configuration are outside the validation diff."
+    "The new end-to-end resume regression failed before the fix because both histories were replaced by the newly completed round.",
+    "Validation covers normal resume, legacy fallback, partial history, no-new-round interruption, cumulative runtime, best-score and best-round reconciliation, recursive cross-history conflicts, invalid round values, and CLI failure propagation.",
+    "Unsafe or unsupported resume state is rejected before run config, manifest, checkpoint, round, summary, or history writes.",
+    "Independent read-only adversarial and code reviews reported no remaining confirmed P1 or P2 defect in the tested ARA-010 matrix.",
+    "Ignored runtime artifacts and local configuration remain outside the validation diff."
   ]
 }

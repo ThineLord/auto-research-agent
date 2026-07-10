@@ -79,3 +79,16 @@ Validation and implementation outcomes will be appended only after they are actu
 - Related suites passed with `63 passed, 9 subtests passed`; full `make check` passed with `145 passed, 49 subtests passed`.
 - Committed the fix as `7d226f8`.
 - Committed state checkpoint `5ab7119`, pushed it, verified exact local/remote SHA equality, and confirmed all Python 3.10/3.13 push and PR checks passed.
+
+## 2026-07-10 - Resume history integrity
+
+- Reproduced resumed round 4 replacing both prior history arrays with only round 4, clearing best-round metadata, resetting cumulative runtime/streak state, and omitting previous-round context.
+- Loaded run-local metrics as the primary history and used project score history only as a checkpoint-correlated legacy fallback.
+- Preserved opaque legacy fields while requiring strictly increasing prior rounds and recursively consistent shared semantics across both histories.
+- Failed before any run artifact write for malformed JSON, wrong types, duplicate/out-of-order/future rounds, cross-history conflicts, unsupported checkpoint best scores, or unresolved partial-history best metadata.
+- Reconciled best score/round only from supported evidence, retained tied strict-improvement rounds, restored last successful agent and drafting-mode context, and kept cumulative runtime/analytics accurate.
+- Made unsafe history and blocked resume previews return CLI status 2 while retaining run-lock cleanup.
+- Added strict `start_round` and checkpoint `last_completed_round` validation before artifact creation.
+- Focused resume/consumer validation passed with `70 passed, 23 subtests passed`; final `make check` passed with `153 passed, 67 subtests passed`.
+- Independent read-only adversarial and code reviews reported no remaining confirmed P1/P2 defect in the tested resume-integrity matrix.
+- Committed the implementation as `6d56d09`.

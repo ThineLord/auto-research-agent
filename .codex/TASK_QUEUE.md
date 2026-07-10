@@ -78,7 +78,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-010 - Preserve prior round history when resuming a run
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P1
 - Risk: high
 - Description: resume initializes empty histories and can rewrite `round_metrics.json` and summaries with only newly resumed rounds.
@@ -87,6 +87,18 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Validation command: focused resume regression with existing rounds, analytics/compare tests, then `make check`.
 - Commit required: yes.
 - Dependencies: atomic state writing preferred first.
+
+## ARA-020 - Preserve legacy run-manifest provenance across resume
+
+- Status: `TODO`
+- Priority: P2
+- Risk: medium
+- Description: resume rebuilds `run_manifest.json` from the current session and can replace the original start time, mode, and unknown legacy fields even though `run_config.json` preserves session history.
+- Related files: `src/runner.py`, `src/run_config.py`, resume provenance tests
+- Acceptance criteria: resume retains original run identity/start provenance and unknown legacy manifest fields while adding current resume metadata; consumers remain compatible.
+- Validation command: focused resume/run-config tests followed by `make check`.
+- Commit required: yes.
+- Dependencies: `ARA-010`.
 
 ## ARA-011 - Prevent failed rounds from replacing a trusted best output
 
