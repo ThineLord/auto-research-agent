@@ -13,6 +13,8 @@
 * The `--compare-runs` CLI now rejects fewer than two run directories with a clear argument error,
   matching its documented contract. The internal comparison helper still accepts one run for
   compatibility with existing UI, analytics, and legacy-metadata callers.
+* Failed agent rounds and invalid Judge outputs no longer replace a trusted `best_output.md` with
+  synthetic zero-score or placeholder content; their artifacts and error metrics remain available.
 
 ### Maintenance
 

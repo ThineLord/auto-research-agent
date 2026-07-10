@@ -819,7 +819,8 @@ def run_iterative_rounds(
         judge_rubric = parse_judge_rubric(judge_output)
         completed_rounds = round_index
 
-        improved = score > best_score
+        successful_research_round = not round_errors and parsed_score is not None
+        improved = successful_research_round and score > best_score
         if improved:
             best_score = score
             best_round = round_index
@@ -938,7 +939,7 @@ def run_iterative_rounds(
             "provider_quota_this_round": provider_quota_this_round,
             "provider_quota_streak": consecutive_provider_quota_failures,
             "skipped_placeholder_this_round": skipped_placeholder_this_round,
-            "successful_research_round": not round_errors and parsed_score is not None,
+            "successful_research_round": successful_research_round,
             "invalid_score_this_round": parsed_score is None,
             "judge_rubric": judge_rubric,
             "model": model_name,

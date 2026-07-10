@@ -62,6 +62,7 @@ from src.cli import parse_args
 from src.cloud_free import CloudFreeDailyQuotaExhausted
 from src.constants import (
     STOP_CLOUD_DAILY_QUOTA,
+    STOP_INVALID_SCORE,
     STOP_MAX_ROUNDS,
     STOP_OLLAMA_TIMEOUT,
     STOP_PROVIDER_QUOTA_EXHAUSTED,
@@ -324,6 +325,11 @@ class GenericProviderFailureAgents(FakeAgents):
 
     def review(self, *, task: str, memory: str, draft_output: str) -> str:
         raise RuntimeError("Gemini request failed.")
+
+
+class InvalidScoreAgents(FakeAgents):
+    def judge(self, *, task: str, memory: str, revised_output: str) -> str:
+        return "Judge completed without a numeric score."
 
 
 class RoundLoopTests(unittest.TestCase):
@@ -739,6 +745,8 @@ class RoundLoopTests(unittest.TestCase):
             project_dir.mkdir()
             memory_path = project_dir / "memory.md"
             memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            best_output_path = project_dir / "best_output.md"
+            best_output_path.write_text("Trusted prior best.\n", encoding="utf-8")
 
             result = run_iterative_rounds(
                 console=Console(),
@@ -767,6 +775,43 @@ class RoundLoopTests(unittest.TestCase):
             self.assertFalse(score_history[0]["provider_quota_this_round"])
             self.assertTrue(score_history[0]["skipped_placeholder_this_round"])
             self.assertFalse(score_history[0]["successful_research_round"])
+            self.assertFalse(score_history[0]["improved"])
+            self.assertEqual(result["best_output"], "Trusted prior best.")
+            self.assertEqual(best_output_path.read_text(encoding="utf-8"), "Trusted prior best.\n")
+
+    def test_invalid_judge_score_does_not_replace_trusted_best_output(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            best_output_path = project_dir / "best_output.md"
+            best_output_path.write_text("Trusted prior best.\n", encoding="utf-8")
+
+            result = run_iterative_rounds(
+                console=Console(),
+                agents=InvalidScoreAgents(),
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="normal",
+                model_name="fake-model",
+                max_rounds=1,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+            )
+
+            score_history = json.loads(
+                (project_dir / "score_history.json").read_text(encoding="utf-8")
+            )
+
+            self.assertEqual(result["stop_reason"], STOP_INVALID_SCORE)
+            self.assertTrue(score_history[0]["invalid_score_this_round"])
+            self.assertFalse(score_history[0]["successful_research_round"])
+            self.assertFalse(score_history[0]["improved"])
+            self.assertEqual(result["best_output"], "Trusted prior best.")
+            self.assertEqual(best_output_path.read_text(encoding="utf-8"), "Trusted prior best.\n")
 
     def test_round_loop_checkpoints_resumable_cloud_quota_pause(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
