@@ -4,22 +4,20 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: record and remotely verify the locally completed Gemini transport-timeout
-  checkpoint (`ARA-015`) before selecting the next P1 task.
+- Current goal: record the remotely verified Gemini transport-timeout checkpoint (`ARA-015`)
+  before selecting the next P1 task.
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `817b8a130228e09b2cfedea130ccfeb88942919c`
-- Last known stable commit: `817b8a130228e09b2cfedea130ccfeb88942919c` (implementation commit;
-  full local validation and independent review passed, remote/CI verification pending)
-- Active task: ARA-015 is `DONE` locally at `817b8a1`; the recovery-state checkpoint and remote
-  verification are in progress.
-- Uncommitted changes: yes; only the reviewed `.codex` recovery-state checkpoint remains.
+- Current HEAD at state snapshot: `be3721603bd2958ccf184ba5248bf0be2c888b4e`
+- Last known stable commit: `be3721603bd2958ccf184ba5248bf0be2c888b4e` (exact local,
+  remote-tracking, and GitHub branch equality plus all Python 3.10/3.13 push/PR checks passed)
+- Active task: ARA-015 is `DONE`, pushed, and CI-verified; its final state-only closeout is in
+  progress.
+- Uncommitted changes: yes; only this remotely verified `.codex` state closeout remains.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
-- `.codex/TASK_QUEUE.md`
 - `.codex/COMPLETED.md`
-- `.codex/DECISIONS.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
@@ -176,12 +174,16 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Independent final delta-only review reported green, and the scoped staged path/key/private-key
   scan passed.
 - Committed implementation, tests, and changelog as `817b8a1`.
+- Committed recovery state as `be37216`, pushed both commits, and verified exact local,
+  remote-tracking, and GitHub branch SHA equality.
+- Updated draft PR 13 after bounded GitHub API retries; all four Python 3.10/3.13 push and
+  pull-request checks passed, and the PR remains open, draft, and mergeable.
 
 ## Remaining Steps
 
-- Commit this recovery-state checkpoint and push both ARA-015 commits.
-- Verify exact local, remote-tracking, and GitHub branch SHA equality.
-- Update draft PR 13 and wait for Python 3.10/3.13 push/pull-request CI.
+- Commit and push this final remotely verified state-only closeout.
+- Reverify exact remote SHA and the state-only GitHub Actions run.
+- Select the next highest-value P1 only after the branch is clean and synchronized.
 
 ## Test Status
 
@@ -318,11 +320,14 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Independent ARA-015 review found the initial generic `timeout` text match also classified an
   unsupported timeout option as a network timeout; the heuristic is now narrowed and the negative
   regression passes.
+- The first non-interactive PR body update closed stdin and temporarily produced an empty body;
+  subsequent GraphQL/REST attempts hit EOF/TLS handshake errors. A bounded REST retry restored a
+  verified 2260-character ARA-015 body without changing the draft state or branch.
 
 ## Next Command
 
 ```bash
-git add .codex/CURRENT_STATE.md .codex/TASK_QUEUE.md .codex/COMPLETED.md .codex/DECISIONS.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
+git add .codex/CURRENT_STATE.md .codex/COMPLETED.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
 ```
 
 ## Interruption Recovery

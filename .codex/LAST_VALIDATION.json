@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T03:00:09+08:00",
+  "recorded_at": "2026-07-11T03:08:47+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "817b8a130228e09b2cfedea130ccfeb88942919c",
-  "last_known_stable_commit": "817b8a130228e09b2cfedea130ccfeb88942919c",
-  "status": "passed_local_checkpoint_pending_push",
+  "head_commit": "be3721603bd2958ccf184ba5248bf0be2c888b4e",
+  "last_known_stable_commit": "be3721603bd2958ccf184ba5248bf0be2c888b4e",
+  "status": "passed_pushed_ci_verified",
   "commands": [
     {
       "command": "make check",
@@ -55,6 +55,28 @@
       "command": "git diff --check, staged diff check, and scoped staged path/key/private-key scan",
       "exit_code": 0,
       "result": "passed"
+    },
+    {
+      "command": "exact local, remote-tracking, and git ls-remote SHA comparison",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "be3721603bd2958ccf184ba5248bf0be2c888b4e"
+      }
+    },
+    {
+      "command": "gh pr view/checks 13 --repo ThineLord/auto-research-agent",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "draft": true,
+        "mergeable": true,
+        "body_verified": true
+      }
     }
   ],
   "failures": [],
@@ -69,7 +91,8 @@
     "All explicit-key, custom-environment, and SDK-default credential paths now pass the same transport timeout while preserving generation settings.",
     "Timeout classification uses concrete timeout base types, explicit timed-out wording, and HTTP 408/504; misleading option text and class-name substrings remain unknown.",
     "Native timeout and HTTP 408 retain non-retrying behavior; HTTP 504 retains its existing retryable 5xx policy.",
-    "Implementation commit 817b8a130228e09b2cfedea130ccfeb88942919c passed the full local gate and independent review; push and CI verification are pending the recovery-state checkpoint.",
+    "Implementation commit 817b8a130228e09b2cfedea130ccfeb88942919c and recovery checkpoint be3721603bd2958ccf184ba5248bf0be2c888b4e were pushed; exact SHA equality and all four GitHub checks were verified.",
+    "Draft PR 13 has a verified ARA-015 body, remains open, draft, and mergeable; no merge was attempted.",
     "Direct and runner-consumed KeyboardInterrupt status remains separately queued as ARA-023; dependency policy remains ARA-019.",
     "Ignored runtime artifacts and local configuration remain outside the validation diff."
   ]

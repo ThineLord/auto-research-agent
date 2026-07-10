@@ -168,8 +168,9 @@ Validation and implementation outcomes will be appended only after they are actu
   `206 passed, 134 subtests passed`.
 - Multiple independent SDK, compatibility, and adversarial reviews reported green after two
   reproduced timeout-classification false positives were corrected.
-- Committed implementation, tests, and changelog as `817b8a1`; remote/CI verification is pending
-  the recovery-state checkpoint.
+- Committed implementation, tests, and changelog as `817b8a1` and recovery state as `be37216`;
+  pushed both and verified exact local/remote SHA equality.
+- Updated draft PR 13 and confirmed Python 3.10/3.13 passed for both push and pull-request triggers.
 
 ## 2026-07-11 - Reliable CLI startup exit status and malformed-input boundaries
 
