@@ -4,22 +4,20 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: publish and remotely verify the completed CLI startup exit-status checkpoint
-  (`ARA-017`).
+- Current goal: record the remotely verified CLI startup exit-status checkpoint (`ARA-017`) before
+  beginning the next P1 task.
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `8845adfc2a6f53e1ef0084ad8f2dcbffff39bea4`
-- Last known stable commit: `8845adfc2a6f53e1ef0084ad8f2dcbffff39bea4` (local full gate and
-  independent adversarial re-review passed; remote push and CI verification are pending)
-- Active task: ARA-017 implementation is `DONE`; recovery-state and remote-verification closeout is
-  in progress.
-- Uncommitted changes: yes; only the reviewed `.codex` recovery-state update remains.
+- Current HEAD at state snapshot: `a513e4dfd4bb99f6b24a12195c0c40bf55feb274`
+- Last known stable commit: `a513e4dfd4bb99f6b24a12195c0c40bf55feb274` (exact local,
+  remote-tracking, and GitHub branch equality plus all Python 3.10/3.13 push/PR checks passed)
+- Active task: ARA-017 is `DONE`, pushed, and CI-verified; its final state-only closeout is in
+  progress.
+- Uncommitted changes: yes; only the remotely verified `.codex` recovery-state closeout remains.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
-- `.codex/TASK_QUEUE.md`
 - `.codex/COMPLETED.md`
-- `.codex/DECISIONS.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
@@ -154,13 +152,15 @@ Updated: 2026-07-11 (Asia/Shanghai)
   subtests passed`).
 - `git diff --check`, staged diff checks, and staged personal-path/credential/private-key scans passed.
 - Committed implementation, tests, changelog, and developer documentation as `8845adf`.
+- Committed recovery state as `a513e4d`, pushed both commits, and verified exact local,
+  remote-tracking, and GitHub branch SHA equality.
+- Updated draft PR 13; all four Python 3.10/3.13 push and pull-request checks passed.
 
 ## Remaining Steps
 
-- Commit this recovery-state checkpoint without staging ignored runtime artifacts.
-- Push `8845adf` plus the state checkpoint, verify exact remote SHA equality, update draft PR 13,
-  and wait for all Python 3.10/3.13 push and pull-request checks.
-- Record the remotely verified SHA in a final state-only closeout before selecting the next P1 task.
+- Commit and push this final remotely verified state-only closeout.
+- Reverify exact remote SHA and the state-only GitHub Actions run.
+- Select the next highest-value P1 only after the branch is clean and synchronized.
 
 ## Test Status
 
@@ -243,6 +243,10 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Independent final delta-only review: green; no remaining non-interrupt ARA-017 startup
   false-success or traceback gap was confirmed.
 - Real provider smoke: not run; all changes are provider-free startup/input boundary behavior.
+- GitHub Actions for pushed ARA-017 checkpoint `a513e4d`: Python 3.10 and Python 3.13 passed for
+  both push and pull-request triggers.
+- GitHub sync: local, remote-tracking, and GitHub branch SHAs match at
+  `a513e4dfd4bb99f6b24a12195c0c40bf55feb274`; draft PR 13 is updated and mergeable.
 
 ## Recent Failed Command
 
@@ -281,7 +285,7 @@ Updated: 2026-07-11 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git add .codex/CURRENT_STATE.md .codex/TASK_QUEUE.md .codex/COMPLETED.md .codex/DECISIONS.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
+git add .codex/CURRENT_STATE.md .codex/COMPLETED.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
 ```
 
 ## Interruption Recovery

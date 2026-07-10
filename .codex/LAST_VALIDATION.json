@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T02:37:18+08:00",
+  "recorded_at": "2026-07-11T02:41:11+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "8845adfc2a6f53e1ef0084ad8f2dcbffff39bea4",
-  "last_known_stable_commit": "8845adfc2a6f53e1ef0084ad8f2dcbffff39bea4",
-  "status": "passed_committed_push_pending",
+  "head_commit": "a513e4dfd4bb99f6b24a12195c0c40bf55feb274",
+  "last_known_stable_commit": "a513e4dfd4bb99f6b24a12195c0c40bf55feb274",
+  "status": "passed_pushed_ci_verified",
   "commands": [
     {
       "command": "make check",
@@ -67,6 +67,25 @@
         "valid_cache_compatibility": "passed",
         "final_delta_review": "green"
       }
+    },
+    {
+      "command": "exact local, remote-tracking, and git ls-remote SHA comparison",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "a513e4dfd4bb99f6b24a12195c0c40bf55feb274"
+      }
+    },
+    {
+      "command": "gh pr checks 13 --repo ThineLord/auto-research-agent",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed"
+      }
     }
   ],
   "failures": [],
@@ -74,10 +93,6 @@
     {
       "check": "real provider smoke",
       "reason": "CLI status and malformed-input behavior are fully exercised with provider-free subprocesses, mocks, and temporary filesystems; no paid or network model call is required."
-    },
-    {
-      "check": "GitHub Actions",
-      "reason": "Implementation commit is local and the push is the next checkpoint action."
     }
   ],
   "notes": [
@@ -87,7 +102,8 @@
     "Checkpoint, optional cloud-cache, and resume-history readers safely classify invalid UTF-8, parser size/depth, structure, record schema, and unsafe numeric provenance before downstream use or writes.",
     "Valid cache records retain defaults, ignore unknown fields, and remain compatible; invalid records are skipped without discarding other valid records.",
     "Direct and runner-consumed KeyboardInterrupt status remains separately queued as ARA-023; package resource completeness remains ARA-004.",
-    "Implementation commit 8845adfc2a6f53e1ef0084ad8f2dcbffff39bea4 is locally validated; exact remote SHA and GitHub CI verification are pending.",
+    "Implementation commit 8845adfc2a6f53e1ef0084ad8f2dcbffff39bea4 and recovery checkpoint a513e4dfd4bb99f6b24a12195c0c40bf55feb274 were pushed; exact SHA equality and all four GitHub checks were verified.",
+    "Draft PR 13 is updated, open, draft, and mergeable; no merge was attempted.",
     "Ignored runtime artifacts and local configuration remain outside the validation diff."
   ]
 }

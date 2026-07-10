@@ -109,11 +109,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-015 - Some CLI startup failures exit successfully
 
-- Status: fixed, validated, and committed locally; remote push pending
+- Status: fixed, pushed, and CI-verified
 - Severity: P1 automation/release reliability
 - Impact: missing config/resources can print an error while returning status 0, allowing a smoke check to pass falsely.
-- Current action: task `ARA-017` completed at local commit `8845adf`; publish the recovery-state
-  checkpoint and verify GitHub CI. Wheel asset completeness remains separate task `ARA-004`.
+- Current action: task `ARA-017` completed at implementation commit `8845adf` and remotely verified
+  checkpoint `a513e4d`. Wheel asset completeness remains separate task `ARA-004`.
 
 ## KI-016 - Public distribution license is absent
 

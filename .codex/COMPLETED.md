@@ -168,5 +168,6 @@ Validation and implementation outcomes will be appended only after they are actu
   `203 passed, 128 subtests passed`.
 - Multiple independent adversarial reviews found and verified the decode/parser/schema/numeric/depth
   corrections; the final delta review was green.
-- Committed implementation, tests, changelog, and developer documentation as `8845adf`; push and CI
-  verification remain the next checkpoint action.
+- Committed implementation, tests, changelog, and developer documentation as `8845adf` and recovery
+  state as `a513e4d`; pushed both and verified exact local/remote SHA equality.
+- Updated draft PR 13 and confirmed Python 3.10/3.13 passed for both push and pull-request triggers.
