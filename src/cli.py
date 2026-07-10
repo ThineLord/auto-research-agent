@@ -238,7 +238,10 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         default=2,
         help="Stop after this many consecutive provider quota/rate-limit failed rounds.",
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.compare_runs is not None and len(args.compare_runs) < 2:
+        parser.error("--compare-runs requires at least two RUN_DIR arguments")
+    return args
 
 
 def _has_gemini_api_key_source(*, api_key_env: str, config_api_key: str = "") -> bool:

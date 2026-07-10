@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+* The `--compare-runs` CLI now rejects fewer than two run directories with a clear argument error,
+  matching its documented contract. The internal comparison helper still accepts one run for
+  compatibility with existing UI, analytics, and legacy-metadata callers.
+
+### Maintenance
+
+* Added tracked `.codex/` recovery state, task queue, validation evidence, decisions, known issues,
+  and resume instructions for interruption-safe autonomous maintenance.
+
 ## v0.1.1-hardening - Post-Audit Hardening Release
 
 Date: 2026-06-25

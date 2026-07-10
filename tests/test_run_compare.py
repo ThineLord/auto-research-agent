@@ -4,15 +4,31 @@ import json
 import tempfile
 import unittest
 from argparse import Namespace
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 
 from rich.console import Console
 
-from src.cli import _run_compare_cli
+from src.cli import _run_compare_cli, parse_args
 from src.run_compare import compare_runs, load_run_summary, write_run_comparison
 
 
 class RunCompareTests(unittest.TestCase):
+    def test_cli_rejects_a_single_compare_run(self) -> None:
+        stderr = StringIO()
+
+        with redirect_stderr(stderr), self.assertRaises(SystemExit) as raised:
+            parse_args(["--compare-runs", "runs/only"])
+
+        self.assertEqual(raised.exception.code, 2)
+        self.assertIn("--compare-runs requires at least two RUN_DIR arguments", stderr.getvalue())
+
+    def test_cli_accepts_two_or_more_compare_runs(self) -> None:
+        args = parse_args(["--compare-runs", "runs/a", "runs/b", "runs/c"])
+
+        self.assertEqual(args.compare_runs, ["runs/a", "runs/b", "runs/c"])
+
     def test_compare_runs_ranks_by_best_score_and_writes_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
