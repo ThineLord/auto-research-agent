@@ -90,7 +90,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-011 - Prevent failed rounds from replacing a trusted best output
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P1
 - Risk: high
 - Description: a failed research round can produce a synthetic zero score that beats the internal `-1` sentinel and overwrite a valid prior best output with skipped/error text.

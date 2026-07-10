@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-10T16:44:53+08:00",
+  "recorded_at": "2026-07-10T16:54:15+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "bb26c6dece18d0e0e3fd67d761f18b5a14f9cf6c",
-  "last_known_stable_commit": "bb26c6dece18d0e0e3fd67d761f18b5a14f9cf6c",
+  "head_commit": "198f9ec0c4e81b0d67894ebc067a65a96bc23865",
+  "last_known_stable_commit": "198f9ec0c4e81b0d67894ebc067a65a96bc23865",
   "status": "passed_local_commit_pending_push",
   "commands": [
     {
@@ -14,18 +14,19 @@
         "ruff_format_files": 50,
         "ruff_lint": "passed",
         "import_smoke": "passed",
-        "pytest_tests_passed": 141,
+        "pytest_tests_passed": 142,
         "pytest_subtests_passed": 43,
         "pytest_duration_seconds": 0.46
       }
     },
     {
-      "command": ".venv/bin/python -m pytest tests/test_llm.py -q",
+      "command": ".venv/bin/python -m pytest tests/test_round_loop.py -q",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "pytest_tests_passed": 11,
-        "pytest_duration_seconds": 0.07
+        "pytest_tests_passed": 17,
+        "pytest_subtests_passed": 3,
+        "pytest_duration_seconds": 0.25
       }
     },
     {
@@ -58,7 +59,8 @@
   "notes": [
     "The new compare-runs regression test failed before the fix because the parser accepted one path.",
     "The new credential regression failed before the fix because provider events contained the configured key.",
-    "The recorded HEAD contains the validated ARA-008 security fix; only maintenance-state closeout files remain uncommitted.",
+    "The new best-output regression failed before the fix because a failed round was marked improved.",
+    "The recorded HEAD contains the validated ARA-011 integrity fix; only maintenance-state closeout files remain uncommitted.",
     "Ignored runtime artifacts and local configuration are outside the validation diff."
   ]
 }

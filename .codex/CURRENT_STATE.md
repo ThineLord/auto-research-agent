@@ -4,12 +4,12 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: checkpoint and publish the verified provider credential redaction fix.
+- Current goal: checkpoint and publish the verified best-output integrity fix.
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD commit: `bb26c6dece18d0e0e3fd67d761f18b5a14f9cf6c`
-- Last known stable commit: `bb26c6dece18d0e0e3fd67d761f18b5a14f9cf6c` (`make check` passed; local security commit)
-- Active task: closeout for completed task `ARA-008` in `.codex/TASK_QUEUE.md`
-- Uncommitted changes: yes; only maintenance-state closeout files remain after the validated security commit.
+- Current HEAD commit: `198f9ec0c4e81b0d67894ebc067a65a96bc23865`
+- Last known stable commit: `198f9ec0c4e81b0d67894ebc067a65a96bc23865` (`make check` passed; local integrity commit)
+- Active task: closeout for completed task `ARA-011` in `.codex/TASK_QUEUE.md`
+- Uncommitted changes: yes; only maintenance-state closeout files remain after the validated integrity commit.
 
 ## Modified Files
 
@@ -42,6 +42,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Added failing regression coverage for explicit and custom-environment credentials.
 - Redacted known configured secrets before event persistence and before constructing displayed exception chains.
 - Committed the credential-redaction fix as `bb26c6d`.
+- Committed the security state checkpoint as `c8d6c17`, pushed both commits, and updated draft PR 13.
+- Reproduced failed provider rounds and invalid Judge output replacing a trusted best file.
+- Added focused regression coverage for both failure classes.
+- Reused the existing successful-round predicate to gate best-score and best-output updates.
+- Committed the best-output integrity fix as `198f9ec`.
 
 ## Remaining Steps
 
@@ -57,6 +62,10 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - GitHub sync: local and remote `033ed01638965d873a08da05d3ad02dc3529b162` match; PR 13 is draft.
 - Credential-redaction targeted suite: `tests/test_llm.py` passed (`11 passed`).
 - Full regression after the security fix: `make check` passed (`141 passed, 43 subtests passed`).
+- `git diff --check` passed.
+- GitHub sync: local and remote `c8d6c174d5ebb97e5c49bc373d4e0aac761a4f85` match; PR 13 is draft and updated.
+- Runner target validation: `17 passed, 3 subtests passed`.
+- Full regression after the integrity fix: `make check` passed (`142 passed, 43 subtests passed`).
 - `git diff --check` passed.
 - Provider-backed tests: not planned for this checkpoint; no paid or network model calls are needed.
 

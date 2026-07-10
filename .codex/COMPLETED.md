@@ -48,3 +48,13 @@ Validation and implementation outcomes will be appended only after they are actu
 - Rebuilt outward exception chains from sanitized diagnostic messages while preserving public error types and classifications.
 - Targeted LLM tests passed with `11 passed`; full `make check` passed with `141 passed, 43 subtests passed`.
 - Committed the fix as `bb26c6d`.
+- Committed the security checkpoint state as `c8d6c17`, pushed through the command-scoped proxy, verified the exact remote SHA, and updated draft PR 13.
+
+## 2026-07-10 - Best-output integrity on failed rounds
+
+- Reproduced a provider review failure overwriting trusted prior content with `[REVISE SKIPPED]` because synthetic score 0 exceeded the `-1` sentinel.
+- Added a failing regression assertion for provider-stage failure and coverage for a Judge output with no numeric score.
+- Required a round to have no agent errors and a parsed score before it can improve best score/output.
+- Preserved failure round artifacts, error classifications, stop evidence, score history, and round metrics.
+- Runner suite passed with `17 passed, 3 subtests passed`; full `make check` passed with `142 passed, 43 subtests passed`.
+- Committed the fix as `198f9ec`.

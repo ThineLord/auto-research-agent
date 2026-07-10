@@ -12,7 +12,7 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-002 - Compare-runs arity contract may be inconsistent
 
-- Status: fixed, validated, and committed locally
+- Status: fixed, validated, committed, and pushed
 - Severity: P1
 - Evidence source: tracked `TEST_AND_NEXT_STEPS.md` reports that one run was accepted while CLI help and docs require two or more.
 - Impact: users cannot tell whether a one-run self-baseline is supported or accidental.
@@ -52,10 +52,10 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-007 - Configured credentials can be echoed into provider events
 
-- Status: fixed and validated in the current uncommitted checkpoint
+- Status: fixed, validated, and committed locally
 - Severity: P0
 - Impact: an arbitrary configured API key echoed by a provider response can survive pattern-only redaction and be serialized locally.
-- Current action: task `ARA-008` completed; pending remote push.
+- Current action: task `ARA-008` completed at remote checkpoint `c8d6c17`.
 
 ## KI-008 - Interrupted JSON writes can destroy the last checkpoint
 
@@ -73,10 +73,10 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-010 - Failed rounds can replace prior best output
 
-- Status: reproduced by read-only audit
+- Status: fixed and validated in the current uncommitted checkpoint
 - Severity: P1
 - Impact: synthetic failure output can beat the internal sentinel score and overwrite trusted prior content.
-- Current action: task `ARA-011`.
+- Current action: task `ARA-011` completed; pending remote push.
 
 ## KI-011 - Resume roots are not constrained to the project runs directory
 
