@@ -40,20 +40,20 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-`ARA-015` should be `DONE` at implementation commit `817b8a1` and remotely verified checkpoint
-`be37216`. Its final local validation command was:
+`ARA-004` is `BLOCKED` before implementation. Its safe wheel/sdist reproduction confirmed missing
+bundled assets and a combined resource/workspace root. Read `KI-005`, `KI-013`, and `KI-023` in
+`.codex/KNOWN_ISSUES.md` before continuing. The last stable full validation command was:
 
 ```bash
 make check
 ```
 
-If the branch is ahead of origin by only the final ARA-015 state closeout, inspect and push it
-without force, then verify exact remote SHA and CI; do not repeat the implementation. No real
-Gemini call is needed. After synchronization, choose the next P1 from `.codex/TASK_QUEUE.md`; keep
-interrupt status (`ARA-023`), package assets (`ARA-004`), dependency policy (`ARA-019`),
-project-level symlink policy (`ARA-022`), and manifest provenance (`ARA-020`) separate. If another
-task is active, run its exact validation command first. Understand any uncommitted diff before
-editing it.
+Do not repeat the unsafe local build harness and do not delete or rewrite ignored `projects/example`
+state. Wait for the owner's two decisions: approve the revised 45–90 minute package-resource/
+workspace implementation, and choose whether to preserve or best-effort roll back deterministic run
+`20260711_031915_776385`. If implementation is approved, keep UI/scripts publication, package
+version/license, dependency policy (`ARA-019`), symlink policy (`ARA-022`), and provider behavior out
+of scope. Run artifact builds from a Git export with isolated interpreters and a neutral CWD.
 
 ## 5. Safety boundaries
 

@@ -42,7 +42,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-004 - Verify source distribution and wheel behavior from a clean install
 
-- Status: `TODO`
+- Status: `BLOCKED`
 - Priority: P1
 - Risk: medium
 - Description: a clean wheel-layout smoke can run `--help` but `--mock` cannot find `config.example.yaml`; verify and repair the install-time resource root without changing provider semantics.
@@ -50,7 +50,8 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Acceptance criteria: exact wheel/sdist contents and clean-install smoke results are recorded; any missing assets have a reproducible test before a fix.
 - Validation command: isolated build/install smoke commands selected after checking available build tooling.
 - Commit required: only if a verified packaging defect is fixed.
-- Dependencies: `ARA-001`.
+- Dependencies: `ARA-001`; owner approval for the >30-minute resource/workspace implementation
+  checkpoint and disposition of the accidentally advanced ignored `projects/example` state.
 
 ## ARA-008 - Redact the configured provider credential from provider events
 

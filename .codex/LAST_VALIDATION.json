@@ -1,11 +1,36 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T03:08:47+08:00",
+  "recorded_at": "2026-07-11T03:25:40+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "be3721603bd2958ccf184ba5248bf0be2c888b4e",
-  "last_known_stable_commit": "be3721603bd2958ccf184ba5248bf0be2c888b4e",
-  "status": "passed_pushed_ci_verified",
+  "head_commit": "e202dfb90c2e5b5d2c4fa164f450244fbd06e21b",
+  "last_known_stable_commit": "e202dfb90c2e5b5d2c4fa164f450244fbd06e21b",
+  "status": "packaging_defect_reproduced_blocked_before_implementation",
   "commands": [
+    {
+      "command": "isolated PEP 517 wheel and sdist build plus exact archive inventory",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "wheel_files": 31,
+        "sdist_files": 57,
+        "config_example_in_both": false,
+        "prompt_files_in_both": 0,
+        "example_project_in_both": false,
+        "ui_and_scripts_in_both": false
+      }
+    },
+    {
+      "command": "isolated wheel/sdist console and module help/mock smoke matrix",
+      "exit_code": 0,
+      "result": "defect_reproduced",
+      "summary": {
+        "help_controls_exit": 0,
+        "mock_controls_exit": 2,
+        "mock_error": "Config file not found: config.example.yaml",
+        "provider_calls": 0,
+        "neutral_workspace_artifacts": 0
+      }
+    },
     {
       "command": "make check",
       "exit_code": 0,
@@ -61,7 +86,7 @@
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "verified_commit": "be3721603bd2958ccf184ba5248bf0be2c888b4e"
+        "verified_commit": "e202dfb90c2e5b5d2c4fa164f450244fbd06e21b"
       }
     },
     {
@@ -79,19 +104,40 @@
       }
     }
   ],
-  "failures": [],
+  "failures": [
+    {
+      "command": "initial local ARA-004 build/install harness",
+      "result": "harness_failed_and_touched_ignored_example_state",
+      "summary": {
+        "missing_build_backend": "setuptools",
+        "editable_source_imported": true,
+        "deterministic_run_id": "20260711_031915_776385",
+        "provider_calls": 0,
+        "tracked_files_changed": 0,
+        "cleanup_attempted": false
+      }
+    }
+  ],
   "not_run": [
     {
+      "check": "ARA-004 implementation, artifact regression, and post-fix full gate",
+      "reason": "The verified safe fix exceeds the 30-minute checkpoint threshold and requires owner approval; implementation has not started."
+    },
+    {
       "check": "real provider smoke",
-      "reason": "Timeout propagation and error behavior are fully exercised through mocks plus a provider-free SDK construction smoke; a paid or network model call is unnecessary."
+      "reason": "Package-resource and provider-free mock behavior require no paid or network model call."
     }
   ],
   "notes": [
+    "Both clean artifacts omit config.example.yaml, all four prompts, the example project, UI, and scripts.",
+    "Installed CLI root resolution points at site-packages, so adding loose data files alone would still make writable project output target the package installation.",
+    "The scoped safe design is package-internal public assets plus importlib.resources, CWD as installed workspace, and mock-only example seeding while source/editable behavior remains unchanged.",
+    "The initial local harness incident touched only ignored projects/example state; no cleanup or speculative reconstruction was attempted.",
     "The installed google-genai 2.7.0 public Client accepts http_options.timeout in milliseconds; 37 configured seconds produced 37000 without a request.",
     "All explicit-key, custom-environment, and SDK-default credential paths now pass the same transport timeout while preserving generation settings.",
     "Timeout classification uses concrete timeout base types, explicit timed-out wording, and HTTP 408/504; misleading option text and class-name substrings remain unknown.",
     "Native timeout and HTTP 408 retain non-retrying behavior; HTTP 504 retains its existing retryable 5xx policy.",
-    "Implementation commit 817b8a130228e09b2cfedea130ccfeb88942919c and recovery checkpoint be3721603bd2958ccf184ba5248bf0be2c888b4e were pushed; exact SHA equality and all four GitHub checks were verified.",
+    "Implementation commit 817b8a130228e09b2cfedea130ccfeb88942919c, recovery checkpoint be3721603bd2958ccf184ba5248bf0be2c888b4e, and verified-state closeout e202dfb90c2e5b5d2c4fa164f450244fbd06e21b were pushed; exact SHA equality and all four final GitHub checks were verified.",
     "Draft PR 13 has a verified ARA-015 body, remains open, draft, and mergeable; no merge was attempted.",
     "Direct and runner-consumed KeyboardInterrupt status remains separately queued as ARA-023; dependency policy remains ARA-019.",
     "Ignored runtime artifacts and local configuration remain outside the validation diff."

@@ -36,11 +36,12 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-005 - Non-editable package assets are not yet verified
 
-- Status: open
+- Status: verified incomplete in both wheel and sdist
 - Severity: P2
 - Evidence: the project declares only the `src` package while runtime workflows also reference repository assets and UI/scripts.
 - Impact: wheel-installed behavior may differ from editable or cloned-checkout behavior.
-- Current action: task `ARA-004`; verify in isolation before changing packaging.
+- Current action: task `ARA-004`; safe implementation requires separating installed read-only
+  resources from a writable workspace and is awaiting the recorded long-task checkpoint approval.
 
 ## KI-006 - Legacy ignored logs can predate path masking
 
@@ -95,10 +96,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-013 - Wheel-installed mock workflow cannot find repository assets
 
-- Status: reproduced in an isolated wheel-layout smoke
+- Status: reproduced in isolated wheel and sdist installs; implementation blocked before changes
 - Severity: P1 for packaged distribution
 - Impact: console help works, but mock startup cannot locate `config.example.yaml`; a source checkout works.
-- Current action: task `ARA-004`; do not advertise wheel readiness meanwhile.
+- Current action: task `ARA-004`; do not advertise wheel readiness. Avoid package-root data files
+  that would make installed workflows write into `site-packages`.
 
 ## KI-014 - Tracked reports contain a personal absolute-path fragment
 
@@ -165,3 +167,13 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Impact: direct interrupts caught by the CLI and runner-consumed safe interrupts do not yet share a
   documented process-status contract, so changing only one path could make automation inconsistent.
 - Current action: task `ARA-023`; preserve safe-stop artifacts while defining the status boundary.
+
+## KI-023 - A maintenance smoke advanced ignored example-project state
+
+- Status: awaiting owner disposition; no cleanup attempted
+- Severity: local-state integrity incident, no tracked-code/provider impact
+- Impact: deterministic run `20260711_031915_776385` created one ignored run and replaced five
+  ignored project-level state files plus appended `run.log` under `projects/example`.
+- Current action: preserve all touched files as-is until the owner chooses to keep the transparent
+  mock checkpoint or authorizes a backed-up best-effort rollback. Repository history cannot restore
+  the prior ignored state byte-for-byte.

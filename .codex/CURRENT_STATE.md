@@ -4,20 +4,21 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: record the remotely verified Gemini transport-timeout checkpoint (`ARA-015`)
-  before selecting the next P1 task.
+- Current goal: make clean wheel and source-distribution installs retain the provider-free resources
+  needed by documented CLI workflows (`ARA-004`).
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `be3721603bd2958ccf184ba5248bf0be2c888b4e`
-- Last known stable commit: `be3721603bd2958ccf184ba5248bf0be2c888b4e` (exact local,
+- Current HEAD at state snapshot: `e202dfb90c2e5b5d2c4fa164f450244fbd06e21b`
+- Last known stable commit: `e202dfb90c2e5b5d2c4fa164f450244fbd06e21b` (exact local,
   remote-tracking, and GitHub branch equality plus all Python 3.10/3.13 push/PR checks passed)
-- Active task: ARA-015 is `DONE`, pushed, and CI-verified; its final state-only closeout is in
-  progress.
-- Uncommitted changes: yes; only this remotely verified `.codex` state closeout remains.
+- Active task: ARA-004 is `BLOCKED` before implementation. The verified safe fix now exceeds the
+  30-minute checkpoint threshold, and an accidental local mock changed ignored example-project
+  state that must not be deleted or reconstructed without owner direction.
+- Uncommitted changes: yes; only the ARA-004 audit/blocker recovery-state checkpoint is present.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
-- `.codex/COMPLETED.md`
+- `.codex/TASK_QUEUE.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
@@ -178,12 +179,29 @@ Updated: 2026-07-11 (Asia/Shanghai)
   remote-tracking, and GitHub branch SHA equality.
 - Updated draft PR 13 after bounded GitHub API retries; all four Python 3.10/3.13 push and
   pull-request checks passed, and the PR remains open, draft, and mergeable.
+- Exported clean HEAD and independently built wheel and sdist with isolated PEP 517 tooling.
+  Wheel/module and sdist/module/console `--help` controls returned 0 without source-tree imports.
+- Verified the wheel contains only package modules plus distribution metadata and the sdist adds
+  tests/basic metadata; both omit `config.example.yaml`, prompts, example project, UI, and scripts.
+- Reproduced wheel and sdist console/module mock startup exiting 2 with
+  `Config file not found: config.example.yaml` in empty neutral working directories before project
+  or provider work; the safe reproduction wrote no artifacts.
+- Confirmed the root cause is a combined source/resource/workspace root: installed `src/cli.py`
+  resolves its package parent as `site-packages`, while runtime requires immutable repository assets
+  and writable project output.
+- Scoped the safe implementation to bundled public config/prompts/example assets, an
+  `importlib.resources` resolver, CWD as installed writable workspace, and mock-only example seeding.
+  Source/editable behavior, provider semantics, prompt bytes, UI/scripts distribution, versions,
+  licenses, dependencies, and other projects remain unchanged/out of scope.
 
 ## Remaining Steps
 
-- Commit and push this final remotely verified state-only closeout.
-- Reverify exact remote SHA and the state-only GitHub Actions run.
-- Select the next highest-value P1 only after the branch is clean and synchronized.
+- Obtain owner approval for the revised Large estimate (45–90 minutes) and proposed installed
+  workspace/resource contract.
+- Decide whether to preserve the accidental deterministic example run or authorize a best-effort
+  rollback/backup procedure; byte-exact rollback is unavailable from repository state alone.
+- After approval, add the failing artifact regression, implement in phases, run wheel/sdist clean
+  smokes and `make check`, then commit/push and verify PR CI.
 
 ## Test Status
 
@@ -196,6 +214,13 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Independent compatibility review: three credential branches, Python 3.10 syntax parsing,
   HTTP 408/504 policy, and model/prompt/generation-config preservation passed. Native Python 3.10
   execution remains for GitHub Actions.
+- Final ARA-015 state-only closeout `e202dfb`: exact remote SHA verified; Python 3.10/3.13 passed
+  for both push and pull-request workflows.
+- ARA-004 safe isolated build inventory: wheel/sdist built successfully; four console/module help
+  controls passed, and four mock controls failed at missing bundled config with status 2. Neutral
+  workspaces remained empty.
+- ARA-004 implementation tests were not started because the verified fix exceeds 30 minutes and
+  needs an explicit checkpoint approval.
 - Current branch validation: `make check` passed at 2026-07-10T16:27:39+08:00.
 - Results: Ruff format passed (50 files), Ruff lint passed, import smoke passed, pytest passed (`139 passed, 43 subtests passed`).
 - Compare-runs targeted validation: module suite passed (`7 passed`).
@@ -323,11 +348,17 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - The first non-interactive PR body update closed stdin and temporarily produced an empty body;
   subsequent GraphQL/REST attempts hit EOF/TLS handshake errors. A bounded REST retry restored a
   verified 2260-character ARA-015 body without changing the draft state or branch.
+- The first local ARA-004 harness tried to call an unavailable `.venv` build backend, then failed to
+  stop after that error. Editable-path leakage imported the source checkout and completed one
+  deterministic mock run (`20260711_031915_776385`) in ignored `projects/example` state.
+- That incident created one run directory, atomically replaced `best_output.md`, `checkpoint.json`,
+  `memory.md`, `research_state.json`, and `score_history.json`, and appended `run.log`. No provider,
+  secret, tracked file, or canonical research artifact was involved. No cleanup was attempted.
 
 ## Next Command
 
 ```bash
-git add .codex/CURRENT_STATE.md .codex/COMPLETED.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
+git status --short --branch && sed -n '1,220p' .codex/CURRENT_STATE.md
 ```
 
 ## Interruption Recovery
