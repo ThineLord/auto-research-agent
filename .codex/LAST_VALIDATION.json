@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-10T18:08:23+08:00",
+  "recorded_at": "2026-07-10T18:13:51+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "6d56d097a9f8881828109de2380f98929633acce",
-  "last_known_stable_commit": "6d56d097a9f8881828109de2380f98929633acce",
-  "status": "passed_local_commit_pending_push",
+  "head_commit": "b8b629baa728ec30279bce55bb86e039ef31c2c3",
+  "last_known_stable_commit": "b8b629baa728ec30279bce55bb86e039ef31c2c3",
+  "status": "passed_pushed_ci_verified",
   "commands": [
     {
       "command": "make check",
@@ -33,6 +33,17 @@
       "command": "git diff --check",
       "exit_code": 0,
       "result": "passed"
+    },
+    {
+      "command": "gh pr checks 13 --repo ThineLord/auto-research-agent",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed"
+      }
     }
   ],
   "failures": [],
@@ -47,6 +58,7 @@
     "Validation covers normal resume, legacy fallback, partial history, no-new-round interruption, cumulative runtime, best-score and best-round reconciliation, recursive cross-history conflicts, invalid round values, and CLI failure propagation.",
     "Unsafe or unsupported resume state is rejected before run config, manifest, checkpoint, round, summary, or history writes.",
     "Independent read-only adversarial and code reviews reported no remaining confirmed P1 or P2 defect in the tested ARA-010 matrix.",
+    "Local, remote-tracking, and GitHub branch SHAs were verified equal at b8b629baa728ec30279bce55bb86e039ef31c2c3 before this state-only closeout commit.",
     "Ignored runtime artifacts and local configuration remain outside the validation diff."
   ]
 }

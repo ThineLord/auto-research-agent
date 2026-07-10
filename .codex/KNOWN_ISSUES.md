@@ -66,10 +66,10 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-009 - Resume can discard historical metrics
 
-- Status: fixed, validated, and committed locally
+- Status: fixed, validated, committed, pushed, and CI-verified
 - Severity: P1
 - Impact: appending a resumed round can rewrite metrics and summaries with only the new round, corrupting longitudinal interpretation.
-- Current action: task `ARA-010` completed at local commit `6d56d09`; remote push pending.
+- Current action: task `ARA-010` completed at remote checkpoint `b8b629b`.
 
 ## KI-010 - Failed rounds can replace prior best output
 

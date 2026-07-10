@@ -4,11 +4,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: publish the validated `ARA-010` resume-integrity fix, then continue with `ARA-012`.
+- Current goal: begin `ARA-012` from the published and CI-verified `ARA-010` checkpoint.
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `6d56d097a9f8881828109de2380f98929633acce` (use `git rev-parse HEAD` after the state-only closeout commit)
-- Last known stable commit: `6d56d097a9f8881828109de2380f98929633acce` (`make check` and independent adversarial review passed locally; remote push pending)
-- Active task: closeout for completed task `ARA-010` in `.codex/TASK_QUEUE.md`
+- Current HEAD at state snapshot: `b8b629baa728ec30279bce55bb86e039ef31c2c3` (use `git rev-parse HEAD` after the state-only closeout commit)
+- Last known stable commit: `b8b629baa728ec30279bce55bb86e039ef31c2c3` (`make check`, independent adversarial review, remote synchronization, and GitHub Actions passed)
+- Active task: prepare `ARA-012` in `.codex/TASK_QUEUE.md`
 - Uncommitted changes: yes; maintenance-state closeout files only.
 
 ## Modified Files
@@ -63,11 +63,14 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Added strict round-number validation and nonzero CLI status for any blocked resume preview/history condition.
 - Verified normal, legacy fallback, partial-history, stop-before-round, stale/outlier metadata, recursive JSON-conflict, and analytics/compare paths.
 - Committed the implementation, tests, and docs as `6d56d09`.
+- Committed the ARA-010 recovery-state checkpoint as `b8b629b`, pushed both commits, and verified the local, remote-tracking, and GitHub branch SHAs match.
+- Updated draft PR 13 with the resume-integrity scope and evidence.
+- Verified all Python 3.10 and Python 3.13 GitHub Actions jobs passed for both push and pull-request triggers.
 
 ## Remaining Steps
 
-- Commit this state closeout, push `6d56d09` plus the state commit, update draft PR 13, and verify the exact remote SHA and CI.
-- Begin `ARA-012` only from a clean synchronized checkpoint; keep run-root containment separate from history semantics.
+- Commit and push this verified state closeout.
+- Mark `ARA-012` `IN_PROGRESS`, reproduce the checkpoint run-root escape without writing outside a temporary project, and keep path containment separate from history semantics.
 
 ## Test Status
 
@@ -99,6 +102,8 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Final ARA-010 `make check` passed: Ruff format (50 files), Ruff lint, import smoke, and pytest (`153 passed, 67 subtests passed`).
 - Independent adversarial and code reviews reproduced the pre-fix failures, challenged cross-artifact conflicts, and reported no remaining confirmed P1/P2 issue after the final corrections.
 - Final `git diff --check` and staged sensitive-pattern scans passed.
+- GitHub Actions for the pushed ARA-010 checkpoint: Python 3.10 and Python 3.13 passed for both push and pull-request triggers.
+- GitHub sync: local, remote-tracking, and GitHub branch SHAs match at `b8b629baa728ec30279bce55bb86e039ef31c2c3`; draft PR 13 is updated and mergeable.
 - Provider-backed tests: not planned for this checkpoint; no paid or network model calls are needed.
 
 ## Recent Failed Command
@@ -125,5 +130,5 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.
 - Do not change prompts, scoring semantics, provider behavior, benchmark results, or artifact interpretation as part of a maintenance-only fix.
-- Do not start `ARA-012` until the `ARA-010` commits are pushed and remote CI is verified.
+- Keep `ARA-012` scoped to run-root containment; do not combine it with the separate manifest-provenance task `ARA-020`.
 - Do not stage with `git add -A`; stage only reviewed paths.

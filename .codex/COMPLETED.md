@@ -92,3 +92,5 @@ Validation and implementation outcomes will be appended only after they are actu
 - Focused resume/consumer validation passed with `70 passed, 23 subtests passed`; final `make check` passed with `153 passed, 67 subtests passed`.
 - Independent read-only adversarial and code reviews reported no remaining confirmed P1/P2 defect in the tested resume-integrity matrix.
 - Committed the implementation as `6d56d09`.
+- Committed its recovery-state checkpoint as `b8b629b`, pushed both commits, and verified exact local/remote SHA equality.
+- Updated draft PR 13 and confirmed Python 3.10/3.13 passed for both push and pull-request GitHub Actions triggers.
