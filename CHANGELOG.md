@@ -32,6 +32,12 @@
 * Resuming an existing run now retains and appends prior round metrics and score history, preserves
   best-round and cumulative runtime metadata, restores previous-round drafting context, and fails
   closed before writes when an existing history file is malformed or unsafe to append to.
+* Run acquisition now holds a cross-process OS guard for the full run lifecycle and records an
+  owner token plus guard identity in `active_run.json`. Concurrent cooperating contenders cannot
+  both acquire, crashed owners are recoverable without stale-file deletion races, malformed legacy
+  PID metadata no longer raises, recreated guard inodes cannot displace a live recorded owner, and
+  an old or fork-inherited handle cannot delete replacement/parent metadata. CLI constructor
+  failures also release the guard before propagating.
 
 ### Maintenance
 

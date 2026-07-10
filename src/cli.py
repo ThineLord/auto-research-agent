@@ -64,7 +64,7 @@ from .resume import run_resume_mode
 from .run_analytics import analyze_run
 from .run_compare import compare_runs
 from .runner import ResumeHistoryError, run_iterative_rounds
-from .runtime import acquire_run_lock, release_run_lock
+from .runtime import RUN_LOCK_GUARD_FILENAME, acquire_run_lock, release_run_lock
 from .session import run_session_mode
 from .storage import write_json_file
 
@@ -317,6 +317,15 @@ def _display_repo_path(root: Path, value: object) -> str:
         return f"<repo>/{path.name}"
 
 
+def _print_run_lock_recovery_hint(console: Console, root: Path, project_dir: Path) -> None:
+    metadata_path = _display_repo_path(root, project_dir / RUN_LOCK_FILENAME)
+    guard_path = _display_repo_path(root, project_dir / RUN_LOCK_GUARD_FILENAME)
+    console.print(
+        "[yellow]If no run process is active, inspect and move aside stale lock paths "
+        f"{metadata_path} and {guard_path}, then retry.[/yellow]"
+    )
+
+
 def _privacy_safe_comparison(comparison: dict[str, Any], root: Path) -> dict[str, Any]:
     safe_comparison = dict(comparison)
     safe_runs: list[dict[str, Any]] = []
@@ -511,10 +520,7 @@ def main() -> None:
         )
         if lock_error:
             console.print(f"[red]{lock_error}[/red]")
-            console.print(
-                "[yellow]If this is stale, remove "
-                f"{_display_repo_path(root, project_dir / RUN_LOCK_FILENAME)} and retry.[/yellow]"
-            )
+            _print_run_lock_recovery_hint(console, root, project_dir)
             return
         try:
             run_literature_survey_mode(
@@ -554,13 +560,10 @@ def main() -> None:
         )
         if lock_error:
             console.print(f"[red]{lock_error}[/red]")
-            console.print(
-                "[yellow]If this is stale, remove "
-                f"{_display_repo_path(root, project_dir / RUN_LOCK_FILENAME)} and retry.[/yellow]"
-            )
+            _print_run_lock_recovery_hint(console, root, project_dir)
             return
-        agents = build_mock_agents(topic_context=topic_context)
         try:
+            agents = build_mock_agents(topic_context=topic_context)
             run_iterative_rounds(
                 console=console,
                 agents=agents,
@@ -744,32 +747,29 @@ def main() -> None:
     )
     if lock_error:
         console.print(f"[red]{lock_error}[/red]")
-        console.print(
-            "[yellow]If this is stale, remove "
-            f"{_display_repo_path(root, project_dir / RUN_LOCK_FILENAME)} and retry.[/yellow]"
-        )
+        _print_run_lock_recovery_hint(console, root, project_dir)
         return
 
-    llm = create_llm_client(
-        provider=provider,
-        model_name=model_name,
-        ollama_base_url=base_url,
-        timeout_seconds=timeout_seconds,
-        max_prompt_chars=max_prompt_chars,
-        gemini_config=gemini_config,
-        cloud_free_config=cloud_free_config
-        if provider == MODEL_PROVIDER_GEMINI and cloud_free_config.cloud_free_mode
-        else None,
-    )
-    agents = ResearchAgents.from_prompt_dir(
-        llm=llm,
-        prompt_dir=prompts_dir,
-        temperature=temperature,
-        top_p=top_p,
-        topic_context=topic_context,
-    )
-
     try:
+        llm = create_llm_client(
+            provider=provider,
+            model_name=model_name,
+            ollama_base_url=base_url,
+            timeout_seconds=timeout_seconds,
+            max_prompt_chars=max_prompt_chars,
+            gemini_config=gemini_config,
+            cloud_free_config=cloud_free_config
+            if provider == MODEL_PROVIDER_GEMINI and cloud_free_config.cloud_free_mode
+            else None,
+        )
+        agents = ResearchAgents.from_prompt_dir(
+            llm=llm,
+            prompt_dir=prompts_dir,
+            temperature=temperature,
+            top_p=top_p,
+            topic_context=topic_context,
+        )
+
         if args.resume:
             try:
                 resume_started = run_resume_mode(

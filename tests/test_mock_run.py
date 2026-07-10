@@ -184,6 +184,44 @@ class MockRunTests(unittest.TestCase):
             self.assertEqual(kwargs["max_rounds"], MOCK_DEFAULT_ROUNDS)
             self.assertEqual(kwargs["per_agent_timeout_seconds"], 1)
 
+    def test_cli_mock_constructor_failure_releases_run_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "projects" / "example"
+            project_dir.mkdir(parents=True)
+            project_input = SimpleNamespace(
+                project_name="example",
+                project_dir=project_dir,
+                task_path=project_dir / "task.md",
+                task_text="# Mock task",
+                project_title="Mock task",
+                source_kind="example_default",
+                as_metadata=lambda: {"project_name": "example"},
+            )
+            args = cli_module.parse_args(["--mock", "--project", "example"])
+
+            with (
+                patch.object(cli_module, "parse_args", return_value=args),
+                patch.object(cli_module, "load_app_config", return_value=AppConfig()),
+                patch.object(cli_module, "load_project_input", return_value=project_input),
+                patch.object(
+                    cli_module,
+                    "build_mock_agents",
+                    side_effect=RuntimeError("injected constructor failure"),
+                ),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "injected constructor failure"):
+                    cli_module.main()
+
+            self.assertFalse((project_dir / "active_run.json").exists())
+            retry_handle, retry_error = cli_module.acquire_run_lock(
+                project_dir,
+                mode="mock",
+                model_name=MOCK_MODEL_NAME,
+            )
+            self.assertIsNotNone(retry_handle)
+            self.assertIsNone(retry_error)
+            cli_module.release_run_lock(retry_handle)
+
 
 if __name__ == "__main__":
     unittest.main()

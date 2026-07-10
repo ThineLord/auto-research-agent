@@ -121,6 +121,16 @@ The UI starts background processes through `src.runtime.start_background_process
 is written to `ui_run_process.json` or `ui_model_job_process.json`; stale metadata is removed when
 the PID is no longer active.
 
+Run exclusivity uses a long-held OS advisory guard at project-root `active_run.guard`; the ignored guard
+file is persistent, while `active_run.json` remains transient diagnostic metadata. The metadata
+includes a per-acquisition owner token plus guard device/inode identity. The guard is held from
+successful acquisition through all client/agent initialization and run dispatch, and release
+removes metadata only when its token, PID, and guard identity still match the handle. A process
+crash releases the kernel guard automatically, so the next process can replace stale metadata
+without a check/delete race. If the guard path is accidentally recreated while an owner remains
+live, the stored PID/identity prevents the new inode from taking over. Existing live legacy
+PID-only locks remain blocking; malformed or dead legacy metadata is recovered under the guard.
+
 Progress comes from:
 
 - `checkpoint.json` for completed round, best score, stop reason, and resume eligibility.

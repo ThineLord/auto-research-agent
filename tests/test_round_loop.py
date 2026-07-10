@@ -1307,6 +1307,76 @@ class RoundLoopTests(unittest.TestCase):
             self.assertFalse((project_dir / "run.log").exists())
             self.assertEqual(list(outside_run.iterdir()), [])
 
+    def test_cli_model_constructor_failures_release_run_lock(self) -> None:
+        for failure_stage in ("client", "agents"):
+            with self.subTest(stage=failure_stage), tempfile.TemporaryDirectory() as tmp:
+                temp_root = Path(tmp)
+                project_dir = temp_root / "projects" / "selected"
+                project_dir.mkdir(parents=True)
+                args = parse_args(
+                    [
+                        "--diagnostic",
+                        "--provider",
+                        "ollama",
+                        "--model",
+                        "qwen3:8b",
+                        "--project",
+                        "selected",
+                    ]
+                )
+                project_input = types.SimpleNamespace(
+                    project_name="selected",
+                    project_dir=project_dir,
+                    task_path=project_dir / "task.md",
+                    task_text="# Constructor failure test",
+                    project_title="Constructor failure test",
+                    source_kind="user_provided",
+                    as_metadata=lambda: {"project_name": "selected"},
+                )
+                client_result = (
+                    RuntimeError("injected client failure")
+                    if failure_stage == "client"
+                    else types.SimpleNamespace(timeout_seconds=1)
+                )
+
+                with (
+                    patch.object(cli_module, "parse_args", return_value=args),
+                    patch.object(cli_module, "load_app_config", return_value=AppConfig()),
+                    patch.object(cli_module, "load_project_input", return_value=project_input),
+                    patch.object(
+                        cli_module,
+                        "list_installed_ollama_models",
+                        return_value=(["qwen3:8b"], None),
+                    ),
+                    patch.object(
+                        cli_module,
+                        "create_llm_client",
+                        side_effect=client_result if isinstance(client_result, Exception) else None,
+                        return_value=None
+                        if isinstance(client_result, Exception)
+                        else client_result,
+                    ),
+                    patch.object(
+                        cli_module.ResearchAgents,
+                        "from_prompt_dir",
+                        side_effect=RuntimeError("injected agents failure")
+                        if failure_stage == "agents"
+                        else None,
+                    ),
+                ):
+                    with self.assertRaisesRegex(RuntimeError, f"injected {failure_stage} failure"):
+                        cli_module.main()
+
+                self.assertFalse((project_dir / "active_run.json").exists())
+                retry_handle, retry_error = cli_module.acquire_run_lock(
+                    project_dir,
+                    mode="diagnostic",
+                    model_name="qwen3:8b",
+                )
+                self.assertIsNotNone(retry_handle)
+                self.assertIsNone(retry_error)
+                cli_module.release_run_lock(retry_handle)
+
     def test_resume_rejects_non_directory_run_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)

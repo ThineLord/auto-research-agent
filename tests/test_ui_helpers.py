@@ -3,8 +3,12 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 import tempfile
+import threading
+import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -119,6 +123,26 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         ):
             self.assertTrue(runtime_module.is_pid_running(123))
 
+        with patch.object(runtime_module.os, "kill", side_effect=PermissionError):
+            self.assertTrue(runtime_module.is_pid_running(123))
+
+        with patch.object(runtime_module.os, "kill") as kill:
+            self.assertFalse(runtime_module.is_pid_running(2**63))
+        kill.assert_not_called()
+
+        with (
+            patch.object(runtime_module.os, "name", "nt"),
+            patch.object(
+                runtime_module,
+                "_is_windows_pid_running",
+                return_value=True,
+            ) as windows_probe,
+            patch.object(runtime_module.os, "kill") as kill,
+        ):
+            self.assertTrue(runtime_module.is_pid_running(456))
+        windows_probe.assert_called_once_with(456)
+        kill.assert_not_called()
+
     def test_start_background_process_writes_meta_and_reports_errors(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -197,6 +221,493 @@ class SharedUiBackendHelperTests(unittest.TestCase):
             self.assertTrue(lock_path.is_dir())
             release_run_lock(lock_path)
             self.assertTrue(lock_path.is_dir())
+
+    def test_run_lock_replaces_malformed_pid_without_raising(self) -> None:
+        invalid_pids = (
+            "not-a-pid",
+            {"invalid": True},
+            [123],
+            None,
+            True,
+            1.5,
+            2**63,
+            "9" * 100,
+        )
+        for invalid_pid in invalid_pids:
+            with self.subTest(pid=invalid_pid), tempfile.TemporaryDirectory() as tmp:
+                project_dir = Path(tmp)
+                lock_path = project_dir / "active_run.json"
+                write_json_file(lock_path, {"pid": invalid_pid, "mode": "stale"})
+
+                with patch.object(runtime_module, "is_pid_running") as pid_probe:
+                    handle, error = acquire_run_lock(
+                        project_dir,
+                        mode="run",
+                        model_name="mock",
+                    )
+
+                pid_probe.assert_not_called()
+                self.assertIsNotNone(handle)
+                self.assertIsNone(error)
+                lock_data = read_json_file(lock_path)
+                self.assertEqual(lock_data["pid"], os.getpid())
+                self.assertEqual(lock_data["mode"], "run")
+                self.assertTrue(lock_data.get("owner_token"))
+                release_run_lock(handle)
+                self.assertFalse(lock_path.exists())
+
+    def test_run_lock_tolerates_corrupt_bytes_during_acquire_and_release(self) -> None:
+        corrupt_payloads = (
+            b"\xff",
+            b'{"pid": ' + (b"9" * 5000) + b"}",
+            b'{"x":' + (b"[" * 20000) + b"0" + (b"]" * 20000) + b"}",
+        )
+        for payload in corrupt_payloads:
+            with self.subTest(payload_size=len(payload)), tempfile.TemporaryDirectory() as tmp:
+                project_dir = Path(tmp)
+                lock_path = project_dir / "active_run.json"
+                lock_path.write_bytes(payload)
+
+                handle, error = acquire_run_lock(project_dir, mode="run", model_name="mock")
+
+                self.assertIsNotNone(handle)
+                self.assertIsNone(error)
+                lock_path.write_bytes(payload)
+                contender, contender_error = acquire_run_lock(
+                    project_dir,
+                    mode="run",
+                    model_name="contender",
+                )
+                self.assertIsNone(contender)
+                self.assertIn("Another run is already active", contender_error or "")
+                release_run_lock(handle)
+                self.assertEqual(lock_path.read_bytes(), payload)
+                retry_handle, retry_error = acquire_run_lock(
+                    project_dir,
+                    mode="run",
+                    model_name="retry",
+                )
+                self.assertIsNotNone(retry_handle)
+                self.assertIsNone(retry_error)
+                release_run_lock(retry_handle)
+
+    def test_run_lock_acquisition_is_exclusive_under_a_synchronized_race(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            start_barrier = threading.Barrier(3)
+
+            def attempt(model: str) -> tuple[object, object]:
+                start_barrier.wait(timeout=2)
+                return acquire_run_lock(
+                    project_dir,
+                    mode="run",
+                    model_name=model,
+                )
+
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                futures = [pool.submit(attempt, model) for model in ("model-one", "model-two")]
+                start_barrier.wait(timeout=2)
+                results = [future.result(timeout=2) for future in futures]
+
+            acquired = [handle for handle, error in results if handle is not None and error is None]
+            blocked = [error for handle, error in results if handle is None and error is not None]
+            self.assertEqual(len(acquired), 1)
+            self.assertEqual(len(blocked), 1)
+            self.assertIn("Another run is already active", blocked[0])
+            release_run_lock(acquired[0])
+
+    def test_run_lock_release_does_not_delete_a_replacement_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            lock_path = project_dir / "active_run.json"
+            old_handle, error = acquire_run_lock(project_dir, mode="run", model_name="old")
+            self.assertIsNotNone(old_handle)
+            self.assertIsNone(error)
+            replacement = {
+                "pid": os.getpid(),
+                "mode": "run",
+                "model": "replacement",
+                "started_at": "replacement-start",
+                "owner_token": "replacement-owner",
+            }
+            write_json_file(lock_path, replacement)
+
+            release_run_lock(old_handle)
+
+            self.assertTrue(lock_path.exists())
+            self.assertEqual(read_json_file(lock_path), replacement)
+
+    def test_run_lock_bare_path_cannot_release_owner_capability(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            lock_path = project_dir / "active_run.json"
+            handle, error = acquire_run_lock(project_dir, mode="run", model_name="mock")
+            self.assertIsNotNone(handle)
+            self.assertIsNone(error)
+            self.assertEqual(str(handle), str(lock_path))
+            self.assertNotIn(read_json_file(lock_path)["owner_token"], repr(handle))
+
+            release_run_lock(Path(handle))
+
+            self.assertTrue(lock_path.exists())
+            release_run_lock(handle)
+            self.assertFalse(lock_path.exists())
+
+    def test_run_lock_preserves_live_legacy_owner_and_recovers_dead_owner(self) -> None:
+        for owner_live in (True, False):
+            with self.subTest(owner_live=owner_live), tempfile.TemporaryDirectory() as tmp:
+                project_dir = Path(tmp)
+                lock_path = project_dir / "active_run.json"
+                legacy = {
+                    "pid": str(os.getpid()),
+                    "mode": "legacy",
+                    "model": "legacy-model",
+                    "started_at": "legacy-start",
+                }
+                write_json_file(lock_path, legacy)
+
+                with patch.object(
+                    runtime_module,
+                    "is_pid_running",
+                    return_value=owner_live,
+                ) as pid_probe:
+                    handle, error = acquire_run_lock(
+                        project_dir,
+                        mode="run",
+                        model_name="new-model",
+                    )
+
+                pid_probe.assert_called_once_with(os.getpid())
+                if owner_live:
+                    self.assertIsNone(handle)
+                    self.assertIn("Another run is already active", error or "")
+                    self.assertEqual(read_json_file(lock_path), legacy)
+                else:
+                    self.assertIsNotNone(handle)
+                    self.assertIsNone(error)
+                    self.assertNotEqual(read_json_file(lock_path), legacy)
+                    release_run_lock(handle)
+
+    def test_run_lock_rejects_non_regular_metadata_without_reading_it(self) -> None:
+        kinds = ["symlink"]
+        if hasattr(os, "mkfifo"):
+            kinds.append("fifo")
+        for kind in kinds:
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tmp:
+                project_dir = Path(tmp)
+                lock_path = project_dir / "active_run.json"
+                if kind == "symlink":
+                    target = project_dir / "outside-lock.json"
+                    write_json_file(target, {"pid": 0, "private": "sentinel"})
+                    lock_path.symlink_to(target)
+                else:
+                    os.mkfifo(lock_path)
+
+                with patch.object(
+                    runtime_module,
+                    "read_json_file",
+                    side_effect=AssertionError("non-regular lock metadata must not be read"),
+                ):
+                    handle, error = acquire_run_lock(
+                        project_dir,
+                        mode="run",
+                        model_name="mock",
+                    )
+
+                self.assertIsNone(handle)
+                self.assertIn("Stale run lock could not be cleared", error or "")
+                self.assertTrue(lock_path.is_symlink() if kind == "symlink" else lock_path.exists())
+
+    def test_run_lock_rejects_non_regular_guard_without_opening_it(self) -> None:
+        kinds = ["symlink"]
+        if hasattr(os, "mkfifo"):
+            kinds.append("fifo")
+        for kind in kinds:
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tmp:
+                project_dir = Path(tmp)
+                guard_path = project_dir / "active_run.guard"
+                if kind == "symlink":
+                    target = project_dir / "outside-guard"
+                    target.write_bytes(b"sentinel")
+                    guard_path.symlink_to(target)
+                else:
+                    os.mkfifo(guard_path)
+
+                with patch.object(
+                    runtime_module,
+                    "_try_lock_guard",
+                    side_effect=AssertionError("unsafe guard must not be opened"),
+                ):
+                    handle, error = acquire_run_lock(
+                        project_dir,
+                        mode="run",
+                        model_name="mock",
+                    )
+
+                self.assertIsNone(handle)
+                self.assertIn("Run lock guard could not be acquired", error or "")
+                self.assertTrue(
+                    guard_path.is_symlink() if kind == "symlink" else guard_path.exists()
+                )
+
+    def test_run_lock_metadata_failure_releases_guard_for_retry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+
+            with patch.object(
+                runtime_module,
+                "write_json_file",
+                side_effect=OSError("injected write failure"),
+            ):
+                failed_handle, error = acquire_run_lock(
+                    project_dir,
+                    mode="run",
+                    model_name="mock",
+                )
+
+            self.assertIsNone(failed_handle)
+            self.assertIn("Run lock metadata could not be written", error or "")
+            retry_handle, retry_error = acquire_run_lock(
+                project_dir,
+                mode="run",
+                model_name="mock",
+            )
+            self.assertIsNotNone(retry_handle)
+            self.assertIsNone(retry_error)
+            release_run_lock(retry_handle)
+
+    def test_run_lock_recovers_after_owner_process_crash(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            script = (
+                "import os, sys; from pathlib import Path; "
+                "from src.runtime import acquire_run_lock; "
+                "handle, error = acquire_run_lock(Path(sys.argv[1]), mode='run', "
+                "model_name='crashed-owner'); "
+                "os._exit(0 if handle is not None and error is None else 3)"
+            )
+
+            child = subprocess.run(
+                [sys.executable, "-c", script, str(project_dir)],
+                cwd=Path(__file__).resolve().parents[1],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+            self.assertEqual(child.returncode, 0, child.stderr)
+            crashed_lock = read_json_file(project_dir / "active_run.json")
+            self.assertTrue(crashed_lock.get("owner_token"))
+
+            recovered_handle, error = acquire_run_lock(
+                project_dir,
+                mode="run",
+                model_name="recovered-owner",
+            )
+
+            self.assertIsNotNone(recovered_handle)
+            self.assertIsNone(error)
+            recovered_lock = read_json_file(project_dir / "active_run.json")
+            self.assertNotEqual(recovered_lock["owner_token"], crashed_lock["owner_token"])
+            release_run_lock(recovered_handle)
+
+    @unittest.skipIf(os.name == "nt", "Windows prevents unlinking an open guard")
+    def test_run_lock_recreated_guard_cannot_displace_live_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            owner_handle, owner_error = acquire_run_lock(
+                project_dir,
+                mode="run",
+                model_name="owner",
+            )
+            self.assertIsNotNone(owner_handle)
+            self.assertIsNone(owner_error)
+            guard_path = project_dir / "active_run.guard"
+            guard_path.unlink()
+
+            contender, contender_error = acquire_run_lock(
+                project_dir,
+                mode="run",
+                model_name="contender",
+            )
+
+            self.assertIsNone(contender)
+            self.assertIn("Another run is already active", contender_error or "")
+            release_run_lock(owner_handle)
+            retry_handle, retry_error = acquire_run_lock(
+                project_dir,
+                mode="run",
+                model_name="retry",
+            )
+            self.assertIsNotNone(retry_handle)
+            self.assertIsNone(retry_error)
+            release_run_lock(retry_handle)
+
+    @unittest.skipUnless(hasattr(os, "fork"), "requires POSIX fork semantics")
+    def test_run_lock_fork_child_cannot_release_parent_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            owner_handle, owner_error = acquire_run_lock(
+                project_dir,
+                mode="run",
+                model_name="parent",
+            )
+            self.assertIsNotNone(owner_handle)
+            self.assertIsNone(owner_error)
+
+            child_pid = os.fork()
+            if child_pid == 0:
+                release_run_lock(owner_handle)
+                os._exit(0)
+            _, child_status = os.waitpid(child_pid, 0)
+            self.assertEqual(os.waitstatus_to_exitcode(child_status), 0)
+            self.assertTrue((project_dir / "active_run.json").exists())
+            contender, contender_error = acquire_run_lock(
+                project_dir,
+                mode="run",
+                model_name="contender",
+            )
+            self.assertIsNone(contender)
+            self.assertIn("Another run is already active", contender_error or "")
+            release_run_lock(owner_handle)
+
+    def test_run_lock_blocks_a_second_process_until_release(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            ready_path = project_dir / "child-ready"
+            release_path = project_dir / "release-child"
+            script = """
+import sys
+import time
+from pathlib import Path
+from src.runtime import acquire_run_lock, release_run_lock
+
+root, ready, release = map(Path, sys.argv[1:])
+handle, error = acquire_run_lock(root, mode="run", model_name="child")
+ready.write_text("ok" if handle is not None and error is None else "failed")
+deadline = time.monotonic() + 5
+while not release.exists() and time.monotonic() < deadline:
+    time.sleep(0.01)
+release_run_lock(handle)
+"""
+            child = subprocess.Popen(
+                [
+                    sys.executable,
+                    "-c",
+                    script,
+                    str(project_dir),
+                    str(ready_path),
+                    str(release_path),
+                ],
+                cwd=Path(__file__).resolve().parents[1],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            deadline = time.monotonic() + 5
+            while not ready_path.exists() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            try:
+                self.assertTrue(ready_path.exists())
+                self.assertEqual(ready_path.read_text(encoding="utf-8"), "ok")
+                blocked_handle, blocked_error = acquire_run_lock(
+                    project_dir,
+                    mode="run",
+                    model_name="parent",
+                )
+                self.assertIsNone(blocked_handle)
+                self.assertIn("Another run is already active", blocked_error or "")
+            finally:
+                release_path.write_text("release", encoding="utf-8")
+                stdout, stderr = child.communicate(timeout=10)
+            self.assertEqual(child.returncode, 0, f"{stdout}\n{stderr}")
+            parent_handle, parent_error = acquire_run_lock(
+                project_dir,
+                mode="run",
+                model_name="parent",
+            )
+            self.assertIsNotNone(parent_handle)
+            self.assertIsNone(parent_error)
+            release_run_lock(parent_handle)
+
+    def test_run_lock_simultaneous_processes_have_exactly_one_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            start_path = project_dir / "start-contenders"
+            release_path = project_dir / "release-owner"
+            result_paths = [project_dir / f"result-{index}" for index in range(4)]
+            script = """
+import sys
+import time
+from pathlib import Path
+from src.runtime import acquire_run_lock, release_run_lock
+
+root, start, release, result = map(Path, sys.argv[1:])
+deadline = time.monotonic() + 10
+while not start.exists() and time.monotonic() < deadline:
+    time.sleep(0.005)
+handle, error = acquire_run_lock(root, mode="run", model_name=result.name)
+result.write_text("acquired" if handle is not None and error is None else "blocked")
+while handle is not None and not release.exists() and time.monotonic() < deadline:
+    time.sleep(0.005)
+release_run_lock(handle)
+"""
+            children = [
+                subprocess.Popen(
+                    [
+                        sys.executable,
+                        "-c",
+                        script,
+                        str(project_dir),
+                        str(start_path),
+                        str(release_path),
+                        str(result_path),
+                    ],
+                    cwd=Path(__file__).resolve().parents[1],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                for result_path in result_paths
+            ]
+            start_path.write_text("start", encoding="utf-8")
+            deadline = time.monotonic() + 10
+            while not all(path.exists() for path in result_paths) and time.monotonic() < deadline:
+                time.sleep(0.01)
+            try:
+                self.assertTrue(all(path.exists() for path in result_paths))
+                results = [path.read_text(encoding="utf-8") for path in result_paths]
+                self.assertEqual(results.count("acquired"), 1)
+                self.assertEqual(results.count("blocked"), 3)
+            finally:
+                release_path.write_text("release", encoding="utf-8")
+                child_outputs = [child.communicate(timeout=15) for child in children]
+            for child, (stdout, stderr) in zip(children, child_outputs, strict=True):
+                self.assertEqual(child.returncode, 0, f"{stdout}\n{stderr}")
+
+    def test_run_lock_repeated_old_release_does_not_remove_new_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            lock_path = project_dir / "active_run.json"
+            old_handle, old_error = acquire_run_lock(
+                project_dir,
+                mode="run",
+                model_name="old",
+            )
+            self.assertIsNone(old_error)
+            release_run_lock(old_handle)
+            new_handle, new_error = acquire_run_lock(
+                project_dir,
+                mode="run",
+                model_name="new",
+            )
+            self.assertIsNone(new_error)
+            new_lock = read_json_file(lock_path)
+
+            release_run_lock(old_handle)
+
+            self.assertEqual(read_json_file(lock_path), new_lock)
+            release_run_lock(new_handle)
 
     def test_parse_ollama_list_output_sorts_dedupes_and_handles_empty_list(self) -> None:
         output = (
