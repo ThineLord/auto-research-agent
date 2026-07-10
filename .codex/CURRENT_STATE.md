@@ -4,12 +4,12 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: checkpoint and publish the verified best-output integrity fix.
+- Current goal: checkpoint and publish the verified round-limit validation fix.
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD commit: `198f9ec0c4e81b0d67894ebc067a65a96bc23865`
-- Last known stable commit: `198f9ec0c4e81b0d67894ebc067a65a96bc23865` (`make check` passed; local integrity commit)
-- Active task: closeout for completed task `ARA-011` in `.codex/TASK_QUEUE.md`
-- Uncommitted changes: yes; only maintenance-state closeout files remain after the validated integrity commit.
+- Current HEAD commit: `e6bffa606cffd3ce2d2f8e4210dcc6c6a6bde62c`
+- Last known stable commit: `e6bffa606cffd3ce2d2f8e4210dcc6c6a6bde62c` (`make check` passed; local round-limit commit)
+- Active task: closeout for completed task `ARA-003` in `.codex/TASK_QUEUE.md`
+- Uncommitted changes: yes; only maintenance-state closeout files remain after the validated round-limit commit.
 
 ## Modified Files
 
@@ -47,6 +47,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Added focused regression coverage for both failure classes.
 - Reused the existing successful-round predicate to gate best-score and best-output updates.
 - Committed the best-output integrity fix as `198f9ec`.
+- Committed the integrity state checkpoint as `7e9a1f5`, pushed both commits, and updated draft PR 13.
+- Reproduced zero and negative CLI values being silently normalized to one round.
+- Added failing parser and direct-runner tests before implementation.
+- Added positive-integer argument validation and a runner guard before any run artifact creation.
+- Committed the round-limit validation fix as `e6bffa6`.
 
 ## Remaining Steps
 
@@ -63,6 +68,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Credential-redaction targeted suite: `tests/test_llm.py` passed (`11 passed`).
 - Full regression after the security fix: `make check` passed (`141 passed, 43 subtests passed`).
 - `git diff --check` passed.
+- GitHub sync: local and remote `7e9a1f5839d75a2056810a619919886560bddb97` match; PR 13 is draft and updated.
+- Round-limit target suites: `22 passed, 7 subtests passed`.
+- Zero and negative provider-free CLI smoke paths both exited 2 before startup.
+- Full regression after the round-limit fix: `make check` passed (`144 passed, 47 subtests passed`).
+- `git diff --check` passed and no silent round-limit clamp remains.
 - GitHub sync: local and remote `c8d6c174d5ebb97e5c49bc373d4e0aac761a4f85` match; PR 13 is draft and updated.
 - Runner target validation: `17 passed, 3 subtests passed`.
 - Full regression after the integrity fix: `make check` passed (`142 passed, 43 subtests passed`).

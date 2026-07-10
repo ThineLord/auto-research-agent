@@ -30,7 +30,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-003 - Make non-positive max-round overrides explicit
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P1
 - Risk: medium
 - Description: reject non-positive CLI overrides before provider setup and add a runner fail-fast guard before artifact creation; current silent coercion can unexpectedly trigger a provider call.

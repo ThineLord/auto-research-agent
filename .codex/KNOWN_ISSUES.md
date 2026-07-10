@@ -20,11 +20,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-003 - Non-positive max-round override may be silently coerced
 
-- Status: reproduced on the stable base commit; queued for the next isolated fix
+- Status: fixed, validated, and committed locally
 - Severity: P1
 - Evidence source: tracked `TEST_AND_NEXT_STEPS.md` reports that `--max-rounds 0` produced a one-round mock run.
 - Impact: surprising automation behavior and a possible unintended provider call when zero rounds were expected.
-- Current action: task `ARA-003`.
+- Current action: task `ARA-003` completed; pending remote push.
 
 ## KI-004 - Source tag and package metadata use different versions
 

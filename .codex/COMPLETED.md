@@ -58,3 +58,13 @@ Validation and implementation outcomes will be appended only after they are actu
 - Preserved failure round artifacts, error classifications, stop evidence, score history, and round metrics.
 - Runner suite passed with `17 passed, 3 subtests passed`; full `make check` passed with `142 passed, 43 subtests passed`.
 - Committed the fix as `198f9ec`.
+- Committed the integrity checkpoint state as `7e9a1f5`, pushed through the command-scoped proxy, verified the exact remote SHA, and updated draft PR 13.
+
+## 2026-07-10 - Explicit positive round limits
+
+- Reproduced `--max-rounds 0` and negative values being silently coerced to one provider-capable round.
+- Reproduced direct non-positive runner calls generating misleading zero-round completion artifacts.
+- Added parser tests for zero/negative values and a runner fault-boundary test for no agent calls or run artifacts.
+- Added a positive-integer argparse type and a pre-artifact runner `ValueError` guard; removed silent clamps.
+- Target suites passed with `22 passed, 7 subtests passed`; full `make check` passed with `144 passed, 47 subtests passed`.
+- Committed the fix as `e6bffa6`.
