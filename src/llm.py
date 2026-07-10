@@ -365,9 +365,10 @@ class GeminiClient:
 
     def _create_client(self) -> Any:
         genai, _ = _load_google_genai()
+        http_options = {"timeout": self.timeout_seconds * 1000}
         configured_key = self.api_key.strip()
         if configured_key:
-            return genai.Client(api_key=configured_key)
+            return genai.Client(api_key=configured_key, http_options=http_options)
 
         # Gemini 3 models commonly perform best with temperature around 1.0, but
         # project-level temperature remains the source of truth for compatibility.
@@ -376,8 +377,8 @@ class GeminiClient:
             DEFAULT_GEMINI_API_KEY_ENV,
             "GOOGLE_API_KEY",
         }:
-            return genai.Client(api_key=env_key)
-        return genai.Client()
+            return genai.Client(api_key=env_key, http_options=http_options)
+        return genai.Client(http_options=http_options)
 
     def _generation_config(
         self,
@@ -539,6 +540,8 @@ class GeminiClient:
                     "PROVIDER_QUOTA_EXHAUSTED: Gemini provider quota or rate limit reached. "
                     f"{info.public_message}"
                 ) from RuntimeError(safe_message)
+            if info.error_type == "timeout":
+                raise RuntimeError(info.public_message) from RuntimeError(safe_message)
             if self._scheduler is not None:
                 raise RuntimeError(info.public_message) from RuntimeError(safe_message)
             raise RuntimeError(
@@ -569,6 +572,8 @@ class GeminiClient:
                     "PROVIDER_QUOTA_EXHAUSTED: Gemini provider quota or rate limit reached. "
                     f"{info.public_message}"
                 ) from RuntimeError(safe_message)
+            if info.error_type == "timeout":
+                raise RuntimeError(info.public_message) from RuntimeError(safe_message)
             raise RuntimeError(
                 "Failed to call Gemini API. Check API key, model name, and network access."
             ) from RuntimeError(safe_message)

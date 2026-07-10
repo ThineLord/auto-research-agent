@@ -20,6 +20,9 @@
 
 ### Fixed
 
+* Gemini now passes the configured `model.timeout_seconds` to the Google Gen AI client's HTTP
+  transport in milliseconds for every supported API-key source. Transport timeouts are reported as
+  a privacy-safe `timeout` provider error without adding retries or changing generation settings.
 * The `--compare-runs` CLI now rejects fewer than two run directories with a clear argument error,
   matching its documented contract. The internal comparison helper still accepts one run for
   compatibility with existing UI, analytics, and legacy-metadata callers.

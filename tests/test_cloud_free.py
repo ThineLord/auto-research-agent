@@ -203,6 +203,46 @@ class CloudFreePolicyTests(unittest.TestCase):
         self.assertTrue(info.retryable)
         self.assertEqual(info.error_type, "rate_limited")
 
+    def test_timeout_error_has_safe_non_retrying_classification(self) -> None:
+        class TimeoutException(Exception):
+            pass
+
+        class ReadTimeout(TimeoutException):
+            pass
+
+        for error in (
+            TimeoutError("read operation timed out"),
+            ReadTimeout(""),
+        ):
+            with self.subTest(error_type=type(error).__name__):
+                info = classify_gemini_error(error)
+
+                self.assertEqual(info.error_type, "timeout")
+                self.assertEqual(info.public_message, "Gemini request timed out.")
+                self.assertFalse(info.retryable)
+
+        unsupported_option = classify_gemini_error(
+            RuntimeError("invalid option timeout is unsupported")
+        )
+        self.assertEqual(unsupported_option.error_type, "unknown")
+        for error_type in ("TimeoutConfigurationError", "NotATimeoutError"):
+            with self.subTest(error_type=error_type):
+                misleading_error = type(error_type, (Exception,), {})("configuration rejected")
+                self.assertEqual(classify_gemini_error(misleading_error).error_type, "unknown")
+
+    def test_http_timeout_status_preserves_existing_retry_policy(self) -> None:
+        class HttpError(Exception):
+            def __init__(self, status_code: int):
+                super().__init__(f"HTTP {status_code}")
+                self.status_code = status_code
+
+        for status_code, retryable in ((408, False), (504, True)):
+            with self.subTest(status_code=status_code):
+                info = classify_gemini_error(HttpError(status_code))
+
+                self.assertEqual(info.error_type, "timeout")
+                self.assertEqual(info.retryable, retryable)
+
     def test_prompt_budget_guard_preserves_critical_state(self) -> None:
         prompt = (
             "# Topic Context\nKeep this topic.\n\n"

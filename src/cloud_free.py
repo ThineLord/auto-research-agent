@@ -404,6 +404,16 @@ def classify_gemini_error(exc: BaseException) -> GeminiErrorInfo:
     status = _status_code_from_exception(exc)
     message = _safe_error_message(exc)
     text = message.lower()
+    timeout_type_names = {"timeout", "timeouterror", "timeoutexception"}
+    timeout_exception_type = any(
+        base.__name__.lower() in timeout_type_names for base in type(exc).__mro__
+    )
+    timeout_error = (
+        status in {408, 504}
+        or isinstance(exc, TimeoutError)
+        or timeout_exception_type
+        or bool(re.search(r"\btimed[ -]?out\b", text, flags=re.I))
+    )
     rate_limited = (
         status == 429
         or "429" in text
@@ -439,6 +449,9 @@ def classify_gemini_error(exc: BaseException) -> GeminiErrorInfo:
     elif rate_limited:
         public = "Gemini free-tier rate limit reached; backing off before retry."
         error_type = "rate_limited"
+    elif timeout_error:
+        public = "Gemini request timed out."
+        error_type = "timeout"
     elif token_context:
         public = "Gemini prompt or context limit was reached."
         error_type = "token_context"

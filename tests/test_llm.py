@@ -110,7 +110,7 @@ class LlmClientTests(unittest.TestCase):
             patch.object(llm_module, "_load_google_genai", return_value=(fake_genai, fake_types)),
             patch.dict(llm_module.os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True),
         ):
-            output = GeminiClient(model="gemini-3.5-flash").generate(
+            output = GeminiClient(model="gemini-3.5-flash", timeout_seconds=37).generate(
                 agent_name="draft",
                 system_prompt="system",
                 user_prompt="hello",
@@ -119,7 +119,7 @@ class LlmClientTests(unittest.TestCase):
             )
 
         self.assertEqual(output, "OK")
-        fake_genai.Client.assert_called_once_with()
+        fake_genai.Client.assert_called_once_with(http_options={"timeout": 37_000})
         generate_content.assert_called_once()
         kwargs = generate_content.call_args.kwargs
         self.assertEqual(kwargs["model"], "gemini-3.5-flash")
@@ -153,7 +153,10 @@ class LlmClientTests(unittest.TestCase):
         config = generate_content.call_args.kwargs["config"]
         self.assertEqual(config.kwargs["response_mime_type"], "application/json")
         self.assertEqual(config.kwargs["response_json_schema"], response_format)
-        fake_genai.Client.assert_called_once_with(api_key="local-key")
+        fake_genai.Client.assert_called_once_with(
+            api_key="local-key",
+            http_options={"timeout": 120_000},
+        )
 
     def test_gemini_generate_requires_api_key_source(self) -> None:
         with patch.dict(llm_module.os.environ, {}, clear=True):
@@ -254,7 +257,48 @@ class LlmClientTests(unittest.TestCase):
 
         self.assertNotIn(secret, event_text)
         self.assertIn("[redacted-api-key]", event_text)
-        fake_genai.Client.assert_called_once_with(api_key=secret)
+        fake_genai.Client.assert_called_once_with(
+            api_key=secret,
+            http_options={"timeout": 120_000},
+        )
+
+    def test_gemini_timeout_error_is_classified_and_redacted(self) -> None:
+        secret = "timeout-credential-with-an-unrecognized-shape"
+        generate_content = Mock(side_effect=TimeoutError(f"read timed out after {secret}"))
+        fake_client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+        fake_genai = SimpleNamespace(Client=Mock(return_value=fake_client))
+        fake_types = SimpleNamespace(GenerateContentConfig=FakeGenerateContentConfig)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            event_path = Path(tmp) / "provider_events.jsonl"
+            client = GeminiClient(
+                model="gemini-3.5-flash",
+                api_key=secret,
+                provider_event_path=event_path,
+            )
+
+            with patch.object(
+                llm_module,
+                "_load_google_genai",
+                return_value=(fake_genai, fake_types),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "Gemini request timed out") as raised:
+                    client.generate(system_prompt=None, user_prompt="hello")
+
+            event = json.loads(event_path.read_text(encoding="utf-8").splitlines()[-1])
+            traceback_text = "".join(
+                traceback.format_exception(
+                    type(raised.exception),
+                    raised.exception,
+                    raised.exception.__traceback__,
+                )
+            )
+
+        self.assertEqual(event["event"], "request_error")
+        self.assertEqual(event["error_type"], "timeout")
+        self.assertFalse(event["retryable"])
+        self.assertNotIn(secret, event["message"])
+        self.assertNotIn(secret, traceback_text)
 
     def test_gemini_provider_events_record_quota_error(self) -> None:
         generate_content = Mock(
