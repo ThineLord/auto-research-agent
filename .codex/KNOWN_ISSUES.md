@@ -52,17 +52,17 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-007 - Configured credentials can be echoed into provider events
 
-- Status: fixed, validated, and committed locally
+- Status: fixed, validated, committed, pushed, and CI-verified
 - Severity: P0
 - Impact: an arbitrary configured API key echoed by a provider response can survive pattern-only redaction and be serialized locally.
 - Current action: task `ARA-008` completed at remote checkpoint `c8d6c17`.
 
 ## KI-008 - Interrupted JSON writes can destroy the last checkpoint
 
-- Status: fixed, validated, and committed locally
+- Status: fixed, validated, committed, pushed, and CI-verified
 - Severity: P1
 - Impact: an in-place write failure truncates the old valid checkpoint, after which tolerant reads can silently return empty state.
-- Current action: task `ARA-009` completed; pending remote push.
+- Current action: task `ARA-009` completed at remote checkpoint `5ab7119`.
 
 ## KI-009 - Resume can discard historical metrics
 

@@ -4,19 +4,17 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: checkpoint and publish the verified atomic state-write fix.
+- Current goal: stable remote checkpoint reached; resume with `ARA-010` (preserve run history across resume).
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD commit: `7d226f8067788e151b180f6e9e82d5524253879a`
-- Last known stable commit: `7d226f8067788e151b180f6e9e82d5524253879a` (`make check` passed; local atomic-write commit)
-- Active task: closeout for completed task `ARA-009` in `.codex/TASK_QUEUE.md`
-- Uncommitted changes: yes; only maintenance-state closeout files remain after the validated atomic-write commit.
+- Current HEAD commit at snapshot start: `5ab7119b925b7c9c1281c7d942c9da6b0b410463` (use `git rev-parse HEAD` after the state-only closeout commit)
+- Last known stable commit: `5ab7119b925b7c9c1281c7d942c9da6b0b410463` (`make check`, remote SHA, and GitHub Actions verified)
+- Active task: none; next task is `ARA-010` in `.codex/TASK_QUEUE.md`
+- Uncommitted changes: expected none after this state-only closeout commit; inspect any difference before resuming.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
-- `.codex/TASK_QUEUE.md`
 - `.codex/COMPLETED.md`
-- `.codex/DECISIONS.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
@@ -57,10 +55,13 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Centralized replacement writes through same-directory temp files with flush, fsync, atomic replace, and cleanup.
 - Preserved append-only best-effort logging behavior outside the atomic replacement helper.
 - Committed the atomic state-write fix as `7d226f8`.
+- Committed state checkpoint `5ab7119`, pushed both commits, verified local/remote equality, and confirmed all Python 3.10/3.13 push and PR checks passed.
 
 ## Remaining Steps
 
-- Commit the state closeout, push both local commits, update draft PR 13, and verify the remote SHA.
+- Start `ARA-010` by first reproducing resume history loss against the preserved remote checkpoint.
+- Restore existing round metrics, score history, best-round metadata, and prior-round context without altering completed round files.
+- Keep `ARA-012` path-containment work separate from the history-preservation change.
 
 ## Test Status
 
@@ -83,7 +84,8 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Fault injection preserved the prior JSON and cleaned temp files for both `fsync` and `replace` failures.
 - Full regression after the atomic-write fix: `make check` passed (`145 passed, 49 subtests passed`).
 - `git diff --check` passed and storage replacement paths no longer call `Path.write_text` directly.
-- GitHub sync: local and remote `c8d6c174d5ebb97e5c49bc373d4e0aac761a4f85` match; PR 13 is draft and updated.
+- GitHub Actions: Python 3.10 and Python 3.13 both passed for push and pull-request triggers on the remote checkpoint.
+- GitHub sync: local and remote `5ab7119b925b7c9c1281c7d942c9da6b0b410463` match; PR 13 is draft and updated.
 - Runner target validation: `17 passed, 3 subtests passed`.
 - Full regression after the integrity fix: `make check` passed (`142 passed, 43 subtests passed`).
 - `git diff --check` passed.

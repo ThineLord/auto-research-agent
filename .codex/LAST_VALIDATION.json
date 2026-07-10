@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-10T17:11:04+08:00",
+  "recorded_at": "2026-07-10T17:13:58+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "7d226f8067788e151b180f6e9e82d5524253879a",
-  "last_known_stable_commit": "7d226f8067788e151b180f6e9e82d5524253879a",
-  "status": "passed_local_commit_pending_push",
+  "head_commit": "5ab7119b925b7c9c1281c7d942c9da6b0b410463",
+  "last_known_stable_commit": "5ab7119b925b7c9c1281c7d942c9da6b0b410463",
+  "status": "passed_clean_remote_checkpoint",
   "commands": [
     {
       "command": "make check",
@@ -62,7 +62,8 @@
     "The new best-output regression failed before the fix because a failed round was marked improved.",
     "The round-limit regression tests failed before the fix because the CLI and runner accepted non-positive values.",
     "The atomic-write regression failed before the fix because storage never called fsync or replace.",
-    "The recorded HEAD contains the validated ARA-009 atomic-write fix; only maintenance-state closeout files remain uncommitted.",
+    "Local and remote maintenance branch HEAD matched at the recorded commit before this state-only closeout.",
+    "GitHub Actions passed on Python 3.10 and Python 3.13 for both push and pull-request triggers.",
     "Ignored runtime artifacts and local configuration are outside the validation diff."
   ]
 }

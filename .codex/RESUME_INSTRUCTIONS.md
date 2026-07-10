@@ -40,10 +40,10 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-If `ARA-009` is `DONE` but the branch is not pushed, first inspect the local commits and rerun:
+No task should be `IN_PROGRESS` at this checkpoint. After confirming a clean tree, start `ARA-010` and run:
 
 ```bash
-.venv/bin/python -m pytest tests/test_storage.py tests/test_round_loop.py -q
+.venv/bin/python -m pytest tests/test_round_loop.py -q
 ```
 
 If another task is active, run its exact validation command from `.codex/TASK_QUEUE.md` first. Understand any uncommitted diff before editing it.
