@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import math
 import re
 import time
 from datetime import datetime
@@ -48,6 +50,7 @@ from .storage import (
     make_round_dir,
     make_run_root,
     parse_score,
+    read_json_file,
     read_text,
     save_round_outputs,
     summarize_round_memory,
@@ -58,6 +61,302 @@ from .storage import (
     write_score_history,
     write_text,
 )
+
+
+class ResumeHistoryError(ValueError):
+    """Raised before writes when existing resume history is unsafe to append to."""
+
+
+def _history_round_number(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value) if math.isfinite(value) and value.is_integer() else None
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _history_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        result = float(value)
+        return result if math.isfinite(result) else None
+    try:
+        result = float(str(value))
+    except (TypeError, ValueError):
+        return None
+    return result if math.isfinite(result) else None
+
+
+def _read_resume_history(path: Path, *, start_round: int) -> List[Dict[str, Any]] | None:
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ResumeHistoryError(f"{path.name} is unreadable or invalid JSON") from exc
+    if not isinstance(payload, list):
+        raise ResumeHistoryError(f"{path.name} must contain a JSON array")
+
+    history: List[Dict[str, Any]] = []
+    previous_round = 0
+    for entry in payload:
+        if not isinstance(entry, dict):
+            raise ResumeHistoryError(f"{path.name} contains a non-object entry")
+        round_number = _history_round_number(entry.get("round"))
+        if round_number is None or round_number < 1:
+            raise ResumeHistoryError(f"{path.name} contains an invalid round number")
+        if round_number <= previous_round:
+            raise ResumeHistoryError(f"{path.name} rounds must be strictly increasing")
+        if round_number >= start_round:
+            raise ResumeHistoryError(
+                f"{path.name} already contains round {round_number}, which is not before "
+                f"resume round {start_round}"
+            )
+        history.append(dict(entry))
+        previous_round = round_number
+    return history
+
+
+def _read_resume_round_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError):
+        return ""
+
+
+def _resume_json_values_equal(left: Any, right: Any) -> bool:
+    if isinstance(left, bool) ^ isinstance(right, bool):
+        return False
+    if isinstance(left, dict) and isinstance(right, dict):
+        return left.keys() == right.keys() and all(
+            _resume_json_values_equal(left[key], right[key]) for key in left
+        )
+    if isinstance(left, list) and isinstance(right, list):
+        return len(left) == len(right) and all(
+            _resume_json_values_equal(left_item, right_item)
+            for left_item, right_item in zip(left, right, strict=True)
+        )
+    return left == right
+
+
+def _load_resume_histories(
+    *,
+    score_history_path: Path,
+    round_metrics_path: Path,
+    start_round: int,
+    checkpoint_best_score: float | None = None,
+) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[str, Any]]:
+    existing_round_metrics = _read_resume_history(round_metrics_path, start_round=start_round)
+    existing_score_history = _read_resume_history(score_history_path, start_round=start_round)
+
+    if existing_round_metrics is not None and existing_score_history is not None:
+        metric_rounds = [
+            _history_round_number(entry.get("round")) for entry in existing_round_metrics
+        ]
+        score_rounds = [
+            _history_round_number(entry.get("round")) for entry in existing_score_history
+        ]
+        if metric_rounds != score_rounds:
+            raise ResumeHistoryError(
+                "round_metrics.json and score_history.json contain different round sequences"
+            )
+        for metric_entry, score_entry, round_number in zip(
+            existing_round_metrics,
+            existing_score_history,
+            metric_rounds,
+            strict=True,
+        ):
+            for key in sorted(metric_entry.keys() & score_entry.keys()):
+                if key == "round":
+                    continue
+                metric_value = metric_entry[key]
+                score_history_value = score_entry[key]
+                values_match = _resume_json_values_equal(metric_value, score_history_value)
+                if key == "score":
+                    metric_score = _history_float(metric_value)
+                    score_history_score = _history_float(score_history_value)
+                    values_match = (
+                        metric_score is not None
+                        and score_history_score is not None
+                        and math.isclose(
+                            metric_score,
+                            score_history_score,
+                            rel_tol=0.0,
+                            abs_tol=0.005,
+                        )
+                    )
+                if not values_match:
+                    raise ResumeHistoryError(
+                        "round_metrics.json and score_history.json disagree on "
+                        f"{key} for round {round_number}"
+                    )
+
+    if existing_round_metrics is None and existing_score_history is not None and start_round > 1:
+        fallback_rounds = [
+            _history_round_number(entry.get("round")) for entry in existing_score_history
+        ]
+        fallback_last_round = fallback_rounds[-1] if fallback_rounds else None
+        if fallback_last_round != start_round - 1:
+            raise ResumeHistoryError(
+                "score_history.json cannot be correlated with the checkpoint's last round"
+            )
+        fallback_scores = [
+            score
+            for entry in existing_score_history
+            if entry.get("successful_research_round") is not False
+            and (score := _history_float(entry.get("score"))) is not None
+        ]
+        if existing_score_history and not fallback_scores:
+            raise ResumeHistoryError(
+                "score_history.json has no numeric scores for checkpoint correlation"
+            )
+        if fallback_scores and checkpoint_best_score is None:
+            raise ResumeHistoryError(
+                "score_history.json cannot be correlated without a checkpoint best_score"
+            )
+        fallback_is_complete = len(fallback_rounds) == start_round - 1 and all(
+            round_number == index for index, round_number in enumerate(fallback_rounds, start=1)
+        )
+        fallback_best_score = max(fallback_scores, default=None)
+        if (
+            fallback_is_complete
+            and fallback_best_score is not None
+            and checkpoint_best_score is not None
+            and not math.isclose(
+                fallback_best_score,
+                checkpoint_best_score,
+                rel_tol=0.0,
+                abs_tol=0.005,
+            )
+        ):
+            raise ResumeHistoryError(
+                "complete score_history.json does not match the checkpoint best_score"
+            )
+        if (
+            not fallback_is_complete
+            and fallback_best_score is not None
+            and checkpoint_best_score is not None
+            and fallback_best_score > checkpoint_best_score + 0.005
+        ):
+            raise ResumeHistoryError(
+                "partial score_history.json exceeds the checkpoint best_score and cannot "
+                "be safely attributed to this run"
+            )
+
+    if existing_round_metrics is None:
+        round_metrics = [dict(entry) for entry in (existing_score_history or [])]
+        round_metrics_source = (
+            "score_history_fallback" if existing_score_history is not None else "none"
+        )
+    else:
+        round_metrics = existing_round_metrics
+        round_metrics_source = "round_metrics"
+
+    if existing_score_history is None:
+        score_history = [dict(entry) for entry in round_metrics]
+        score_history_source = (
+            "round_metrics_fallback" if existing_round_metrics is not None else "none"
+        )
+    else:
+        score_history = existing_score_history
+        score_history_source = "score_history"
+
+    retained_rounds = [
+        round_number
+        for entry in round_metrics
+        if (round_number := _history_round_number(entry.get("round"))) is not None
+    ]
+    history_is_complete = len(retained_rounds) == max(0, start_round - 1) and all(
+        round_number == index for index, round_number in enumerate(retained_rounds, start=1)
+    )
+    history_status = "complete" if history_is_complete else "partial"
+    metadata = {
+        "history_status": history_status,
+        "retained_round_count": len(round_metrics),
+        "retained_rounds": retained_rounds,
+        "round_metrics_source": round_metrics_source,
+        "score_history_source": score_history_source,
+    }
+    return score_history, round_metrics, metadata
+
+
+def _history_entry_for_round(
+    history: Sequence[Dict[str, Any]], round_number: int
+) -> Dict[str, Any] | None:
+    for entry in reversed(history):
+        if _history_round_number(entry.get("round")) == round_number:
+            return entry
+    return None
+
+
+def _history_best_round(history: Sequence[Dict[str, Any]], best_score: float) -> int | None:
+    last_improved_round: int | None = None
+    matching_rounds: List[int] = []
+    matching_improved_rounds: List[int] = []
+    for entry in history:
+        if entry.get("successful_research_round") is False:
+            continue
+        round_number = _history_round_number(entry.get("round"))
+        score = _history_float(entry.get("score"))
+        if round_number is None or score is None:
+            continue
+        if best_score >= 0 and math.isclose(score, best_score, rel_tol=0.0, abs_tol=0.005):
+            matching_rounds.append(round_number)
+            if entry.get("improved") is True:
+                matching_improved_rounds.append(round_number)
+        if entry.get("improved") is True:
+            last_improved_round = round_number
+    if matching_improved_rounds:
+        return matching_improved_rounds[-1]
+    if matching_rounds:
+        return matching_rounds[0]
+    return last_improved_round if best_score < 0 else None
+
+
+def _best_round_from_sources(
+    *,
+    history: Sequence[Dict[str, Any]],
+    best_score: float,
+    before_round: int,
+    metadata_candidates: Sequence[tuple[Any, Any]],
+) -> int | None:
+    history_best_round = _history_best_round(history, best_score)
+    if history_best_round is not None and history_best_round < before_round:
+        return history_best_round
+
+    for round_value, score_value in metadata_candidates:
+        round_number = _history_round_number(round_value)
+        source_score = _history_float(score_value)
+        if (
+            round_number is None
+            or round_number < 1
+            or round_number >= before_round
+            or source_score is None
+            or not math.isclose(source_score, best_score, rel_tol=0.0, abs_tol=0.005)
+        ):
+            continue
+        historical_entry = _history_entry_for_round(history, round_number)
+        historical_score = _history_float((historical_entry or {}).get("score"))
+        if historical_score is not None and not math.isclose(
+            historical_score,
+            best_score,
+            rel_tol=0.0,
+            abs_tol=0.005,
+        ):
+            continue
+        return round_number
+    return None
+
+
+def _prior_runtime_seconds(*values: Any) -> float:
+    candidates = [value for item in values if (value := _history_float(item)) is not None]
+    return max((value for value in candidates if value >= 0.0), default=0.0)
 
 
 def _display_metadata_path(value: object, repo_root: Path | None) -> str:
@@ -300,6 +599,8 @@ def run_iterative_rounds(
 ) -> Dict[str, Any]:
     if max_rounds < 1:
         raise ValueError("max_rounds must be >= 1")
+    if isinstance(start_round, bool) or not isinstance(start_round, int) or start_round < 1:
+        raise ValueError("start_round must be >= 1")
 
     # Termination guarantee:
     # 1) The only round loop is a bounded for-loop over [1..max_rounds].
@@ -315,6 +616,9 @@ def run_iterative_rounds(
     interrupted_report_path = project_dir / "interrupted_report.md"
     run_id = run_root.name
     run_config_path = run_root / "run_config.json"
+    score_history_path = project_dir / "score_history.json"
+    round_metrics_path = run_root / "round_metrics.json"
+    research_state_path = project_dir / "research_state.json"
     started_at_iso = datetime.now().astimezone().isoformat()
     initial_best_output = read_text(best_output_path)
     base_resume_metadata = _base_resume_metadata(
@@ -327,6 +631,90 @@ def run_iterative_rounds(
         checkpoint_preview=resume_metadata,
     )
     existing_run_config = read_run_config(run_root)
+    existing_run_summary = read_json_file(run_root / "run_summary.json")
+    resumes_existing_run = base_resume_metadata["lifecycle_action"] == "resume_existing_run"
+    score_history: List[Dict[str, Any]] = []
+    round_metrics: List[Dict[str, Any]] = []
+    if resumes_existing_run:
+        checkpoint_best_score = _history_float(initial_best_score)
+        checkpoint_best_score = (
+            checkpoint_best_score
+            if checkpoint_best_score is not None and checkpoint_best_score >= 0
+            else None
+        )
+        score_history, round_metrics, history_metadata = _load_resume_histories(
+            score_history_path=score_history_path,
+            round_metrics_path=round_metrics_path,
+            start_round=start_round,
+            checkpoint_best_score=checkpoint_best_score,
+        )
+        base_resume_metadata.update(history_metadata)
+    prior_total_runtime = (
+        _prior_runtime_seconds(
+            existing_run_config.get("total_runtime_seconds"),
+            existing_run_summary.get("total_runtime_seconds"),
+            existing_run_summary.get("total_elapsed_seconds"),
+        )
+        if resumes_existing_run
+        else 0.0
+    )
+    best_score = initial_best_score
+    historical_scores = [
+        score
+        for entry in round_metrics
+        if entry.get("successful_research_round") is not False
+        and (score := _history_float(entry.get("score"))) is not None
+    ]
+    if resumes_existing_run:
+        best_score_sources = {
+            "checkpoint": _history_float(initial_best_score),
+            "run_summary": _history_float(existing_run_summary.get("best_score")),
+            "run_config": _history_float(existing_run_config.get("best_score")),
+            "round_metrics": max(historical_scores) if historical_scores else None,
+        }
+        valid_best_scores = {
+            source: score
+            for source, score in best_score_sources.items()
+            if score is not None and score >= 0
+        }
+        checkpoint_best_score = valid_best_scores.get("checkpoint")
+        historical_best_score = valid_best_scores.get("round_metrics")
+        history_is_complete = (
+            base_resume_metadata.get("history_status") == "complete"
+            and historical_best_score is not None
+        )
+        if (
+            history_is_complete
+            and checkpoint_best_score is not None
+            and checkpoint_best_score > historical_best_score + 0.005
+        ):
+            raise ResumeHistoryError("checkpoint best_score exceeds the complete round history")
+        supported_scores = [historical_best_score] if historical_best_score is not None else []
+        if history_is_complete:
+            pass
+        else:
+            metadata_scores = [
+                score for source, score in valid_best_scores.items() if source != "round_metrics"
+            ]
+            distinct_metadata_scores = {round(score, 6) for score in metadata_scores}
+            if len(distinct_metadata_scores) > 1:
+                raise ResumeHistoryError(
+                    "partial round history has conflicting best_score metadata"
+                )
+            if metadata_scores:
+                supported_scores.append(metadata_scores[0])
+            elif initial_best_output:
+                raise ResumeHistoryError(
+                    "best_output.md exists but partial history has no best_score metadata"
+                )
+        best_score = max(supported_scores, default=-1.0)
+        all_source_scores = list(valid_best_scores.values())
+        rounded_source_scores = {round(score, 6) for score in all_source_scores}
+        base_resume_metadata["best_score_reconciled"] = len(rounded_source_scores) > 1 or any(
+            not math.isclose(score, best_score, rel_tol=0.0, abs_tol=0.005)
+            for score in all_source_scores
+        )
+        base_resume_metadata["best_score_source_count"] = len(all_source_scores)
     runtime_snapshot = {
         "max_rounds": max_rounds,
         "start_round": start_round,
@@ -398,30 +786,58 @@ def run_iterative_rounds(
         f"global_runtime_limit={global_max_runtime_seconds}s",
     )
 
-    best_score = initial_best_score
     best_output = initial_best_output
-    best_round: Optional[int] = None
-    previous_judge = ""
-    judge_history: List[str] = []
-    score_history: List[Dict[str, Any]] = []
-    round_metrics: List[Dict[str, Any]] = []
-    score_history_path = project_dir / "score_history.json"
-    round_metrics_path = run_root / "round_metrics.json"
-    research_state_path = project_dir / "research_state.json"
-    non_improve_streak = 0
+    best_round = _best_round_from_sources(
+        history=round_metrics,
+        best_score=best_score,
+        before_round=start_round,
+        metadata_candidates=(
+            ((resume_metadata or {}).get("best_round"), initial_best_score),
+            (
+                existing_run_summary.get("best_round"),
+                existing_run_summary.get("best_score"),
+            ),
+            (
+                existing_run_config.get("best_round"),
+                existing_run_config.get("best_score"),
+            ),
+        ),
+    )
+    previous_round = start_round - 1 if resumes_existing_run else 0
+    previous_round_dir = run_root / f"round_{previous_round:02d}" if previous_round else None
+    last_draft_output = (
+        _read_resume_round_text(previous_round_dir / "01_draft.md") if previous_round_dir else ""
+    )
+    last_review_output = (
+        _read_resume_round_text(previous_round_dir / "02_review.md") if previous_round_dir else ""
+    )
+    last_revised_output = (
+        _read_resume_round_text(previous_round_dir / "03_revised.md") if previous_round_dir else ""
+    )
+    last_judge_output = (
+        _read_resume_round_text(previous_round_dir / "04_judge.md") if previous_round_dir else ""
+    )
+    previous_judge = last_judge_output
+    judge_history: List[str] = [last_judge_output] if last_judge_output else []
+    previous_round_metric = _history_entry_for_round(round_metrics, previous_round)
+    non_improve_streak = max(
+        0,
+        _history_round_number((previous_round_metric or {}).get("non_improve_streak")) or 0,
+    )
     stop_reason = STOP_MAX_ROUNDS
-    completed_rounds = 0
-    last_review_output = ""
-    last_draft_output = ""
-    last_revised_output = ""
-    last_judge_output = ""
-    last_successful_agent = "none"
-    invalid_score_seen = False
-    timeout_seen = False
+    completed_rounds = previous_round
+    last_successful_agent = str((resume_metadata or {}).get("last_successful_agent", "") or "none")
+    invalid_score_seen = any(entry.get("invalid_score_this_round") for entry in round_metrics)
+    timeout_seen = any(entry.get("timeout_this_round") for entry in round_metrics)
     paused_until_reset_message = ""
     consecutive_draft_timeouts = 0
-    consecutive_provider_quota_failures = 0
-    provider_quota_failure_seen = False
+    consecutive_provider_quota_failures = max(
+        0,
+        _history_round_number((previous_round_metric or {}).get("provider_quota_streak")) or 0,
+    )
+    provider_quota_failure_seen = any(
+        entry.get("provider_failure_this_round") for entry in round_metrics
+    )
 
     def _remaining_runtime_seconds() -> int:
         remaining = global_max_runtime_seconds - (time.monotonic() - started_at)
@@ -839,7 +1255,7 @@ def run_iterative_rounds(
         repetitive_judge = _is_repetitive_judge(judge_output, judge_history)
         judge_history.append(judge_output)
 
-        previous_score = round_metrics[-1].get("score") if round_metrics else None
+        previous_score = _history_float(round_metrics[-1].get("score")) if round_metrics else None
         continuation_source = draft_previous_revised_output or draft_previous_draft_output
         agent_topic_context = getattr(agents, "topic_context", "")
         draft_input_context = [
@@ -910,7 +1326,7 @@ def run_iterative_rounds(
             previous_revised=draft_previous_revised_output,
             previous_judge=previous_judge,
             current_score=score,
-            previous_score=previous_score if isinstance(previous_score, (int, float)) else None,
+            previous_score=previous_score,
         )
         round_metric = {
             "round": round_index,
@@ -985,6 +1401,7 @@ def run_iterative_rounds(
             "last_completed_round": round_index,
             "last_successful_agent": last_successful_agent,
             "best_score": round(best_score, 2),
+            "best_round": best_round,
             "best_round_path": str(run_root / f"round_{best_round:02d}") if best_round else "",
             "stop_reason": "",
             "can_resume": True,
@@ -1093,7 +1510,8 @@ def run_iterative_rounds(
         display_path(best_output_path, repo_root) if best_output_path.exists() else "N/A"
     )
     score_history_path_text = display_path(score_history_path, repo_root)
-    total_runtime = time.monotonic() - started_at
+    session_runtime = time.monotonic() - started_at
+    total_runtime = prior_total_runtime + session_runtime
 
     console.rule("Run Summary")
     console.print(f"[bold]Completed rounds:[/bold] {completed_rounds}")
@@ -1126,6 +1544,7 @@ def run_iterative_rounds(
         "last_completed_round": completed_rounds,
         "last_successful_agent": last_successful_agent,
         "best_score": round(best_score, 2),
+        "best_round": best_round,
         "best_round_path": str(run_root / f"round_{best_round:02d}") if best_round else "",
         "stop_reason": stop_reason,
         "updated_at": datetime.now().isoformat(),

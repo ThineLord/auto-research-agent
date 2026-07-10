@@ -63,7 +63,7 @@ from .project_input import ProjectInputError, load_project_input
 from .resume import run_resume_mode
 from .run_analytics import analyze_run
 from .run_compare import compare_runs
-from .runner import run_iterative_rounds
+from .runner import ResumeHistoryError, run_iterative_rounds
 from .runtime import acquire_run_lock, release_run_lock
 from .session import run_session_mode
 from .storage import write_json_file
@@ -771,27 +771,32 @@ def main() -> None:
 
     try:
         if args.resume:
-            run_resume_mode(
-                console=console,
-                agents=agents,
-                task_text=task_text,
-                project_dir=project_dir,
-                memory_path=memory_path,
-                model_name=model_label,
-                max_rounds=max_rounds,
-                stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
-                global_max_runtime_seconds=normal_max_runtime_seconds,
-                per_agent_timeout_seconds=timeout_seconds,
-                topic_keywords=topic_keywords,
-                project_metadata=project_metadata,
-                model_provider=provider,
-                model_parameters=model_parameters,
-                topic_snapshot=topic_snapshot,
-                prompt_dir=prompts_dir,
-                repo_root=root,
-                drafting_mode=drafting_mode,
-                max_consecutive_provider_quota_failures=max_provider_quota_failures,
-            )
+            try:
+                resume_started = run_resume_mode(
+                    console=console,
+                    agents=agents,
+                    task_text=task_text,
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    model_name=model_label,
+                    max_rounds=max_rounds,
+                    stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
+                    global_max_runtime_seconds=normal_max_runtime_seconds,
+                    per_agent_timeout_seconds=timeout_seconds,
+                    topic_keywords=topic_keywords,
+                    project_metadata=project_metadata,
+                    model_provider=provider,
+                    model_parameters=model_parameters,
+                    topic_snapshot=topic_snapshot,
+                    prompt_dir=prompts_dir,
+                    repo_root=root,
+                    drafting_mode=drafting_mode,
+                    max_consecutive_provider_quota_failures=max_provider_quota_failures,
+                )
+            except ResumeHistoryError:
+                raise SystemExit(2) from None
+            if not resume_started:
+                raise SystemExit(2)
             return
 
         if args.continuous:

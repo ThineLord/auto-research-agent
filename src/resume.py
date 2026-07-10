@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -9,7 +10,7 @@ from rich.console import Console
 
 from .agents import ResearchAgents
 from .config import DEFAULT_DRAFTING_MODE
-from .runner import run_iterative_rounds
+from .runner import ResumeHistoryError, run_iterative_rounds
 from .storage import read_json_file
 
 ROUND_OUTPUT_FILES = ("01_draft.md", "02_review.md", "03_revised.md", "04_judge.md")
@@ -32,6 +33,34 @@ def _safe_float(value: Any, default: float = -1.0) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _strict_round_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value) if math.isfinite(value) and value.is_integer() else None
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
+def _checkpoint_best_round(checkpoint: dict[str, Any]) -> int | None:
+    best_round = _strict_round_int(checkpoint.get("best_round"))
+    if best_round is not None and best_round > 0:
+        return best_round
+    best_round_path = str(checkpoint.get("best_round_path", "")).strip()
+    round_dir_name = Path(best_round_path).name if best_round_path else ""
+    if not round_dir_name.startswith("round_"):
+        return None
+    suffix = round_dir_name.removeprefix("round_")
+    parsed = _strict_round_int(suffix) if suffix.isdigit() else None
+    return parsed if parsed is not None and parsed > 0 else None
 
 
 def _display_path(path: Path, root: Path | None) -> str:
@@ -125,8 +154,17 @@ def build_resume_preview(
 
     run_root_text = str(checkpoint.get("run_root", "")).strip()
     run_root_path = Path(run_root_text) if run_root_text else None
-    last_completed_round = _safe_int(checkpoint.get("last_completed_round"), 0)
+    last_completed_round = _strict_round_int(checkpoint.get("last_completed_round", 0))
+    if last_completed_round is None or last_completed_round < 0:
+        return {
+            "can_resume": False,
+            "blocked_reason": "invalid_last_completed_round",
+            "message": "checkpoint last_completed_round must be >= 0",
+            "checkpoint_path": str(checkpoint_path),
+            "checkpoint_display_path": _display_path(checkpoint_path, repo_root),
+        }
     next_round = last_completed_round + 1
+    best_round = _checkpoint_best_round(checkpoint)
     run_id = str(checkpoint.get("run_id") or (run_root_path.name if run_root_path else "")).strip()
     stop_reason = str(checkpoint.get("stop_reason", "") or "unknown")
     run_config_path = (
@@ -164,6 +202,9 @@ def build_resume_preview(
         "stop_reason": stop_reason,
         "can_resume": bool(checkpoint.get("can_resume")),
         "best_score": _safe_float(checkpoint.get("best_score"), -1.0),
+        "best_round": best_round,
+        "best_round_path": str(checkpoint.get("best_round_path", "")),
+        "last_successful_agent": str(checkpoint.get("last_successful_agent", "") or "none"),
         "completed_round_files_preserved": True,
         "next_round_path": str(next_round_path) if next_round_path else "",
         "next_round_display": next_round_info["display_path"],
@@ -262,7 +303,7 @@ def run_resume_mode(
     repo_root: Path | None = None,
     drafting_mode: str = DEFAULT_DRAFTING_MODE,
     max_consecutive_provider_quota_failures: int = 2,
-) -> None:
+) -> bool:
     checkpoint_path = project_dir / "checkpoint.json"
     checkpoint = read_json_file(checkpoint_path)
     preview = build_resume_preview(
@@ -273,7 +314,7 @@ def run_resume_mode(
     _print_resume_preview(console, preview)
     if not preview.get("can_resume"):
         console.print(f"[red]Cannot resume: {preview.get('message', 'unknown reason')}.[/red]")
-        return
+        return False
     run_root_path = Path(str(preview["run_root"]))
     start_round = _safe_int(preview.get("next_round"), 1)
     initial_best_score = _safe_float(preview.get("best_score"), -1.0)
@@ -286,29 +327,34 @@ def run_resume_mode(
             "[yellow]Resume note:[/yellow] "
             f"{preview.get('next_round_display')} already exists but is empty; resume can use it."
         )
-    run_iterative_rounds(
-        console=console,
-        agents=agents,
-        task_text=task_text,
-        project_dir=project_dir,
-        memory_path=memory_path,
-        mode="resume",
-        model_name=model_name,
-        max_rounds=max(max_rounds, start_round),
-        stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
-        global_max_runtime_seconds=global_max_runtime_seconds,
-        per_agent_timeout_seconds=per_agent_timeout_seconds,
-        start_round=start_round,
-        run_root_override=run_root_path,
-        initial_best_score=initial_best_score,
-        topic_keywords=topic_keywords,
-        project_metadata=project_metadata,
-        model_provider=model_provider,
-        model_parameters=model_parameters,
-        topic_snapshot=topic_snapshot,
-        prompt_dir=prompt_dir,
-        repo_root=repo_root,
-        drafting_mode=drafting_mode,
-        max_consecutive_provider_quota_failures=max_consecutive_provider_quota_failures,
-        resume_metadata=preview,
-    )
+    try:
+        run_iterative_rounds(
+            console=console,
+            agents=agents,
+            task_text=task_text,
+            project_dir=project_dir,
+            memory_path=memory_path,
+            mode="resume",
+            model_name=model_name,
+            max_rounds=max(max_rounds, start_round),
+            stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
+            global_max_runtime_seconds=global_max_runtime_seconds,
+            per_agent_timeout_seconds=per_agent_timeout_seconds,
+            start_round=start_round,
+            run_root_override=run_root_path,
+            initial_best_score=initial_best_score,
+            topic_keywords=topic_keywords,
+            project_metadata=project_metadata,
+            model_provider=model_provider,
+            model_parameters=model_parameters,
+            topic_snapshot=topic_snapshot,
+            prompt_dir=prompt_dir,
+            repo_root=repo_root,
+            drafting_mode=drafting_mode,
+            max_consecutive_provider_quota_failures=max_consecutive_provider_quota_failures,
+            resume_metadata=preview,
+        )
+        return True
+    except ResumeHistoryError as exc:
+        console.print(f"[red]Cannot resume safely: {exc}.[/red]")
+        raise

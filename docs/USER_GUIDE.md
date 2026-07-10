@@ -298,8 +298,13 @@ make resume
 
 - 从 `last_completed_round + 1` 继续
 - 不覆盖已完成 round 文件
+- 保留并追加既有 `round_metrics.json` 和 `score_history.json`，同时延续 best-round、累计 runtime、
+  未提升计数、上一轮 judge，以及当前 drafting mode 所需的 review/draft/revised 上下文
 - 如果下一轮目录不存在或为空，可以继续；如果下一轮目录已存在且非空，会 fail-safe 停止，
   避免覆盖 partial/uncheckpointed 输出
+- 如果既有 history 不是安全的 JSON array，或包含无效、重复、乱序、未来轮次，会在任何 artifact
+  写入前 fail-safe 停止并让 CLI 返回状态 2；两份 history 的轮次或共有字段冲突时也会阻塞。旧 run
+  缺少 run-local metrics 时，只有 project score history 能关联到 checkpoint 上一轮才会兼容恢复
 - 只有更高分时才更新 `best_output.md`
 
 ## 输出文件怎么读（先看哪个）

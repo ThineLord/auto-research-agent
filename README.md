@@ -72,6 +72,9 @@ Mock mode 会复用正常 round runner，写入 `run_config.json`、`round_metri
 - Rubric summaries 只是 Judge 已返回结构化子项的趋势汇总，不是新的 benchmark 分数。
 - `make resume` 会继续 checkpoint 指向的旧 run；`make run` 会新建 run，即使旧 `best_output.md` 可作为上下文。
 - 如果下一轮目录已经存在且非空，resume 会 fail-safe 阻塞，避免覆盖 partial/uncheckpointed 输出。
+- resume 会保留并追加同一 run 的既有 metrics/score history、best-round 和上一轮上下文；如果既有
+  history 无法安全解析、互相冲突或包含重复/未来轮次，会在写入任何 run artifact 前 fail-safe
+  阻塞，并让 CLI 返回非零状态。
 
 ## What To Demo First
 

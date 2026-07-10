@@ -19,6 +19,9 @@
   them before creating run artifacts, instead of silently running one round or emitting a zero-round run.
 * State and artifact replacement writes now use same-directory temporary files, file flush/fsync,
   and atomic replace so a pre-commit failure preserves the previous valid checkpoint.
+* Resuming an existing run now retains and appends prior round metrics and score history, preserves
+  best-round and cumulative runtime metadata, restores previous-round drafting context, and fails
+  closed before writes when an existing history file is malformed or unsafe to append to.
 
 ### Maintenance
 

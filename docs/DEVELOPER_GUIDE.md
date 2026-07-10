@@ -146,7 +146,9 @@ schema-additive and must not reinterpret or rescale the Judge's top-level score.
 - `resume_metadata` appears in checkpoint, run config, and run summary. It distinguishes
   `start_new_run` from `resume_existing_run`, records checkpoint resume round, whether previous
   best output is only context for a new run, whether completed round files are preserved, and the
-  next-round directory status/safety action.
+  next-round directory status/safety action. Resumed runs also record retained-history status and
+  source fields. Existing histories remain opaque append-only records; unsafe arrays fail closed
+  before run config, manifest, checkpoint, round, or summary writes.
 - `run.log` for the current running stage.
 - `STOP_REQUESTED` for safe user-initiated pause.
 

@@ -64,12 +64,20 @@ from src.constants import (
     STOP_CLOUD_DAILY_QUOTA,
     STOP_INVALID_SCORE,
     STOP_MAX_ROUNDS,
+    STOP_NO_IMPROVEMENT,
     STOP_OLLAMA_TIMEOUT,
     STOP_PROVIDER_QUOTA_EXHAUSTED,
     STOP_USER_REQUESTED,
 )
 from src.resume import build_resume_preview, run_resume_mode
-from src.runner import run_iterative_rounds
+from src.run_analytics import analyze_run
+from src.run_compare import load_run_summary
+from src.runner import (
+    ResumeHistoryError,
+    _history_best_round,
+    _load_resume_histories,
+    run_iterative_rounds,
+)
 
 
 class FakeLLM:
@@ -359,6 +367,35 @@ class RoundLoopTests(unittest.TestCase):
                         mode="normal",
                         model_name="fake-model",
                         max_rounds=max_rounds,
+                        stop_if_no_improvement_rounds=10,
+                        global_max_runtime_seconds=60,
+                        per_agent_timeout_seconds=300,
+                    )
+
+                self.assertEqual(agents.draft_rounds, [])
+                self.assertFalse((project_dir / "runs").exists())
+                self.assertFalse((project_dir / "checkpoint.json").exists())
+
+    def test_round_loop_rejects_non_positive_start_round_before_writing_artifacts(self) -> None:
+        for start_round in (0, -1, -0.5, 1.5, True):
+            with self.subTest(start_round=start_round), tempfile.TemporaryDirectory() as tmp:
+                project_dir = Path(tmp) / "project"
+                project_dir.mkdir()
+                memory_path = project_dir / "memory.md"
+                memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                agents = RecordingAgents()
+
+                with self.assertRaisesRegex(ValueError, "start_round must be >= 1"):
+                    run_iterative_rounds(
+                        console=Console(),
+                        agents=agents,
+                        task_text="Design a privacy-aware memory adapter.",
+                        project_dir=project_dir,
+                        memory_path=memory_path,
+                        mode="resume",
+                        model_name="fake-model",
+                        max_rounds=1,
+                        start_round=start_round,  # type: ignore[arg-type]
                         stop_if_no_improvement_rounds=10,
                         global_max_runtime_seconds=60,
                         per_agent_timeout_seconds=300,
@@ -1000,7 +1037,7 @@ class RoundLoopTests(unittest.TestCase):
             agents = RecordingAgents()
             console = Console(record=True)
 
-            run_resume_mode(
+            resume_started = run_resume_mode(
                 console=console,
                 agents=agents,
                 task_text="Design a privacy-aware memory adapter.",
@@ -1016,6 +1053,7 @@ class RoundLoopTests(unittest.TestCase):
             checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
             run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
             run_summary = json.loads((run_root / "run_summary.json").read_text(encoding="utf-8"))
+            self.assertTrue(resume_started)
             self.assertEqual(agents.draft_rounds, [4])
             self.assertEqual(checkpoint["last_completed_round"], 4)
             self.assertEqual(
@@ -1037,6 +1075,557 @@ class RoundLoopTests(unittest.TestCase):
                     resume_metadata["next_round_safety_action"], "proceed_create_round_dir"
                 )
             self.assertEqual(run_config["resume_sessions"][0]["start_round"], 4)
+
+    def test_resume_preserves_history_best_round_and_previous_round_context(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            best_output_path = project_dir / "best_output.md"
+            best_output_path.write_text("Trusted round 2 best.\n", encoding="utf-8")
+
+            round_outputs = {
+                1: ("draft one", "review one", "revised one", "judge one"),
+                2: ("draft two", "review two", "revised two", "judge two"),
+                3: ("draft three", "review three", "revised three", "judge three"),
+            }
+            for round_index, outputs in round_outputs.items():
+                round_dir = run_root / f"round_{round_index:02d}"
+                round_dir.mkdir()
+                for filename, content in zip(
+                    ("01_draft.md", "02_review.md", "03_revised.md", "04_judge.md"),
+                    outputs,
+                    strict=True,
+                ):
+                    (round_dir / filename).write_text(f"{content}\n", encoding="utf-8")
+
+            historical_metrics = [
+                {
+                    "round": 1,
+                    "score": 80.0,
+                    "improved": True,
+                    "non_improve_streak": 0,
+                    "successful_research_round": True,
+                    "timeout_this_round": False,
+                    "provider_failure_this_round": False,
+                    "invalid_score_this_round": False,
+                    "errors": [],
+                    "agent_timings_seconds": {"draft": 1.0},
+                    "estimated_input_tokens": 40,
+                    "estimated_output_tokens": 60,
+                    "estimated_total_tokens": 100,
+                },
+                {
+                    "round": 2,
+                    "score": 93.0,
+                    "improved": True,
+                    "non_improve_streak": 0,
+                    "successful_research_round": True,
+                    "timeout_this_round": False,
+                    "provider_failure_this_round": False,
+                    "invalid_score_this_round": False,
+                    "errors": [],
+                    "agent_timings_seconds": {"draft": 2.0},
+                    "estimated_input_tokens": 80,
+                    "estimated_output_tokens": 120,
+                    "estimated_total_tokens": 200,
+                },
+                {
+                    "round": 3,
+                    "score": 85.0,
+                    "improved": False,
+                    "non_improve_streak": 1,
+                    "successful_research_round": True,
+                    "timeout_this_round": False,
+                    "provider_failure_this_round": False,
+                    "invalid_score_this_round": False,
+                    "errors": [],
+                    "agent_timings_seconds": {"draft": 3.0},
+                    "estimated_input_tokens": 120,
+                    "estimated_output_tokens": 180,
+                    "estimated_total_tokens": 300,
+                },
+            ]
+            (run_root / "round_metrics.json").write_text(
+                json.dumps(historical_metrics), encoding="utf-8"
+            )
+            (project_dir / "score_history.json").write_text(
+                json.dumps(historical_metrics), encoding="utf-8"
+            )
+            (run_root / "run_config.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "started_at": "2026-07-10T00:00:00+00:00",
+                        "completed_rounds": 3,
+                        "best_score": 93.0,
+                        "best_round": 2,
+                        "total_runtime_seconds": 12.5,
+                        "resume_sessions": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (run_root / "run_summary.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "completed_rounds": 3,
+                        "round_count": 3,
+                        "best_score": 100.0,
+                        "best_round": 3,
+                        "total_runtime_seconds": 12.5,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (project_dir / "checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 3,
+                        "best_score": 80.0,
+                        "best_round": 4,
+                        "best_round_path": str(run_root / "round_04"),
+                        "last_successful_agent": "judge",
+                        "can_resume": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            agents = DraftContextAgents()
+
+            run_resume_mode(
+                console=Console(),
+                agents=agents,
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                model_name="fake-model",
+                max_rounds=4,
+                stop_if_no_improvement_rounds=2,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+                drafting_mode="continue_from_previous_draft",
+            )
+
+            round_metrics = json.loads(
+                (run_root / "round_metrics.json").read_text(encoding="utf-8")
+            )
+            score_history = json.loads(
+                (project_dir / "score_history.json").read_text(encoding="utf-8")
+            )
+            checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
+            run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+            run_summary = json.loads((run_root / "run_summary.json").read_text(encoding="utf-8"))
+
+            self.assertEqual(round_metrics[:3], historical_metrics)
+            self.assertEqual(score_history[:3], historical_metrics)
+            self.assertEqual([entry["round"] for entry in round_metrics], [1, 2, 3, 4])
+            self.assertEqual([entry["round"] for entry in score_history], [1, 2, 3, 4])
+            self.assertEqual(round_metrics, score_history)
+            self.assertEqual(round_metrics[-1]["non_improve_streak"], 2)
+            self.assertTrue(round_metrics[-1]["evolution_metrics"]["has_previous_round"])
+            self.assertEqual(
+                round_metrics[-1]["evolution_metrics"]["score_delta_vs_previous"], -35.0
+            )
+
+            self.assertEqual(len(agents.draft_contexts), 1)
+            self.assertEqual(agents.draft_contexts[0]["previous_judge"], "judge three")
+            self.assertEqual(agents.draft_contexts[0]["previous_review"], "review three")
+            self.assertEqual(agents.draft_contexts[0]["previous_draft"], "draft three")
+            self.assertEqual(agents.draft_contexts[0]["previous_revised"], "revised three")
+
+            self.assertEqual(checkpoint["last_completed_round"], 4)
+            self.assertEqual(checkpoint["best_score"], 93.0)
+            self.assertEqual(checkpoint["best_round"], 2)
+            self.assertEqual(checkpoint["best_round_path"], str(run_root / "round_02"))
+            self.assertEqual(checkpoint["last_successful_agent"], "judge")
+            self.assertEqual(checkpoint["stop_reason"], STOP_NO_IMPROVEMENT)
+            self.assertEqual(run_config["completed_rounds"], 4)
+            self.assertEqual(run_config["best_round"], 2)
+            self.assertTrue(run_config["resume_metadata"]["best_score_reconciled"])
+            self.assertGreaterEqual(run_config["total_runtime_seconds"], 12.5)
+            self.assertEqual(run_summary["completed_rounds"], 4)
+            self.assertEqual(run_summary["round_count"], 4)
+            self.assertEqual(run_summary["best_round"], 2)
+            self.assertEqual(run_summary["stop_reason"], STOP_NO_IMPROVEMENT)
+            self.assertEqual(run_summary["successful_rounds"], [1, 2, 3, 4])
+            self.assertGreaterEqual(run_summary["total_runtime_seconds"], 12.5)
+            self.assertGreater(run_summary["total_estimated_tokens"], 600)
+            comparison_summary = load_run_summary(run_root)
+            analysis = analyze_run(run_root)
+            self.assertEqual(comparison_summary["completed_rounds"], 4)
+            self.assertEqual(comparison_summary["round_count"], 4)
+            self.assertEqual(comparison_summary["average_score"], 77.0)
+            self.assertEqual(analysis["score"]["first_round"], 1)
+            self.assertEqual(analysis["score"]["latest_round"], 4)
+            self.assertEqual(analysis["score"]["score_delta_first_to_latest"], -30.0)
+            self.assertEqual(
+                best_output_path.read_text(encoding="utf-8"), "Trusted round 2 best.\n"
+            )
+            self.assertEqual(
+                (run_root / "round_03" / "03_revised.md").read_text(encoding="utf-8"),
+                "revised three\n",
+            )
+
+    def test_resume_uses_project_score_history_for_legacy_run_without_metrics(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            run_root = project_dir / "runs" / "legacy-resume-run"
+            previous_round_dir = run_root / "round_01"
+            previous_round_dir.mkdir(parents=True)
+            (previous_round_dir / "04_judge.md").write_text("legacy judge\n", encoding="utf-8")
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            (project_dir / "best_output.md").write_text("Legacy best.\n", encoding="utf-8")
+            legacy_entry = {
+                "round": "1",
+                "score": "80",
+                "improved": True,
+                "non_improve_streak": 0,
+                "successful_research_round": True,
+                "legacy_marker": {"preserve": True},
+            }
+            (project_dir / "score_history.json").write_text(
+                json.dumps([legacy_entry]), encoding="utf-8"
+            )
+            (project_dir / "checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "legacy-resume-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 1,
+                        "best_score": 80.0,
+                        "best_round_path": str(previous_round_dir),
+                        "can_resume": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            run_resume_mode(
+                console=Console(),
+                agents=RecordingAgents(),
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                model_name="fake-model",
+                max_rounds=2,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+            )
+
+            round_metrics = json.loads(
+                (run_root / "round_metrics.json").read_text(encoding="utf-8")
+            )
+            score_history = json.loads(
+                (project_dir / "score_history.json").read_text(encoding="utf-8")
+            )
+            run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+            run_summary = json.loads((run_root / "run_summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(round_metrics[0], legacy_entry)
+            self.assertEqual(score_history[0], legacy_entry)
+            self.assertEqual([entry["round"] for entry in round_metrics], ["1", 2])
+            self.assertEqual([entry["round"] for entry in score_history], ["1", 2])
+            self.assertEqual(
+                round_metrics[-1]["evolution_metrics"]["score_delta_vs_previous"], -16.0
+            )
+            self.assertEqual(run_summary["round_count"], 2)
+            self.assertEqual(run_summary["best_round"], 1)
+            self.assertEqual(run_config["resume_metadata"]["history_status"], "complete")
+            self.assertEqual(
+                run_config["resume_metadata"]["round_metrics_source"],
+                "score_history_fallback",
+            )
+
+    def test_resume_stop_before_new_round_does_not_rewind_history(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            (project_dir / "best_output.md").write_text("Trusted best.\n", encoding="utf-8")
+            historical_metrics = [
+                {
+                    "round": round_index,
+                    "score": score,
+                    "improved": round_index == 2,
+                    "non_improve_streak": 1 if round_index == 3 else 0,
+                    "successful_research_round": True,
+                    "errors": [],
+                }
+                for round_index, score in ((1, 80.0), (2, 93.0), (3, 85.0))
+            ]
+            history_bytes = json.dumps(historical_metrics).encode()
+            (run_root / "round_metrics.json").write_bytes(history_bytes)
+            (project_dir / "score_history.json").write_bytes(history_bytes)
+            (run_root / "run_config.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "started_at": "2026-07-10T00:00:00+00:00",
+                        "completed_rounds": 3,
+                        "best_score": 93.0,
+                        "best_round": 2,
+                        "total_runtime_seconds": 7.5,
+                        "resume_sessions": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (run_root / "run_summary.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "completed_rounds": 3,
+                        "round_count": 3,
+                        "best_score": 93.0,
+                        "best_round": 2,
+                        "total_runtime_seconds": 7.5,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (project_dir / "checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 3,
+                        "best_score": 93.0,
+                        "best_round_path": str(run_root / "round_02"),
+                        "last_successful_agent": "judge",
+                        "can_resume": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (project_dir / "STOP_REQUESTED").write_text("STOP_REQUESTED\n", encoding="utf-8")
+            agents = RecordingAgents()
+
+            run_resume_mode(
+                console=Console(),
+                agents=agents,
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                model_name="fake-model",
+                max_rounds=4,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+            )
+
+            checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
+            run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+            run_summary = json.loads((run_root / "run_summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(agents.draft_rounds, [])
+            self.assertFalse((run_root / "round_04").exists())
+            self.assertEqual((run_root / "round_metrics.json").read_bytes(), history_bytes)
+            self.assertEqual((project_dir / "score_history.json").read_bytes(), history_bytes)
+            self.assertEqual(checkpoint["last_completed_round"], 3)
+            self.assertEqual(checkpoint["best_round"], 2)
+            self.assertEqual(checkpoint["best_round_path"], str(run_root / "round_02"))
+            self.assertEqual(checkpoint["stop_reason"], STOP_USER_REQUESTED)
+            self.assertEqual(checkpoint["last_successful_agent"], "judge")
+            self.assertEqual(run_config["completed_rounds"], 3)
+            self.assertEqual(run_config["best_round"], 2)
+            self.assertEqual(run_summary["completed_rounds"], 3)
+            self.assertEqual(run_summary["round_count"], 3)
+            self.assertEqual(run_summary["best_round"], 2)
+
+    def test_history_best_round_prefers_the_strict_improvement_on_tied_scores(self) -> None:
+        history = [
+            {"round": 1, "score": 80.0, "improved": True},
+            {"round": 2, "score": 93.0, "improved": True},
+            {"round": 3, "score": 93.0, "improved": False},
+        ]
+        self.assertEqual(_history_best_round(history, 93.0), 2)
+        self.assertEqual(
+            _history_best_round(
+                [
+                    {"round": 1, "score": 93.0},
+                    {"round": 2, "score": 93.0},
+                ],
+                93.0,
+            ),
+            1,
+        )
+
+    def test_unsafe_resume_histories_fail_before_writing_any_artifact(self) -> None:
+        valid_round_one = b'[{"round": 1, "score": 80}]'
+        unsafe_histories = {
+            "invalid_json": (b'{"not": "complete"', valid_round_one, 80.0),
+            "wrong_type": (b'{"round": 1}', valid_round_one, 80.0),
+            "duplicate_round": (
+                b'[{"round": 1}, {"round": 1}]',
+                valid_round_one,
+                80.0,
+            ),
+            "future_round": (
+                b'[{"round": 1}, {"round": 2}]',
+                valid_round_one,
+                80.0,
+            ),
+            "different_round_sequences": (valid_round_one, b"[]", 80.0),
+            "same_round_conflicting_fields": (
+                b'[{"round": 1, "score": 80, "successful_research_round": false}]',
+                b'[{"round": 1, "score": 80, "successful_research_round": true}]',
+                80.0,
+            ),
+            "same_round_bool_int_conflict": (
+                b'[{"round": 1, "score": 80, "successful_research_round": true}]',
+                b'[{"round": 1, "score": 80, "successful_research_round": 1}]',
+                80.0,
+            ),
+            "nested_bool_int_conflict": (
+                b'[{"round": 1, "score": 80, "agent_io_metrics": {"draft": {"called": true}}}]',
+                b'[{"round": 1, "score": 80, "agent_io_metrics": {"draft": {"called": 1}}}]',
+                80.0,
+            ),
+            "list_bool_int_conflict": (
+                b'[{"round": 1, "score": 80, "errors": [true]}]',
+                b'[{"round": 1, "score": 80, "errors": [1]}]',
+                80.0,
+            ),
+            "unsupported_checkpoint_best": (valid_round_one, valid_round_one, 90.0),
+        }
+        for case, (
+            round_metrics_content,
+            score_history_content,
+            checkpoint_best_score,
+        ) in unsafe_histories.items():
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp:
+                project_dir = Path(tmp) / "project"
+                project_dir.mkdir()
+                run_root = project_dir / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                memory_path = project_dir / "memory.md"
+                memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                artifact_contents = {
+                    run_root / "round_metrics.json": round_metrics_content,
+                    project_dir / "score_history.json": score_history_content,
+                    run_root / "run_config.json": b'{"run_id": "resume-run"}',
+                    run_root / "run_summary.json": b'{"completed_rounds": 1}',
+                    run_root / "run_manifest.json": b'{"legacy_field": "preserve"}',
+                    project_dir / "checkpoint.json": json.dumps(
+                        {
+                            "run_id": "resume-run",
+                            "run_root": str(run_root),
+                            "last_completed_round": 1,
+                            "best_score": checkpoint_best_score,
+                            "best_round_path": str(run_root / "round_01"),
+                            "can_resume": True,
+                        }
+                    ).encode(),
+                }
+                for path, content in artifact_contents.items():
+                    path.write_bytes(content)
+                agents = RecordingAgents()
+                console = Console(record=True)
+
+                with self.assertRaises(ResumeHistoryError) as caught:
+                    run_resume_mode(
+                        console=console,
+                        agents=agents,
+                        task_text="Design a privacy-aware memory adapter.",
+                        project_dir=project_dir,
+                        memory_path=memory_path,
+                        model_name="fake-model",
+                        max_rounds=2,
+                        stop_if_no_improvement_rounds=10,
+                        global_max_runtime_seconds=60,
+                        per_agent_timeout_seconds=300,
+                    )
+
+                self.assertEqual(agents.draft_rounds, [])
+                self.assertFalse((run_root / "round_02").exists())
+                for path, content in artifact_contents.items():
+                    self.assertEqual(path.read_bytes(), content)
+                if hasattr(console, "export_text"):
+                    output = " ".join(console.export_text().split())
+                    self.assertIn("Cannot resume safely", output)
+                    if case == "unsupported_checkpoint_best":
+                        self.assertIn("checkpoint best_score", output)
+                    else:
+                        self.assertIn("round_metrics.json", output)
+                    self.assertNotIn(str(Path(tmp)), output)
+                self.assertNotIn(str(Path(tmp)), str(caught.exception))
+
+    def test_legacy_score_history_fallback_must_not_exceed_checkpoint_best(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            score_history_path = root / "score_history.json"
+            round_metrics_path = root / "run" / "round_metrics.json"
+            score_history_path.write_text(
+                '[{"round": 1, "score": 90, "successful_research_round": true}]',
+                encoding="utf-8",
+            )
+
+            for checkpoint_best_score in (80.0, 100.0, None):
+                with self.subTest(checkpoint_best_score=checkpoint_best_score):
+                    with self.assertRaisesRegex(ResumeHistoryError, "checkpoint best_score"):
+                        _load_resume_histories(
+                            score_history_path=score_history_path,
+                            round_metrics_path=round_metrics_path,
+                            start_round=2,
+                            checkpoint_best_score=checkpoint_best_score,
+                        )
+
+            self.assertFalse(round_metrics_path.exists())
+
+    def test_partial_history_without_best_metadata_preserves_existing_best(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            artifact_contents = {
+                run_root / "round_metrics.json": b'[{"round": 1, "score": 50}]',
+                project_dir / "score_history.json": b'[{"round": 1, "score": 50}]',
+                project_dir / "best_output.md": b"Trusted missing-round best.\n",
+                run_root / "run_config.json": b'{"run_id": "resume-run"}',
+                run_root / "run_summary.json": b'{"completed_rounds": 2}',
+                project_dir / "checkpoint.json": json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 2,
+                        "can_resume": True,
+                    }
+                ).encode(),
+            }
+            for path, content in artifact_contents.items():
+                path.write_bytes(content)
+
+            with self.assertRaisesRegex(ResumeHistoryError, "partial history"):
+                run_resume_mode(
+                    console=Console(),
+                    agents=RecordingAgents(),
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    model_name="fake-model",
+                    max_rounds=3,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                )
+
+            self.assertFalse((run_root / "round_03").exists())
+            for path, content in artifact_contents.items():
+                self.assertEqual(path.read_bytes(), content)
 
     def test_resume_blocks_partial_next_round_without_overwriting(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1069,7 +1658,7 @@ class RoundLoopTests(unittest.TestCase):
             agents = RecordingAgents()
             console = Console(record=True)
 
-            run_resume_mode(
+            resume_started = run_resume_mode(
                 console=console,
                 agents=agents,
                 task_text="Design a privacy-aware memory adapter.",
@@ -1084,6 +1673,7 @@ class RoundLoopTests(unittest.TestCase):
             )
 
             self.assertFalse(preview["can_resume"])
+            self.assertFalse(resume_started)
             self.assertEqual(preview["blocked_reason"], "partial_next_round_exists")
             self.assertEqual(preview["next_round_status"], "partial")
             self.assertEqual(preview["next_round_safety_action"], "fail_safe_require_user_action")
@@ -1112,6 +1702,18 @@ class RoundLoopTests(unittest.TestCase):
                 checkpoint={},
                 repo_root=repo_root,
             )
+            invalid_round_previews = [
+                build_resume_preview(
+                    project_dir=project_dir,
+                    checkpoint={
+                        "can_resume": True,
+                        "run_root": str(project_dir / "runs" / "invalid-run"),
+                        "last_completed_round": invalid_round,
+                    },
+                    repo_root=repo_root,
+                )
+                for invalid_round in (-1, -0.5, 1.5, True)
+            ]
             stale_preview = build_resume_preview(
                 project_dir=project_dir,
                 checkpoint={
@@ -1140,6 +1742,11 @@ class RoundLoopTests(unittest.TestCase):
 
         self.assertFalse(missing_preview["can_resume"])
         self.assertEqual(missing_preview["blocked_reason"], "missing_checkpoint")
+        for invalid_round_preview in invalid_round_previews:
+            self.assertFalse(invalid_round_preview["can_resume"])
+            self.assertEqual(
+                invalid_round_preview["blocked_reason"], "invalid_last_completed_round"
+            )
         self.assertFalse(stale_preview["can_resume"])
         self.assertEqual(stale_preview["blocked_reason"], "stale_run_root")
         self.assertEqual(stale_preview["next_round"], 3)
