@@ -108,3 +108,20 @@ Validation and implementation outcomes will be appended only after they are actu
 - Independent bounded adversarial review found no remaining confirmed defect within the static ARA-012 scope.
 - Committed the implementation, regression matrix, UI integration, translations, changelog, and public docs as `e47ba44`.
 - Committed recovery state as `31db3f8`, pushed both commits, verified exact local/remote SHA equality, updated draft PR 13, and confirmed Python 3.10/3.13 passed for both push and pull-request triggers.
+
+## 2026-07-10 - UI checkpoint artifact read containment
+
+- Reproduced metadata, analytics, and output browsing following external checkpoint config/summary,
+  summary metrics, external run roots, and run/round symlinks.
+- Added a read-only canonical run-root validation mode while preserving writable resume semantics.
+- Derived fixed run artifact names, rejected unsafe/non-regular config/summary/metrics/manifest and
+  round leaves before reads, and returned unavailable entries without propagating unsafe paths.
+- Restricted project-level score-history fallback to the no-`run_root` legacy layout after an
+  independent adversarial review reproduced the remaining selected-run external read.
+- Preserved safe legacy metadata, configured `runs/` storage symlinks, and read-only artifact viewing.
+- Focused UI/resume/analytics/compare regression passed with `84 passed, 47 subtests passed`; final
+  `make check` passed with `172 passed, 91 subtests passed`.
+- Two independent read-only reviews reported no remaining actionable finding within ARA-021 after
+  the score-history correction.
+- Committed the implementation, tests, changelog, and public docs as `98ea4a3`; push and CI
+  verification remain the next checkpoint action.

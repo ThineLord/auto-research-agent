@@ -40,13 +40,18 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-`ARA-012` should be `DONE`, pushed, and CI-verified. If the maintenance branch is ahead of origin, inspect any final state-only closeout before pushing; do not repeat the implementation. Its final local validation command was:
+`ARA-021` should be `DONE` at implementation commit `98ea4a3`. Its final local validation command was:
 
 ```bash
 make check
 ```
 
-After the branch is clean, pushed, and CI-verified, the next task is `ARA-021`. Mark it `IN_PROGRESS` before editing and begin with focused UI metadata/dashboard/catalog tests proving external checkpoint artifact references are not read. Keep project-level symlink/TOCTOU policy (`ARA-022`) and manifest provenance/identity (`ARA-020`) separate. If another task is active, run its exact validation command from `.codex/TASK_QUEUE.md` first. Understand any uncommitted diff before editing it.
+If the branch is ahead of origin, inspect and commit only the ARA-021 recovery-state files, then
+push without force and verify the exact remote SHA plus draft PR 13 checks. Do not repeat the
+implementation. After GitHub synchronization, the next recommended task is `ARA-013` (atomic,
+owner-safe run locks). Keep project-level symlink/TOCTOU policy (`ARA-022`) and manifest
+provenance/identity (`ARA-020`) separate. If another task is active, run its exact validation command
+from `.codex/TASK_QUEUE.md` first. Understand any uncommitted diff before editing it.
 
 ## 5. Safety boundaries
 
@@ -58,5 +63,5 @@ After the branch is clean, pushed, and CI-verified, the next task is `ARA-021`. 
 ## Suggested immediate command
 
 ```bash
-git status --short --branch && git rev-list --left-right --count origin/codex/sol-autonomous-hardening...HEAD
+git status --short --branch && git show --stat --oneline HEAD
 ```

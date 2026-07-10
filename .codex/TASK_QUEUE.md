@@ -126,7 +126,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-021 - Constrain UI checkpoint artifact reads to the selected run
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P1
 - Risk: medium
 - Description: the output browser and analytics helpers independently trust checkpoint `run_config`/`run_summary` and summary `round_metrics_path`, so rendering a crafted checkpoint can read external JSON even though Resume itself is now blocked.

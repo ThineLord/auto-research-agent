@@ -54,3 +54,16 @@
 - Reason: repository-generated checkpoints have always used absolute direct-child run roots, while trusting arbitrary checkpoint paths permits external reads and writes.
 - Compatibility: a user-configured `project/runs` storage symlink remains supported because normal run creation already follows it; the checkpoint may choose only a canonical direct child of that resolved storage root.
 - Boundary: static root/child checks protect resume-consumed config, legacy manifest, summary, metrics/history, previous context, and planned round paths. UI raw artifact references and active filesystem-swap resistance remain separate tasks `ARA-021` and `ARA-022`.
+
+## 2026-07-10 - Derive UI artifacts from the selected canonical run
+
+- Decision: when checkpoint `run_root` is present, latest-run metadata, analytics, and output
+  browsing use only fixed config/summary/metrics/manifest and round-output names derived from its
+  validated canonical root. Redundant checkpoint and summary path values cannot redirect reads.
+- Reason: those fixed names are the repository-generated schema, while trusting stored absolute
+  pointers allowed crafted or stale checkpoints to read arbitrary local JSON and text.
+- Compatibility: a read-only canonical run and a configured resolved `runs/` storage symlink remain
+  browseable. The project-level score-history fallback remains only for the no-`run_root` legacy
+  layout.
+- Boundary: project-level logs/outputs, discovered-run comparison paths, active filesystem swaps,
+  and the broader local artifact symlink policy remain `ARA-022`.

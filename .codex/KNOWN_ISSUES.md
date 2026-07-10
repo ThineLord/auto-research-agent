@@ -143,10 +143,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-020 - UI artifact viewers can follow external checkpoint references
 
-- Status: reproduced; separate from the Resume write boundary
+- Status: fixed, validated, and committed locally; remote push pending
 - Severity: P1 privacy
 - Impact: metadata, analytics, and output-catalog helpers can read checkpoint-supplied run config/summary paths or a summary-supplied metrics path outside the selected run.
-- Current action: task `ARA-021`; reuse canonical run-root validation for every UI artifact consumer.
+- Current action: task `ARA-021` completed at local commit `98ea4a3`; publish the recovery-state
+  checkpoint and verify GitHub CI.
 
 ## KI-021 - Static resume checks do not close active filesystem swap races
 

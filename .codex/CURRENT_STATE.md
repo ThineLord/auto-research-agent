@@ -4,17 +4,20 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: begin `ARA-021` from the published and CI-verified `ARA-012` checkpoint.
+- Current goal: constrain UI checkpoint artifact reads to the selected canonical run (`ARA-021`).
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `31db3f8286b3cbe0874d6ab0e938bd496e5d3730` (use `git rev-parse HEAD` after the final state-only closeout commit)
-- Last known stable commit: `31db3f8286b3cbe0874d6ab0e938bd496e5d3730` (`make check`, focused consumers, independent review, exact remote synchronization, and GitHub Actions passed)
-- Active task: prepare `ARA-021` in `.codex/TASK_QUEUE.md`
-- Uncommitted changes: yes; final verified maintenance-state closeout only.
+- Current HEAD at state snapshot: `98ea4a312014300a77a2a33aeead441d9a7a4df6`
+- Last known stable commit: `98ea4a312014300a77a2a33aeead441d9a7a4df6` (`make check`,
+  focused consumers, and independent adversarial re-review passed locally; push pending)
+- Active task: `ARA-021` (`DONE`) in `.codex/TASK_QUEUE.md`; publish its recovery checkpoint.
+- Uncommitted changes: yes; recovery-state closeout only.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
+- `.codex/TASK_QUEUE.md`
 - `.codex/COMPLETED.md`
+- `.codex/DECISIONS.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
@@ -74,11 +77,33 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Committed the ARA-012 recovery-state checkpoint as `31db3f8`, pushed both commits, and verified local, remote-tracking, and GitHub branch SHAs match.
 - Updated draft PR 13 with the path boundary, validation matrix, and explicitly queued residual risks.
 - Verified all Python 3.10 and Python 3.13 GitHub Actions jobs passed for both push and pull-request triggers.
+- Reproduced UI metadata, analytics, and output-catalog reads from external checkpoint config,
+  summary, metrics, run-root, and latest-round references; the initial focused regression failed
+  in all three expected cases.
+- Added a read-only canonical run-root validator while preserving the resume runner's read/write
+  requirement and configured `runs/` storage symlink compatibility.
+- Made UI run-local consumers ignore redundant path fields, derive fixed artifact names, reject
+  unsafe/non-regular config/summary/metrics/manifest and round-output leaves before reads, and
+  return partial/unavailable state without propagating unsafe catalog paths.
+- Added guarded no-read, external-root, checkpoint/summary redirect, config/summary/metrics/manifest
+  symlink, non-regular file, latest-round link, configured-storage, and read-only access coverage.
+- Focused UI tests passed (`35 passed, 4 subtests passed`); UI/resume/analytics/compare regression
+  passed (`83 passed, 47 subtests passed`). Ruff checks and `git diff --check` passed.
+- Independent post-fix review reproduced one remaining selected-run read through project-level
+  `score_history.json`; added a no-read regression and limited that fallback to no-`run_root`
+  legacy projects.
+- Re-ran the focused consumer suite (`84 passed, 47 subtests passed`) and final `make check`
+  (`172 passed, 91 subtests passed`).
+- Independent adversarial re-review reported green across selected, invalid, and legacy run scopes.
+- Staged scans found no personal absolute path, credential pattern, or private-key material.
+- Committed the ARA-021 implementation, tests, changelog, and public docs as `98ea4a3`.
 
 ## Remaining Steps
 
-- Commit and push this final verified state closeout.
-- Mark `ARA-021` `IN_PROGRESS` only after the branch is clean and synchronized; keep project-level symlink/TOCTOU policy separate as `ARA-022`.
+- Commit this completed recovery-state checkpoint and push it with implementation commit `98ea4a3`.
+- Verify local, remote-tracking, and GitHub branch SHAs, update draft PR 13, and wait for Python
+  3.10/3.13 push and pull-request checks.
+- After a clean synchronized checkpoint, begin `ARA-013` with a failing run-lock ownership/race test.
 
 ## Test Status
 
@@ -119,6 +144,14 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Final `git diff --check`, staged diff check, and personal-path/credential/private-key scans passed.
 - GitHub Actions for the pushed ARA-012 checkpoint: Python 3.10 and Python 3.13 passed for both push and pull-request triggers.
 - GitHub sync: local, remote-tracking, and GitHub branch SHAs match at `31db3f8286b3cbe0874d6ab0e938bd496e5d3730`; draft PR 13 is updated and mergeable.
+- ARA-021 pre-fix focused reproduction: `3 failed, 29 deselected`; external provider/model and
+  run paths reached metadata/dashboard/catalog as expected before the fix.
+- ARA-021 focused UI regression after final correction: `36 passed, 4 subtests passed`.
+- ARA-021 UI/resume/analytics/compare regression: `84 passed, 47 subtests passed`.
+- Final ARA-021 `make check`: Ruff format (51 files), Ruff lint, import smoke, and pytest
+  (`172 passed, 91 subtests passed`).
+- Independent post-fix re-review: green after the project score-history correction.
+- `git diff --check`, staged diff check, and staged personal-path/credential/private-key scans passed.
 - Provider-backed tests: not planned for this checkpoint; no paid or network model calls are needed.
 
 ## Recent Failed Command
@@ -130,11 +163,20 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - An interim `make check` stopped at Ruff formatting while implementation was still in progress; formatting was applied and the final full gate passed.
 - The initial ARA-012 regression accepted absolute, traversal, symlink, and `runs/` container roots and allowed a direct runner override to write externally; these were the expected pre-fix failures.
 - Interim adversarial probes found future-round symlink, malformed NUL, unreadable directory, legacy-manifest, non-file artifact, and permission-error gaps; each received a focused regression before the final full gate.
+- The initial ARA-021 focused regression failed all three new tests by reading an external root,
+  explicit checkpoint config/summary references, and a config/round symlink; this was the expected
+  pre-fix reproduction.
+- The first post-fix focused run had one path-equality failure because macOS canonicalized `/var`
+  to `/private/var`; the assertion now compares canonical paths and the security behavior passed.
+- An interim Ruff format check requested formatting in `ui/app.py`; formatting was applied and the
+  subsequent focused Ruff check passed.
+- The first independent ARA-021 review found selected runs still loading project score history; a
+  dedicated no-read test failed before the correction and passed afterward. The second review was green.
 
 ## Next Command
 
 ```bash
-git status --short --branch
+git add .codex/CURRENT_STATE.md .codex/TASK_QUEUE.md .codex/COMPLETED.md .codex/DECISIONS.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
 ```
 
 ## Interruption Recovery
@@ -147,6 +189,6 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.
 - Do not change prompts, scoring semantics, provider behavior, benchmark results, or artifact interpretation as part of a maintenance-only fix.
-- Keep `ARA-021` scoped to UI artifact-consumer reads; do not combine it with project-level symlink/TOCTOU policy (`ARA-022`).
-- Do not claim UI artifact viewers or active filesystem-swap resistance are fixed by ARA-012; they remain `ARA-021` and `ARA-022`.
+- Do not widen the completed `ARA-021` checkpoint into project-level output/log symlink or active
+  filesystem-swap policy; those remain `ARA-022`.
 - Do not stage with `git add -A`; stage only reviewed paths.
