@@ -40,9 +40,10 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-`ARA-004` is `BLOCKED` before implementation. Its safe wheel/sdist reproduction confirmed missing
-bundled assets and a combined resource/workspace root. Read `KI-005`, `KI-013`, and `KI-023` in
-`.codex/KNOWN_ISSUES.md` before continuing. The last stable full validation command was:
+`ARA-004` is `BLOCKED` before implementation at remotely verified audit checkpoint `89e95bf`. Its
+safe wheel/sdist reproduction confirmed missing bundled assets and a combined resource/workspace
+root. Read `KI-005`, `KI-013`, and `KI-023` in `.codex/KNOWN_ISSUES.md` before continuing. The last
+stable full validation command was:
 
 ```bash
 make check

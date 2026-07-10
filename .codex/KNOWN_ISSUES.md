@@ -40,8 +40,9 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Severity: P2
 - Evidence: the project declares only the `src` package while runtime workflows also reference repository assets and UI/scripts.
 - Impact: wheel-installed behavior may differ from editable or cloned-checkout behavior.
-- Current action: task `ARA-004`; safe implementation requires separating installed read-only
-  resources from a writable workspace and is awaiting the recorded long-task checkpoint approval.
+- Current action: task `ARA-004`; audit checkpoint `89e95bf` is remotely verified. Safe
+  implementation requires separating installed read-only resources from a writable workspace and
+  is awaiting the recorded long-task checkpoint approval.
 
 ## KI-006 - Legacy ignored logs can predate path masking
 
@@ -99,8 +100,9 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Status: reproduced in isolated wheel and sdist installs; implementation blocked before changes
 - Severity: P1 for packaged distribution
 - Impact: console help works, but mock startup cannot locate `config.example.yaml`; a source checkout works.
-- Current action: task `ARA-004`; do not advertise wheel readiness. Avoid package-root data files
-  that would make installed workflows write into `site-packages`.
+- Current action: task `ARA-004`; audit checkpoint `89e95bf` is remotely verified. Do not advertise
+  wheel readiness or use package-root data files that would make installed workflows write into
+  `site-packages`.
 
 ## KI-014 - Tracked reports contain a personal absolute-path fragment
 

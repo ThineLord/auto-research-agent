@@ -7,18 +7,17 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Current goal: make clean wheel and source-distribution installs retain the provider-free resources
   needed by documented CLI workflows (`ARA-004`).
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `e202dfb90c2e5b5d2c4fa164f450244fbd06e21b`
-- Last known stable commit: `e202dfb90c2e5b5d2c4fa164f450244fbd06e21b` (exact local,
+- Current HEAD at state snapshot: `89e95bf861f1ba501cf0d002e4210597b1526344`
+- Last known stable commit: `89e95bf861f1ba501cf0d002e4210597b1526344` (exact local,
   remote-tracking, and GitHub branch equality plus all Python 3.10/3.13 push/PR checks passed)
 - Active task: ARA-004 is `BLOCKED` before implementation. The verified safe fix now exceeds the
   30-minute checkpoint threshold, and an accidental local mock changed ignored example-project
   state that must not be deleted or reconstructed without owner direction.
-- Uncommitted changes: yes; only the ARA-004 audit/blocker recovery-state checkpoint is present.
+- Uncommitted changes: yes; only the remotely verified ARA-004 audit state closeout remains.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
-- `.codex/TASK_QUEUE.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
@@ -193,6 +192,9 @@ Updated: 2026-07-11 (Asia/Shanghai)
   `importlib.resources` resolver, CWD as installed writable workspace, and mock-only example seeding.
   Source/editable behavior, provider semantics, prompt bytes, UI/scripts distribution, versions,
   licenses, dependencies, and other projects remain unchanged/out of scope.
+- Committed and pushed the audit/blocker recovery checkpoint as `89e95bf`, verified exact local,
+  remote-tracking, and GitHub SHA equality, updated draft PR 13, and confirmed Python 3.10/3.13
+  passed for both push and pull-request workflows.
 
 ## Remaining Steps
 
@@ -221,6 +223,7 @@ Updated: 2026-07-11 (Asia/Shanghai)
   workspaces remained empty.
 - ARA-004 implementation tests were not started because the verified fix exceeds 30 minutes and
   needs an explicit checkpoint approval.
+- ARA-004 audit checkpoint `89e95bf`: all four Python 3.10/3.13 push/pull-request CI jobs passed.
 - Current branch validation: `make check` passed at 2026-07-10T16:27:39+08:00.
 - Results: Ruff format passed (50 files), Ruff lint passed, import smoke passed, pytest passed (`139 passed, 43 subtests passed`).
 - Compare-runs targeted validation: module suite passed (`7 passed`).
@@ -354,11 +357,13 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - That incident created one run directory, atomically replaced `best_output.md`, `checkpoint.json`,
   `memory.md`, `research_state.json`, and `score_history.json`, and appended `run.log`. No provider,
   secret, tracked file, or canonical research artifact was involved. No cleanup was attempted.
+- The first audit-checkpoint GitHub run-list query returned EOF; a bounded retry succeeded and both
+  workflow runs plus all four version jobs were verified successful.
 
 ## Next Command
 
 ```bash
-git status --short --branch && sed -n '1,220p' .codex/CURRENT_STATE.md
+git add .codex/CURRENT_STATE.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
 ```
 
 ## Interruption Recovery
