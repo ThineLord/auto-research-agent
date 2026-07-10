@@ -160,6 +160,13 @@ schema-additive and must not reinterpret or rescale the Judge's top-level score.
 The Streamlit UI renders a compact latest-run metadata table from `run_config.json` and
 `run_summary.json`, keeps artifact paths repo-relative or masked, and gives artifact-specific
 messages when `run_config.json`, `run_summary.json`, or `round_metrics.json` has not been written.
+When a checkpoint selects a run, these UI consumers validate and canonicalize its per-run root,
+derive those fixed filenames, and validate each leaf before reading it. Checkpoint `run_config` /
+`run_summary` values and summary `round_metrics_path` remain provenance only; they cannot redirect
+UI reads. Unsafe roots, non-regular files, and escaping run/round links produce partial or
+unavailable views without exposing their target paths. This boundary does not define the broader
+project-level artifact symlink policy. Project-level `score_history.json` is used only by the
+no-`run_root` legacy layout; a selected canonical run uses its own `round_metrics.json` instead.
 The `Run analytics dashboard` uses existing `run_summary.json`, `round_metrics.json`, and
 `score_history.json` only. It displays compact score, rubric, similarity/evolution, timeout/error,
 agent timing, and estimated-token views, and should keep missing/legacy fields as empty partial

@@ -13,6 +13,10 @@
   manifest, summary, metrics/history, previous-round context, and all planned round directories
   also reject escaping symlinks, invalid file types, or inaccessible paths before those paths are
   read or written; the UI disables Resume for the same unsafe checkpoints.
+* Latest-run UI metadata, analytics, and output browsing now derive fixed artifact names from the
+  validated canonical checkpoint run root. Redundant external checkpoint/summary references and
+  unsafe run or round artifact links become unavailable without being read; configured `runs/`
+  storage symlinks and safe legacy in-run metadata remain supported.
 
 ### Fixed
 

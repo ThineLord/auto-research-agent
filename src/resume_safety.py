@@ -34,12 +34,13 @@ RESUME_PATH_MESSAGES = {
 }
 
 
-def validate_resume_run_root(
+def validate_project_run_root(
     *,
     project_dir: Path,
     run_root_value: Any,
+    require_writable: bool = False,
 ) -> tuple[Path | None, str | None]:
-    """Return a canonical per-run directory and an optional privacy-safe blocker code."""
+    """Return a canonical project run directory and an optional privacy-safe blocker code."""
     run_root_text = str(run_root_value or "").strip()
     if not run_root_text:
         return None, MISSING_RUN_ROOT
@@ -65,9 +66,23 @@ def validate_resume_run_root(
         return resolved_candidate, STALE_RUN_ROOT
     if not resolved_candidate.is_dir():
         return resolved_candidate, INVALID_RUN_ROOT
-    if not os.access(resolved_candidate, os.R_OK | os.W_OK | os.X_OK):
+    access_mode = os.R_OK | os.X_OK | (os.W_OK if require_writable else 0)
+    if not os.access(resolved_candidate, access_mode):
         return resolved_candidate, INACCESSIBLE_RUN_ROOT
     return resolved_candidate, None
+
+
+def validate_resume_run_root(
+    *,
+    project_dir: Path,
+    run_root_value: Any,
+) -> tuple[Path | None, str | None]:
+    """Validate a canonical per-run directory for resume reads and writes."""
+    return validate_project_run_root(
+        project_dir=project_dir,
+        run_root_value=run_root_value,
+        require_writable=True,
+    )
 
 
 def validate_resume_round_dir(

@@ -79,6 +79,9 @@ Mock mode 会复用正常 round runner，写入 `run_config.json`、`round_metri
   路径穿越和普通文件会在扫描该目录前阻塞。resume 会进一步检查它要读取的
   config/legacy manifest/summary/metrics/history、上一轮上下文和本次计划写入的所有 round 目录，
   拒绝逃逸符号链接或无效文件类型；UI 使用同一 preview 并禁用不安全 checkpoint 的 Resume 按钮。
+- UI 的 latest metadata、analytics 和 output browser 只从验证后的 checkpoint run root 派生固定
+  artifact 文件名；checkpoint/summary 中冗余的外部路径不会参与选址，不安全的 run/round 文件会显示
+  为不可用而不会被读取。此边界不改变项目级日志、历史输出等本地 artifact 的既有信任策略。
 
 ## What To Demo First
 

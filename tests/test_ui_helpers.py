@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -895,7 +896,407 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertNotIn(str(Path(tmp)), "\n".join(by_key.values()))
 
         metrics_item = next(item for item in catalog if item["label"] == "Round metrics")
-        self.assertEqual(metrics_item["path"], round_metrics_path)
+        self.assertEqual(metrics_item["path"], round_metrics_path.resolve())
+
+    def test_ui_run_artifacts_ignore_external_checkpoint_and_summary_references(self) -> None:
+        import ui.app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "project"
+            run_root = project_dir / "runs" / "run1"
+            run_root.mkdir(parents=True)
+            external_dir = repo_root / "external"
+            external_dir.mkdir()
+
+            write_json_file(
+                run_root / "run_config.json",
+                {
+                    "run_id": "run1",
+                    "model": {"provider": "ollama", "name": "safe-model"},
+                },
+            )
+            write_json_file(
+                run_root / "run_summary.json",
+                {
+                    "run_id": "run1",
+                    "best_score": 81,
+                    "round_metrics_path": str(external_dir / "round_metrics.json"),
+                },
+            )
+            write_json_file(run_root / "round_metrics.json", [{"round": 1, "score": 81}])
+            write_json_file(
+                external_dir / "run_config.json",
+                {
+                    "run_id": "private-run",
+                    "model": {"provider": "EXTERNAL_PROVIDER", "name": "private-model"},
+                },
+            )
+            write_json_file(
+                external_dir / "run_summary.json",
+                {
+                    "run_id": "private-run",
+                    "best_score": 999,
+                    "round_metrics_path": str(external_dir / "round_metrics.json"),
+                },
+            )
+            write_json_file(
+                external_dir / "round_metrics.json",
+                [{"round": 1, "score": 999}],
+            )
+            checkpoint = {
+                "run_root": str(run_root),
+                "run_config": str(external_dir / "run_config.json"),
+                "run_summary": str(external_dir / "run_summary.json"),
+                "last_completed_round": 1,
+            }
+
+            canonical_run_root = run_root.resolve()
+            read_json = ui_app.read_json_file
+            read_json_list = ui_app._read_json_list_file
+            analyze = ui_app.analyze_run
+
+            def guarded_read_json(path: Path) -> dict[str, object]:
+                self.assertFalse(path.is_symlink())
+                self.assertEqual(path.resolve().parent, canonical_run_root)
+                return read_json(path)
+
+            def guarded_read_json_list(path: Path) -> list[dict[str, object]]:
+                self.assertFalse(path.is_symlink())
+                self.assertEqual(path.resolve().parent, canonical_run_root)
+                return read_json_list(path)
+
+            def guarded_analyze(path: Path) -> dict[str, object]:
+                self.assertEqual(path.resolve(), canonical_run_root)
+                return analyze(path)
+
+            with (
+                patch.object(ui_app, "read_json_file", side_effect=guarded_read_json),
+                patch.object(
+                    ui_app,
+                    "_read_json_list_file",
+                    side_effect=guarded_read_json_list,
+                ),
+                patch.object(ui_app, "analyze_run", side_effect=guarded_analyze),
+            ):
+                rows = ui_app.build_run_metadata_rows(project_dir, checkpoint)
+                dashboard = ui_app.build_run_analytics_dashboard(project_dir, checkpoint)
+                catalog = ui_app.build_output_catalog(project_dir, checkpoint)
+
+        by_key = {row["field_key"]: row["value"] for row in rows}
+        self.assertEqual(by_key["run_meta_provider"], "ollama")
+        self.assertEqual(by_key["run_meta_model"], "safe-model")
+        self.assertEqual(dashboard["cards"][0]["value"], 81.0)
+        self.assertNotIn("999", json.dumps(dashboard))
+        by_label = {item["label"]: item for item in catalog}
+        self.assertEqual(by_label["Run config"]["path"], run_root.resolve() / "run_config.json")
+        self.assertEqual(by_label["Run summary"]["path"], run_root.resolve() / "run_summary.json")
+        self.assertEqual(
+            by_label["Round metrics"]["path"], run_root.resolve() / "round_metrics.json"
+        )
+
+    def test_ui_run_artifacts_do_not_read_an_external_run_root(self) -> None:
+        import ui.app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "project"
+            project_dir.mkdir()
+            outside_run = repo_root / "other" / "runs" / "private-run"
+            outside_round = outside_run / "round_01"
+            outside_round.mkdir(parents=True)
+            write_json_file(
+                outside_run / "run_config.json",
+                {
+                    "run_id": "private-run",
+                    "model": {"provider": "EXTERNAL_PROVIDER", "name": "private-model"},
+                },
+            )
+            (outside_round / "04_judge.md").write_text("private judge", encoding="utf-8")
+            write_json_file(
+                project_dir / "run_config.json",
+                {
+                    "run_id": "wrong-project-fallback",
+                    "model": {"provider": "PROJECT_FALLBACK", "name": "wrong-model"},
+                },
+            )
+            write_json_file(
+                project_dir / "score_history.json",
+                [{"round": 1, "score": 777}],
+            )
+            checkpoint = {
+                "run_root": str(outside_run),
+                "last_completed_round": 1,
+            }
+
+            with (
+                patch.object(
+                    ui_app,
+                    "read_json_file",
+                    side_effect=AssertionError("unsafe root must not be read"),
+                ),
+                patch.object(
+                    ui_app,
+                    "_read_json_list_file",
+                    side_effect=AssertionError("unsafe root metrics must not be read"),
+                ),
+                patch.object(
+                    ui_app,
+                    "load_score_history_rows",
+                    side_effect=AssertionError("unsafe root must not use project history"),
+                ),
+                patch.object(
+                    ui_app,
+                    "analyze_run",
+                    side_effect=AssertionError("unsafe root must not be analyzed"),
+                ),
+            ):
+                rows = ui_app.build_run_metadata_rows(project_dir, checkpoint)
+                dashboard = ui_app.build_run_analytics_dashboard(project_dir, checkpoint)
+                catalog = ui_app.build_output_catalog(project_dir, checkpoint)
+
+        self.assertEqual(rows, [])
+        self.assertFalse(dashboard["available"])
+        self.assertNotIn("EXTERNAL_PROVIDER", json.dumps(dashboard))
+        run_items = {
+            item["label"]: item
+            for item in catalog
+            if item["label"] in {"Run config", "Run summary", "Round metrics"}
+        }
+        self.assertTrue(run_items)
+        self.assertTrue(all(not item["exists"] for item in run_items.values()))
+        self.assertTrue(all(item["path"] is None for item in run_items.values()))
+        self.assertFalse(
+            any(item["label"] == "Latest round judge" and item["exists"] for item in catalog)
+        )
+
+    def test_ui_selected_run_does_not_read_project_score_history(self) -> None:
+        import ui.app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "project"
+            run_root = project_dir / "runs" / "selected-run"
+            run_root.mkdir(parents=True)
+            write_json_file(
+                run_root / "run_config.json",
+                {
+                    "run_id": "selected-run",
+                    "model": {"provider": "ollama", "name": "safe-model"},
+                },
+            )
+            external_history = repo_root / "private-score-history.json"
+            write_json_file(external_history, [{"round": 42, "score": 888}])
+            (project_dir / "score_history.json").symlink_to(external_history)
+
+            with patch.object(
+                ui_app,
+                "load_score_history_rows",
+                wraps=ui_app.load_score_history_rows,
+            ) as load_score_history:
+                dashboard = ui_app.build_run_analytics_dashboard(
+                    project_dir,
+                    {"run_root": str(run_root)},
+                )
+
+        load_score_history.assert_not_called()
+        self.assertFalse(dashboard["available"])
+        self.assertNotIn("888", json.dumps(dashboard))
+        self.assertNotIn("private-score-history", json.dumps(dashboard))
+
+    def test_ui_run_artifacts_reject_external_leaf_symlinks(self) -> None:
+        import ui.app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "project"
+            run_root = project_dir / "runs" / "run1"
+            run_root.mkdir(parents=True)
+            outside_config = repo_root / "private-config.json"
+            write_json_file(
+                outside_config,
+                {
+                    "run_id": "private-run",
+                    "model": {"provider": "EXTERNAL_PROVIDER", "name": "private-model"},
+                },
+            )
+            (run_root / "run_config.json").symlink_to(outside_config)
+            outside_round = repo_root / "private-round"
+            outside_round.mkdir()
+            (outside_round / "04_judge.md").write_text("private judge", encoding="utf-8")
+            (run_root / "round_01").symlink_to(outside_round, target_is_directory=True)
+            checkpoint = {"run_root": str(run_root), "last_completed_round": 1}
+
+            with patch.object(ui_app, "analyze_run", wraps=ui_app.analyze_run) as analyze:
+                rows = ui_app.build_run_metadata_rows(project_dir, checkpoint)
+                dashboard = ui_app.build_run_analytics_dashboard(project_dir, checkpoint)
+                catalog = ui_app.build_output_catalog(project_dir, checkpoint)
+
+        self.assertNotIn("EXTERNAL_PROVIDER", json.dumps(rows))
+        self.assertNotIn("EXTERNAL_PROVIDER", json.dumps(dashboard))
+        analyze.assert_not_called()
+        config_item = next(item for item in catalog if item["label"] == "Run config")
+        self.assertFalse(config_item["exists"])
+        self.assertIsNone(config_item["path"])
+        self.assertFalse(
+            any(item["label"] == "Latest round judge" and item["exists"] for item in catalog)
+        )
+
+    def test_ui_run_artifact_bundle_rejects_each_unsafe_leaf_before_read(self) -> None:
+        import ui.app as ui_app
+
+        cases: tuple[tuple[str, object], ...] = (
+            (
+                "run_config.json",
+                {
+                    "run_id": "private-run",
+                    "model": {"provider": "PRIVATE_SENTINEL", "name": "private-model"},
+                },
+            ),
+            ("run_summary.json", {"run_id": "private-run", "best_score": 999}),
+            ("round_metrics.json", [{"round": 1, "score": 999}]),
+            ("run_manifest.json", {"run_id": "private-run", "model": "PRIVATE_SENTINEL"}),
+        )
+        catalog_labels = {
+            "run_config.json": "Run config",
+            "run_summary.json": "Run summary",
+            "round_metrics.json": "Round metrics",
+        }
+
+        for artifact_name, private_payload in cases:
+            with self.subTest(artifact=artifact_name), tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                project_dir = repo_root / "project"
+                run_root = project_dir / "runs" / "run1"
+                run_root.mkdir(parents=True)
+                if artifact_name not in {"run_config.json", "run_manifest.json"}:
+                    write_json_file(
+                        run_root / "run_config.json",
+                        {
+                            "run_id": "run1",
+                            "model": {"provider": "ollama", "name": "safe-model"},
+                        },
+                    )
+                if artifact_name != "run_summary.json":
+                    write_json_file(
+                        run_root / "run_summary.json",
+                        {"run_id": "run1", "best_score": 80},
+                    )
+                if artifact_name != "round_metrics.json":
+                    write_json_file(
+                        run_root / "round_metrics.json",
+                        [{"round": 1, "score": 80}],
+                    )
+                private_path = repo_root / f"private-{artifact_name}"
+                private_path.write_text(json.dumps(private_payload), encoding="utf-8")
+                (run_root / artifact_name).symlink_to(private_path)
+                checkpoint = {"run_root": str(run_root), "last_completed_round": 1}
+                read_json = ui_app.read_json_file
+                read_json_list = ui_app._read_json_list_file
+
+                def guarded_read_json(path: Path) -> dict[str, object]:
+                    self.assertFalse(path.is_symlink())
+                    return read_json(path)
+
+                def guarded_read_json_list(path: Path) -> list[dict[str, object]]:
+                    self.assertFalse(path.is_symlink())
+                    return read_json_list(path)
+
+                with (
+                    patch.object(ui_app, "read_json_file", side_effect=guarded_read_json),
+                    patch.object(
+                        ui_app,
+                        "_read_json_list_file",
+                        side_effect=guarded_read_json_list,
+                    ),
+                    patch.object(ui_app, "analyze_run", wraps=ui_app.analyze_run) as analyze,
+                ):
+                    rows = ui_app.build_run_metadata_rows(project_dir, checkpoint)
+                    dashboard = ui_app.build_run_analytics_dashboard(project_dir, checkpoint)
+                    catalog = ui_app.build_output_catalog(project_dir, checkpoint)
+
+                analyze.assert_not_called()
+                rendered = json.dumps({"rows": rows, "dashboard": dashboard}, default=str)
+                self.assertNotIn("PRIVATE_SENTINEL", rendered)
+                self.assertNotIn("999", rendered)
+                if artifact_name in catalog_labels:
+                    item = next(
+                        item for item in catalog if item["label"] == catalog_labels[artifact_name]
+                    )
+                    self.assertFalse(item["exists"])
+                    self.assertIsNone(item["path"])
+
+    def test_ui_run_artifacts_reject_non_regular_leaf_and_latest_round_symlink(self) -> None:
+        import ui.app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "project"
+            run_root = project_dir / "runs" / "run1"
+            round_dir = run_root / "round_01"
+            round_dir.mkdir(parents=True)
+            write_json_file(
+                run_root / "run_config.json",
+                {"run_id": "run1", "model": {"provider": "ollama", "name": "safe-model"}},
+            )
+            (run_root / "run_summary.json").mkdir()
+            private_judge = repo_root / "private-judge.md"
+            private_judge.write_text("PRIVATE_JUDGE", encoding="utf-8")
+            (round_dir / "04_judge.md").symlink_to(private_judge)
+            checkpoint = {"run_root": str(run_root), "last_completed_round": 1}
+
+            with patch.object(ui_app, "analyze_run", wraps=ui_app.analyze_run) as analyze:
+                rows = ui_app.build_run_metadata_rows(project_dir, checkpoint)
+                catalog = ui_app.build_output_catalog(project_dir, checkpoint)
+
+        analyze.assert_not_called()
+        by_key = {row["field_key"]: row["value"] for row in rows}
+        self.assertEqual(by_key["run_meta_provider"], "ollama")
+        self.assertEqual(by_key["run_meta_run_summary_path"], "N/A")
+        summary_item = next(item for item in catalog if item["label"] == "Run summary")
+        judge_item = next(item for item in catalog if item["label"] == "Latest round judge")
+        self.assertFalse(summary_item["exists"])
+        self.assertIsNone(summary_item["path"])
+        self.assertFalse(judge_item["exists"])
+        self.assertIsNone(judge_item["path"])
+
+    def test_ui_run_artifacts_support_configured_runs_storage_symlink_read_only(self) -> None:
+        import ui.app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "project"
+            project_dir.mkdir()
+            runs_storage = repo_root / "configured-runs-storage"
+            runs_storage.mkdir()
+            (project_dir / "runs").symlink_to(runs_storage, target_is_directory=True)
+            run_root = runs_storage / "run1"
+            run_root.mkdir()
+            write_json_file(
+                run_root / "run_config.json",
+                {
+                    "run_id": "run1",
+                    "model": {"provider": "ollama", "name": "safe-model"},
+                },
+            )
+            root_access_modes: list[int] = []
+
+            def read_only_access(path: object, mode: int) -> bool:
+                if Path(path).resolve() == run_root.resolve():
+                    root_access_modes.append(mode)
+                    return not bool(mode & os.W_OK)
+                return True
+
+            with patch("src.resume_safety.os.access", side_effect=read_only_access):
+                rows = ui_app.build_run_metadata_rows(
+                    project_dir,
+                    {"run_root": str(project_dir / "runs" / "run1")},
+                )
+
+        by_key = {row["field_key"]: row["value"] for row in rows}
+        self.assertEqual(by_key["run_meta_provider"], "ollama")
+        self.assertTrue(root_access_modes)
+        self.assertTrue(all(not mode & os.W_OK for mode in root_access_modes))
 
     def test_stop_signal_display_path_is_masked(self) -> None:
         import ui.app as ui_app

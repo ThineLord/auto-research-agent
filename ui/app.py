@@ -47,6 +47,11 @@ from src.config import (
 )
 from src.llm import GeminiClient
 from src.resume import build_resume_preview
+from src.resume_safety import (
+    resume_artifact_links_are_safe,
+    validate_project_run_root,
+    validate_resume_round_dir,
+)
 from src.run_analytics import analyze_run
 from src.run_compare import compare_runs
 from src.runtime import (
@@ -734,34 +739,63 @@ def detect_output_kind(path: Path) -> str:
     return "text"
 
 
-def resolve_run_artifact_paths(project_dir: Path, checkpoint: dict[str, Any]) -> dict[str, Path]:
+def resolve_run_artifact_paths(project_dir: Path, checkpoint: dict[str, Any]) -> dict[str, Any]:
+    """Resolve UI run artifacts without trusting redundant checkpoint path fields."""
     run_root_text = str(checkpoint.get("run_root", "")).strip()
-    run_root = Path(run_root_text) if run_root_text else None
-    run_config_path = (
-        Path(str(checkpoint.get("run_config")))
-        if checkpoint.get("run_config")
-        else (run_root / "run_config.json" if run_root else project_dir / "run_config.json")
-    )
-    run_summary_path = (
-        Path(str(checkpoint.get("run_summary")))
-        if checkpoint.get("run_summary")
-        else (run_root / "run_summary.json" if run_root else project_dir / "run_summary.json")
-    )
+    run_root_requested = bool(run_root_text)
+    run_root: Path | None
+    run_scope_valid = True
+    if run_root_requested:
+        run_root, run_root_error = validate_project_run_root(
+            project_dir=project_dir,
+            run_root_value=run_root_text,
+        )
+        run_scope_valid = run_root_error is None and run_root is not None
+    else:
+        # Older project layouts stored these files directly in the selected project.
+        run_root = project_dir
 
-    round_metrics_path = (
-        run_root / "round_metrics.json" if run_root else project_dir / "round_metrics.json"
-    )
-    if run_summary_path.exists():
-        run_summary = read_json_file(run_summary_path)
-        round_metrics_text = str(run_summary.get("round_metrics_path", "")).strip()
-        if round_metrics_text:
-            round_metrics_path = Path(round_metrics_text)
+    artifact_root = run_root if run_scope_valid and run_root is not None else project_dir
+    run_config_path = artifact_root / "run_config.json"
+    run_summary_path = artifact_root / "run_summary.json"
+    round_metrics_path = artifact_root / "round_metrics.json"
+    run_manifest_path = artifact_root / "run_manifest.json"
+
+    if run_scope_valid and run_root_requested:
+        artifact_safety = {
+            name: resume_artifact_links_are_safe(parent_dir=artifact_root, paths=(path,))
+            for name, path in (
+                ("run_config", run_config_path),
+                ("run_summary", run_summary_path),
+                ("round_metrics", round_metrics_path),
+                ("run_manifest", run_manifest_path),
+            )
+        }
+    elif run_scope_valid:
+        # Project-level artifact symlink policy is tracked separately from checkpoint scope.
+        artifact_safety = {
+            "run_config": True,
+            "run_summary": True,
+            "round_metrics": True,
+            "run_manifest": True,
+        }
+    else:
+        artifact_safety = {
+            "run_config": False,
+            "run_summary": False,
+            "round_metrics": False,
+            "run_manifest": False,
+        }
 
     return {
-        "run_root": run_root or project_dir,
+        "run_root": artifact_root,
+        "run_root_requested": run_root_requested,
+        "run_scope_valid": run_scope_valid,
         "run_config": run_config_path,
         "run_summary": run_summary_path,
         "round_metrics": round_metrics_path,
+        "run_manifest": run_manifest_path,
+        **{f"{name}_safe": safe for name, safe in artifact_safety.items()},
     }
 
 
@@ -791,8 +825,16 @@ def _short_commit(value: Any) -> str:
 
 def build_run_metadata_rows(project_dir: Path, checkpoint: dict[str, Any]) -> list[dict[str, str]]:
     paths = resolve_run_artifact_paths(project_dir, checkpoint)
-    run_config = read_json_file(paths["run_config"]) if paths["run_config"].exists() else {}
-    run_summary = read_json_file(paths["run_summary"]) if paths["run_summary"].exists() else {}
+    run_config = (
+        read_json_file(paths["run_config"])
+        if paths["run_config_safe"] and paths["run_config"].exists()
+        else {}
+    )
+    run_summary = (
+        read_json_file(paths["run_summary"])
+        if paths["run_summary_safe"] and paths["run_summary"].exists()
+        else {}
+    )
     if not run_config and not run_summary:
         return []
 
@@ -874,9 +916,18 @@ def build_run_metadata_rows(project_dir: Path, checkpoint: dict[str, Any]) -> li
         ("run_meta_git_commit", _short_commit(git_meta.get("commit"))),
         ("run_meta_started_at", run_config.get("started_at")),
         ("run_meta_ended_at", run_config.get("ended_at")),
-        ("run_meta_run_config_path", output_display_path(paths["run_config"])),
-        ("run_meta_run_summary_path", output_display_path(paths["run_summary"])),
-        ("run_meta_round_metrics_path", output_display_path(paths["round_metrics"])),
+        (
+            "run_meta_run_config_path",
+            output_display_path(paths["run_config"]) if paths["run_config_safe"] else None,
+        ),
+        (
+            "run_meta_run_summary_path",
+            output_display_path(paths["run_summary"]) if paths["run_summary_safe"] else None,
+        ),
+        (
+            "run_meta_round_metrics_path",
+            output_display_path(paths["round_metrics"]) if paths["round_metrics_safe"] else None,
+        ),
     ]
     return [{"field_key": field_key, "value": _display_value(value)} for field_key, value in values]
 
@@ -953,14 +1004,34 @@ def _has_run_artifacts(run_root: Path) -> bool:
 def build_run_analytics_dashboard(project_dir: Path, checkpoint: dict[str, Any]) -> dict[str, Any]:
     paths = resolve_run_artifact_paths(project_dir, checkpoint)
     run_root = paths["run_root"]
-    run_summary = read_json_file(paths["run_summary"]) if paths["run_summary"].exists() else {}
-    round_metric_entries = _read_json_list_file(paths["round_metrics"])
-    score_rows = load_score_history_rows(project_dir / "score_history.json")
+    run_summary = (
+        read_json_file(paths["run_summary"])
+        if paths["run_summary_safe"] and paths["run_summary"].exists()
+        else {}
+    )
+    round_metric_entries = (
+        _read_json_list_file(paths["round_metrics"]) if paths["round_metrics_safe"] else []
+    )
+    use_legacy_project_history = paths["run_scope_valid"] and not paths["run_root_requested"]
+    score_rows = (
+        load_score_history_rows(project_dir / "score_history.json")
+        if use_legacy_project_history
+        else []
+    )
     if not score_rows and round_metric_entries:
         score_rows = _flatten_metric_rows(round_metric_entries)
 
     analysis: dict[str, Any] = {}
-    if run_root.exists() and _has_run_artifacts(run_root):
+    analysis_artifacts_safe = all(
+        paths[f"{name}_safe"]
+        for name in ("run_config", "run_summary", "round_metrics", "run_manifest")
+    )
+    if (
+        paths["run_scope_valid"]
+        and analysis_artifacts_safe
+        and run_root.exists()
+        and _has_run_artifacts(run_root)
+    ):
         analysis = analyze_run(run_root)
     rounds = analysis.get("rounds") if isinstance(analysis.get("rounds"), dict) else {}
     score = analysis.get("score") if isinstance(analysis.get("score"), dict) else {}
@@ -1008,14 +1079,15 @@ def build_run_analytics_dashboard(project_dir: Path, checkpoint: dict[str, Any])
         {"label_key": "analytics_agent_elapsed", "value": _format_seconds(total_agent_elapsed)},
         {"label_key": "analytics_estimated_tokens", "value": total_estimated_tokens},
     ]
+    source_candidates = (
+        (paths["run_summary"], paths["run_summary_safe"]),
+        (paths["round_metrics"], paths["round_metrics_safe"]),
+        (project_dir / "score_history.json", use_legacy_project_history),
+    )
     source_paths = [
         output_display_path(path)
-        for path in (
-            paths["run_summary"],
-            paths["round_metrics"],
-            project_dir / "score_history.json",
-        )
-        if path.exists()
+        for path, path_safe in source_candidates
+        if path_safe and path.exists()
     ]
     return {
         "available": bool(score_rows or run_summary or round_metric_entries),
@@ -1247,7 +1319,9 @@ def _render_dashboard_table_chart(
 
 def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[dict[str, Any]]:
     paths = resolve_run_artifact_paths(project_dir, checkpoint)
-    run_root = paths["run_root"] if paths["run_root"] != project_dir else None
+    run_root = (
+        paths["run_root"] if paths["run_scope_valid"] and paths["run_root"] != project_dir else None
+    )
     catalog = [
         {
             "label": "Best output",
@@ -1272,19 +1346,22 @@ def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[
         {
             "label": "Run config",
             "label_key": "output_run_config",
-            "path": paths["run_config"],
+            "path": paths["run_config"] if paths["run_config_safe"] else None,
+            "path_safe": paths["run_config_safe"],
             "missing_key": "missing_run_config",
         },
         {
             "label": "Run summary",
             "label_key": "output_run_summary",
-            "path": paths["run_summary"],
+            "path": paths["run_summary"] if paths["run_summary_safe"] else None,
+            "path_safe": paths["run_summary_safe"],
             "missing_key": "missing_run_summary",
         },
         {
             "label": "Round metrics",
             "label_key": "output_round_metrics",
-            "path": paths["round_metrics"],
+            "path": paths["round_metrics"] if paths["round_metrics_safe"] else None,
+            "path_safe": paths["round_metrics_safe"],
             "missing_key": "missing_round_metrics",
         },
         {
@@ -1313,42 +1390,58 @@ def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[
     round_index = _safe_int(checkpoint.get("last_completed_round"))
     if run_root and round_index > 0 and run_root.exists():
         round_dir = run_root / f"round_{round_index:02d}"
-        catalog.extend(
-            [
+        safe_round_dir, round_error = validate_resume_round_dir(
+            run_root=run_root,
+            round_dir=round_dir,
+        )
+        if round_error is None and safe_round_dir is not None:
+            round_outputs = [
                 {
                     "label": "Latest round draft",
                     "label_key": "output_latest_draft",
-                    "path": round_dir / "01_draft.md",
+                    "path": safe_round_dir / "01_draft.md",
                 },
                 {
                     "label": "Latest round review",
                     "label_key": "output_latest_review",
-                    "path": round_dir / "02_review.md",
+                    "path": safe_round_dir / "02_review.md",
                 },
                 {
                     "label": "Latest round revised",
                     "label_key": "output_latest_revised",
-                    "path": round_dir / "03_revised.md",
+                    "path": safe_round_dir / "03_revised.md",
                 },
                 {
                     "label": "Latest round judge",
                     "label_key": "output_latest_judge",
-                    "path": round_dir / "04_judge.md",
+                    "path": safe_round_dir / "04_judge.md",
                 },
             ]
-        )
+            for item in round_outputs:
+                path_safe = resume_artifact_links_are_safe(
+                    parent_dir=safe_round_dir,
+                    paths=(item["path"],),
+                )
+                item["path_safe"] = path_safe
+                if not path_safe:
+                    item["path"] = None
+            catalog.extend(round_outputs)
 
-    return [
-        {
-            "label": item["label"],
-            "label_key": item["label_key"],
-            "path": item["path"],
-            "kind": detect_output_kind(item["path"]),
-            "exists": item["path"].exists(),
-            "missing_key": item.get("missing_key", "output_not_generated"),
-        }
-        for item in catalog
-    ]
+    resolved_catalog = []
+    for item in catalog:
+        path = item["path"]
+        path_safe = bool(item.get("path_safe", True))
+        resolved_catalog.append(
+            {
+                "label": item["label"],
+                "label_key": item["label_key"],
+                "path": path,
+                "kind": detect_output_kind(path) if path is not None else "text",
+                "exists": bool(path_safe and path is not None and path.exists()),
+                "missing_key": item.get("missing_key", "output_not_generated"),
+            }
+        )
+    return resolved_catalog
 
 
 def load_score_history_rows(score_history_path: Path) -> list[dict[str, Any]]:
@@ -2263,7 +2356,8 @@ def main() -> None:
     )
     selected_output = output_catalog[selected_output_index]
     selected_path = selected_output["path"]
-    st.caption(output_display_path(selected_path))
+    if selected_path is not None:
+        st.caption(output_display_path(selected_path))
     if not selected_output["exists"]:
         st.info(t(str(selected_output.get("missing_key", "output_not_generated"))))
     else:
