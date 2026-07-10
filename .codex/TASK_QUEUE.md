@@ -54,7 +54,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-008 - Redact the configured provider credential from provider events
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P0
 - Risk: high
 - Description: provider error/event redaction currently relies on token-shaped patterns and can persist an arbitrary configured API key if a remote response echoes it.
@@ -159,6 +159,42 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Validation command: tracked-file path/secret scan plus `make check`.
 - Commit required: yes.
 - Dependencies: avoid changing historical findings beyond redaction.
+
+## ARA-017 - Return nonzero status for CLI startup and validation errors
+
+- Status: `TODO`
+- Priority: P1
+- Risk: medium
+- Description: several config/project/provider startup failures print an error and return normally, so automation and clean-install smoke tests can report false success.
+- Related files: `src/cli.py`, `src/main.py`, console entrypoint tests
+- Acceptance criteria: user/config/startup failures return a documented nonzero status; `--help` and successful provider-free modes remain zero; library helpers keep clear behavior.
+- Validation command: subprocess CLI error/success tests followed by `make check`.
+- Commit required: yes.
+- Dependencies: define narrow error categories to avoid changing successful workflows.
+
+## ARA-018 - Choose a public distribution license and package metadata policy
+
+- Status: `BLOCKED`
+- Priority: P1 for public package release
+- Risk: high product/legal decision
+- Description: the repository has no `LICENSE` and package metadata lacks license/project identity fields; Codex must not choose a license for the owner.
+- Related files: future `LICENSE`, `pyproject.toml`, release documentation
+- Acceptance criteria: owner selects the license and distribution intent; metadata and release guidance then match that decision.
+- Validation command: package metadata inspection and license-file presence check.
+- Commit required: yes after owner decision.
+- Dependencies: explicit project-owner license decision.
+
+## ARA-019 - Add reproducible packaging and CI hardening after policy decisions
+
+- Status: `DEFERRED`
+- Priority: P2
+- Risk: medium
+- Description: editable-only CI masks package assets; dependencies are unconstrained, workflow permissions/timeouts are implicit, and third-party actions are tag-pinned rather than commit-pinned.
+- Related files: `.github/workflows/ci.yml`, `pyproject.toml`, constraints/lock policy
+- Acceptance criteria: isolated artifact install smoke, least-privilege Actions permissions, bounded job time, and evidence-based dependency floors or constraints.
+- Validation command: local equivalent plus GitHub Actions on the maintenance PR.
+- Commit required: yes.
+- Dependencies: `ARA-004`, `ARA-006`, and `ARA-018` policy outcomes.
 
 ## ARA-005 - Align stale future-priority documentation with implemented features
 

@@ -40,10 +40,10 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-If `ARA-001` is still `IN_PROGRESS`, run:
+If `ARA-008` is `DONE` but the branch is not pushed, first inspect the local commits and rerun:
 
 ```bash
-make check
+.venv/bin/python -m pytest tests/test_llm.py -q
 ```
 
 If another task is active, run its exact validation command from `.codex/TASK_QUEUE.md` first. Understand any uncommitted diff before editing it.
@@ -58,5 +58,5 @@ If another task is active, run its exact validation command from `.codex/TASK_QU
 ## Suggested immediate command
 
 ```bash
-make check
+git status --short --branch
 ```

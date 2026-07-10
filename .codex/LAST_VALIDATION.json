@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-10T16:27:39+08:00",
+  "recorded_at": "2026-07-10T16:44:53+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "a94c4e20983565ea77e2d125a843b5a6c6a4a8d4",
-  "last_known_stable_commit": "a94c4e20983565ea77e2d125a843b5a6c6a4a8d4",
-  "status": "passed_with_validated_uncommitted_changes",
+  "head_commit": "bb26c6dece18d0e0e3fd67d761f18b5a14f9cf6c",
+  "last_known_stable_commit": "bb26c6dece18d0e0e3fd67d761f18b5a14f9cf6c",
+  "status": "passed_local_commit_pending_push",
   "commands": [
     {
       "command": "make check",
@@ -14,18 +14,18 @@
         "ruff_format_files": 50,
         "ruff_lint": "passed",
         "import_smoke": "passed",
-        "pytest_tests_passed": 139,
+        "pytest_tests_passed": 141,
         "pytest_subtests_passed": 43,
-        "pytest_duration_seconds": 0.49
+        "pytest_duration_seconds": 0.46
       }
     },
     {
-      "command": ".venv/bin/python -m pytest tests/test_run_compare.py -q",
+      "command": ".venv/bin/python -m pytest tests/test_llm.py -q",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "pytest_tests_passed": 7,
-        "pytest_duration_seconds": 0.1
+        "pytest_tests_passed": 11,
+        "pytest_duration_seconds": 0.07
       }
     },
     {
@@ -57,7 +57,8 @@
   ],
   "notes": [
     "The new compare-runs regression test failed before the fix because the parser accepted one path.",
-    "The recorded HEAD is the clean stable base; current validated changes are not committed yet.",
+    "The new credential regression failed before the fix because provider events contained the configured key.",
+    "The recorded HEAD contains the validated ARA-008 security fix; only maintenance-state closeout files remain uncommitted.",
     "Ignored runtime artifacts and local configuration are outside the validation diff."
   ]
 }

@@ -30,3 +30,14 @@
 
 - Decision: when public behavior and documentation disagree, first inspect callers and tests, then prefer the smallest behavior-preserving clarification unless correctness or safety requires stricter validation.
 - Reason: the project explicitly preserves historical compatibility and research artifacts.
+
+## 2026-07-10 - Keep Git transport workarounds command-scoped
+
+- Decision: after the normal HTTPS push hung, retry with proxy settings passed only to that single `git push` and remote-verification command.
+- Reason: this restored reliable GitHub transport without changing repository or global Git configuration.
+
+## 2026-07-10 - Redact configured credentials before persistence and exception chaining
+
+- Decision: replace the exact resolved Gemini credential before generic token-pattern redaction and use only the sanitized message in provider events and visible exception causes.
+- Reason: key-shape patterns cannot cover arbitrary or future credential formats, and Python traceback chaining otherwise re-exposes a safely wrapped provider error.
+- Boundary: preserve request, retry, quota classification, public exception type, and provider semantics.

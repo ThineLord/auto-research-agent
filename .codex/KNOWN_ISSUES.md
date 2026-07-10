@@ -12,7 +12,7 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-002 - Compare-runs arity contract may be inconsistent
 
-- Status: fixed and validated in the current uncommitted checkpoint
+- Status: fixed, validated, and committed locally
 - Severity: P1
 - Evidence source: tracked `TEST_AND_NEXT_STEPS.md` reports that one run was accepted while CLI help and docs require two or more.
 - Impact: users cannot tell whether a one-run self-baseline is supported or accidental.
@@ -52,10 +52,10 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-007 - Configured credentials can be echoed into provider events
 
-- Status: reproduced by read-only audit
+- Status: fixed and validated in the current uncommitted checkpoint
 - Severity: P0
 - Impact: an arbitrary configured API key echoed by a provider response can survive pattern-only redaction and be serialized locally.
-- Current action: task `ARA-008`; fix before any real-provider smoke.
+- Current action: task `ARA-008` completed; pending remote push.
 
 ## KI-008 - Interrupted JSON writes can destroy the last checkpoint
 
@@ -105,3 +105,31 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Severity: P1 privacy/release hygiene
 - Impact: the repository embeds a real local username in historical scan examples and evidence text.
 - Current action: task `ARA-016`; redact without changing the historical conclusions and add a regression gate.
+
+## KI-015 - Some CLI startup failures exit successfully
+
+- Status: reproduced in isolated packaging smoke
+- Severity: P1 automation/release reliability
+- Impact: missing config/resources can print an error while returning status 0, allowing a smoke check to pass falsely.
+- Current action: task `ARA-017`.
+
+## KI-016 - Public distribution license is absent
+
+- Status: confirmed; owner decision required
+- Severity: P1 release blocker, not a runtime defect
+- Impact: public package publication has no declared license or complete project metadata.
+- Current action: task `ARA-018`; do not choose a license autonomously.
+
+## KI-017 - Gemini transport timeout is not wired to the SDK client
+
+- Status: confirmed wiring gap; real provider not invoked during audit
+- Severity: P1 bounded-runtime reliability
+- Impact: one SDK request can exceed configured per-agent and global runtime expectations.
+- Current action: task `ARA-015`; verify the installed SDK API before implementation.
+
+## KI-018 - Historical benchmark report can use another run's stop reason
+
+- Status: reproduced by read-only audit
+- Severity: P2
+- Impact: a historical target run can be mislabeled from the project's latest checkpoint.
+- Current action: task `ARA-014`.

@@ -4,12 +4,12 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: checkpoint and publish the verified compare-runs CLI contract fix.
+- Current goal: checkpoint and publish the verified provider credential redaction fix.
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD commit: `a94c4e20983565ea77e2d125a843b5a6c6a4a8d4`
-- Last known stable commit: `a94c4e20983565ea77e2d125a843b5a6c6a4a8d4` (`make check` passed on this commit)
-- Active task: closeout for completed task `ARA-002` in `.codex/TASK_QUEUE.md`
-- Uncommitted changes: yes; the recovery checkpoint and validated compare-runs fix are awaiting commit.
+- Current HEAD commit: `bb26c6dece18d0e0e3fd67d761f18b5a14f9cf6c`
+- Last known stable commit: `bb26c6dece18d0e0e3fd67d761f18b5a14f9cf6c` (`make check` passed; local security commit)
+- Active task: closeout for completed task `ARA-008` in `.codex/TASK_QUEUE.md`
+- Uncommitted changes: yes; only maintenance-state closeout files remain after the validated security commit.
 
 ## Modified Files
 
@@ -20,9 +20,6 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
-- `CHANGELOG.md`
-- `src/cli.py`
-- `tests/test_run_compare.py`
 
 ## Completed Steps
 
@@ -38,11 +35,17 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Added a regression test that failed before the fix and passed after it.
 - Added CLI-boundary validation while preserving the single-run internal helper behavior.
 - Verified the two-or-more path with a three-path parser test and a two-path CLI smoke.
+- Committed recovery state as `a1fec51` and the compare-runs fix as `033ed01`.
+- Pushed `codex/sol-autonomous-hardening` and verified the remote SHA matches local HEAD.
+- Opened draft PR 13 for continued maintenance checkpoints.
+- Reproduced exact-key leakage in provider events and formatted exception tracebacks.
+- Added failing regression coverage for explicit and custom-environment credentials.
+- Redacted known configured secrets before event persistence and before constructing displayed exception chains.
+- Committed the credential-redaction fix as `bb26c6d`.
 
 ## Remaining Steps
 
-- Review the complete diff for secrets, absolute local paths, and generated artifacts.
-- Update these state files, commit, push, and verify the remote branch.
+- Commit the state closeout, push both local commits, update draft PR 13, and verify the remote SHA.
 
 ## Test Status
 
@@ -51,11 +54,17 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Compare-runs targeted validation: module suite passed (`7 passed`).
 - Single-path CLI reproduction after the fix: rejected with exit code 2 and the expected argument error.
 - Two-path CLI smoke after the fix: exit code 0 and `run_count: 2`.
+- GitHub sync: local and remote `033ed01638965d873a08da05d3ad02dc3529b162` match; PR 13 is draft.
+- Credential-redaction targeted suite: `tests/test_llm.py` passed (`11 passed`).
+- Full regression after the security fix: `make check` passed (`141 passed, 43 subtests passed`).
+- `git diff --check` passed.
 - Provider-backed tests: not planned for this checkpoint; no paid or network model calls are needed.
 
 ## Recent Failed Command
 
 - `git show --no-patch --format='%H %P %s' REBASE_HEAD` failed with `fatal: bad object REBASE_HEAD` because the stale file references an unavailable object. This is not an active Git operation.
+- The first unproxied push hung without output and was interrupted safely; the command-scoped proxy retry succeeded.
+- One post-push GitHub API verification hit a TLS handshake timeout; scoped `git ls-remote` independently verified the exact remote SHA.
 
 ## Next Command
 
