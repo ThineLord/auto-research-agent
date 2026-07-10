@@ -190,7 +190,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-015 - Enforce Gemini request timeouts at the HTTP client layer
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P1
 - Risk: medium
 - Description: configured timeout values are recorded but not passed to the Gemini transport, so one request may exceed the runner's bounded runtime expectations.

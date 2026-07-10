@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T02:41:11+08:00",
+  "recorded_at": "2026-07-11T03:00:09+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "a513e4dfd4bb99f6b24a12195c0c40bf55feb274",
-  "last_known_stable_commit": "a513e4dfd4bb99f6b24a12195c0c40bf55feb274",
-  "status": "passed_pushed_ci_verified",
+  "head_commit": "817b8a130228e09b2cfedea130ccfeb88942919c",
+  "last_known_stable_commit": "817b8a130228e09b2cfedea130ccfeb88942919c",
+  "status": "passed_local_checkpoint_pending_push",
   "commands": [
     {
       "command": "make check",
@@ -14,96 +14,63 @@
         "ruff_format_files": 52,
         "ruff_lint": "passed",
         "import_smoke": "passed",
-        "pytest_tests_passed": 203,
-        "pytest_subtests_passed": 128,
+        "pytest_tests_passed": 206,
+        "pytest_subtests_passed": 134,
         "pytest_duration_seconds": 2.18
       }
     },
     {
-      "command": ".venv/bin/python -m pytest -q tests/test_cloud_free.py tests/test_config.py tests/test_storage.py tests/test_project_input.py tests/test_cli_exit_codes.py tests/test_round_loop.py tests/test_mock_run.py",
+      "command": ".venv/bin/python -m pytest -q tests/test_llm.py tests/test_cloud_free.py tests/test_config.py",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "pytest_tests_passed": 103,
-        "pytest_subtests_passed": 103,
-        "pytest_duration_seconds": 1.79
+        "pytest_tests_passed": 46,
+        "pytest_subtests_passed": 44,
+        "pytest_duration_seconds": 0.66
       }
     },
     {
-      "command": "module, editable console, and isolated-root CLI exit-status smoke matrix",
+      "command": "provider-free google-genai 2.7.0 Client construction smoke",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "help_and_provider_free_analysis": 0,
-        "explicit_cloud_discovery_failure": 1,
-        "config_project_provider_lock_and_resume_refusals": 2
+        "configured_timeout_seconds": 37,
+        "sdk_timeout_milliseconds": 37000,
+        "network_request_made": false
       }
     },
     {
-      "command": "malformed config, task, checkpoint, resume-history, and cloud-cache adversarial probes",
+      "command": "independent SDK, compatibility, and final delta-only reviews",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "invalid_utf8": "passed",
-        "oversized_numbers": "passed",
-        "deep_json_and_yaml": "passed",
-        "invalid_cache_schema_and_numeric_bounds": "passed",
-        "resume_history_depth_128_accepted": true,
-        "resume_history_depth_129_rejected": true
-      }
-    },
-    {
-      "command": "git diff --check, staged diff check, and scoped staged personal-path, credential-pattern, and private-key scans",
-      "exit_code": 0,
-      "result": "passed"
-    },
-    {
-      "command": "independent CLI return-path, malformed-input, cache-schema, and delta-only re-review",
-      "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "handled_startup_false_success": "passed",
-        "malformed_input_tracebacks": "passed",
-        "valid_cache_compatibility": "passed",
+        "credential_branches": "passed",
+        "generation_semantics": "unchanged",
+        "retry_policy": "unchanged",
+        "timeout_false_positive_regressions": "passed",
         "final_delta_review": "green"
       }
     },
     {
-      "command": "exact local, remote-tracking, and git ls-remote SHA comparison",
+      "command": "git diff --check, staged diff check, and scoped staged path/key/private-key scan",
       "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "verified_commit": "a513e4dfd4bb99f6b24a12195c0c40bf55feb274"
-      }
-    },
-    {
-      "command": "gh pr checks 13 --repo ThineLord/auto-research-agent",
-      "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "python_3_10_push": "passed",
-        "python_3_13_push": "passed",
-        "python_3_10_pull_request": "passed",
-        "python_3_13_pull_request": "passed"
-      }
+      "result": "passed"
     }
   ],
   "failures": [],
   "not_run": [
     {
       "check": "real provider smoke",
-      "reason": "CLI status and malformed-input behavior are fully exercised with provider-free subprocesses, mocks, and temporary filesystems; no paid or network model call is required."
+      "reason": "Timeout propagation and error behavior are fully exercised through mocks plus a provider-free SDK construction smoke; a paid or network model call is unnecessary."
     }
   ],
   "notes": [
-    "Pre-fix module, console, and isolated-root probes proved handled config, project, provider prerequisite, and lock errors printed a diagnostic but returned status 0.",
-    "Handled startup refusals now terminate with status 2, explicit failed cloud discovery with status 1, and help, successful provider-free analysis, and profile fallback with status 0.",
-    "Unreadable or non-UTF-8 config and task files produce privacy-safe diagnostics without traceback.",
-    "Checkpoint, optional cloud-cache, and resume-history readers safely classify invalid UTF-8, parser size/depth, structure, record schema, and unsafe numeric provenance before downstream use or writes.",
-    "Valid cache records retain defaults, ignore unknown fields, and remain compatible; invalid records are skipped without discarding other valid records.",
-    "Direct and runner-consumed KeyboardInterrupt status remains separately queued as ARA-023; package resource completeness remains ARA-004.",
-    "Implementation commit 8845adfc2a6f53e1ef0084ad8f2dcbffff39bea4 and recovery checkpoint a513e4dfd4bb99f6b24a12195c0c40bf55feb274 were pushed; exact SHA equality and all four GitHub checks were verified.",
-    "Draft PR 13 is updated, open, draft, and mergeable; no merge was attempted.",
+    "The installed google-genai 2.7.0 public Client accepts http_options.timeout in milliseconds; 37 configured seconds produced 37000 without a request.",
+    "All explicit-key, custom-environment, and SDK-default credential paths now pass the same transport timeout while preserving generation settings.",
+    "Timeout classification uses concrete timeout base types, explicit timed-out wording, and HTTP 408/504; misleading option text and class-name substrings remain unknown.",
+    "Native timeout and HTTP 408 retain non-retrying behavior; HTTP 504 retains its existing retryable 5xx policy.",
+    "Implementation commit 817b8a130228e09b2cfedea130ccfeb88942919c passed the full local gate and independent review; push and CI verification are pending the recovery-state checkpoint.",
+    "Direct and runner-consumed KeyboardInterrupt status remains separately queued as ARA-023; dependency policy remains ARA-019.",
     "Ignored runtime artifacts and local configuration remain outside the validation diff."
   ]
 }

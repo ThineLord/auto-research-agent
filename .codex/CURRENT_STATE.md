@@ -4,20 +4,22 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: record the remotely verified CLI startup exit-status checkpoint (`ARA-017`) before
-  beginning the next P1 task.
+- Current goal: record and remotely verify the locally completed Gemini transport-timeout
+  checkpoint (`ARA-015`) before selecting the next P1 task.
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `a513e4dfd4bb99f6b24a12195c0c40bf55feb274`
-- Last known stable commit: `a513e4dfd4bb99f6b24a12195c0c40bf55feb274` (exact local,
-  remote-tracking, and GitHub branch equality plus all Python 3.10/3.13 push/PR checks passed)
-- Active task: ARA-017 is `DONE`, pushed, and CI-verified; its final state-only closeout is in
-  progress.
-- Uncommitted changes: yes; only the remotely verified `.codex` recovery-state closeout remains.
+- Current HEAD at state snapshot: `817b8a130228e09b2cfedea130ccfeb88942919c`
+- Last known stable commit: `817b8a130228e09b2cfedea130ccfeb88942919c` (implementation commit;
+  full local validation and independent review passed, remote/CI verification pending)
+- Active task: ARA-015 is `DONE` locally at `817b8a1`; the recovery-state checkpoint and remote
+  verification are in progress.
+- Uncommitted changes: yes; only the reviewed `.codex` recovery-state checkpoint remains.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
+- `.codex/TASK_QUEUE.md`
 - `.codex/COMPLETED.md`
+- `.codex/DECISIONS.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
@@ -155,15 +157,43 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Committed recovery state as `a513e4d`, pushed both commits, and verified exact local,
   remote-tracking, and GitHub branch SHA equality.
 - Updated draft PR 13; all four Python 3.10/3.13 push and pull-request checks passed.
+- Confirmed the installed `google-genai 2.7.0` public Client API accepts client-wide
+  `http_options`, and its `timeout` value is milliseconds. A provider-free construction smoke
+  preserved `37000` for a configured 37-second timeout.
+- Reproduced all three Gemini credential branches omitting timeout before the fix; the new focused
+  assertions and timeout-classification checks failed for the expected reasons.
+- Passed `http_options={"timeout": timeout_seconds * 1000}` through explicit-key, custom-environment,
+  and SDK-default credential paths without changing generation content or configuration.
+- Classified transport timeouts as the privacy-safe `timeout` error while preserving the existing
+  retry policy: native timeout/HTTP 408 remain non-retrying and HTTP 504 retains its existing 5xx
+  retryability.
+- Independent review found a generic `timeout` option error could be misclassified; narrowed the
+  text heuristic to explicit `timed out` wording and added a negative regression.
+- Replaced arbitrary timeout-like exception-name substring matching with exact timeout base-class
+  matching after the final adversarial review reproduced misleading configuration-class names.
+- Final focused regression passed with `46 passed, 44 subtests passed`; final `make check` passed
+  with Ruff format/lint, import smoke, and pytest (`206 passed, 134 subtests passed`).
+- Independent final delta-only review reported green, and the scoped staged path/key/private-key
+  scan passed.
+- Committed implementation, tests, and changelog as `817b8a1`.
 
 ## Remaining Steps
 
-- Commit and push this final remotely verified state-only closeout.
-- Reverify exact remote SHA and the state-only GitHub Actions run.
-- Select the next highest-value P1 only after the branch is clean and synchronized.
+- Commit this recovery-state checkpoint and push both ARA-015 commits.
+- Verify exact local, remote-tracking, and GitHub branch SHA equality.
+- Update draft PR 13 and wait for Python 3.10/3.13 push/pull-request CI.
 
 ## Test Status
 
+- Final ARA-015 focused regression: `46 passed, 44 subtests passed`; focused Ruff lint and
+  `git diff --check` passed.
+- Final ARA-015 `make check`: Ruff format passed (52 files), Ruff lint passed, import smoke passed,
+  and pytest passed (`206 passed, 134 subtests passed in 2.18s`).
+- Provider-free SDK construction smoke: `google-genai 2.7.0` accepted
+  `http_options={"timeout": 37000}` without making a request.
+- Independent compatibility review: three credential branches, Python 3.10 syntax parsing,
+  HTTP 408/504 policy, and model/prompt/generation-config preservation passed. Native Python 3.10
+  execution remains for GitHub Actions.
 - Current branch validation: `make check` passed at 2026-07-10T16:27:39+08:00.
 - Results: Ruff format passed (50 files), Ruff lint passed, import smoke passed, pytest passed (`139 passed, 43 subtests passed`).
 - Compare-runs targeted validation: module suite passed (`7 passed`).
@@ -281,11 +311,18 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Independent adversarial probes successively found invalid UTF-8/OSError input, huge/deep parser,
   cloud-cache schema/numeric, and deep semantic-history gaps; each received a focused regression
   before the final green review and full gate.
+- The first ARA-015 pytest selector used the wrong test class name and collected no tests; the
+  corrected selector then produced the intended pre-fix failures.
+- Initial ARA-015 regressions failed because all Gemini Client branches omitted `http_options` and
+  timeout exceptions were classified as `unknown`; these were the expected pre-fix reproductions.
+- Independent ARA-015 review found the initial generic `timeout` text match also classified an
+  unsupported timeout option as a network timeout; the heuristic is now narrowed and the negative
+  regression passes.
 
 ## Next Command
 
 ```bash
-git add .codex/CURRENT_STATE.md .codex/COMPLETED.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
+git add .codex/CURRENT_STATE.md .codex/TASK_QUEUE.md .codex/COMPLETED.md .codex/DECISIONS.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
 ```
 
 ## Interruption Recovery

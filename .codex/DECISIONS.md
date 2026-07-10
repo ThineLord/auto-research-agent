@@ -98,3 +98,16 @@
   fallback remain unchanged. The fix does not make wheel resources self-contained.
 - Boundary: direct and runner-consumed interrupt status is deferred to ARA-023; package asset/root
   behavior remains ARA-004; prompts, provider requests, scoring, and experiment artifacts are unchanged.
+
+## 2026-07-11 - Apply Gemini timeout at the Client HTTP boundary
+
+- Decision: pass the validated `timeout_seconds` to every Gemini `genai.Client` credential path as
+  Client-level `http_options.timeout` after converting seconds to milliseconds.
+- Reason: the configuration and logs already promised a bounded request timeout, but generation
+  config did not enforce one at the transport layer; the installed public SDK contract confirms
+  Client-level HTTP options are the supported boundary.
+- Error policy: classify concrete timeout types, explicit `timed out` messages, and HTTP 408/504 as
+  `timeout`; do not treat arbitrary option text or timeout-like class-name substrings as transport
+  failures.
+- Compatibility: preserve model, prompts, generation configuration, credential selection, and the
+  existing retry decision. Real provider calls and dependency constraints remain outside this fix.

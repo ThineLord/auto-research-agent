@@ -124,10 +124,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-017 - Gemini transport timeout is not wired to the SDK client
 
-- Status: confirmed wiring gap; real provider not invoked during audit
+- Status: fixed locally; remote/CI verification pending
 - Severity: P1 bounded-runtime reliability
 - Impact: one SDK request can exceed configured per-agent and global runtime expectations.
-- Current action: task `ARA-015`; verify the installed SDK API before implementation.
+- Current action: task `ARA-015` completed at implementation commit `817b8a1`; full local gate and
+  independent review passed without a real provider call.
 
 ## KI-018 - Historical benchmark report can use another run's stop reason
 

@@ -151,6 +151,26 @@ Validation and implementation outcomes will be appended only after they are actu
   recovery state as `e93aa77`; pushed both and verified exact local/remote SHA equality.
 - Updated draft PR 13 and confirmed Python 3.10/3.13 passed for both push and pull-request triggers.
 
+## 2026-07-11 - Gemini HTTP transport timeout enforcement
+
+- Verified against installed `google-genai 2.7.0` that Client-level `http_options.timeout` is the
+  supported public transport setting and uses milliseconds.
+- Reproduced explicit-key, custom-environment, and SDK-default credential paths all omitting the
+  configured timeout before the fix.
+- Passed `timeout_seconds * 1000` to all three Client construction paths without changing model,
+  prompt, temperature, top-p, structured-response configuration, or credential selection.
+- Classified built-in/httpx-style transport timeouts and HTTP 408/504 as privacy-safe `timeout`
+  errors while preserving the existing retry rule (native timeout/408 false, existing 504 true).
+- Added negative coverage so unsupported timeout options and misleading exception class names are
+  not mislabeled as network timeouts; exact configured credentials remain redacted from events and
+  displayed traceback chains.
+- Focused regression passed with `46 passed, 44 subtests passed`; final `make check` passed with
+  `206 passed, 134 subtests passed`.
+- Multiple independent SDK, compatibility, and adversarial reviews reported green after two
+  reproduced timeout-classification false positives were corrected.
+- Committed implementation, tests, and changelog as `817b8a1`; remote/CI verification is pending
+  the recovery-state checkpoint.
+
 ## 2026-07-11 - Reliable CLI startup exit status and malformed-input boundaries
 
 - Reproduced config, project, provider prerequisite, and survey/mock/normal lock errors printing a
