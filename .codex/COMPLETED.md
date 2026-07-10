@@ -123,5 +123,6 @@ Validation and implementation outcomes will be appended only after they are actu
   `make check` passed with `172 passed, 91 subtests passed`.
 - Two independent read-only reviews reported no remaining actionable finding within ARA-021 after
   the score-history correction.
-- Committed the implementation, tests, changelog, and public docs as `98ea4a3`; push and CI
-  verification remain the next checkpoint action.
+- Committed the implementation, tests, changelog, and public docs as `98ea4a3` and recovery state as
+  `3624385`; pushed both, verified exact local/remote SHA equality, updated draft PR 13, and
+  confirmed Python 3.10/3.13 passed for both push and pull-request triggers.

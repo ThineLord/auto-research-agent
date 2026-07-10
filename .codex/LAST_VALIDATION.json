@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-10T19:19:40+08:00",
+  "recorded_at": "2026-07-10T19:21:41+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "98ea4a312014300a77a2a33aeead441d9a7a4df6",
-  "last_known_stable_commit": "98ea4a312014300a77a2a33aeead441d9a7a4df6",
-  "status": "passed_committed_push_pending",
+  "head_commit": "3624385fe368c4593b452418e4b000463933a87c",
+  "last_known_stable_commit": "3624385fe368c4593b452418e4b000463933a87c",
+  "status": "passed_pushed_ci_verified",
   "commands": [
     {
       "command": "make check",
@@ -48,6 +48,17 @@
         "invalid_run_scope": "passed",
         "legacy_no_run_root_scope": "passed"
       }
+    },
+    {
+      "command": "gh pr checks 13 --repo ThineLord/auto-research-agent",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed"
+      }
     }
   ],
   "failures": [],
@@ -55,10 +66,6 @@
     {
       "check": "real provider smoke",
       "reason": "UI artifact path containment is fully exercised with provider-free helpers and temporary filesystems; no paid or network model call is required."
-    },
-    {
-      "check": "GitHub Actions",
-      "reason": "Push and pull-request checks cannot start until the local implementation and recovery-state commits are pushed."
     }
   ],
   "notes": [
@@ -68,6 +75,8 @@
     "Configured runs-storage symlinks and read-only canonical runs remain supported while resume retains its writable-root requirement.",
     "Independent review found the project score-history gap; its dedicated no-read test failed before correction, and the independent re-review was green afterward.",
     "Project-level output/log symlinks and active filesystem-swap resistance remain separately queued as ARA-022.",
+    "Local, remote-tracking, and GitHub branch SHAs were verified equal at 3624385fe368c4593b452418e4b000463933a87c before this final state-only closeout commit.",
+    "Draft PR 13 is updated, open, draft, and mergeable; all four push and pull-request CI jobs passed.",
     "Ignored runtime artifacts and local configuration remain outside the validation diff."
   ]
 }

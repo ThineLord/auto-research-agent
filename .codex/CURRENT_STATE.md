@@ -4,20 +4,20 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: constrain UI checkpoint artifact reads to the selected canonical run (`ARA-021`).
+- Current goal: begin owner-safe run-lock hardening (`ARA-013`) from the published ARA-021 checkpoint.
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `98ea4a312014300a77a2a33aeead441d9a7a4df6`
-- Last known stable commit: `98ea4a312014300a77a2a33aeead441d9a7a4df6` (`make check`,
-  focused consumers, and independent adversarial re-review passed locally; push pending)
-- Active task: `ARA-021` (`DONE`) in `.codex/TASK_QUEUE.md`; publish its recovery checkpoint.
-- Uncommitted changes: yes; recovery-state closeout only.
+- Current HEAD at state snapshot: `3624385fe368c4593b452418e4b000463933a87c` (use
+  `git rev-parse HEAD` after the final state-only closeout commit)
+- Last known stable commit: `3624385fe368c4593b452418e4b000463933a87c` (`make check`,
+  focused consumers, independent adversarial re-review, exact remote synchronization, and all
+  Python 3.10/3.13 push/PR checks passed)
+- Active task: prepare `ARA-013` in `.codex/TASK_QUEUE.md` after the final state-only closeout.
+- Uncommitted changes: yes; final verified recovery-state closeout only.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
-- `.codex/TASK_QUEUE.md`
 - `.codex/COMPLETED.md`
-- `.codex/DECISIONS.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
@@ -97,13 +97,15 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Independent adversarial re-review reported green across selected, invalid, and legacy run scopes.
 - Staged scans found no personal absolute path, credential pattern, or private-key material.
 - Committed the ARA-021 implementation, tests, changelog, and public docs as `98ea4a3`.
+- Committed recovery state as `3624385`, pushed both commits, and verified local,
+  remote-tracking, and GitHub branch SHA equality.
+- Updated draft PR 13 and confirmed all four Python 3.10/3.13 push and pull-request checks passed.
 
 ## Remaining Steps
 
-- Commit this completed recovery-state checkpoint and push it with implementation commit `98ea4a3`.
-- Verify local, remote-tracking, and GitHub branch SHAs, update draft PR 13, and wait for Python
-  3.10/3.13 push and pull-request checks.
-- After a clean synchronized checkpoint, begin `ARA-013` with a failing run-lock ownership/race test.
+- Commit and push this final verified state-only closeout.
+- Mark `ARA-013` `IN_PROGRESS` only after the branch is clean and synchronized; begin with a failing
+  run-lock ownership/race regression and keep unrelated packaging/provider work separate.
 
 ## Test Status
 
@@ -152,6 +154,9 @@ Updated: 2026-07-10 (Asia/Shanghai)
   (`172 passed, 91 subtests passed`).
 - Independent post-fix re-review: green after the project score-history correction.
 - `git diff --check`, staged diff check, and staged personal-path/credential/private-key scans passed.
+- GitHub Actions for ARA-021: Python 3.10 and Python 3.13 passed for both push and pull-request triggers.
+- GitHub sync: local, remote-tracking, and GitHub branch SHAs match at
+  `3624385fe368c4593b452418e4b000463933a87c`; draft PR 13 is updated and mergeable.
 - Provider-backed tests: not planned for this checkpoint; no paid or network model calls are needed.
 
 ## Recent Failed Command
@@ -176,7 +181,7 @@ Updated: 2026-07-10 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git add .codex/CURRENT_STATE.md .codex/TASK_QUEUE.md .codex/COMPLETED.md .codex/DECISIONS.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
+git status --short --branch
 ```
 
 ## Interruption Recovery
