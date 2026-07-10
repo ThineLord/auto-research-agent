@@ -66,7 +66,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-009 - Make checkpoint and JSON state writes atomic
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P1
 - Risk: medium
 - Description: state JSON currently uses in-place writes, so an interruption can truncate the previous valid checkpoint and make recovery silently fall back to empty data.

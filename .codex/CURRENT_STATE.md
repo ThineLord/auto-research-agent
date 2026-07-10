@@ -4,12 +4,12 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: checkpoint and publish the verified round-limit validation fix.
+- Current goal: checkpoint and publish the verified atomic state-write fix.
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD commit: `e6bffa606cffd3ce2d2f8e4210dcc6c6a6bde62c`
-- Last known stable commit: `e6bffa606cffd3ce2d2f8e4210dcc6c6a6bde62c` (`make check` passed; local round-limit commit)
-- Active task: closeout for completed task `ARA-003` in `.codex/TASK_QUEUE.md`
-- Uncommitted changes: yes; only maintenance-state closeout files remain after the validated round-limit commit.
+- Current HEAD commit: `7d226f8067788e151b180f6e9e82d5524253879a`
+- Last known stable commit: `7d226f8067788e151b180f6e9e82d5524253879a` (`make check` passed; local atomic-write commit)
+- Active task: closeout for completed task `ARA-009` in `.codex/TASK_QUEUE.md`
+- Uncommitted changes: yes; only maintenance-state closeout files remain after the validated atomic-write commit.
 
 ## Modified Files
 
@@ -52,6 +52,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Added failing parser and direct-runner tests before implementation.
 - Added positive-integer argument validation and a runner guard before any run artifact creation.
 - Committed the round-limit validation fix as `e6bffa6`.
+- Committed the round-limit state checkpoint as `5c5bdc0`, pushed both commits, and updated the remote branch.
+- Added failing fault-injection coverage for `fsync` and atomic-replace failures.
+- Centralized replacement writes through same-directory temp files with flush, fsync, atomic replace, and cleanup.
+- Preserved append-only best-effort logging behavior outside the atomic replacement helper.
+- Committed the atomic state-write fix as `7d226f8`.
 
 ## Remaining Steps
 
@@ -73,6 +78,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Zero and negative provider-free CLI smoke paths both exited 2 before startup.
 - Full regression after the round-limit fix: `make check` passed (`144 passed, 47 subtests passed`).
 - `git diff --check` passed and no silent round-limit clamp remains.
+- GitHub sync: local and remote `5c5bdc0a22c47b466356be8005b9b27882622f7f` match.
+- Atomic-write related regression: `63 passed, 9 subtests passed`.
+- Fault injection preserved the prior JSON and cleaned temp files for both `fsync` and `replace` failures.
+- Full regression after the atomic-write fix: `make check` passed (`145 passed, 49 subtests passed`).
+- `git diff --check` passed and storage replacement paths no longer call `Path.write_text` directly.
 - GitHub sync: local and remote `c8d6c174d5ebb97e5c49bc373d4e0aac761a4f85` match; PR 13 is draft and updated.
 - Runner target validation: `17 passed, 3 subtests passed`.
 - Full regression after the integrity fix: `make check` passed (`142 passed, 43 subtests passed`).

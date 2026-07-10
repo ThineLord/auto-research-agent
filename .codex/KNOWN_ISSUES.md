@@ -20,11 +20,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-003 - Non-positive max-round override may be silently coerced
 
-- Status: fixed, validated, and committed locally
+- Status: fixed, validated, committed, and pushed
 - Severity: P1
 - Evidence source: tracked `TEST_AND_NEXT_STEPS.md` reports that `--max-rounds 0` produced a one-round mock run.
 - Impact: surprising automation behavior and a possible unintended provider call when zero rounds were expected.
-- Current action: task `ARA-003` completed; pending remote push.
+- Current action: task `ARA-003` completed at remote checkpoint `5c5bdc0`.
 
 ## KI-004 - Source tag and package metadata use different versions
 
@@ -59,10 +59,10 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-008 - Interrupted JSON writes can destroy the last checkpoint
 
-- Status: reproduced by fault injection
+- Status: fixed, validated, and committed locally
 - Severity: P1
 - Impact: an in-place write failure truncates the old valid checkpoint, after which tolerant reads can silently return empty state.
-- Current action: task `ARA-009`.
+- Current action: task `ARA-009` completed; pending remote push.
 
 ## KI-009 - Resume can discard historical metrics
 

@@ -68,3 +68,13 @@ Validation and implementation outcomes will be appended only after they are actu
 - Added a positive-integer argparse type and a pre-artifact runner `ValueError` guard; removed silent clamps.
 - Target suites passed with `22 passed, 7 subtests passed`; full `make check` passed with `144 passed, 47 subtests passed`.
 - Committed the fix as `e6bffa6`.
+- Committed the round-limit checkpoint state as `5c5bdc0`, pushed through the command-scoped proxy, and verified the exact remote SHA.
+
+## 2026-07-10 - Atomic state and artifact replacement
+
+- Reproduced the lack of a failure boundary around checkpoint replacement.
+- Added `fsync` and `os.replace` fault injection that requires the previous checkpoint to remain valid and temp files to be cleaned.
+- Routed JSON, score history, research state, memory, best output, round text, and exact text replacements through one same-directory atomic writer.
+- Kept log append behavior unchanged and best effort.
+- Related suites passed with `63 passed, 9 subtests passed`; full `make check` passed with `145 passed, 49 subtests passed`.
+- Committed the fix as `7d226f8`.
