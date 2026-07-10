@@ -1,0 +1,107 @@
+# Known Issues
+
+Updated: 2026-07-10 (Asia/Shanghai)
+
+## KI-001 - Stale invalid `.git/REBASE_HEAD`
+
+- Status: observed; non-blocking
+- Severity: P3
+- Evidence: the file exists and references an unavailable object, while `rebase-merge`, `rebase-apply`, and sequencer state are absent and `git status --porcelain=v2 --branch` is clean.
+- Impact: diagnostic scripts that test only for `.git/REBASE_HEAD` can falsely report an active rebase.
+- Current action: leave untouched; use actual rebase directories and porcelain status to determine operation state.
+
+## KI-002 - Compare-runs arity contract may be inconsistent
+
+- Status: fixed and validated in the current uncommitted checkpoint
+- Severity: P1
+- Evidence source: tracked `TEST_AND_NEXT_STEPS.md` reports that one run was accepted while CLI help and docs require two or more.
+- Impact: users cannot tell whether a one-run self-baseline is supported or accidental.
+- Current action: task `ARA-002` completed; pending commit and remote push.
+
+## KI-003 - Non-positive max-round override may be silently coerced
+
+- Status: reproduced on the stable base commit; queued for the next isolated fix
+- Severity: P1
+- Evidence source: tracked `TEST_AND_NEXT_STEPS.md` reports that `--max-rounds 0` produced a one-round mock run.
+- Impact: surprising automation behavior and a possible unintended provider call when zero rounds were expected.
+- Current action: task `ARA-003`.
+
+## KI-004 - Source tag and package metadata use different versions
+
+- Status: confirmed by tracked metadata; policy decision deferred
+- Severity: P2 for packaged distribution, P3 for cloned-checkout use
+- Evidence: `pyproject.toml` declares `0.1.0`; tracked release documentation identifies `v0.1.1-hardening`.
+- Impact: wheel metadata and source release naming may diverge.
+- Current action: task `ARA-006`; do not change version without a distribution policy.
+
+## KI-005 - Non-editable package assets are not yet verified
+
+- Status: open
+- Severity: P2
+- Evidence: the project declares only the `src` package while runtime workflows also reference repository assets and UI/scripts.
+- Impact: wheel-installed behavior may differ from editable or cloned-checkout behavior.
+- Current action: task `ARA-004`; verify in isolation before changing packaging.
+
+## KI-006 - Legacy ignored logs can predate path masking
+
+- Status: known local-data risk; no tracked-code regression
+- Severity: P3
+- Evidence source: tracked release review; current ignored runtime data is intentionally not opened, rewritten, or committed during startup.
+- Impact: manually shared old artifacts may disclose local paths.
+- Current action: never publish ignored artifacts without a scoped privacy scan.
+
+## KI-007 - Configured credentials can be echoed into provider events
+
+- Status: reproduced by read-only audit
+- Severity: P0
+- Impact: an arbitrary configured API key echoed by a provider response can survive pattern-only redaction and be serialized locally.
+- Current action: task `ARA-008`; fix before any real-provider smoke.
+
+## KI-008 - Interrupted JSON writes can destroy the last checkpoint
+
+- Status: reproduced by fault injection
+- Severity: P1
+- Impact: an in-place write failure truncates the old valid checkpoint, after which tolerant reads can silently return empty state.
+- Current action: task `ARA-009`.
+
+## KI-009 - Resume can discard historical metrics
+
+- Status: reproduced by read-only audit
+- Severity: P1
+- Impact: appending a resumed round can rewrite metrics and summaries with only the new round, corrupting longitudinal interpretation.
+- Current action: task `ARA-010`.
+
+## KI-010 - Failed rounds can replace prior best output
+
+- Status: reproduced by read-only audit
+- Severity: P1
+- Impact: synthetic failure output can beat the internal sentinel score and overwrite trusted prior content.
+- Current action: task `ARA-011`.
+
+## KI-011 - Resume roots are not constrained to the project runs directory
+
+- Status: reproduced by read-only audit
+- Severity: P1
+- Impact: a crafted or stale checkpoint can direct resumed artifact writes outside the selected project's run tree.
+- Current action: task `ARA-012`.
+
+## KI-012 - Run locks are not atomic or owner-safe
+
+- Status: reproduced by read-only audit
+- Severity: P1
+- Impact: concurrent acquisition can race, an old owner can remove a newer lock, and malformed PID metadata can raise.
+- Current action: task `ARA-013`.
+
+## KI-013 - Wheel-installed mock workflow cannot find repository assets
+
+- Status: reproduced in an isolated wheel-layout smoke
+- Severity: P1 for packaged distribution
+- Impact: console help works, but mock startup cannot locate `config.example.yaml`; a source checkout works.
+- Current action: task `ARA-004`; do not advertise wheel readiness meanwhile.
+
+## KI-014 - Tracked reports contain a personal absolute-path fragment
+
+- Status: confirmed by tracked-file scan
+- Severity: P1 privacy/release hygiene
+- Impact: the repository embeds a real local username in historical scan examples and evidence text.
+- Current action: task `ARA-016`; redact without changing the historical conclusions and add a regression gate.
