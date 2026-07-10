@@ -150,7 +150,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-013 - Make run-lock acquisition and release ownership-safe
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P1
 - Risk: medium
 - Description: the lock file is not acquired atomically and release lacks an owner token, so an old process can delete a newer owner's lock; malformed PID types can also raise unexpectedly.

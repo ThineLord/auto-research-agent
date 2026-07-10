@@ -67,3 +67,18 @@
   layout.
 - Boundary: project-level logs/outputs, discovered-run comparison paths, active filesystem swaps,
   and the broader local artifact symlink policy remain `ARA-022`.
+
+## 2026-07-11 - Use a long-held owner-capability run lock
+
+- Decision: use a persistent project-root `active_run.guard` OS advisory lock as the authority for
+  the full run lifecycle. Keep `active_run.json` as atomically replaced diagnostic metadata with a
+  random owner token, PID, and guard device/inode identity.
+- Reason: check/write and stale-file deletion protocols allow simultaneous winners and can delete a
+  replacement owner. A kernel-held guard is released on crash without a racy stale unlink.
+- Compatibility: existing live PID-only locks remain blocking; dead or malformed legacy metadata
+  is recovered after the guard is acquired. The returned handle remains path-like for display, but
+  only the intact capability may release; a bare `Path` fails closed.
+- Platform: POSIX uses `flock`; Windows uses nonblocking byte-range locking and a non-destructive
+  `OpenProcess` liveness probe. Static non-regular guard/metadata paths fail closed.
+- Boundary: general CLI startup error exit codes remain `ARA-017`; active non-cooperating path swaps
+  outside the token/PID/guard-identity defense remain `ARA-022`.

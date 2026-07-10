@@ -1,23 +1,24 @@
 # Codex Current State
 
-Updated: 2026-07-10 (Asia/Shanghai)
+Updated: 2026-07-11 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: begin owner-safe run-lock hardening (`ARA-013`) from the published ARA-021 checkpoint.
+- Current goal: publish and remotely verify the completed owner-safe run-lock checkpoint (`ARA-013`).
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `3624385fe368c4593b452418e4b000463933a87c` (use
-  `git rev-parse HEAD` after the final state-only closeout commit)
-- Last known stable commit: `3624385fe368c4593b452418e4b000463933a87c` (`make check`,
-  focused consumers, independent adversarial re-review, exact remote synchronization, and all
-  Python 3.10/3.13 push/PR checks passed)
-- Active task: prepare `ARA-013` in `.codex/TASK_QUEUE.md` after the final state-only closeout.
-- Uncommitted changes: yes; final verified recovery-state closeout only.
+- Current HEAD at state snapshot: `55e7287865bad016874981a071cb19afb0871e1d`
+- Last known stable commit: `55e7287865bad016874981a071cb19afb0871e1d` (local full gate and
+  independent reviews passed; remote push and CI verification are pending)
+- Active task: ARA-013 implementation is `DONE`; only its recovery-state and remote-verification
+  closeout is in progress.
+- Uncommitted changes: yes; only the reviewed `.codex` recovery-state update remains.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
+- `.codex/TASK_QUEUE.md`
 - `.codex/COMPLETED.md`
+- `.codex/DECISIONS.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
@@ -100,12 +101,39 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Committed recovery state as `3624385`, pushed both commits, and verified local,
   remote-tracking, and GitHub branch SHA equality.
 - Updated draft PR 13 and confirmed all four Python 3.10/3.13 push and pull-request checks passed.
+- Pushed final ARA-021 verified-state closeout `538d0be`, verified exact remote SHA equality, and
+  confirmed all four Python 3.10/3.13 push and pull-request checks passed again.
+- Reproduced malformed PID exceptions, two simultaneous acquisition successes, and an old release
+  deleting replacement-owner metadata before implementing ARA-013.
+- Replaced check/write/delete locking with a long-held cross-process OS guard, per-acquisition
+  owner capability, atomic metadata replacement, guard device/inode provenance, and owner-checked
+  release. Crash recovery now relies on kernel lock release instead of racy stale deletion.
+- Moved the persistent guard to project-root `active_run.guard`, added its exact ignore rule, and
+  rejected static symlink/FIFO/directory guards and metadata without following them.
+- Hardened malformed metadata for invalid UTF-8, oversized/deep JSON, invalid/oversized PID values,
+  POSIX permission probes, and non-destructive Windows process liveness checks.
+- Prevented a fork child from unlocking its parent, prevented a recreated guard inode from
+  displacing a live owner, and made bare paths fail closed while preserving path string/fspath use.
+- Moved mock, client, and agent construction inside the lock-owning `try/finally` boundary.
+- Added synchronized thread and multi-process contention, process crash, legacy live/dead,
+  non-regular node, metadata failure, replacement/repeated release, fork, and constructor-failure
+  regressions.
+- Related runtime/UI/mock/round suites passed (`94 passed, 68 subtests passed`); the synchronized
+  thread race passed 25 consecutive executions.
+- Independent design, compatibility, adversarial, platform, and post-fix reviews reproduced interim
+  gaps; all reported P1/P2 implementation issues were corrected, and the platform re-review is green.
+- Final `make check` passed with Ruff format/lint, import smoke, and pytest (`189 passed, 110
+  subtests passed`). Staged diff and sensitive-pattern scans passed.
+- Committed the owner-safe lock implementation, regression matrix, ignore policy, changelog, and
+  developer documentation as `55e7287`.
 
 ## Remaining Steps
 
-- Commit and push this final verified state-only closeout.
-- Mark `ARA-013` `IN_PROGRESS` only after the branch is clean and synchronized; begin with a failing
-  run-lock ownership/race regression and keep unrelated packaging/provider work separate.
+- Commit this recovery-state checkpoint without staging ignored runtime artifacts.
+- Push `55e7287` plus the state checkpoint, verify exact remote SHA equality, update draft PR 13,
+  and wait for all Python 3.10/3.13 push and pull-request checks.
+- Record the remotely verified SHA in a final state-only closeout, push it, and reverify CI before
+  selecting the next P1 task.
 
 ## Test Status
 
@@ -157,7 +185,19 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - GitHub Actions for ARA-021: Python 3.10 and Python 3.13 passed for both push and pull-request triggers.
 - GitHub sync: local, remote-tracking, and GitHub branch SHAs match at
   `3624385fe368c4593b452418e4b000463933a87c`; draft PR 13 is updated and mergeable.
-- Provider-backed tests: not planned for this checkpoint; no paid or network model calls are needed.
+- Final ARA-021 state-only closeout: local and remote match at
+  `538d0bef9d75f8794fe2793bba89e16e9eb16e4f`; all four GitHub checks passed.
+- ARA-013 pre-fix focused regression: `3 failed, 1 passed, 35 deselected`; each failure matched a
+  reproduced acquisition/ownership defect.
+- Final related ARA-013 module regression before the full gate: `94 passed, 68 subtests passed`.
+- PID/lock focused matrix: `17 passed, 17 subtests passed`.
+- Final ARA-013 `make check`: Ruff format (51 files), Ruff lint, import smoke, and pytest
+  (`189 passed, 110 subtests passed in 0.87s`).
+- Ruff format/lint, `git diff --check`, staged diff check, and staged personal-path/credential/
+  private-key scans passed on the committed implementation.
+- Independent final adversarial and platform re-review: green; native Windows was not available,
+  so Windows-specific process probes were covered by mocked/static tests.
+- Provider-backed tests: not planned; locking and constructor cleanup require no model/network call.
 
 ## Recent Failed Command
 
@@ -177,11 +217,15 @@ Updated: 2026-07-10 (Asia/Shanghai)
   subsequent focused Ruff check passed.
 - The first independent ARA-021 review found selected runs still loading project score history; a
   dedicated no-read test failed before the correction and passed afterward. The second review was green.
+- Initial ARA-013 tests failed on malformed PID, dual acquisition, and replacement deletion as
+  expected. Interim reviews then found invalid bytes/deep JSON, oversized PID, fork release,
+  disposable/symlink guard, POSIX EPERM, and Windows probe gaps; each now has code and regression
+  coverage.
 
 ## Next Command
 
 ```bash
-git status --short --branch
+git add .codex/CURRENT_STATE.md .codex/TASK_QUEUE.md .codex/COMPLETED.md .codex/DECISIONS.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
 ```
 
 ## Interruption Recovery
@@ -196,4 +240,6 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - Do not change prompts, scoring semantics, provider behavior, benchmark results, or artifact interpretation as part of a maintenance-only fix.
 - Do not widen the completed `ARA-021` checkpoint into project-level output/log symlink or active
   filesystem-swap policy; those remain `ARA-022`.
+- Keep ARA-013 scoped to lock ownership/lifecycle. General CLI startup failures returning status 0
+  remain `ARA-017`; active non-cooperating filesystem replacement remains `ARA-022`.
 - Do not stage with `git add -A`; stage only reviewed paths.

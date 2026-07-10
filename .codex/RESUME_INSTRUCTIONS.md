@@ -40,18 +40,18 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-`ARA-021` should be `DONE`, pushed, and CI-verified at checkpoint `3624385`. Its final local
-validation command was:
+`ARA-013` should be `DONE` at implementation commit `55e7287`. Its final local validation command was:
 
 ```bash
 make check
 ```
 
-If the branch is ahead of origin, inspect any final state-only closeout before pushing; do not
-repeat the ARA-021 implementation. After GitHub synchronization, the next recommended task is
-`ARA-013` (atomic, owner-safe run locks). Keep project-level symlink/TOCTOU policy (`ARA-022`) and manifest
+If the branch is ahead of origin, inspect and commit only the ARA-013 recovery-state files, then
+push without force and verify the exact remote SHA plus draft PR 13 checks. Do not repeat the
+implementation. After synchronization, choose the next P1 from `.codex/TASK_QUEUE.md`; keep general
+CLI startup status (`ARA-017`), project-level symlink/TOCTOU policy (`ARA-022`), and manifest
 provenance/identity (`ARA-020`) separate. If another task is active, run its exact validation command
-from `.codex/TASK_QUEUE.md` first. Understand any uncommitted diff before editing it.
+first. Understand any uncommitted diff before editing it.
 
 ## 5. Safety boundaries
 
@@ -63,5 +63,5 @@ from `.codex/TASK_QUEUE.md` first. Understand any uncommitted diff before editin
 ## Suggested immediate command
 
 ```bash
-git status --short --branch && git rev-list --left-right --count origin/codex/sol-autonomous-hardening...HEAD
+git status --short --branch && git show --stat --oneline HEAD
 ```

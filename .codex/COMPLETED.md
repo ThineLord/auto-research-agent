@@ -126,3 +126,26 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed the implementation, tests, changelog, and public docs as `98ea4a3` and recovery state as
   `3624385`; pushed both, verified exact local/remote SHA equality, updated draft PR 13, and
   confirmed Python 3.10/3.13 passed for both push and pull-request triggers.
+
+## 2026-07-11 - Owner-safe atomic run locking
+
+- Reproduced malformed PID exceptions, two synchronized contenders both reporting success, and an
+  old release deleting replacement-owner metadata.
+- Replaced check/write/delete coordination with a long-held cross-process OS guard and an owner
+  capability whose metadata includes token, PID, and guard device/inode identity.
+- Added crash recovery without stale deletion, live legacy-owner preservation, malformed legacy
+  recovery, static symlink/FIFO/directory rejection, safe bare-path behavior, and fork-child
+  ownership protection.
+- Hardened invalid UTF-8, oversized/deep JSON, oversized PID, POSIX permission, and Windows process
+  liveness paths so diagnostic metadata cannot crash or destructively probe lock owners.
+- Moved mock/client/agent construction inside lock-owning `try/finally` scopes and added exact stale
+  metadata/guard recovery guidance.
+- Added synchronized thread and four-process competition, live cross-process blocking, process
+  crash, guard recreation, fork inheritance, metadata failure, legacy, replacement/repeat release,
+  non-regular node, and constructor-failure regressions.
+- Related runtime/UI/mock/round tests passed with `94 passed, 68 subtests passed`; final `make check`
+  passed with `189 passed, 110 subtests passed`; the synchronized thread test passed 25 repeats.
+- Multiple independent design/adversarial/platform/post-fix reviews reported green after all
+  reproduced P1/P2 protocol gaps were corrected.
+- Committed implementation, tests, ignore policy, changelog, and developer docs as `55e7287`; push
+  and CI verification remain the next checkpoint action.

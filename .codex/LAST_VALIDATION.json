@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-10T19:21:41+08:00",
+  "recorded_at": "2026-07-11T02:03:34+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "3624385fe368c4593b452418e4b000463933a87c",
-  "last_known_stable_commit": "3624385fe368c4593b452418e4b000463933a87c",
-  "status": "passed_pushed_ci_verified",
+  "head_commit": "55e7287865bad016874981a071cb19afb0871e1d",
+  "last_known_stable_commit": "55e7287865bad016874981a071cb19afb0871e1d",
+  "status": "passed_committed_push_pending",
   "commands": [
     {
       "command": "make check",
@@ -14,50 +14,54 @@
         "ruff_format_files": 51,
         "ruff_lint": "passed",
         "import_smoke": "passed",
-        "pytest_tests_passed": 172,
-        "pytest_subtests_passed": 91,
-        "pytest_duration_seconds": 0.66
+        "pytest_tests_passed": 189,
+        "pytest_subtests_passed": 110,
+        "pytest_duration_seconds": 0.87
       }
     },
     {
-      "command": ".venv/bin/python -m pytest -q tests/test_ui_helpers.py tests/test_round_loop.py tests/test_run_analytics.py tests/test_run_compare.py",
+      "command": ".venv/bin/python -m pytest -q tests/test_ui_helpers.py tests/test_mock_run.py tests/test_round_loop.py",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "pytest_tests_passed": 84,
-        "pytest_subtests_passed": 47,
-        "pytest_duration_seconds": 0.51
+        "pytest_tests_passed": 94,
+        "pytest_subtests_passed": 68,
+        "pytest_duration_seconds": 0.75
       }
     },
     {
-      "command": "git diff --check and staged diff check",
+      "command": ".venv/bin/python -m pytest -q tests/test_ui_helpers.py -k 'pid or lock'",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 17,
+        "pytest_subtests_passed": 17,
+        "pytest_duration_seconds": 0.24
+      }
+    },
+    {
+      "command": "repeat synchronized thread lock contention regression 25 times",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "successful_repetitions": 25
+      }
+    },
+    {
+      "command": "git diff --check, staged diff check, and scoped staged personal-path, credential-pattern, and private-key scans",
       "exit_code": 0,
       "result": "passed"
     },
     {
-      "command": "scoped staged personal-path, credential-pattern, and private-key scan",
-      "exit_code": 0,
-      "result": "passed"
-    },
-    {
-      "command": "independent bounded adversarial re-review",
+      "command": "independent design, compatibility, adversarial, platform, and post-fix re-review",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "selected_run_scope": "passed",
-        "invalid_run_scope": "passed",
-        "legacy_no_run_root_scope": "passed"
-      }
-    },
-    {
-      "command": "gh pr checks 13 --repo ThineLord/auto-research-agent",
-      "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "python_3_10_push": "passed",
-        "python_3_13_push": "passed",
-        "python_3_10_pull_request": "passed",
-        "python_3_13_pull_request": "passed"
+        "malformed_metadata": "passed",
+        "thread_and_process_contention": "passed",
+        "guard_recreation_and_fork": "passed",
+        "posix_native_paths": "passed",
+        "windows_mocked_static_paths": "passed"
       }
     }
   ],
@@ -65,18 +69,25 @@
   "not_run": [
     {
       "check": "real provider smoke",
-      "reason": "UI artifact path containment is fully exercised with provider-free helpers and temporary filesystems; no paid or network model call is required."
+      "reason": "Run-lock ownership and constructor cleanup are fully exercised with provider-free helpers and subprocesses; no paid or network model call is required."
+    },
+    {
+      "check": "native Windows host validation",
+      "reason": "No native Windows host is available; Windows-specific process liveness and locking branches received mocked/static regression coverage."
+    },
+    {
+      "check": "GitHub Actions",
+      "reason": "Implementation commit is local and the push is the next checkpoint action."
     }
   ],
   "notes": [
-    "The initial regressions proved external checkpoint config/summary, summary metrics, external run roots, and run/round symlinks were read before the fix.",
-    "UI consumers now derive fixed artifact names from a canonical selected run and validate config, summary, metrics, legacy manifest, round directories, and round leaves before reads.",
-    "Unsafe catalog entries carry no path, and selected runs no longer load project-level score history; the no-run-root legacy fallback remains compatible.",
-    "Configured runs-storage symlinks and read-only canonical runs remain supported while resume retains its writable-root requirement.",
-    "Independent review found the project score-history gap; its dedicated no-read test failed before correction, and the independent re-review was green afterward.",
-    "Project-level output/log symlinks and active filesystem-swap resistance remain separately queued as ARA-022.",
-    "Local, remote-tracking, and GitHub branch SHAs were verified equal at 3624385fe368c4593b452418e4b000463933a87c before this final state-only closeout commit.",
-    "Draft PR 13 is updated, open, draft, and mergeable; all four push and pull-request CI jobs passed.",
+    "Pre-fix regressions proved malformed PID metadata could raise, synchronized contenders could both acquire, and an old release could delete replacement-owner metadata.",
+    "The authority is now a long-held project-root OS guard; diagnostic metadata carries an unforgeable owner token, PID, and guard device/inode identity and is atomically replaced.",
+    "Crash recovery uses kernel lock release, live legacy PID-only locks remain blocking, and dead or malformed legacy metadata is recovered only after acquiring the guard.",
+    "Invalid UTF-8, oversized or deeply nested JSON, oversized PID values, non-regular nodes, POSIX permission probes, Windows liveness probes, guard recreation, and fork inheritance are covered.",
+    "Mock, client, and agent construction now occur inside the lock-owning try/finally boundary.",
+    "General CLI startup failure exit status remains ARA-017; active non-cooperating filesystem replacement remains ARA-022.",
+    "Implementation commit 55e7287865bad016874981a071cb19afb0871e1d is locally validated; exact remote SHA and GitHub CI verification are pending.",
     "Ignored runtime artifacts and local configuration remain outside the validation diff."
   ]
 }
