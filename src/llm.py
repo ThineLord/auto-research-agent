@@ -33,8 +33,11 @@ from .config import (
 logger = logging.getLogger(__name__)
 
 
-def _redact_provider_message(text: str) -> str:
+def _redact_provider_message(text: str, *, secrets: tuple[str, ...] = ()) -> str:
     redacted = str(text or "")
+    known_secrets = {str(secret).strip() for secret in secrets if str(secret).strip()}
+    for secret in sorted(known_secrets, key=len, reverse=True):
+        redacted = redacted.replace(secret, "[redacted-api-key]")
     redacted = re.sub(r"AIza[0-9A-Za-z_\-]{20,}", "[redacted-api-key]", redacted)
     redacted = re.sub(
         r"(?i)(api[_ -]?key|key|token)=['\"]?[^'\"\s,;]+",
@@ -441,6 +444,7 @@ class GeminiClient:
         final_prompt_chars = system_chars + len(user_prompt)
 
         self._ensure_api_key_available()
+        known_secrets = (self._available_api_key(),)
         client = self._create_client()
         config = self._generation_config(
             system_prompt=system_prompt,
@@ -494,6 +498,7 @@ class GeminiClient:
 
             response = self._scheduler.call(operation) if self._scheduler else operation()
         except CloudFreeDailyQuotaExhausted as exc:
+            safe_message = _redact_provider_message(str(exc), secrets=known_secrets)
             _write_provider_event(
                 self.provider_event_path,
                 {
@@ -504,13 +509,14 @@ class GeminiClient:
                     "round": self.current_round,
                     "run_id": self.run_id,
                     "error_type": "daily_quota_exhausted",
-                    "message": _redact_provider_message(str(exc)),
+                    "message": safe_message,
                 },
             )
-            raise
+            raise CloudFreeDailyQuotaExhausted(safe_message) from None
         except RuntimeError as exc:
             info = classify_gemini_error(exc)
             error_type = info.error_type
+            safe_message = _redact_provider_message(str(exc), secrets=known_secrets)
             _write_provider_event(
                 self.provider_event_path,
                 {
@@ -525,21 +531,22 @@ class GeminiClient:
                     "rate_limited": info.rate_limited,
                     "daily_quota_exhausted": info.daily_quota_exhausted,
                     "retry_after_seconds": info.retry_after_seconds,
-                    "message": _redact_provider_message(str(exc)),
+                    "message": safe_message,
                 },
             )
             if info.rate_limited or info.daily_quota_exhausted:
                 raise RuntimeError(
                     "PROVIDER_QUOTA_EXHAUSTED: Gemini provider quota or rate limit reached. "
                     f"{info.public_message}"
-                ) from exc
+                ) from RuntimeError(safe_message)
             if self._scheduler is not None:
-                raise
+                raise RuntimeError(info.public_message) from RuntimeError(safe_message)
             raise RuntimeError(
                 "Failed to call Gemini API. Check API key, model name, and network access."
-            ) from exc
+            ) from RuntimeError(safe_message)
         except Exception as exc:  # noqa: BLE001
             info = classify_gemini_error(exc)
+            safe_message = _redact_provider_message(str(exc), secrets=known_secrets)
             _write_provider_event(
                 self.provider_event_path,
                 {
@@ -554,17 +561,17 @@ class GeminiClient:
                     "rate_limited": info.rate_limited,
                     "daily_quota_exhausted": info.daily_quota_exhausted,
                     "retry_after_seconds": info.retry_after_seconds,
-                    "message": _redact_provider_message(str(exc)),
+                    "message": safe_message,
                 },
             )
             if info.rate_limited or info.daily_quota_exhausted:
                 raise RuntimeError(
                     "PROVIDER_QUOTA_EXHAUSTED: Gemini provider quota or rate limit reached. "
                     f"{info.public_message}"
-                ) from exc
+                ) from RuntimeError(safe_message)
             raise RuntimeError(
                 "Failed to call Gemini API. Check API key, model name, and network access."
-            ) from exc
+            ) from RuntimeError(safe_message)
 
         content = _read_response_text(response)
         elapsed = time.monotonic() - started

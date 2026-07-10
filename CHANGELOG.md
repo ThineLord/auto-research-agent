@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Security
+
+* Provider event messages and displayed Gemini exception tracebacks now redact the exact configured
+  API key, including credentials supplied through a custom environment variable, even when the
+  upstream error echoes a key that does not match a known token pattern.
+
 ### Fixed
 
 * The `--compare-runs` CLI now rejects fewer than two run directories with a clear argument error,

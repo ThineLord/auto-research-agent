@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+import traceback
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -182,6 +183,78 @@ class LlmClientTests(unittest.TestCase):
 
         self.assertIn("Failed to call Gemini API", str(ctx.exception))
         self.assertNotIn(secret, str(ctx.exception))
+
+    def test_gemini_error_traceback_and_provider_event_redact_configured_key(self) -> None:
+        secret = "credential-value-with-an-unrecognized-shape"
+        generate_content = Mock(side_effect=RuntimeError(f"provider echoed {secret}"))
+        fake_client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+        fake_genai = SimpleNamespace(Client=Mock(return_value=fake_client))
+        fake_types = SimpleNamespace(GenerateContentConfig=FakeGenerateContentConfig)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            event_path = Path(tmp) / "provider_events.jsonl"
+            client = GeminiClient(
+                model="gemini-3.5-flash",
+                api_key=secret,
+                provider_event_path=event_path,
+            )
+
+            with patch.object(
+                llm_module,
+                "_load_google_genai",
+                return_value=(fake_genai, fake_types),
+            ):
+                with self.assertRaises(RuntimeError) as raised:
+                    client.generate(system_prompt=None, user_prompt="hello")
+
+            event_text = event_path.read_text(encoding="utf-8")
+            traceback_text = "".join(
+                traceback.format_exception(
+                    type(raised.exception),
+                    raised.exception,
+                    raised.exception.__traceback__,
+                )
+            )
+
+        self.assertNotIn(secret, event_text)
+        self.assertNotIn(secret, traceback_text)
+        self.assertIn("[redacted-api-key]", event_text)
+
+    def test_gemini_provider_event_redacts_custom_environment_key(self) -> None:
+        secret = "environment-credential-with-an-unrecognized-shape"
+        generate_content = Mock(side_effect=ValueError(f"upstream echoed {secret}"))
+        fake_client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+        fake_genai = SimpleNamespace(Client=Mock(return_value=fake_client))
+        fake_types = SimpleNamespace(GenerateContentConfig=FakeGenerateContentConfig)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            event_path = Path(tmp) / "provider_events.jsonl"
+            client = GeminiClient(
+                model="gemini-3.5-flash",
+                api_key_env="CUSTOM_PROVIDER_KEY",
+                provider_event_path=event_path,
+            )
+
+            with (
+                patch.object(
+                    llm_module,
+                    "_load_google_genai",
+                    return_value=(fake_genai, fake_types),
+                ),
+                patch.dict(
+                    llm_module.os.environ,
+                    {"CUSTOM_PROVIDER_KEY": secret},
+                    clear=True,
+                ),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "Failed to call Gemini API"):
+                    client.generate(system_prompt=None, user_prompt="hello")
+
+            event_text = event_path.read_text(encoding="utf-8")
+
+        self.assertNotIn(secret, event_text)
+        self.assertIn("[redacted-api-key]", event_text)
+        fake_genai.Client.assert_called_once_with(api_key=secret)
 
     def test_gemini_provider_events_record_quota_error(self) -> None:
         generate_content = Mock(
