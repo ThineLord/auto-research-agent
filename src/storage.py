@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
@@ -30,6 +32,33 @@ DEFAULT_RESEARCH_KEYWORDS = [
 ]
 
 
+def _atomic_write_text(path: Path, content: str) -> None:
+    """Durably replace a text file without truncating the previous version on failure."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temp_file:
+            temp_path = Path(temp_file.name)
+            temp_file.write(content)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+        os.replace(temp_path, path)
+    except BaseException:
+        if temp_path is not None:
+            try:
+                temp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise
+
+
 def read_text(path: Path) -> str:
     if not path.exists():
         return ""
@@ -37,8 +66,7 @@ def read_text(path: Path) -> str:
 
 
 def write_text(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content.strip() + "\n", encoding="utf-8")
+    _atomic_write_text(path, content.strip() + "\n")
 
 
 def read_file_text(path: Path) -> str:
@@ -66,8 +94,7 @@ def display_path(path: Path | str | None, root: Path | None = None, default: str
 
 def write_file_text(path: Path, content: str) -> None:
     """Write text exactly as provided, creating parent directories as needed."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    _atomic_write_text(path, content)
 
 
 def tail_file_lines(path: Path, max_lines: int = 200) -> str:
@@ -308,13 +335,11 @@ def update_project_memory(
     if _word_count(combined) > MAX_MEMORY_WORDS:
         combined = _tail_words(combined, MAX_MEMORY_WORDS)
     combined = combined.strip() + "\n"
-    memory_path.parent.mkdir(parents=True, exist_ok=True)
-    memory_path.write_text(combined, encoding="utf-8")
+    _atomic_write_text(memory_path, combined)
 
 
 def write_score_history(path: Path, history: List[Dict[str, Any]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(history, indent=2), encoding="utf-8")
+    _atomic_write_text(path, json.dumps(history, indent=2))
 
 
 def get_memory_for_prompt(memory_path: Path) -> str:
@@ -382,8 +407,7 @@ def update_research_state(
         "current_best_score": round(best_score, 2),
     }
 
-    state_path.parent.mkdir(parents=True, exist_ok=True)
-    state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    _atomic_write_text(state_path, json.dumps(state, indent=2))
     return state
 
 
@@ -400,8 +424,7 @@ def read_json_file(path: Path) -> Dict[str, Any]:
 
 
 def write_json_file(path: Path, data: Dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    _atomic_write_text(path, json.dumps(data, indent=2))
 
 
 def append_log_line(log_path: Path, message: str) -> None:

@@ -17,6 +17,8 @@
   synthetic zero-score or placeholder content; their artifacts and error metrics remain available.
 * Non-positive `--max-rounds` values now fail at argument parsing, and direct runner calls reject
   them before creating run artifacts, instead of silently running one round or emitting a zero-round run.
+* State and artifact replacement writes now use same-directory temporary files, file flush/fsync,
+  and atomic replace so a pre-commit failure preserves the previous valid checkpoint.
 
 ### Maintenance
 

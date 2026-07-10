@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from src.storage import (
     append_log_line,
@@ -54,6 +56,27 @@ class StorageTests(unittest.TestCase):
             target = root / "nested" / "state.json"
             write_json_file(target, {"round": 2, "score": 91})
             self.assertEqual(json.loads(target.read_text(encoding="utf-8"))["score"], 91)
+
+    def test_json_write_preserves_previous_state_when_atomic_commit_fails(self) -> None:
+        for failing_call in ("fsync", "replace"):
+            with self.subTest(failing_call=failing_call), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                target = root / "checkpoint.json"
+                previous = {"last_completed_round": 7, "can_resume": True}
+                target.write_text(json.dumps(previous), encoding="utf-8")
+
+                with (
+                    patch.object(
+                        os,
+                        failing_call,
+                        side_effect=OSError(f"simulated {failing_call} failure"),
+                    ),
+                    self.assertRaisesRegex(OSError, f"simulated {failing_call} failure"),
+                ):
+                    write_json_file(target, {"last_completed_round": 8, "can_resume": True})
+
+                self.assertEqual(json.loads(target.read_text(encoding="utf-8")), previous)
+                self.assertEqual(list(root.glob(".checkpoint.json.*.tmp")), [])
 
     def test_append_log_line_tolerates_stale_directory_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
