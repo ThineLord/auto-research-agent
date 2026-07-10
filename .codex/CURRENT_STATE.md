@@ -4,11 +4,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: begin `ARA-012` from the published and CI-verified `ARA-010` checkpoint.
+- Current goal: publish the validated `ARA-012` resume-path containment fix, then continue with `ARA-021`.
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `b8b629baa728ec30279bce55bb86e039ef31c2c3` (use `git rev-parse HEAD` after the state-only closeout commit)
-- Last known stable commit: `b8b629baa728ec30279bce55bb86e039ef31c2c3` (`make check`, independent adversarial review, remote synchronization, and GitHub Actions passed)
-- Active task: prepare `ARA-012` in `.codex/TASK_QUEUE.md`
+- Current HEAD at state snapshot: `e47ba449cff0351706014b04083d141f47d33b2d` (use `git rev-parse HEAD` after the state-only closeout commit)
+- Last known stable commit: `e47ba449cff0351706014b04083d141f47d33b2d` (`make check`, focused consumers, CLI smoke, and independent adversarial review passed locally; remote push pending)
+- Active task: closeout for completed task `ARA-012` in `.codex/TASK_QUEUE.md`
 - Uncommitted changes: yes; maintenance-state closeout files only.
 
 ## Modified Files
@@ -16,6 +16,7 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - `.codex/CURRENT_STATE.md`
 - `.codex/TASK_QUEUE.md`
 - `.codex/COMPLETED.md`
+- `.codex/DECISIONS.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
@@ -66,11 +67,17 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Committed the ARA-010 recovery-state checkpoint as `b8b629b`, pushed both commits, and verified the local, remote-tracking, and GitHub branch SHAs match.
 - Updated draft PR 13 with the resume-integrity scope and evidence.
 - Verified all Python 3.10 and Python 3.13 GitHub Actions jobs passed for both push and pull-request triggers.
+- Reproduced checkpoint roots escaping to arbitrary/cross-project paths and direct runner overrides writing outside the selected project.
+- Added shared canonical root, round, state-artifact, accessibility, and privacy-safe error checks before resume inspection or writes.
+- Preflighted every planned resume round and rechecked each current round, including future-round, previous-context, manifest, NUL, permission, and symlink cases.
+- Reused the backend preview in the UI so unsafe checkpoints disable Resume; verified CLI exit status 2 and run-lock release.
+- Preserved canonical legacy absolute roots and user-configured resolved `runs/` storage symlinks.
+- Committed the implementation, tests, and public docs as `e47ba44`.
 
 ## Remaining Steps
 
-- Commit and push this verified state closeout.
-- Mark `ARA-012` `IN_PROGRESS`, reproduce the checkpoint run-root escape without writing outside a temporary project, and keep path containment separate from history semantics.
+- Commit this state closeout, push `e47ba44` plus the state commit, update draft PR 13, and verify the exact remote SHA and CI.
+- Begin `ARA-021` only from a clean synchronized checkpoint; keep UI artifact-consumer reads separate from Resume execution safety.
 
 ## Test Status
 
@@ -104,6 +111,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Final `git diff --check` and staged sensitive-pattern scans passed.
 - GitHub Actions for the pushed ARA-010 checkpoint: Python 3.10 and Python 3.13 passed for both push and pull-request triggers.
 - GitHub sync: local, remote-tracking, and GitHub branch SHAs match at `b8b629baa728ec30279bce55bb86e039ef31c2c3`; draft PR 13 is updated and mergeable.
+- ARA-012 focused resume/UI/config/analytics/compare regression passed (`80 passed, 43 subtests passed`).
+- Final ARA-012 `make check` passed: Ruff format (51 files), Ruff lint, import smoke including `src.resume_safety`/`ui.app`, and pytest (`165 passed, 87 subtests passed`).
+- CLI unsafe-resume smoke exited 2 and removed the run lock without agent calls, run-log creation, or external writes.
+- Independent bounded adversarial review confirmed canonical/legacy, cross-project/traversal/relative, root/round/state symlink, future-round, NUL, access-permission, no-write, UI, and CLI behavior; no confirmed issue remains in the static ARA-012 scope.
+- Final `git diff --check`, staged diff check, and personal-path/credential/private-key scans passed.
 - Provider-backed tests: not planned for this checkpoint; no paid or network model calls are needed.
 
 ## Recent Failed Command
@@ -113,6 +125,8 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - One post-push GitHub API verification hit a TLS handshake timeout; scoped `git ls-remote` independently verified the exact remote SHA.
 - The new resume-integrity regression initially failed because both histories were truncated to the new round; this was the expected pre-fix reproduction.
 - An interim `make check` stopped at Ruff formatting while implementation was still in progress; formatting was applied and the final full gate passed.
+- The initial ARA-012 regression accepted absolute, traversal, symlink, and `runs/` container roots and allowed a direct runner override to write externally; these were the expected pre-fix failures.
+- Interim adversarial probes found future-round symlink, malformed NUL, unreadable directory, legacy-manifest, non-file artifact, and permission-error gaps; each received a focused regression before the final full gate.
 
 ## Next Command
 
@@ -130,5 +144,6 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.
 - Do not change prompts, scoring semantics, provider behavior, benchmark results, or artifact interpretation as part of a maintenance-only fix.
-- Keep `ARA-012` scoped to run-root containment; do not combine it with the separate manifest-provenance task `ARA-020`.
+- Do not start `ARA-021` until the ARA-012 code/state commits are pushed and remote CI is verified.
+- Do not claim UI artifact viewers or active filesystem-swap resistance are fixed by ARA-012; they remain `ARA-021` and `ARA-022`.
 - Do not stage with `git add -A`; stage only reviewed paths.

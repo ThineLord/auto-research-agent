@@ -40,13 +40,13 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-`ARA-010` should be `DONE`, pushed, and CI-verified. If the maintenance branch is ahead of origin, inspect any state-only closeout commit before pushing; do not repeat the implementation. Its final local validation command was:
+`ARA-012` should be `DONE`. If the maintenance branch is ahead of origin, inspect the local containment commit and state-only closeout before pushing; do not repeat the implementation. Its final local validation command was:
 
 ```bash
 make check
 ```
 
-After the branch is clean and synchronized, the next task is `ARA-012`. Mark it `IN_PROGRESS` before editing and begin with focused resume path-containment tests in `tests/test_round_loop.py`. Keep the separate run-manifest provenance task `ARA-020` out of this change. If another task is active, run its exact validation command from `.codex/TASK_QUEUE.md` first. Understand any uncommitted diff before editing it.
+After the branch is clean, pushed, and CI-verified, the next task is `ARA-021`. Mark it `IN_PROGRESS` before editing and begin with focused UI metadata/dashboard/catalog tests proving external checkpoint artifact references are not read. Keep project-level symlink/TOCTOU policy (`ARA-022`) and manifest provenance/identity (`ARA-020`) separate. If another task is active, run its exact validation command from `.codex/TASK_QUEUE.md` first. Understand any uncommitted diff before editing it.
 
 ## 5. Safety boundaries
 

@@ -80,10 +80,10 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-011 - Resume roots are not constrained to the project runs directory
 
-- Status: reproduced by read-only audit
+- Status: fixed, validated, and committed locally
 - Severity: P1
 - Impact: a crafted or stale checkpoint can direct resumed artifact writes outside the selected project's run tree.
-- Current action: task `ARA-012`.
+- Current action: task `ARA-012` completed at local commit `e47ba44`; remote push pending.
 
 ## KI-012 - Run locks are not atomic or owner-safe
 
@@ -138,5 +138,19 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 - Status: confirmed by read-only audit; separate from history-array integrity
 - Severity: P2
-- Impact: rebuilding `run_manifest.json` during resume can replace original start/mode provenance and discard unknown legacy fields, even though `run_config.json` retains resume sessions.
-- Current action: task `ARA-020`; preserve existing fields with additive resume metadata before changing manifest behavior.
+- Impact: rebuilding `run_manifest.json` during resume can replace original start/mode provenance and discard unknown legacy fields, even though `run_config.json` retains resume sessions; a safe in-runs path alias can also disagree with checkpoint `run_id`.
+- Current action: task `ARA-020`; preserve existing fields with additive resume metadata and define canonical run identity before changing manifest behavior.
+
+## KI-020 - UI artifact viewers can follow external checkpoint references
+
+- Status: reproduced; separate from the Resume write boundary
+- Severity: P1 privacy
+- Impact: metadata, analytics, and output-catalog helpers can read checkpoint-supplied run config/summary paths or a summary-supplied metrics path outside the selected run.
+- Current action: task `ARA-021`; reuse canonical run-root validation for every UI artifact consumer.
+
+## KI-021 - Static resume checks do not close active filesystem swap races
+
+- Status: confirmed residual under an active local-filesystem attacker
+- Severity: P2 under the project's local single-user threat model
+- Impact: renaming a validated run directory and replacing its path with a symlink between checks and stage persistence can redirect later writes; project-level artifact symlinks also remain broader than checkpoint scope.
+- Current action: task `ARA-022`; document the trust boundary before considering descriptor-based no-follow I/O or a repository-wide symlink policy.

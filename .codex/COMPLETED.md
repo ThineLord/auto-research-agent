@@ -94,3 +94,16 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed the implementation as `6d56d09`.
 - Committed its recovery-state checkpoint as `b8b629b`, pushed both commits, and verified exact local/remote SHA equality.
 - Updated draft PR 13 and confirmed Python 3.10/3.13 passed for both push and pull-request GitHub Actions triggers.
+
+## 2026-07-10 - Checkpoint resume path containment
+
+- Reproduced absolute, cross-project, traversal, relative, nested, container-root, and escaping-symlink checkpoint paths being accepted for resume.
+- Reproduced direct runner overrides and future round symlinks writing run artifacts outside the selected project in temporary fixtures.
+- Added `src/resume_safety.py` as the shared canonical boundary for CLI preview, runner defense-in-depth, and UI Resume state.
+- Required an existing absolute per-run direct child of the selected project's resolved `runs/` storage root while preserving repository-generated legacy roots and configured runs-storage symlinks.
+- Validated run config, legacy manifest, summary, metrics/history, previous-round context, and every planned/current round path before resume reads or writes.
+- Rejected path traversal, invalid/non-file state, escaping links, malformed NUL paths, inaccessible directories/files, unsafe future rounds, and privacy-leaking I/O failures with generic blockers.
+- Made the UI disable Resume for the same backend blockers and verified unsafe CLI resume exits 2 while releasing its run lock.
+- Focused consumer regression passed with `80 passed, 43 subtests passed`; final `make check` passed with `165 passed, 87 subtests passed`.
+- Independent bounded adversarial review found no remaining confirmed defect within the static ARA-012 scope.
+- Committed the implementation, regression matrix, UI integration, translations, changelog, and public docs as `e47ba44`.

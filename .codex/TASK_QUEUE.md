@@ -93,9 +93,9 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Status: `TODO`
 - Priority: P2
 - Risk: medium
-- Description: resume rebuilds `run_manifest.json` from the current session and can replace the original start time, mode, and unknown legacy fields even though `run_config.json` preserves session history.
+- Description: resume rebuilds `run_manifest.json` from the current session and can replace the original start time, mode, and unknown legacy fields even though `run_config.json` preserves session history; an in-runs symlink alias can also leave checkpoint `run_id` inconsistent with the canonical root identity.
 - Related files: `src/runner.py`, `src/run_config.py`, resume provenance tests
-- Acceptance criteria: resume retains original run identity/start provenance and unknown legacy manifest fields while adding current resume metadata; consumers remain compatible.
+- Acceptance criteria: resume retains original run identity/start provenance and unknown legacy manifest fields while adding current resume metadata; a present checkpoint `run_id` agrees with the canonical root identity or follows an explicit alias policy; consumers remain compatible.
 - Validation command: focused resume/run-config tests followed by `make check`.
 - Commit required: yes.
 - Dependencies: `ARA-010`.
@@ -114,15 +114,39 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-012 - Constrain checkpoint run roots to the selected project
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P1
 - Risk: high
 - Description: resume preview can accept an existing checkpoint `run_root` outside `projects/<project>/runs`, allowing cross-project or arbitrary-directory artifact writes.
-- Related files: `src/resume.py`, `src/runner.py`, resume tests
-- Acceptance criteria: resolved resume roots must be contained in the selected project's runs directory; legacy valid roots remain readable; unsafe roots fail closed with a privacy-safe reason.
-- Validation command: path-containment resume tests followed by `make check`.
+- Related files: `src/resume_safety.py`, `src/resume.py`, `src/runner.py`, `ui/app.py`, resume/UI tests and docs
+- Acceptance criteria: the resolved root is an existing absolute per-run directory directly under the selected project's resolved `runs/` directory; equality, nested/relative/cross-project/traversal paths, files, and escaping root/round/resume-state symlinks fail before unsafe inspection or writes with a privacy-safe reason. Repository-generated legacy absolute roots remain usable, all planned resume rounds receive runner preflight/rechecks, and the UI disables Resume on the same blockers.
+- Validation command: focused resume/UI path-containment and consumer tests followed by `make check`.
 - Commit required: yes.
 - Dependencies: none after `ARA-008`.
+
+## ARA-021 - Constrain UI checkpoint artifact reads to the selected run
+
+- Status: `TODO`
+- Priority: P1
+- Risk: medium
+- Description: the output browser and analytics helpers independently trust checkpoint `run_config`/`run_summary` and summary `round_metrics_path`, so rendering a crafted checkpoint can read external JSON even though Resume itself is now blocked.
+- Related files: `ui/app.py`, `src/resume_safety.py`, `tests/test_ui_helpers.py`
+- Acceptance criteria: UI artifact consumers derive or validate all run-local paths against the selected canonical run root before reads; safe legacy in-run metadata remains readable and unsafe references produce partial/unavailable UI state without exposing paths.
+- Validation command: focused UI metadata/dashboard/catalog tests followed by `make check`.
+- Commit required: yes.
+- Dependencies: `ARA-012`.
+
+## ARA-022 - Define project-level symlink boundaries for runtime artifacts
+
+- Status: `TODO`
+- Priority: P2
+- Risk: high
+- Description: project-level inputs/outputs such as `runs/`, `best_output.md`, `memory.md`, logs, and provider events can still follow filesystem symlinks in normal or resume workflows; closing an active rename/symlink race requires a broader storage policy than checkpoint validation.
+- Related files: `src/storage.py`, `src/runner.py`, `src/project_input.py`, runtime artifact tests
+- Acceptance criteria: define the trusted-local-filesystem threat model and either reject unsafe project artifact links consistently or use descriptor-based no-follow writes without breaking canonical local workflows.
+- Validation command: adversarial filesystem tests plus `make check`.
+- Commit required: yes if behavior changes.
+- Dependencies: owner input only if external artifact storage is intended; otherwise higher-priority P1 work.
 
 ## ARA-013 - Make run-lock acquisition and release ownership-safe
 

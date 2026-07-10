@@ -1,64 +1,58 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-10T18:13:51+08:00",
+  "recorded_at": "2026-07-10T18:48:18+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "b8b629baa728ec30279bce55bb86e039ef31c2c3",
-  "last_known_stable_commit": "b8b629baa728ec30279bce55bb86e039ef31c2c3",
-  "status": "passed_pushed_ci_verified",
+  "head_commit": "e47ba449cff0351706014b04083d141f47d33b2d",
+  "last_known_stable_commit": "e47ba449cff0351706014b04083d141f47d33b2d",
+  "status": "passed_local_commit_pending_state_push",
   "commands": [
     {
       "command": "make check",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "ruff_format_files": 50,
+        "ruff_format_files": 51,
         "ruff_lint": "passed",
         "import_smoke": "passed",
-        "pytest_tests_passed": 153,
-        "pytest_subtests_passed": 67,
-        "pytest_duration_seconds": 0.61
+        "pytest_tests_passed": 165,
+        "pytest_subtests_passed": 87,
+        "pytest_duration_seconds": 0.65
       }
     },
     {
-      "command": ".venv/bin/python -m pytest tests/test_round_loop.py tests/test_metrics.py tests/test_run_compare.py tests/test_run_analytics.py tests/test_ui_helpers.py -q",
+      "command": ".venv/bin/python -m pytest tests/test_round_loop.py tests/test_ui_helpers.py tests/test_run_config.py tests/test_run_analytics.py tests/test_run_compare.py -q",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "pytest_tests_passed": 70,
-        "pytest_subtests_passed": 23,
-        "pytest_duration_seconds": 0.44
+        "pytest_tests_passed": 80,
+        "pytest_subtests_passed": 43,
+        "pytest_duration_seconds": 0.52
       }
     },
     {
-      "command": "git diff --check",
+      "command": "git diff --check and staged diff check",
       "exit_code": 0,
       "result": "passed"
     },
     {
-      "command": "gh pr checks 13 --repo ThineLord/auto-research-agent",
+      "command": "scoped staged personal-path, credential-pattern, and private-key scan",
       "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "python_3_10_push": "passed",
-        "python_3_13_push": "passed",
-        "python_3_10_pull_request": "passed",
-        "python_3_13_pull_request": "passed"
-      }
+      "result": "passed"
     }
   ],
   "failures": [],
   "not_run": [
     {
       "check": "real provider smoke",
-      "reason": "Resume integrity is fully exercised with provider-free fake agents and temporary artifacts; no paid or network model call is required."
+      "reason": "Resume path containment is exercised with provider-free fake agents, CLI dispatch mocks, and temporary filesystems; no paid or network model call is required."
     }
   ],
   "notes": [
-    "The new end-to-end resume regression failed before the fix because both histories were replaced by the newly completed round.",
-    "Validation covers normal resume, legacy fallback, partial history, no-new-round interruption, cumulative runtime, best-score and best-round reconciliation, recursive cross-history conflicts, invalid round values, and CLI failure propagation.",
-    "Unsafe or unsupported resume state is rejected before run config, manifest, checkpoint, round, summary, or history writes.",
-    "Independent read-only adversarial and code reviews reported no remaining confirmed P1 or P2 defect in the tested ARA-010 matrix.",
-    "Local, remote-tracking, and GitHub branch SHAs were verified equal at b8b629baa728ec30279bce55bb86e039ef31c2c3 before this state-only closeout commit.",
+    "The initial regression proved external absolute, traversal, symlink, and direct runner roots were accepted and could receive artifacts before the fix.",
+    "Validation covers canonical and legacy roots, configured runs-storage symlinks, relative/nested/cross-project/prefix/NUL/file roots, previous/next/future round links, state artifacts, access failures, privacy-safe errors, UI disablement, CLI exit 2, and run-lock release.",
+    "All planned resume rounds are preflighted and each current round is rechecked before directory creation; active filesystem-swap resistance remains separately queued as ARA-022.",
+    "Independent bounded adversarial review reported no remaining confirmed defect within the static ARA-012 scope.",
+    "UI raw checkpoint artifact references remain separately queued as ARA-021; project-level paths and TOCTOU remain ARA-022.",
     "Ignored runtime artifacts and local configuration remain outside the validation diff."
   ]
 }
