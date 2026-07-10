@@ -69,6 +69,16 @@ from .session import run_session_mode
 from .storage import write_json_file
 
 
+def _positive_round_count(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer >= 1") from exc
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be >= 1")
+    return parsed
+
+
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Local iterative research agent")
     parser.add_argument(
@@ -213,9 +223,9 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--max-rounds",
-        type=int,
+        type=_positive_round_count,
         default=None,
-        help="Override round count for normal/session/resume, or cap continuous mode.",
+        help="Override positive round count for normal/session/resume, or cap continuous mode.",
     )
     parser.add_argument(
         "--drafting-mode",
@@ -427,14 +437,14 @@ def main() -> None:
     if preset_rounds is not None:
         max_rounds = preset_rounds
     if max_rounds_override is not None:
-        max_rounds = max(1, max_rounds_override)
+        max_rounds = max_rounds_override
     if getattr(args, "mock", False) and max_rounds_override is None:
         max_rounds = min(max_rounds, MOCK_DEFAULT_ROUNDS)
     continuous_max_rounds = 9999
     if preset_rounds is not None:
         continuous_max_rounds = preset_rounds
     if max_rounds_override is not None:
-        continuous_max_rounds = max(1, max_rounds_override)
+        continuous_max_rounds = max_rounds_override
     stop_if_no_improvement_rounds = config.stop_if_no_improvement_rounds
     normal_max_runtime_seconds, continuous_max_runtime_seconds = resolve_runtime_limits(config)
     temperature = config_temperature

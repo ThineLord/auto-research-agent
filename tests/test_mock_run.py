@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -28,6 +30,16 @@ class MockRunTests(unittest.TestCase):
 
         self.assertTrue(args.mock)
         self.assertEqual(args.max_rounds, 3)
+
+    def test_parse_args_rejects_non_positive_max_rounds(self) -> None:
+        for value in ("0", "-1"):
+            with self.subTest(value=value):
+                stderr = StringIO()
+                with redirect_stderr(stderr), self.assertRaises(SystemExit) as raised:
+                    cli_module.parse_args(["--mock", "--max-rounds", value])
+
+                self.assertEqual(raised.exception.code, 2)
+                self.assertIn("--max-rounds: must be >= 1", stderr.getvalue())
 
     def test_mock_agents_write_normal_run_artifacts_without_provider(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

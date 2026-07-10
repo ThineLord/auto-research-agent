@@ -15,6 +15,8 @@
   compatibility with existing UI, analytics, and legacy-metadata callers.
 * Failed agent rounds and invalid Judge outputs no longer replace a trusted `best_output.md` with
   synthetic zero-score or placeholder content; their artifacts and error metrics remain available.
+* Non-positive `--max-rounds` values now fail at argument parsing, and direct runner calls reject
+  them before creating run artifacts, instead of silently running one round or emitting a zero-round run.
 
 ### Maintenance
 

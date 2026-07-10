@@ -298,6 +298,9 @@ def run_iterative_rounds(
     max_consecutive_provider_quota_failures: int = 2,
     resume_metadata: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
+    if max_rounds < 1:
+        raise ValueError("max_rounds must be >= 1")
+
     # Termination guarantee:
     # 1) The only round loop is a bounded for-loop over [1..max_rounds].
     # 2) There is no recursive agent call path.

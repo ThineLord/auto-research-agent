@@ -340,6 +340,34 @@ class RoundLoopTests(unittest.TestCase):
         self.assertTrue(callable(main_module.run_diagnostic_mode))
         self.assertTrue(callable(main_module.run_session_mode))
 
+    def test_round_loop_rejects_non_positive_max_rounds_before_writing_artifacts(self) -> None:
+        for max_rounds in (0, -1):
+            with self.subTest(max_rounds=max_rounds), tempfile.TemporaryDirectory() as tmp:
+                project_dir = Path(tmp) / "project"
+                project_dir.mkdir()
+                memory_path = project_dir / "memory.md"
+                memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                agents = RecordingAgents()
+
+                with self.assertRaisesRegex(ValueError, "max_rounds must be >= 1"):
+                    run_iterative_rounds(
+                        console=Console(),
+                        agents=agents,
+                        task_text="Design a privacy-aware memory adapter.",
+                        project_dir=project_dir,
+                        memory_path=memory_path,
+                        mode="normal",
+                        model_name="fake-model",
+                        max_rounds=max_rounds,
+                        stop_if_no_improvement_rounds=10,
+                        global_max_runtime_seconds=60,
+                        per_agent_timeout_seconds=300,
+                    )
+
+                self.assertEqual(agents.draft_rounds, [])
+                self.assertFalse((project_dir / "runs").exists())
+                self.assertFalse((project_dir / "checkpoint.json").exists())
+
     def test_parse_args_accepts_mode_and_model_flags(self) -> None:
         args = parse_args(
             [
