@@ -40,6 +40,14 @@ from .metrics import (
     summarize_agent_io_metrics,
     summarize_round_metrics,
 )
+from .resume_safety import (
+    RESUME_PATH_MESSAGES,
+    UNSAFE_ARTIFACT_PATH,
+    UNSAFE_ROUND_PATH,
+    resume_artifact_links_are_safe,
+    validate_resume_round_dir,
+    validate_resume_run_root,
+)
 from .run_config import build_initial_run_config, finalize_run_config, read_run_config
 from .runtime import log_run as _log
 from .runtime import stop_requested as _stop_requested
@@ -64,7 +72,26 @@ from .storage import (
 
 
 class ResumeHistoryError(ValueError):
-    """Raised before writes when existing resume history is unsafe to append to."""
+    """Raised before writes when existing resume state is unsafe to append to."""
+
+
+def _validate_pending_resume_round_dir(run_root: Path, round_index: int) -> Path:
+    round_dir, path_error = validate_resume_round_dir(
+        run_root=run_root,
+        round_dir=run_root / f"round_{round_index:02d}",
+        require_writable=True,
+    )
+    if path_error or round_dir is None:
+        raise ResumeHistoryError(RESUME_PATH_MESSAGES[path_error or UNSAFE_ROUND_PATH])
+    try:
+        has_entries = round_dir.exists() and any(round_dir.iterdir())
+    except OSError:
+        raise ResumeHistoryError("pending round directory cannot be inspected safely") from None
+    if has_entries:
+        raise ResumeHistoryError(
+            f"pending round {round_index} directory already contains files; resume is blocked"
+        )
+    return round_dir
 
 
 def _history_round_number(value: Any) -> int | None:
@@ -608,7 +635,15 @@ def run_iterative_rounds(
     # 3) No retry loop exists for failed LLM requests.
     # 4) Additional early-stop conditions (timeout/no-improvement/errors) can only reduce runtime.
     started_at = time.monotonic()
-    run_root = run_root_override or make_run_root(project_dir)
+    if run_root_override is not None:
+        run_root, run_root_error = validate_resume_run_root(
+            project_dir=project_dir,
+            run_root_value=run_root_override,
+        )
+        if run_root_error or run_root is None:
+            raise ResumeHistoryError(RESUME_PATH_MESSAGES[run_root_error or "unsafe_run_root"])
+    else:
+        run_root = make_run_root(project_dir)
     log_path = project_dir / "run.log"
     checkpoint_path = project_dir / "checkpoint.json"
     stop_signal_path = project_dir / "STOP_REQUESTED"
@@ -620,6 +655,51 @@ def run_iterative_rounds(
     round_metrics_path = run_root / "round_metrics.json"
     research_state_path = project_dir / "research_state.json"
     started_at_iso = datetime.now().astimezone().isoformat()
+    resumes_existing_run = mode == "resume" or start_round > 1 or run_root_override is not None
+    if resumes_existing_run:
+        resume_artifact_paths = (
+            run_config_path,
+            run_root / "run_summary.json",
+            round_metrics_path,
+            run_root / "run_manifest.json",
+        )
+        if not resume_artifact_links_are_safe(
+            parent_dir=run_root,
+            paths=resume_artifact_paths,
+        ) or not resume_artifact_links_are_safe(
+            parent_dir=project_dir,
+            paths=(score_history_path,),
+        ):
+            raise ResumeHistoryError(RESUME_PATH_MESSAGES[UNSAFE_ARTIFACT_PATH])
+
+        previous_round = start_round - 1
+        if previous_round:
+            previous_round_dir, previous_round_error = validate_resume_round_dir(
+                run_root=run_root,
+                round_dir=run_root / f"round_{previous_round:02d}",
+            )
+            if previous_round_error or previous_round_dir is None:
+                raise ResumeHistoryError(
+                    RESUME_PATH_MESSAGES[previous_round_error or UNSAFE_ROUND_PATH]
+                )
+            previous_outputs = tuple(
+                previous_round_dir / filename
+                for filename in (
+                    "01_draft.md",
+                    "02_review.md",
+                    "03_revised.md",
+                    "04_judge.md",
+                )
+            )
+            if not resume_artifact_links_are_safe(
+                parent_dir=previous_round_dir,
+                paths=previous_outputs,
+            ):
+                raise ResumeHistoryError(RESUME_PATH_MESSAGES[UNSAFE_ARTIFACT_PATH])
+
+        for pending_round in range(start_round, max_rounds + 1):
+            _validate_pending_resume_round_dir(run_root, pending_round)
+
     initial_best_output = read_text(best_output_path)
     base_resume_metadata = _base_resume_metadata(
         mode=mode,
@@ -869,9 +949,13 @@ def run_iterative_rounds(
             _log(console, log_path, mode, f"user_stop_requested_before_round round={round_index}")
             break
 
+        if resumes_existing_run:
+            round_dir = _validate_pending_resume_round_dir(run_root, round_index)
+            round_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            round_dir = make_round_dir(run_root, round_index)
         _log(console, log_path, mode, f"round_enter round={round_index}")
         console.rule(f"Round {round_index}")
-        round_dir = make_round_dir(run_root, round_index)
         draft_output = ""
         review_output = ""
         revised_output = ""

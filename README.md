@@ -75,6 +75,10 @@ Mock mode 会复用正常 round runner，写入 `run_config.json`、`round_metri
 - resume 会保留并追加同一 run 的既有 metrics/score history、best-round 和上一轮上下文；如果既有
   history 无法安全解析、互相冲突或包含重复/未来轮次，会在写入任何 run artifact 前 fail-safe
   阻塞，并让 CLI 返回非零状态。
+- checkpoint 的 `run_root` 必须是当前项目 `runs/<run_id>` 下既有的绝对目录；相对路径、跨项目路径、
+  路径穿越和普通文件会在扫描该目录前阻塞。resume 会进一步检查它要读取的
+  config/legacy manifest/summary/metrics/history、上一轮上下文和本次计划写入的所有 round 目录，
+  拒绝逃逸符号链接或无效文件类型；UI 使用同一 preview 并禁用不安全 checkpoint 的 Resume 按钮。
 
 ## What To Demo First
 

@@ -6,6 +6,7 @@ import types
 import unittest
 from importlib.util import find_spec
 from pathlib import Path
+from unittest.mock import patch
 
 if find_spec("rich") is None:
     rich_module = types.ModuleType("rich")
@@ -57,9 +58,11 @@ if find_spec("yaml") is None:
 
     sys.modules["yaml"] = yaml_module
 
+import src.cli as cli_module
 import src.main as main_module
 from src.cli import parse_args
 from src.cloud_free import CloudFreeDailyQuotaExhausted
+from src.config import AppConfig
 from src.constants import (
     STOP_CLOUD_DAILY_QUOTA,
     STOP_INVALID_SCORE,
@@ -1076,6 +1079,520 @@ class RoundLoopTests(unittest.TestCase):
                 )
             self.assertEqual(run_config["resume_sessions"][0]["start_round"], 4)
 
+    def test_resume_rejects_run_roots_outside_the_selected_project(self) -> None:
+        unsafe_kinds = (
+            "absolute",
+            "traversal",
+            "symlink",
+            "runs_directory",
+            "relative",
+            "nested",
+            "sibling_prefix",
+            "missing_outside",
+            "nul_character",
+        )
+        for unsafe_kind in unsafe_kinds:
+            with self.subTest(unsafe_kind=unsafe_kind), tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                project_dir = repo_root / "projects" / "selected"
+                runs_dir = project_dir / "runs"
+                runs_dir.mkdir(parents=True)
+                outside_run = repo_root / "projects" / "other" / "runs" / unsafe_kind
+                if unsafe_kind != "missing_outside":
+                    outside_run.mkdir(parents=True)
+
+                if unsafe_kind == "absolute":
+                    checkpoint_run_root = outside_run
+                elif unsafe_kind == "traversal":
+                    escaped_run = project_dir / "escaped-run"
+                    escaped_run.mkdir()
+                    checkpoint_run_root = runs_dir / ".." / escaped_run.name
+                elif unsafe_kind == "symlink":
+                    checkpoint_run_root = runs_dir / "linked-run"
+                    checkpoint_run_root.symlink_to(outside_run, target_is_directory=True)
+                elif unsafe_kind == "relative":
+                    relative_target = runs_dir / "relative-run"
+                    relative_target.mkdir()
+                    checkpoint_run_root = Path("projects/selected/runs/relative-run")
+                elif unsafe_kind == "nested":
+                    checkpoint_run_root = runs_dir / "nested" / "run"
+                    checkpoint_run_root.mkdir(parents=True)
+                elif unsafe_kind == "sibling_prefix":
+                    checkpoint_run_root = project_dir / "runs-evil" / "run"
+                    checkpoint_run_root.mkdir(parents=True)
+                elif unsafe_kind == "nul_character":
+                    checkpoint_run_root = str(runs_dir / "bad") + "\x00tail"
+                else:
+                    checkpoint_run_root = (
+                        runs_dir if unsafe_kind == "runs_directory" else outside_run
+                    )
+
+                checkpoint = {
+                    "run_id": "unsafe-run",
+                    "run_root": str(checkpoint_run_root),
+                    "last_completed_round": 0,
+                    "can_resume": True,
+                }
+                preview = build_resume_preview(
+                    project_dir=project_dir,
+                    checkpoint=checkpoint,
+                    repo_root=repo_root,
+                )
+
+                self.assertFalse(preview["can_resume"])
+                self.assertEqual(preview["blocked_reason"], "unsafe_run_root")
+                self.assertIn("selected project's runs directory", preview["message"])
+                self.assertNotIn(str(repo_root), preview["message"])
+
+    def test_runner_rejects_unsafe_run_root_override_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "projects" / "selected"
+            project_dir.mkdir(parents=True)
+            outside_run = repo_root / "outside-run"
+            outside_run.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            agents = RecordingAgents()
+
+            with self.assertRaisesRegex(ResumeHistoryError, "selected project's runs directory"):
+                run_iterative_rounds(
+                    console=Console(),
+                    agents=agents,
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    mode="resume",
+                    model_name="fake-model",
+                    max_rounds=1,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                    run_root_override=outside_run,
+                    repo_root=repo_root,
+                )
+
+            self.assertEqual(agents.draft_rounds, [])
+            self.assertEqual(list(outside_run.iterdir()), [])
+            self.assertFalse((project_dir / "checkpoint.json").exists())
+            self.assertFalse((project_dir / "run.log").exists())
+
+    def test_runner_rechecks_resume_child_paths_before_writes(self) -> None:
+        for unsafe_kind in (
+            "next_round",
+            "future_round",
+            "previous_output",
+            "state_artifact",
+        ):
+            with self.subTest(unsafe_kind=unsafe_kind), tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                project_dir = repo_root / "projects" / "selected"
+                run_root = project_dir / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                outside_path = repo_root / "outside" / unsafe_kind
+                outside_path.parent.mkdir(parents=True)
+                start_round = 1
+                max_rounds = 1
+                if unsafe_kind == "next_round":
+                    outside_path.mkdir()
+                    (run_root / "round_01").symlink_to(
+                        outside_path,
+                        target_is_directory=True,
+                    )
+                elif unsafe_kind == "future_round":
+                    outside_path.mkdir()
+                    (run_root / "round_02").symlink_to(
+                        outside_path,
+                        target_is_directory=True,
+                    )
+                    max_rounds = 2
+                elif unsafe_kind == "previous_output":
+                    outside_path.write_text("private context\n", encoding="utf-8")
+                    previous_round = run_root / "round_01"
+                    previous_round.mkdir()
+                    (previous_round / "04_judge.md").symlink_to(outside_path)
+                    start_round = 2
+                else:
+                    outside_path.write_text('{"private": true}\n', encoding="utf-8")
+                    (run_root / "run_config.json").symlink_to(outside_path)
+                outside_bytes = outside_path.read_bytes() if outside_path.is_file() else None
+                memory_path = project_dir / "memory.md"
+                memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                agents = RecordingAgents()
+
+                with self.assertRaises(ResumeHistoryError):
+                    run_iterative_rounds(
+                        console=Console(),
+                        agents=agents,
+                        task_text="Design a privacy-aware memory adapter.",
+                        project_dir=project_dir,
+                        memory_path=memory_path,
+                        mode="resume",
+                        model_name="fake-model",
+                        max_rounds=max_rounds,
+                        start_round=start_round,
+                        stop_if_no_improvement_rounds=10,
+                        global_max_runtime_seconds=60,
+                        per_agent_timeout_seconds=300,
+                        run_root_override=run_root,
+                        repo_root=repo_root,
+                    )
+
+                self.assertEqual(agents.draft_rounds, [])
+                self.assertFalse((project_dir / "checkpoint.json").exists())
+                self.assertFalse((project_dir / "run.log").exists())
+                if outside_bytes is not None:
+                    self.assertEqual(outside_path.read_bytes(), outside_bytes)
+                else:
+                    self.assertEqual(list(outside_path.iterdir()), [])
+
+    def test_cli_unsafe_resume_exits_two_and_releases_run_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            project_dir = temp_root / "projects" / "selected"
+            project_dir.mkdir(parents=True)
+            outside_run = temp_root / "outside-run"
+            outside_run.mkdir()
+            (project_dir / "checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "outside-run",
+                        "run_root": str(outside_run),
+                        "last_completed_round": 0,
+                        "can_resume": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            args = parse_args(
+                [
+                    "--resume",
+                    "--provider",
+                    "ollama",
+                    "--model",
+                    "qwen3:8b",
+                    "--project",
+                    "selected",
+                ]
+            )
+            project_input = types.SimpleNamespace(
+                project_name="selected",
+                project_dir=project_dir,
+                task_path=project_dir / "task.md",
+                task_text="# Resume safety test",
+                project_title="Resume safety test",
+                source_kind="user_provided",
+                as_metadata=lambda: {"project_name": "selected"},
+            )
+
+            with (
+                patch.object(cli_module, "parse_args", return_value=args),
+                patch.object(cli_module, "load_app_config", return_value=AppConfig()),
+                patch.object(cli_module, "load_project_input", return_value=project_input),
+                patch.object(
+                    cli_module,
+                    "list_installed_ollama_models",
+                    return_value=(["qwen3:8b"], None),
+                ),
+                patch.object(
+                    cli_module,
+                    "create_llm_client",
+                    return_value=types.SimpleNamespace(timeout_seconds=1),
+                ),
+            ):
+                with self.assertRaisesRegex(SystemExit, "2"):
+                    cli_module.main()
+
+            self.assertFalse((project_dir / "active_run.json").exists())
+            self.assertFalse((project_dir / "run.log").exists())
+            self.assertEqual(list(outside_run.iterdir()), [])
+
+    def test_resume_rejects_non_directory_run_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "projects" / "selected"
+            runs_dir = project_dir / "runs"
+            runs_dir.mkdir(parents=True)
+            run_root_file = runs_dir / "not-a-directory"
+            run_root_file.write_text("sentinel\n", encoding="utf-8")
+
+            preview = build_resume_preview(
+                project_dir=project_dir,
+                checkpoint={
+                    "run_root": str(run_root_file),
+                    "last_completed_round": 0,
+                    "can_resume": True,
+                },
+                repo_root=repo_root,
+            )
+
+            self.assertFalse(preview["can_resume"])
+            self.assertEqual(preview["blocked_reason"], "invalid_run_root")
+            self.assertEqual(run_root_file.read_text(encoding="utf-8"), "sentinel\n")
+            self.assertNotIn(str(repo_root), preview["message"])
+
+    def test_resume_accepts_run_under_configured_runs_storage_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "projects" / "selected"
+            project_dir.mkdir(parents=True)
+            external_runs = repo_root / "configured-run-storage"
+            external_runs.mkdir()
+            (project_dir / "runs").symlink_to(external_runs, target_is_directory=True)
+            run_root = external_runs / "legacy-run"
+            run_root.mkdir()
+
+            preview = build_resume_preview(
+                project_dir=project_dir,
+                checkpoint={
+                    "run_id": "legacy-run",
+                    "run_root": str(run_root),
+                    "last_completed_round": 0,
+                    "can_resume": True,
+                },
+                repo_root=repo_root,
+            )
+
+            self.assertTrue(preview["can_resume"])
+            self.assertEqual(Path(preview["run_root"]), run_root.resolve())
+            self.assertEqual(preview["next_round_status"], "missing")
+
+    def test_resume_preview_blocks_unreadable_next_round_without_leaking_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "projects" / "selected"
+            run_root = project_dir / "runs" / "resume-run"
+            next_round = run_root / "round_01"
+            next_round.mkdir(parents=True)
+            checkpoint = {
+                "run_id": "resume-run",
+                "run_root": str(run_root),
+                "last_completed_round": 0,
+                "can_resume": True,
+            }
+
+            with patch.object(
+                Path,
+                "iterdir",
+                side_effect=PermissionError(str(next_round)),
+            ):
+                preview = build_resume_preview(
+                    project_dir=project_dir,
+                    checkpoint=checkpoint,
+                    repo_root=repo_root,
+                )
+
+            self.assertFalse(preview["can_resume"])
+            self.assertEqual(preview["blocked_reason"], "unsafe_round_path")
+            self.assertEqual(preview["next_round_status"], "unsafe")
+            self.assertNotIn(str(repo_root), preview["message"])
+
+    def test_resume_preview_blocks_inaccessible_root_and_state_file(self) -> None:
+        for inaccessible_kind in ("run_root", "run_config"):
+            with (
+                self.subTest(inaccessible_kind=inaccessible_kind),
+                tempfile.TemporaryDirectory() as tmp,
+            ):
+                repo_root = Path(tmp)
+                project_dir = repo_root / "projects" / "selected"
+                run_root = project_dir / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                run_config_path = run_root / "run_config.json"
+                run_config_path.write_text('{"legacy": true}\n', encoding="utf-8")
+                inaccessible_path = (
+                    run_root if inaccessible_kind == "run_root" else run_config_path
+                ).resolve()
+
+                def fake_access(path: object, mode: int) -> bool:
+                    del mode
+                    return Path(path).resolve() != inaccessible_path
+
+                with patch("src.resume_safety.os.access", side_effect=fake_access):
+                    preview = build_resume_preview(
+                        project_dir=project_dir,
+                        checkpoint={
+                            "run_id": "resume-run",
+                            "run_root": str(run_root),
+                            "last_completed_round": 0,
+                            "can_resume": True,
+                        },
+                        repo_root=repo_root,
+                    )
+
+                self.assertFalse(preview["can_resume"])
+                self.assertEqual(
+                    preview["blocked_reason"],
+                    "inaccessible_run_root"
+                    if inaccessible_kind == "run_root"
+                    else "unsafe_artifact_path",
+                )
+                self.assertNotIn(str(repo_root), preview["message"])
+
+    def test_resume_wraps_racing_io_error_without_leaking_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "projects" / "selected"
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            (project_dir / "checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 0,
+                        "can_resume": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            console = Console(record=True)
+            private_temp_path = repo_root / "outside" / ".run_config.secret.tmp"
+
+            with patch(
+                "src.resume.run_iterative_rounds",
+                side_effect=PermissionError(str(private_temp_path)),
+            ):
+                with self.assertRaisesRegex(ResumeHistoryError, "artifact I/O failed") as caught:
+                    run_resume_mode(
+                        console=console,
+                        agents=RecordingAgents(),
+                        task_text="Design a privacy-aware memory adapter.",
+                        project_dir=project_dir,
+                        memory_path=memory_path,
+                        model_name="fake-model",
+                        max_rounds=1,
+                        stop_if_no_improvement_rounds=10,
+                        global_max_runtime_seconds=60,
+                        per_agent_timeout_seconds=300,
+                        repo_root=repo_root,
+                    )
+
+            self.assertNotIn(str(repo_root), str(caught.exception))
+            self.assertNotIn(str(repo_root), console.export_text(styles=False))
+
+    def test_resume_rejects_escaping_round_symlinks_without_external_reads_or_writes(
+        self,
+    ) -> None:
+        for round_kind, last_completed_round in (("previous", 1), ("next", 0)):
+            with self.subTest(round_kind=round_kind), tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                project_dir = repo_root / "projects" / "selected"
+                run_root = project_dir / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                outside_round = repo_root / "outside" / round_kind
+                outside_round.mkdir(parents=True)
+                sentinel_path = outside_round / "04_judge.md"
+                sentinel_path.write_text("external private context\n", encoding="utf-8")
+                linked_round = run_root / f"round_{1:02d}"
+                linked_round.symlink_to(outside_round, target_is_directory=True)
+                checkpoint = {
+                    "run_id": "resume-run",
+                    "run_root": str(run_root),
+                    "last_completed_round": last_completed_round,
+                    "can_resume": True,
+                }
+                checkpoint_path = project_dir / "checkpoint.json"
+                checkpoint_path.write_text(json.dumps(checkpoint), encoding="utf-8")
+                checkpoint_bytes = checkpoint_path.read_bytes()
+                memory_path = project_dir / "memory.md"
+                memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                agents = DraftContextAgents()
+                console = Console(record=True)
+
+                preview = build_resume_preview(
+                    project_dir=project_dir,
+                    checkpoint=checkpoint,
+                    repo_root=repo_root,
+                )
+                resume_started = run_resume_mode(
+                    console=console,
+                    agents=agents,
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    model_name="fake-model",
+                    max_rounds=1,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                    repo_root=repo_root,
+                )
+
+                self.assertFalse(preview["can_resume"])
+                self.assertEqual(preview["blocked_reason"], "unsafe_round_path")
+                self.assertFalse(resume_started)
+                self.assertEqual(agents.draft_contexts, [])
+                self.assertEqual(
+                    sentinel_path.read_text(encoding="utf-8"),
+                    "external private context\n",
+                )
+                self.assertEqual(checkpoint_path.read_bytes(), checkpoint_bytes)
+                self.assertFalse((run_root / "run_config.json").exists())
+                self.assertNotIn(str(repo_root), console.export_text(styles=False))
+
+    def test_resume_rejects_unsafe_state_artifacts_without_reading_them(self) -> None:
+        unsafe_artifacts = (
+            ("run_config_symlink", "run_config.json", True),
+            ("run_manifest_symlink", "run_manifest.json", True),
+            ("run_config_directory", "run_config.json", False),
+        )
+        for case, artifact_name, use_symlink in unsafe_artifacts:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                project_dir = repo_root / "projects" / "selected"
+                run_root = project_dir / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                external_config = repo_root / "outside" / "private.json"
+                external_config.parent.mkdir()
+                external_config.write_text('{"private": "sentinel"}\n', encoding="utf-8")
+                artifact_path = run_root / artifact_name
+                if use_symlink:
+                    artifact_path.symlink_to(external_config)
+                else:
+                    artifact_path.mkdir()
+                checkpoint = {
+                    "run_id": "resume-run",
+                    "run_root": str(run_root),
+                    "last_completed_round": 0,
+                    "can_resume": True,
+                }
+                checkpoint_path = project_dir / "checkpoint.json"
+                checkpoint_path.write_text(json.dumps(checkpoint), encoding="utf-8")
+                memory_path = project_dir / "memory.md"
+                memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                agents = RecordingAgents()
+
+                preview = build_resume_preview(
+                    project_dir=project_dir,
+                    checkpoint=checkpoint,
+                    repo_root=repo_root,
+                )
+                resume_started = run_resume_mode(
+                    console=Console(),
+                    agents=agents,
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    model_name="fake-model",
+                    max_rounds=1,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                    repo_root=repo_root,
+                )
+
+                self.assertFalse(preview["can_resume"])
+                self.assertEqual(preview["blocked_reason"], "unsafe_artifact_path")
+                self.assertFalse(resume_started)
+                self.assertEqual(agents.draft_rounds, [])
+                self.assertEqual(
+                    external_config.read_text(encoding="utf-8"),
+                    '{"private": "sentinel"}\n',
+                )
+                self.assertEqual(artifact_path.is_symlink(), use_symlink)
+
     def test_resume_preserves_history_best_round_and_previous_round_context(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_dir = Path(tmp) / "project"
@@ -1243,7 +1760,7 @@ class RoundLoopTests(unittest.TestCase):
             self.assertEqual(checkpoint["last_completed_round"], 4)
             self.assertEqual(checkpoint["best_score"], 93.0)
             self.assertEqual(checkpoint["best_round"], 2)
-            self.assertEqual(checkpoint["best_round_path"], str(run_root / "round_02"))
+            self.assertEqual(checkpoint["best_round_path"], str((run_root / "round_02").resolve()))
             self.assertEqual(checkpoint["last_successful_agent"], "judge")
             self.assertEqual(checkpoint["stop_reason"], STOP_NO_IMPROVEMENT)
             self.assertEqual(run_config["completed_rounds"], 4)
@@ -1434,7 +1951,7 @@ class RoundLoopTests(unittest.TestCase):
             self.assertEqual((project_dir / "score_history.json").read_bytes(), history_bytes)
             self.assertEqual(checkpoint["last_completed_round"], 3)
             self.assertEqual(checkpoint["best_round"], 2)
-            self.assertEqual(checkpoint["best_round_path"], str(run_root / "round_02"))
+            self.assertEqual(checkpoint["best_round_path"], str((run_root / "round_02").resolve()))
             self.assertEqual(checkpoint["stop_reason"], STOP_USER_REQUESTED)
             self.assertEqual(checkpoint["last_successful_agent"], "judge")
             self.assertEqual(run_config["completed_rounds"], 3)

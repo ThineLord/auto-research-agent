@@ -305,6 +305,10 @@ make resume
 - 如果既有 history 不是安全的 JSON array，或包含无效、重复、乱序、未来轮次，会在任何 artifact
   写入前 fail-safe 停止并让 CLI 返回状态 2；两份 history 的轮次或共有字段冲突时也会阻塞。旧 run
   缺少 run-local metrics 时，只有 project score history 能关联到 checkpoint 上一轮才会兼容恢复
+- `run_root` 必须是当前项目 `runs/` 下既有的绝对、每-run 目录。相对路径、其他项目、`..` 穿越、
+  `runs/` 本身或普通文件会在扫描候选目录前 fail-safe 阻塞。resume 还会检查它将读取的
+  run config/manifest/summary/metrics、上一轮上下文和本次计划写入的所有 round 目录，拒绝逃逸
+  符号链接、无效文件类型或不可安全访问的路径。仓库生成的旧版项目内绝对路径仍兼容
 - 只有更高分时才更新 `best_output.md`
 
 ## 输出文件怎么读（先看哪个）
@@ -336,7 +340,8 @@ prompt 文件 SHA-256、Git commit、开始/结束时间、停止原因和是否
 
 CLI `--resume` 会先打印 resume preview，包括 run id/root、last completed round、next round、
 stop reason、是否可 resume、下一轮目录状态和安全动作。UI 的 Resume 区域也显示同样信息，
-并会提示缺失、stale checkpoint 或 partial next-round directory。
+并会提示缺失、stale、路径不安全的 checkpoint 或 partial next-round directory；这些检查失败时
+Resume 按钮会禁用。
 
 如果要看本次 run 总览和每轮指标，查看：
 

@@ -7,6 +7,12 @@
 * Provider event messages and displayed Gemini exception tracebacks now redact the exact configured
   API key, including credentials supplied through a custom environment variable, even when the
   upstream error echoes a key that does not match a known token pattern.
+* Resume now accepts only canonical absolute per-run directories directly under the selected
+  project's `runs/` directory. Cross-project, relative, traversal, non-directory, and escaping
+  root paths fail closed before inspecting that directory. Resume-consumed run config, legacy
+  manifest, summary, metrics/history, previous-round context, and all planned round directories
+  also reject escaping symlinks, invalid file types, or inaccessible paths before those paths are
+  read or written; the UI disables Resume for the same unsafe checkpoints.
 
 ### Fixed
 

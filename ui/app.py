@@ -46,7 +46,7 @@ from src.config import (
     save_default_model_selection,
 )
 from src.llm import GeminiClient
-from src.resume import inspect_next_round_directory
+from src.resume import build_resume_preview
 from src.run_analytics import analyze_run
 from src.run_compare import compare_runs
 from src.runtime import (
@@ -606,6 +606,7 @@ def infer_running_stage(
 
 def describe_resume_state(
     *,
+    project_dir: Path,
     checkpoint: dict[str, Any],
     run_active: bool,
     selected_model: str,
@@ -640,84 +641,64 @@ def describe_resume_state(
             f" Checkpoint model was `{checkpoint_model}`; selected model is `{selected_model}`."
         )
 
-    run_root_text = str(checkpoint.get("run_root", "")).strip()
-    run_root = Path(run_root_text) if run_root_text else None
-    run_id = str(checkpoint.get("run_id") or (run_root.name if run_root else "") or "N/A")
-    last_completed_round = _safe_int(checkpoint.get("last_completed_round"))
-    next_round = last_completed_round + 1
-    stop_reason = str(checkpoint.get("stop_reason", "unknown") or "unknown")
+    preview = build_resume_preview(
+        project_dir=project_dir,
+        checkpoint=checkpoint,
+        repo_root=ROOT,
+    )
+    run_id = str(preview.get("run_id") or checkpoint.get("run_id") or "N/A")
+    last_completed_round = _safe_int(preview.get("last_completed_round"))
+    next_round = _safe_int(preview.get("next_round"), last_completed_round + 1)
+    stop_reason = str(preview.get("stop_reason") or checkpoint.get("stop_reason") or "unknown")
     details = {
         "run_id": run_id,
-        "run_root": output_display_path(run_root) if run_root else "N/A",
+        "run_root": str(preview.get("run_root_display") or "N/A"),
         "last_completed_round": last_completed_round,
         "next_round": next_round,
         "stop_reason": stop_reason,
-        "can_resume": bool(checkpoint.get("can_resume")),
+        "can_resume": bool(preview.get("can_resume")),
         "completed_round_files_preserved": bool(checkpoint.get("can_resume")),
+        "next_round_status": preview.get("next_round_status", "unknown"),
+        "next_round_safety_action": preview.get("next_round_safety_action", "none"),
+        "next_round_path": preview.get("next_round_display", "N/A"),
+        "next_round_blocks_resume": bool(preview.get("next_round_blocks_resume")),
+        "next_round_existing_files": ", ".join(
+            str(name) for name in preview.get("next_round_existing_files", [])
+        )
+        or "none",
     }
-    if checkpoint.get("can_resume") and not run_root:
+    if checkpoint.get("can_resume") and not preview.get("can_resume"):
         details["can_resume"] = False
-        details["completed_round_files_preserved"] = False
-        return {
-            "can_resume": False,
-            "level": "warning",
-            "message": "Resume checkpoint is missing run_root.",
-            "message_key": "resume_missing_run_root",
-            "message_args": {},
-            "model_mismatch": model_mismatch,
-            "checkpoint_model": checkpoint_model,
-            "selected_model": selected_model,
-            "details": details,
-        }
-    if run_root and checkpoint.get("can_resume") and not run_root.exists():
-        details["can_resume"] = False
-        details["completed_round_files_preserved"] = False
-        return {
-            "can_resume": False,
-            "level": "warning",
-            "message": f"Resume checkpoint is stale. Run root is missing: {details['run_root']}.",
-            "message_key": "resume_stale_checkpoint",
-            "message_args": {"run_root": details["run_root"]},
-            "model_mismatch": model_mismatch,
-            "checkpoint_model": checkpoint_model,
-            "selected_model": selected_model,
-            "details": details,
-        }
-
-    next_round_info = inspect_next_round_directory(
-        run_root / f"round_{next_round:02d}" if run_root else None,
-        ROOT,
-    )
-    details.update(
-        {
-            "next_round_status": next_round_info["status"],
-            "next_round_safety_action": next_round_info["safety_action"],
-            "next_round_path": next_round_info["display_path"],
-            "next_round_blocks_resume": next_round_info["blocks_resume"],
-            "next_round_existing_files": ", ".join(next_round_info["existing_files"]) or "none",
-        }
-    )
-    if checkpoint.get("can_resume") and next_round_info["blocks_resume"]:
-        details["can_resume"] = False
-        return {
-            "can_resume": False,
-            "level": "warning",
-            "message": (
-                "Resume is blocked because the next round directory already contains files."
-            ),
-            "message_key": "resume_partial_next_round",
-            "message_args": {
+        blocked_reason = str(preview.get("blocked_reason") or "unsafe_run_root")
+        message_key = {
+            "missing_run_root": "resume_missing_run_root",
+            "stale_run_root": "resume_stale_checkpoint",
+            "partial_next_round_exists": "resume_partial_next_round",
+        }.get(blocked_reason, "resume_unsafe_checkpoint")
+        message_args = (
+            {
                 "next_round_path": details["next_round_path"],
                 "status": details["next_round_status"],
                 "action": details["next_round_safety_action"],
-            },
+            }
+            if blocked_reason == "partial_next_round_exists"
+            else {"run_root": details["run_root"]}
+            if blocked_reason == "stale_run_root"
+            else {}
+        )
+        return {
+            "can_resume": False,
+            "level": "warning",
+            "message": str(preview.get("message") or "Resume checkpoint is unsafe."),
+            "message_key": message_key,
+            "message_args": message_args,
             "model_mismatch": model_mismatch,
             "checkpoint_model": checkpoint_model,
             "selected_model": selected_model,
             "details": details,
         }
 
-    if checkpoint.get("can_resume"):
+    if preview.get("can_resume"):
         return {
             "can_resume": True,
             "level": "success",
@@ -2017,6 +1998,7 @@ def main() -> None:
             else:
                 st.error(t("stop_signal_failed", path=stop_signal_display))
     resume_state = describe_resume_state(
+        project_dir=proj_path,
         checkpoint=checkpoint,
         run_active=run_active,
         selected_model=model_label,

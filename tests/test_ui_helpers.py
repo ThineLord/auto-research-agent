@@ -515,9 +515,11 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertIsNone(ui_app.live_refresh_interval(False))
 
         with tempfile.TemporaryDirectory() as tmp:
-            run_root = Path(tmp) / "project" / "runs" / "run1"
+            project_dir = Path(tmp) / "project"
+            run_root = project_dir / "runs" / "run1"
             run_root.mkdir(parents=True)
             resume = ui_app.describe_resume_state(
+                project_dir=project_dir,
                 checkpoint={
                     "run_id": "run1",
                     "run_root": str(run_root),
@@ -541,21 +543,26 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertEqual(resume["details"]["next_round_status"], "missing")
         self.assertEqual(resume["details"]["next_round_safety_action"], "proceed_create_round_dir")
 
-        stale_resume = ui_app.describe_resume_state(
-            checkpoint={
-                "run_id": "stale",
-                "run_root": str(Path("/tmp") / "definitely-missing-auto-research-run"),
-                "can_resume": True,
-                "last_completed_round": 4,
-            },
-            run_active=False,
-            selected_model="qwen3:8b",
-        )
-        missing_root_resume = ui_app.describe_resume_state(
-            checkpoint={"can_resume": True, "last_completed_round": 1},
-            run_active=False,
-            selected_model="qwen3:8b",
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            stale_resume = ui_app.describe_resume_state(
+                project_dir=project_dir,
+                checkpoint={
+                    "run_id": "stale",
+                    "run_root": str(project_dir / "runs" / "missing-run"),
+                    "can_resume": True,
+                    "last_completed_round": 4,
+                },
+                run_active=False,
+                selected_model="qwen3:8b",
+            )
+            missing_root_resume = ui_app.describe_resume_state(
+                project_dir=project_dir,
+                checkpoint={"can_resume": True, "last_completed_round": 1},
+                run_active=False,
+                selected_model="qwen3:8b",
+            )
 
         self.assertFalse(stale_resume["can_resume"])
         self.assertEqual(stale_resume["message_key"], "resume_stale_checkpoint")
@@ -565,11 +572,13 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertFalse(missing_root_resume["details"]["can_resume"])
 
         with tempfile.TemporaryDirectory() as tmp:
-            run_root = Path(tmp) / "project" / "runs" / "partial"
+            project_dir = Path(tmp) / "project"
+            run_root = project_dir / "runs" / "partial"
             partial_round = run_root / "round_03"
             partial_round.mkdir(parents=True)
             (partial_round / "01_draft.md").write_text("partial", encoding="utf-8")
             partial_resume = ui_app.describe_resume_state(
+                project_dir=project_dir,
                 checkpoint={
                     "run_id": "partial",
                     "run_root": str(run_root),
@@ -612,6 +621,33 @@ class SharedUiBackendHelperTests(unittest.TestCase):
         self.assertEqual(judge_item["kind"], "markdown")
         metrics_item = next(item for item in catalog if item["label"] == "Round metrics")
         self.assertEqual(metrics_item["missing_key"], "missing_round_metrics")
+
+    def test_ui_disables_resume_for_unsafe_checkpoint_paths(self) -> None:
+        import ui.app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "project"
+            project_dir.mkdir()
+            outside_run = repo_root / "other" / "runs" / "run1"
+            outside_run.mkdir(parents=True)
+
+            resume = ui_app.describe_resume_state(
+                project_dir=project_dir,
+                checkpoint={
+                    "run_id": "unsafe",
+                    "run_root": str(outside_run),
+                    "can_resume": True,
+                    "last_completed_round": 0,
+                },
+                run_active=False,
+                selected_model="qwen3:8b",
+            )
+
+        self.assertFalse(resume["can_resume"])
+        self.assertEqual(resume["message_key"], "resume_unsafe_checkpoint")
+        self.assertFalse(resume["details"]["can_resume"])
+        self.assertNotIn(str(repo_root), resume["message"])
 
     def test_ui_score_history_rows_flatten_metrics_for_display(self) -> None:
         import ui.app as ui_app

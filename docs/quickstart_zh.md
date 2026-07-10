@@ -157,6 +157,9 @@ make resume
 读取 `projects/example/checkpoint.json` 继续同一个 run；CLI 会先显示 resume preview，包括
 run id/root、上一轮、下一轮、stop reason、can_resume、下一轮目录状态和安全动作。已完成轮次文件会保留；
 如果下一轮目录已存在且非空，resume 会 fail-safe 停止，要求先人工检查/移动/删除该目录。
+只有当前项目 `runs/<run_id>` 下既有的绝对目录可恢复；跨项目、相对、穿越或非目录 root 会在扫描
+候选目录前阻塞。resume 会另外验证它消费的 config/legacy manifest/summary/metrics/history、
+上一轮 context 和本次计划 round 路径；这些路径若通过符号链接逃逸也会阻塞，UI 同时禁用 Resume。
 这不同于新开一个 run 后把 `best_output.md` 当 previous-best context 使用。
 
 ```bash
@@ -367,6 +370,7 @@ similarity/evolution、timeout/error、agent timing 和 estimated tokens。它�
 - `src/session.py`：session 模式，先生成 objective 和 plan，再跑迭代，最后生成 report。
 - `src/literature_survey.py`：不调用模型的文献综述资料收集、论文元数据解析、去重、主题/缺口分析和报告生成。
 - `src/resume.py`：读取 checkpoint 并从下一轮继续。
+- `src/resume_safety.py`：统一校验 resume root、round 和 state artifact 的路径边界。
 - `src/storage.py`：文件读写、round 输出、score 解析、memory 更新、research_state 更新。
 - `src/runtime.py`：后台进程、UI 元数据、run lock、测试运行、停止信号。
 - `src/run_config.py`：生成 run-level 复现信息、prompt 文件 hash、Git commit，并兼容读取旧 `run_manifest.json`。

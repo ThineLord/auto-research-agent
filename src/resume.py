@@ -10,6 +10,14 @@ from rich.console import Console
 
 from .agents import ResearchAgents
 from .config import DEFAULT_DRAFTING_MODE
+from .resume_safety import (
+    RESUME_PATH_MESSAGES,
+    UNSAFE_ARTIFACT_PATH,
+    UNSAFE_ROUND_PATH,
+    resume_artifact_links_are_safe,
+    validate_resume_round_dir,
+    validate_resume_run_root,
+)
 from .runner import ResumeHistoryError, run_iterative_rounds
 from .storage import read_json_file
 
@@ -67,7 +75,7 @@ def _display_path(path: Path, root: Path | None) -> str:
     if root is not None:
         try:
             return path.resolve().relative_to(root.resolve()).as_posix()
-        except ValueError:
+        except (OSError, RuntimeError, ValueError):
             pass
     return f"<repo>/{path.name}"
 
@@ -89,6 +97,26 @@ def inspect_next_round_directory(
         }
 
     display_path = _display_path(next_round_path, repo_root)
+    safe_round_path, path_error = validate_resume_round_dir(
+        run_root=next_round_path.parent,
+        round_dir=next_round_path,
+        require_writable=True,
+    )
+    if path_error:
+        return {
+            "path": "",
+            "display_path": "N/A",
+            "exists": False,
+            "status": "unsafe" if path_error == UNSAFE_ROUND_PATH else "invalid",
+            "blocks_resume": True,
+            "blocked_reason": path_error,
+            "message": RESUME_PATH_MESSAGES[path_error],
+            "safety_action": NEXT_ROUND_FAIL_SAFE_ACTION,
+            "existing_files": [],
+            "missing_expected_files": list(ROUND_OUTPUT_FILES),
+        }
+    assert safe_round_path is not None
+    next_round_path = safe_round_path
     if not next_round_path.exists():
         return {
             "path": str(next_round_path),
@@ -101,7 +129,21 @@ def inspect_next_round_directory(
             "missing_expected_files": list(ROUND_OUTPUT_FILES),
         }
 
-    entries = sorted(next_round_path.iterdir(), key=lambda path: path.name)
+    try:
+        entries = sorted(next_round_path.iterdir(), key=lambda path: path.name)
+    except OSError:
+        return {
+            "path": "",
+            "display_path": "N/A",
+            "exists": True,
+            "status": "unsafe",
+            "blocks_resume": True,
+            "blocked_reason": UNSAFE_ROUND_PATH,
+            "message": "next round directory cannot be inspected safely",
+            "safety_action": NEXT_ROUND_FAIL_SAFE_ACTION,
+            "existing_files": [],
+            "missing_expected_files": list(ROUND_OUTPUT_FILES),
+        }
     if not entries:
         return {
             "path": str(next_round_path),
@@ -152,8 +194,6 @@ def build_resume_preview(
             "checkpoint_display_path": _display_path(checkpoint_path, repo_root),
         }
 
-    run_root_text = str(checkpoint.get("run_root", "")).strip()
-    run_root_path = Path(run_root_text) if run_root_text else None
     last_completed_round = _strict_round_int(checkpoint.get("last_completed_round", 0))
     if last_completed_round is None or last_completed_round < 0:
         return {
@@ -165,19 +205,55 @@ def build_resume_preview(
         }
     next_round = last_completed_round + 1
     best_round = _checkpoint_best_round(checkpoint)
-    run_id = str(checkpoint.get("run_id") or (run_root_path.name if run_root_path else "")).strip()
+    run_root_path, run_root_error = validate_resume_run_root(
+        project_dir=project_dir,
+        run_root_value=checkpoint.get("run_root"),
+    )
+    run_id = str(
+        checkpoint.get("run_id")
+        or (run_root_path.name if run_root_path and run_root_error != "unsafe_run_root" else "")
+    ).strip()
     stop_reason = str(checkpoint.get("stop_reason", "") or "unknown")
-    run_config_path = (
-        Path(str(checkpoint.get("run_config")))
-        if checkpoint.get("run_config")
-        else (run_root_path / "run_config.json" if run_root_path else None)
+    run_config_path = run_root_path / "run_config.json" if run_root_path else None
+    run_summary_path = run_root_path / "run_summary.json" if run_root_path else None
+    previous_round_path = (
+        run_root_path / f"round_{last_completed_round:02d}"
+        if run_root_path and last_completed_round
+        else None
     )
-    run_summary_path = (
-        Path(str(checkpoint.get("run_summary")))
-        if checkpoint.get("run_summary")
-        else (run_root_path / "run_summary.json" if run_root_path else None)
+    previous_round_error: str | None = None
+    if run_root_path is not None and run_root_error is None:
+        run_artifact_paths = (
+            run_config_path,
+            run_summary_path,
+            run_root_path / "round_metrics.json",
+            run_root_path / "run_manifest.json",
+        )
+        if not resume_artifact_links_are_safe(
+            parent_dir=run_root_path,
+            paths=(path for path in run_artifact_paths if path is not None),
+        ) or not resume_artifact_links_are_safe(
+            parent_dir=project_dir,
+            paths=(project_dir / "score_history.json",),
+        ):
+            previous_round_error = UNSAFE_ARTIFACT_PATH
+    if previous_round_path is not None and run_root_error is None and previous_round_error is None:
+        safe_previous_round, previous_round_error = validate_resume_round_dir(
+            run_root=run_root_path,
+            round_dir=previous_round_path,
+        )
+        if previous_round_error is None and safe_previous_round is not None:
+            context_paths = [safe_previous_round / name for name in ROUND_OUTPUT_FILES]
+            if not resume_artifact_links_are_safe(
+                parent_dir=safe_previous_round,
+                paths=context_paths,
+            ):
+                previous_round_error = UNSAFE_ARTIFACT_PATH
+    next_round_path = (
+        run_root_path / f"round_{next_round:02d}"
+        if run_root_path and run_root_error is None and previous_round_error is None
+        else None
     )
-    next_round_path = run_root_path / f"round_{next_round:02d}" if run_root_path else None
     next_round_info = inspect_next_round_directory(next_round_path, repo_root)
 
     preview = {
@@ -203,7 +279,9 @@ def build_resume_preview(
         "can_resume": bool(checkpoint.get("can_resume")),
         "best_score": _safe_float(checkpoint.get("best_score"), -1.0),
         "best_round": best_round,
-        "best_round_path": str(checkpoint.get("best_round_path", "")),
+        "best_round_path": (
+            str(run_root_path / f"round_{best_round:02d}") if run_root_path and best_round else ""
+        ),
         "last_successful_agent": str(checkpoint.get("last_successful_agent", "") or "none"),
         "completed_round_files_preserved": True,
         "next_round_path": str(next_round_path) if next_round_path else "",
@@ -225,30 +303,32 @@ def build_resume_preview(
             }
         )
         return preview
-    if run_root_path is None:
+    if run_root_error:
         preview.update(
             {
                 "can_resume": False,
-                "blocked_reason": "missing_run_root",
-                "message": "checkpoint run_root is missing",
+                "blocked_reason": run_root_error,
+                "message": RESUME_PATH_MESSAGES[run_root_error],
             }
         )
         return preview
-    if not run_root_path.exists():
+    if previous_round_error:
         preview.update(
             {
                 "can_resume": False,
-                "blocked_reason": "stale_run_root",
-                "message": "checkpoint run_root does not exist",
+                "blocked_reason": previous_round_error,
+                "message": RESUME_PATH_MESSAGES[previous_round_error],
             }
         )
         return preview
     if next_round_info["blocks_resume"]:
+        blocked_reason = next_round_info.get("blocked_reason")
         preview.update(
             {
                 "can_resume": False,
-                "blocked_reason": "partial_next_round_exists",
-                "message": (
+                "blocked_reason": blocked_reason or "partial_next_round_exists",
+                "message": next_round_info.get("message")
+                or (
                     "next round directory already contains files; resume is blocked to avoid "
                     "overwriting partial or uncheckpointed outputs"
                 ),
@@ -358,3 +438,7 @@ def run_resume_mode(
     except ResumeHistoryError as exc:
         console.print(f"[red]Cannot resume safely: {exc}.[/red]")
         raise
+    except OSError:
+        message = "resume artifact I/O failed; verify project and run directory permissions"
+        console.print(f"[red]Cannot resume safely: {message}.[/red]")
+        raise ResumeHistoryError(message) from None

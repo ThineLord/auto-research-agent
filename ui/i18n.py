@@ -337,6 +337,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         "resume_stale_checkpoint": "Resume checkpoint is stale. Run root is missing: {run_root}.",
         "resume_missing_run_root": "Resume checkpoint is missing run_root.",
+        "resume_unsafe_checkpoint": (
+            "Resume checkpoint has an unsafe or invalid run path. "
+            "Select a run stored under this project's runs directory."
+        ),
         "resume_partial_next_round": (
             "Resume is blocked because `{next_round_path}` is `{status}`. Safety action: {action}."
         ),
@@ -622,6 +626,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "resume_unavailable": "当前不能恢复。上次停止原因：`{stop_reason}`。{model_note}",
         "resume_stale_checkpoint": "恢复检查点已失效：找不到运行目录 {run_root}。",
         "resume_missing_run_root": "恢复检查点缺少 run_root。",
+        "resume_unsafe_checkpoint": (
+            "恢复检查点包含不安全或无效的运行路径。请选择当前项目 runs 目录内的运行。"
+        ),
         "resume_partial_next_round": (
             "恢复已阻止：`{next_round_path}` 状态为 `{status}`。安全动作：{action}。"
         ),

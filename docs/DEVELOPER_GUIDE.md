@@ -149,6 +149,11 @@ schema-additive and must not reinterpret or rescale the Judge's top-level score.
   next-round directory status/safety action. Resumed runs also record retained-history status and
   source fields. Existing histories remain opaque append-only records; unsafe arrays fail closed
   before run config, manifest, checkpoint, round, or summary writes.
+- `src/resume_safety.py` defines the shared resume path boundary used by CLI preview, the runner,
+  and the UI. A resumable root is an existing absolute per-run directory directly under the
+  selected project's resolved `runs/` directory. Root containment is checked before directory
+  listing or run config/manifest/summary/metrics/history reads. The runner preflights all planned
+  round directories and rechecks the current round plus those resume-consumed paths before writes.
 - `run.log` for the current running stage.
 - `STOP_REQUESTED` for safe user-initiated pause.
 
@@ -174,7 +179,8 @@ The Resume control uses checkpoint metadata to preview run id/root, last complet
 round, stop reason, resume eligibility, completed-round preservation, and next-round directory
 status before launching `--resume`. A non-empty next-round directory is treated as partial or
 uncheckpointed output and blocks resume with `fail_safe_require_user_action`; the app does not
-move or delete that directory automatically.
+move or delete that directory automatically. Unsafe or invalid root/round/artifact paths use the
+same backend preview and disable the Resume control.
 
 The model health check is intentionally fast: it checks Ollama API availability and selected-model
 presence without sending a generation prompt.
