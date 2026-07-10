@@ -75,6 +75,22 @@ class ResumeHistoryError(ValueError):
     """Raised before writes when existing resume state is unsafe to append to."""
 
 
+_MAX_RESUME_JSON_DEPTH = 128
+
+
+def _resume_json_nesting_is_safe(value: Any) -> bool:
+    pending: list[tuple[Any, int]] = [(value, 0)]
+    while pending:
+        current, depth = pending.pop()
+        if depth > _MAX_RESUME_JSON_DEPTH:
+            return False
+        if isinstance(current, dict):
+            pending.extend((nested, depth + 1) for nested in current.values())
+        elif isinstance(current, list):
+            pending.extend((nested, depth + 1) for nested in current)
+    return True
+
+
 def _validate_pending_resume_round_dir(run_root: Path, round_index: int) -> Path:
     round_dir, path_error = validate_resume_round_dir(
         run_root=run_root,
@@ -125,10 +141,12 @@ def _read_resume_history(path: Path, *, start_round: int) -> List[Dict[str, Any]
         return None
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+    except (OSError, ValueError, RecursionError) as exc:
         raise ResumeHistoryError(f"{path.name} is unreadable or invalid JSON") from exc
     if not isinstance(payload, list):
         raise ResumeHistoryError(f"{path.name} must contain a JSON array")
+    if not _resume_json_nesting_is_safe(payload):
+        raise ResumeHistoryError(f"{path.name} exceeds the supported JSON nesting depth")
 
     history: List[Dict[str, Any]] = []
     previous_round = 0

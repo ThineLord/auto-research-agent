@@ -38,6 +38,13 @@
   PID metadata no longer raises, recreated guard inodes cannot displace a live recorded owner, and
   an old or fork-inherited handle cannot delete replacement/parent metadata. CLI constructor
   failures also release the guard before propagating.
+* CLI configuration, project-input, provider-prerequisite, and run-lock startup refusals now exit
+  with status 2 instead of printing an error and reporting success. Explicit cloud model discovery
+  failure exits 1, while `--help`, successful provider-free commands, and documented profile
+  fallback behavior remain status 0.
+* Unreadable or non-UTF-8 configuration/task input now produces a privacy-safe startup diagnostic.
+  Tolerant checkpoint and optional cloud-cache readers also treat invalid UTF-8, oversized numeric
+  values, and excessively nested JSON as malformed input instead of leaking a traceback.
 
 ### Maintenance
 

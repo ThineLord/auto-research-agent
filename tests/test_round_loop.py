@@ -2050,8 +2050,21 @@ class RoundLoopTests(unittest.TestCase):
 
     def test_unsafe_resume_histories_fail_before_writing_any_artifact(self) -> None:
         valid_round_one = b'[{"round": 1, "score": 80}]'
+        deeply_nested_value = b'{"nested":' * 150 + b"0" + b"}" * 150
         unsafe_histories = {
             "invalid_json": (b'{"not": "complete"', valid_round_one, 80.0),
+            "invalid_utf8": (b"\xff\xfe", valid_round_one, 80.0),
+            "huge_integer": (
+                b'[{"round": ' + b"9" * 5000 + b"}]",
+                valid_round_one,
+                80.0,
+            ),
+            "deep_json": (b"[" * 2000 + b"0" + b"]" * 2000, valid_round_one, 80.0),
+            "deep_history_value": (
+                b'[{"round": 1, "details": ' + deeply_nested_value + b"}]",
+                valid_round_one,
+                80.0,
+            ),
             "wrong_type": (b'{"round": 1}', valid_round_one, 80.0),
             "duplicate_round": (
                 b'[{"round": 1}, {"round": 1}]',

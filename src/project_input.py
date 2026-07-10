@@ -86,6 +86,8 @@ def load_project_input(
 
     try:
         task_text = task_path.read_text(encoding="utf-8").strip()
+    except UnicodeError as exc:
+        raise ProjectInputError(f"Task file must be valid UTF-8 text: {task_display_path}") from exc
     except OSError as exc:
         reason = getattr(exc, "strerror", None) or exc.__class__.__name__
         raise ProjectInputError(

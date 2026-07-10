@@ -288,6 +288,77 @@ class CloudFreePolicyTests(unittest.TestCase):
             self.assertEqual(load_profile_artifact(project_dir), [])
             self.assertEqual(load_discovery_artifact(project_dir), [])
 
+    def test_invalid_utf8_cloud_free_artifacts_return_empty_lists(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            artifacts = project_dir / "artifacts"
+            artifacts.mkdir()
+            (artifacts / "cloud_free_profile.json").write_bytes(b"\xff\xfe")
+            (artifacts / "cloud_free_models.json").write_bytes(b"\xff\xfe")
+
+            self.assertEqual(load_profile_artifact(project_dir), [])
+            self.assertEqual(load_discovery_artifact(project_dir), [])
+
+            (artifacts / "cloud_free_profile.json").write_text("{}", encoding="utf-8")
+            (artifacts / "cloud_free_models.json").write_text("{}", encoding="utf-8")
+            for error in (ValueError("oversized integer"), RecursionError("too deeply nested")):
+                with (
+                    self.subTest(error=error.__class__.__name__),
+                    patch(
+                        "src.cloud_free.json.loads",
+                        side_effect=error,
+                    ),
+                ):
+                    self.assertEqual(load_profile_artifact(project_dir), [])
+                    self.assertEqual(load_discovery_artifact(project_dir), [])
+
+            (artifacts / "cloud_free_profile.json").write_text(
+                '{"profiles": null}', encoding="utf-8"
+            )
+            (artifacts / "cloud_free_models.json").write_text('{"models": 7}', encoding="utf-8")
+            self.assertEqual(load_profile_artifact(project_dir), [])
+            self.assertEqual(load_discovery_artifact(project_dir), [])
+
+            huge_integer = "9" * 4001
+            (artifacts / "cloud_free_profile.json").write_text(
+                '{"profiles": [{"model_id": "seed", "latency_seconds": ' + huge_integer + "}]}",
+                encoding="utf-8",
+            )
+            (artifacts / "cloud_free_models.json").write_text(
+                '{"models": [{"model_id": "seed", "input_token_limit": ' + huge_integer + "}]}",
+                encoding="utf-8",
+            )
+            self.assertEqual(load_profile_artifact(project_dir), [])
+            self.assertEqual(load_discovery_artifact(project_dir), [])
+
+            (artifacts / "cloud_free_profile.json").write_text(
+                '{"profiles": [{"model_id": "seed", "latency_seconds": "slow"}]}',
+                encoding="utf-8",
+            )
+            (artifacts / "cloud_free_models.json").write_text(
+                '{"models": [{"model_id": null}, {"model_id": []}, '
+                '{"model_id": "seed", "input_token_limit": []}]}',
+                encoding="utf-8",
+            )
+            self.assertEqual(load_profile_artifact(project_dir), [])
+            self.assertEqual(load_discovery_artifact(project_dir), [])
+
+            (artifacts / "cloud_free_profile.json").write_text(
+                '{"profiles": [{"model_id": " gemini-test ", "reachable": true}]}',
+                encoding="utf-8",
+            )
+            (artifacts / "cloud_free_models.json").write_text(
+                '{"models": [{"model_id": " gemini-test ", '
+                '"supported_generation_methods": ["generateContent"], '
+                '"safe_text_generation": true}]}',
+                encoding="utf-8",
+            )
+            loaded_profiles = load_profile_artifact(project_dir)
+            loaded_models = load_discovery_artifact(project_dir)
+            self.assertEqual([profile.model_id for profile in loaded_profiles], ["gemini-test"])
+            self.assertEqual([model.model_id for model in loaded_models], ["gemini-test"])
+            self.assertEqual(loaded_models[0].supported_generation_methods, ("generateContent",))
+
     def test_cloud_free_discovery_cli_masks_project_and_artifact_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             temp_root = Path(tmp)

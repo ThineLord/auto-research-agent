@@ -112,6 +112,24 @@ class ProjectInputTests(unittest.TestCase):
             self.assertIn("projects/missing_project", message)
             self.assertNotIn(str(root.resolve()), message)
 
+    def test_rejects_non_utf8_project_task_without_leaking_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project_dir = root / "projects" / "private"
+            project_dir.mkdir(parents=True)
+            (project_dir / "task.md").write_bytes(b"\xff\xfe")
+
+            with self.assertRaises(ProjectInputError) as raised:
+                load_project_input(
+                    root=root,
+                    project_name="private",
+                    explicit_project=True,
+                )
+
+            self.assertIn("Task file must be valid UTF-8 text", str(raised.exception))
+            self.assertIn("projects/private/task.md", str(raised.exception))
+            self.assertNotIn(str(root.resolve()), str(raised.exception))
+
     def test_cli_project_input_error_masks_repo_root_path(self) -> None:
         args = SimpleNamespace(
             session=False,
@@ -151,8 +169,10 @@ class ProjectInputTests(unittest.TestCase):
             patch.object(cli_module, "Console", return_value=console),
             patch.object(cli_module, "load_app_config", return_value=AppConfig()),
         ):
-            cli_module.main()
+            with self.assertRaises(SystemExit) as raised:
+                cli_module.main()
 
+        self.assertEqual(raised.exception.code, 2)
         output = console.export_text(styles=False)
         self.assertIn("projects/missing_project_for_test", output)
         self.assertNotIn(str(repo_root), output)
@@ -188,8 +208,10 @@ class ProjectInputTests(unittest.TestCase):
             ),
             patch.object(cli_module, "list_installed_ollama_models") as list_models,
         ):
-            cli_module.main()
+            with self.assertRaises(SystemExit) as raised:
+                cli_module.main()
 
+        self.assertEqual(raised.exception.code, 2)
         list_models.assert_not_called()
 
 

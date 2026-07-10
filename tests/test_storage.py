@@ -45,13 +45,28 @@ class StorageTests(unittest.TestCase):
             root = Path(tmp)
             missing = root / "missing.json"
             invalid = root / "invalid.json"
+            invalid_utf8 = root / "invalid-utf8.json"
             stale_directory = root / "checkpoint.json"
             invalid.write_text("{not json", encoding="utf-8")
+            invalid_utf8.write_bytes(b"\xff\xfe")
             stale_directory.mkdir()
 
             self.assertEqual(read_json_file(missing), {})
             self.assertEqual(read_json_file(invalid), {})
+            self.assertEqual(read_json_file(invalid_utf8), {})
             self.assertEqual(read_json_file(stale_directory), {})
+
+            valid = root / "valid.json"
+            valid.write_text('{"round": 1}', encoding="utf-8")
+            for error in (ValueError("oversized integer"), RecursionError("too deeply nested")):
+                with (
+                    self.subTest(error=error.__class__.__name__),
+                    patch(
+                        "src.storage.json.loads",
+                        side_effect=error,
+                    ),
+                ):
+                    self.assertEqual(read_json_file(valid), {})
 
             target = root / "nested" / "state.json"
             write_json_file(target, {"round": 2, "score": 91})

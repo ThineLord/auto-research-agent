@@ -400,8 +400,19 @@ def _read_yaml_mapping(config_path: Path) -> Dict[str, Any]:
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_display_path}")
     try:
-        raw_config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    except YAML_ERROR as exc:
+        config_text = config_path.read_text(encoding="utf-8")
+    except UnicodeError as exc:
+        raise ConfigValidationError(
+            f"{config_display_path}: config file must be valid UTF-8 text"
+        ) from exc
+    except OSError as exc:
+        reason = getattr(exc, "strerror", None) or exc.__class__.__name__
+        raise ConfigValidationError(
+            f"{config_display_path}: config file could not be read: {reason}"
+        ) from exc
+    try:
+        raw_config = yaml.safe_load(config_text)
+    except (YAML_ERROR, ValueError, RecursionError) as exc:
         raise ConfigValidationError(f"{config_display_path}: failed to parse YAML: {exc}") from exc
     if raw_config is None:
         return {}

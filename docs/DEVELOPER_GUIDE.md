@@ -50,6 +50,18 @@ behavior, prompt semantics, scoring semantics, benchmark behavior, or artifact s
 The command-line entry point is `src.cli:main`, exposed as both `python -m src.main` and the
 `auto-research-agent` console script.
 
+CLI exit-status contract:
+
+- `0`: the requested command completed, `--help` was shown, or a documented soft fallback (such as
+  cloud-profile discovery falling back to configured seeds) completed its remaining work.
+- `1`: an explicit operation failed after startup, such as `--cloud-free-discover` being unable to
+  discover models, or an unexpected runtime exception propagated to the process boundary.
+- `2`: arguments, configuration, project input, provider prerequisites, run-lock acquisition, or
+  resume safety checks rejected startup. These failures print a user-facing diagnostic before exit.
+
+The exit-status contract does not make a wheel self-contained: missing packaged configuration or
+prompt assets remain a separate packaging defect, but affected commands must now fail nonzero.
+
 Core modules:
 
 - `src/config.py` validates `config.yaml`, including model, runtime, project, and topic settings.

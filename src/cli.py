@@ -68,6 +68,9 @@ from .runtime import RUN_LOCK_GUARD_FILENAME, acquire_run_lock, release_run_lock
 from .session import run_session_mode
 from .storage import write_json_file
 
+_EXIT_OPERATION_ERROR = 1
+_EXIT_STARTUP_ERROR = 2
+
 
 def _positive_round_count(value: str) -> int:
     try:
@@ -406,14 +409,14 @@ def main() -> None:
                 config = load_app_config(config_path)
             except (ConfigValidationError, FileNotFoundError) as fallback_exc:
                 console.print(f"[red]Config error: {fallback_exc}[/red]")
-                return
+                raise SystemExit(_EXIT_STARTUP_ERROR) from None
             console.print(
                 "[yellow]config.yaml not found; mock mode is using config.example.yaml "
                 "without creating local config.[/yellow]"
             )
         else:
             console.print(f"[red]Config error: {exc}[/red]")
-            return
+            raise SystemExit(_EXIT_STARTUP_ERROR) from None
 
     (
         config_provider,
@@ -437,7 +440,7 @@ def main() -> None:
     project_error = _validate_project_override(project_name)
     if project_error:
         console.print(f"[red]{project_error}[/red]")
-        return
+        raise SystemExit(_EXIT_STARTUP_ERROR)
     benchmark_preset = getattr(args, "benchmark_preset", None)
     max_rounds_override = getattr(args, "max_rounds", None)
     max_provider_quota_failures = max(0, getattr(args, "max_provider_quota_failures", 2))
@@ -496,7 +499,7 @@ def main() -> None:
         )
     except ProjectInputError as exc:
         console.print(f"[red]Project input error: {exc}[/red]")
-        return
+        raise SystemExit(_EXIT_STARTUP_ERROR) from None
     project_dir = project_input.project_dir
     memory_path = project_dir / "memory.md"
     task_text = project_input.task_text
@@ -521,7 +524,7 @@ def main() -> None:
         if lock_error:
             console.print(f"[red]{lock_error}[/red]")
             _print_run_lock_recovery_hint(console, root, project_dir)
-            return
+            raise SystemExit(_EXIT_STARTUP_ERROR)
         try:
             run_literature_survey_mode(
                 console=console,
@@ -561,7 +564,7 @@ def main() -> None:
         if lock_error:
             console.print(f"[red]{lock_error}[/red]")
             _print_run_lock_recovery_hint(console, root, project_dir)
-            return
+            raise SystemExit(_EXIT_STARTUP_ERROR)
         try:
             agents = build_mock_agents(topic_context=topic_context)
             run_iterative_rounds(
@@ -599,14 +602,14 @@ def main() -> None:
         if ollama_error:
             console.print(f"[red]{ollama_error}[/red]")
             console.print("[yellow]Start Ollama service, then retry.[/yellow]")
-            return
+            raise SystemExit(_EXIT_STARTUP_ERROR)
         if model_name not in installed_models:
             console.print(
                 f"[red]Model {model_name} is not installed. Run: ollama pull {model_name}[/red]"
             )
             if args.model is None and "llama3.1:8b" in installed_models:
                 console.print("[yellow]Suggestion: fallback available -> llama3.1:8b[/yellow]")
-            return
+            raise SystemExit(_EXIT_STARTUP_ERROR)
     elif provider == MODEL_PROVIDER_GEMINI:
         if not _has_gemini_api_key_source(
             api_key_env=gemini_api_key_env,
@@ -616,10 +619,10 @@ def main() -> None:
                 "[red]Gemini API key is missing. Set the configured environment variable, "
                 "GEMINI_API_KEY, or GOOGLE_API_KEY, then retry.[/red]"
             )
-            return
+            raise SystemExit(_EXIT_STARTUP_ERROR)
     else:
         console.print(f"[red]Unsupported model provider: {provider}[/red]")
-        return
+        raise SystemExit(_EXIT_STARTUP_ERROR)
 
     if args.cloud_free_discover:
         discovered, error = discover_free_cloud_models(
@@ -629,7 +632,7 @@ def main() -> None:
         )
         if error:
             console.print(f"[red]Cloud model discovery failed: {error}[/red]")
-            return
+            raise SystemExit(_EXIT_OPERATION_ERROR)
         artifact = save_discovery_artifact(project_dir, discovered)
         candidates = build_candidate_pool(
             discovered_models=discovered,
@@ -748,7 +751,7 @@ def main() -> None:
     if lock_error:
         console.print(f"[red]{lock_error}[/red]")
         _print_run_lock_recovery_hint(console, root, project_dir)
-        return
+        raise SystemExit(_EXIT_STARTUP_ERROR)
 
     try:
         llm = create_llm_client(

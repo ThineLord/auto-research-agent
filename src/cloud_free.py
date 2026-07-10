@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import random
 import re
 import time
@@ -824,20 +825,107 @@ def save_profile_artifact(project_dir: Path, profiles: Sequence[CloudModelProfil
     return path
 
 
+_MAX_CACHED_INTEGER = 2**63 - 1
+
+
+def _validated_cached_record(
+    item: Mapping[str, Any],
+    *,
+    string_fields: frozenset[str],
+    boolean_fields: frozenset[str],
+    optional_integer_fields: frozenset[str] = frozenset(),
+    optional_number_fields: frozenset[str] = frozenset(),
+    string_list_fields: frozenset[str] = frozenset(),
+) -> dict[str, Any] | None:
+    allowed_fields = (
+        string_fields
+        | boolean_fields
+        | optional_integer_fields
+        | optional_number_fields
+        | string_list_fields
+    )
+    values: dict[str, Any] = {}
+    for key, value in item.items():
+        if key not in allowed_fields:
+            continue
+        if key in string_fields:
+            if not isinstance(value, str):
+                return None
+        elif key in boolean_fields:
+            if not isinstance(value, bool):
+                return None
+        elif key in optional_integer_fields:
+            if value is not None:
+                if (
+                    isinstance(value, bool)
+                    or not isinstance(value, int)
+                    or value < 0
+                    or value > _MAX_CACHED_INTEGER
+                ):
+                    return None
+        elif key in optional_number_fields:
+            if value is not None:
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    return None
+                if isinstance(value, int) and abs(value) > _MAX_CACHED_INTEGER:
+                    return None
+                numeric_value = float(value)
+                if (
+                    not math.isfinite(numeric_value)
+                    or numeric_value < 0
+                    or numeric_value > _MAX_CACHED_INTEGER
+                ):
+                    return None
+        elif key in string_list_fields:
+            if not isinstance(value, list) or not all(isinstance(part, str) for part in value):
+                return None
+            value = tuple(value)
+        values[key] = value
+    model_id = values.get("model_id")
+    if not isinstance(model_id, str) or not model_id.strip():
+        return None
+    values["model_id"] = model_id.strip()
+    return values
+
+
 def load_profile_artifact(project_dir: Path) -> list[CloudModelProfile]:
     path = project_dir / "artifacts" / PROFILE_ARTIFACT_NAME
     if not path.exists():
         return []
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, ValueError, RecursionError):
         return []
     profiles = payload.get("profiles", []) if isinstance(payload, Mapping) else []
+    if not isinstance(profiles, list):
+        return []
     result: list[CloudModelProfile] = []
     for item in profiles:
         if isinstance(item, Mapping):
-            fields = {field.name for field in CloudModelProfile.__dataclass_fields__.values()}
-            result.append(CloudModelProfile(**{key: item.get(key) for key in fields}))
+            values = _validated_cached_record(
+                item,
+                string_fields=frozenset(
+                    {"model_id", "error_type", "error_message", "attempted_at"}
+                ),
+                boolean_fields=frozenset(
+                    {
+                        "reachable",
+                        "structured_output_works",
+                        "score_parsing_works",
+                        "rate_limited",
+                        "daily_quota_exhausted",
+                        "token_context_error",
+                        "safety_tool_billing_error",
+                        "safe_text_generation",
+                    }
+                ),
+                optional_integer_fields=frozenset(
+                    {"estimated_prompt_tokens", "estimated_output_tokens"}
+                ),
+                optional_number_fields=frozenset({"latency_seconds", "diagnostic_score"}),
+            )
+            if values is not None:
+                result.append(CloudModelProfile(**values))
     return result
 
 
@@ -847,14 +935,43 @@ def load_discovery_artifact(project_dir: Path) -> list[CloudModelInfo]:
         return []
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, ValueError, RecursionError):
         return []
     models = payload.get("models", []) if isinstance(payload, Mapping) else []
+    if not isinstance(models, list):
+        return []
     result: list[CloudModelInfo] = []
     for item in models:
         if isinstance(item, Mapping):
-            fields = {field.name for field in CloudModelInfo.__dataclass_fields__.values()}
-            result.append(CloudModelInfo(**{key: item.get(key) for key in fields}))
+            values = _validated_cached_record(
+                item,
+                string_fields=frozenset(
+                    {"model_id", "display_name", "description", "blocked_reason", "source"}
+                ),
+                boolean_fields=frozenset(
+                    {
+                        "appears_gemini",
+                        "appears_gemma",
+                        "appears_flash",
+                        "appears_flash_lite",
+                        "appears_pro",
+                        "appears_preview",
+                        "appears_live",
+                        "appears_tts",
+                        "appears_grounding",
+                        "appears_search",
+                        "appears_maps",
+                        "appears_tool",
+                        "appears_high_tpm",
+                        "safe_text_generation",
+                        "available",
+                    }
+                ),
+                optional_integer_fields=frozenset({"input_token_limit", "output_token_limit"}),
+                string_list_fields=frozenset({"supported_generation_methods"}),
+            )
+            if values is not None:
+                result.append(CloudModelInfo(**values))
     return result
 
 

@@ -227,17 +227,47 @@ model:
             root = Path(tmp)
             missing_path = root / "config.yaml"
             malformed_path = root / "malformed.yaml"
+            invalid_utf8_path = root / "invalid-utf8.yaml"
+            directory_path = root / "directory.yaml"
+            huge_number_path = root / "huge-number.yaml"
+            deep_yaml_path = root / "deep.yaml"
             malformed_path.write_text("model: [\n", encoding="utf-8")
+            invalid_utf8_path.write_bytes(b"\xff\xfe")
+            directory_path.mkdir()
+            huge_number_path.write_text("max_rounds: " + "9" * 5000, encoding="utf-8")
+            deep_yaml_path.write_text("value: " + "[" * 5000 + "]" * 5000, encoding="utf-8")
 
             with self.assertRaises(FileNotFoundError) as missing_context:
                 load_app_config(missing_path)
             with self.assertRaises(ConfigValidationError) as malformed_context:
                 load_app_config(malformed_path)
+            with self.assertRaises(ConfigValidationError) as invalid_utf8_context:
+                load_app_config(invalid_utf8_path)
+            with self.assertRaises(ConfigValidationError) as directory_context:
+                load_app_config(directory_path)
+            with self.assertRaises(ConfigValidationError) as huge_number_context:
+                load_app_config(huge_number_path)
+            with self.assertRaises(ConfigValidationError) as deep_yaml_context:
+                load_app_config(deep_yaml_path)
 
             self.assertIn("config.yaml", str(missing_context.exception))
             self.assertIn("malformed.yaml: failed to parse YAML", str(malformed_context.exception))
-            self.assertNotIn(str(root.resolve()), str(missing_context.exception))
-            self.assertNotIn(str(root.resolve()), str(malformed_context.exception))
+            self.assertIn(
+                "invalid-utf8.yaml: config file must be valid UTF-8",
+                str(invalid_utf8_context.exception),
+            )
+            self.assertIn(
+                "directory.yaml: config file could not be read", str(directory_context.exception)
+            )
+            for context in (
+                missing_context,
+                malformed_context,
+                invalid_utf8_context,
+                directory_context,
+                huge_number_context,
+                deep_yaml_context,
+            ):
+                self.assertNotIn(str(root.resolve()), str(context.exception))
 
     def test_rejects_unknown_keys_at_each_config_level(self) -> None:
         cases = [
