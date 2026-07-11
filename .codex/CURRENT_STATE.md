@@ -4,29 +4,34 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: make clean wheel and source-distribution installs retain the provider-free resources
-  needed by documented mock workflows without writing runtime state into `site-packages` (`ARA-004`).
+- Current goal: preserve the verified ARA-004 clean-install packaging fix and hand the repository
+  off from a pushed, CI-green, self-resolving recovery checkpoint.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `08994bee99f69399f88a24bb1d0f1e2d21d4c1b0` (the exact HEAD
+- State recorded against commit: `0aee55e1a48dab3d56f0475f789c2134c548ddc5` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `08994bee99f69399f88a24bb1d0f1e2d21d4c1b0` (exact local,
+- Last externally verified fallback: `0aee55e1a48dab3d56f0475f789c2134c548ddc5` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: ARA-004 is `IN_PROGRESS`; owner approval was received for the
-  45–90 minute resource/workspace implementation. KI-023 remains untouched, so build/install/mock
-  validation is restricted to temporary isolated workspaces.
+- Active task at this snapshot: none. ARA-004 is `DONE`; implementation commit `0aee55e` is pushed,
+  exact remote equality is verified, and push run `29148635379` plus PR run `29148637631` passed on
+  Python 3.10 and 3.13. ARA-022 is the next queued candidate but is a high-risk, greater-than-30-
+  minute filesystem-policy task and requires its own assessment/approval under `AGENTS.md`.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
-## Files Changed By The ARA-004 Start Snapshot
+## Files Changed By The Current ARA-004 Work Unit
 
-- `.codex/CURRENT_STATE.md`
-- `.codex/LAST_VALIDATION.json`
-- `.codex/KNOWN_ISSUES.md`
-- `.codex/RESUME_INSTRUCTIONS.md`
-- `.codex/TASK_QUEUE.md`
+- `pyproject.toml`
+- `src/_bundled/` (six explicit public resource copies)
+- `src/package_resources.py`
+- `src/cli.py`, `src/run_config.py`, `src/runner.py`, `src/diagnostic.py`, `src/resume.py`,
+  `src/session.py`
+- `tests/test_package_resources.py`, `tests/test_run_config.py`
+- `README.md`, `CHANGELOG.md`, `docs/DEVELOPER_GUIDE.md`
+- `.codex/CURRENT_STATE.md`, `.codex/LAST_VALIDATION.json`, `.codex/RESUME_INSTRUCTIONS.md`,
+  `.codex/TASK_QUEUE.md`, `.codex/KNOWN_ISSUES.md`, `.codex/DECISIONS.md`, `.codex/COMPLETED.md`
 
 ## Completed Steps
 
@@ -373,32 +378,81 @@ Updated: 2026-07-11 (Asia/Shanghai)
   workspaces remain empty.
 - Preserved KI-023 exactly as-is. Approval covers the packaging/resource implementation, not
   cleanup or reconstruction of ignored `projects/example` state.
+- Reproduced the installed failure before the fix in both neutral and foreign-Git temporary
+  workspaces: both subtests exited 2 because `config.example.yaml` was absent.
+- Added an exact six-file package-data allowlist, byte-parity regression, source/editable layout
+  compatibility, installed CWD workspace, bundled-prompt provenance, no-clobber default mock seed,
+  and explicit source Git-root separation.
+- Proved the installed mock path writes only its temporary workspace, does not create
+  `config.yaml`, ignores untrusted CWD prompt files, leaves copied package files unchanged, and
+  records no foreign workspace commit.
+- Passed focused package/config/CLI/mock/diagnostic/session/runner tests, Ruff lint, and
+  `git diff --check`.
+- Corrected two independent-review findings before commit: interrupted staging-file creation now
+  cleans up on `BaseException`, and final publication uses native no-replace primitives so a racing
+  target directory is never overwritten.
+- Passed final `make check` with Ruff, import smoke, repository-safety scans, and pytest (`246
+  passed, 172 subtests passed in 3.79s`).
+- Built wheel and sdist from the final worktree, verified their exact six-resource allowlists and
+  canonical bytes, installed both into isolated environments, and passed console/module help/mock
+  plus missing-config controls without source imports or package-directory writes.
+- Verified four installed mock runs recorded no foreign CWD Git commit and used the canonical
+  bundled prompts. A separate foreign-Git wheel smoke also retained a null run-config commit.
+- Repeated eight-way seed concurrency 50 times with exactly one publisher each time; Darwin's
+  native no-replace path was exercised locally, Linux ran in Python 3.10/3.13 CI, and Windows was
+  statically/mocked reviewed.
+- Committed the implementation as `0aee55e1a48dab3d56f0475f789c2134c548ddc5`, pushed it, verified
+  local/upstream/`ls-remote` equality with ahead/behind `0/0`, and confirmed both GitHub Actions
+  triggers passed every Python 3.10/3.13 job.
+- Kept all validation artifacts under `/tmp`; none were committed or uploaded. The temporary sdist
+  is explicitly not publication-ready because its tar headers expose the local builder owner/group
+  and generated metadata timestamps are not reproducible. Follow-up ARA-026 records that boundary.
 
 ## Remaining Steps
 
-- Revalidate the exact resource consumers and clean-artifact inventory without touching ignored
-  project state; add a failing isolated regression for the installed mock contract.
-- Implement the minimal package-resource and writable-workspace split while preserving source and
-  editable behavior, provider semantics, prompt bytes, versions, licenses, UI/scripts scope, and
-  all historical artifacts.
-- Run targeted tests, `make check`, source/editable controls, and clean wheel/sdist console/module
-  help/mock smokes; independently re-audit the artifact contents and write boundaries.
-- Commit and push only verified scoped files, verify exact remote SHA and Python 3.10/3.13 CI, and
-  update draft PR 13. Do not create recursive state-only closeouts.
+- No ARA-004 implementation or validation step remains.
+- On recovery, resolve semantic `HEAD`, worktree, upstream, `ls-remote`, and GitHub checks live. If
+  newer state-only evidence is unavailable, use verified implementation commit `0aee55e` as the
+  conservative fallback; do not create a recursive closeout merely to embed a commit's own SHA.
+- Do not publish the temporary sdist. ARA-026 owns deterministic/identity-neutral archive metadata,
+  and ARA-018 still blocks any public package release until the owner chooses a license policy.
+- Before starting ARA-022, provide its required high-risk, greater-than-30-minute assessment and
+  wait for approval. No lower-priority unblocked implementation task remains in the current queue.
 
 ## Test Status
 
-- ARA-004 pre-implementation evidence: clean wheel/sdist help controls passed and all four installed
-  mock controls exited 2 with missing `config.example.yaml`; no provider calls or neutral-workspace
-  artifacts. This evidence is being revalidated through safe temporary fixtures before changes.
-- Current ARA-004 implementation validation: pending.
+- ARA-004 pre-fix regression: two installed-layout subtests failed with status 2 and missing
+  `config.example.yaml`, covering neutral and unrelated-Git CWDs.
+- ARA-004 final package-resource suite: `9 passed, 8 subtests passed`; final combined package/
+  run-config/CLI/mock suite: `35 passed, 20 subtests passed`.
+- Related package, CLI, mock, run-config, diagnostic, session, and round-loop layers passed; the
+  run-config/round-loop result was `47 passed, 59 subtests passed`. Ruff and `git diff --check`
+  passed.
+- Final ARA-004 `make check`: Ruff formatted 56 files, lint/import/safety passed, and pytest passed
+  (`246 passed, 172 subtests passed in 3.79s`). The staged safety scan covered 99 tracked files with
+  zero findings.
+- The same full gate rerun after the recovery-state updates passed (`246 passed, 172 subtests passed
+  in 3.68s`; 99 tracked files and zero safety findings).
+- Final wheel SHA-256: `02462324be35135d2b875b4e6cd3d29ae06b71790ea65e55e72814260eb8050d`;
+  final sdist SHA-256: `3e5917f7b2e80be550a563b29a1ae856bc9a2e38488ccf793b5281d5f9d2afd4`.
+- Wheel/sdist isolated install matrix passed eight help/mock entrypoint controls, two expected
+  missing-config status-2 controls, exact RECORD verification, canonical resource-byte checks,
+  source/editable compatibility, no package-directory mutation, and no foreign Git provenance.
+- Independent artifact, compatibility, code, and adversarial reviews are GO for the code change.
+  Publication of the temporary sdist is NO-GO until ARA-026 normalizes owner/group and generated
+  timestamp metadata.
+- GitHub Actions at `0aee55e`: push run `29148635379` and pull-request run `29148637631` passed on
+  Python 3.10 and 3.13, including install, formatting, lint, imports, safety, and tests in all jobs.
+- Independent recovery-state review: GO after replacing truncated read commands with full-file
+  reads; all seven staged state files, task/issue identifiers, CI evidence, and NO-GO publication
+  boundary are consistent.
 - ARA-025 JSON parsing and semantic consistency assertions: passed; fixed argv resolves current
   `HEAD`, all legacy/fallback fields remain 40-hex, verified commit exists and is an ancestor, and
   recorded CI events/workflow/head/jobs match live GitHub evidence.
 - ARA-025 final `make check`: Ruff format passed (54 files), Ruff lint passed, imports passed, both
   safety scans passed, and pytest passed (`236 passed, 164 subtests passed in 2.70s`).
 - ARA-025 independent review: core design GO; its four final state-synchronization blockers were
-  corrected and require one final readback before commit.
+  corrected before the completed semantic snapshot, and no recursive closeout is required.
 - ARA-005 targeted stale-wording search: passed; no known-completed comparison, analytics,
   dashboard, drafting-mode, timing, or estimated-token item remains described as future work in the
   current-state quickstart roadmap.
@@ -658,11 +712,28 @@ Updated: 2026-07-11 (Asia/Shanghai)
   preserve them falsely; the three-way provenance source policy and repeated-resume regression fixed it.
 - Initial ARA-024 direct and runner-level regressions both failed because `start_round == 1` was the
   only session-append gate; these were expected pre-fix failures.
+- The ARA-004 pre-fix installed-layout regression failed in both neutral and unrelated-Git
+  workspaces with status 2 because `config.example.yaml` was absent; this was the expected defect
+  reproduction.
+- The first ARA-004 full `make check` stopped only at Ruff formatting for the new package-resource
+  module. Formatting was applied and the complete gate then passed.
+- Independent adversarial review first reproduced partial staging residue after an interrupt and
+  weak source-layout detection; the implementation and focused regressions corrected both.
+- A second review found that POSIX rename could replace a concurrently created empty target and
+  identified a cleanup-flag interruption window. Native no-replace publication and unconditional
+  owned-staging cleanup closed both before commit; final reviews were green.
+- The first isolated build emitted a setuptools package-data discovery warning. Setting
+  `include-package-data = false` and retaining the exact package-data allowlist removed implicit
+  discovery without broadening artifact contents.
+- Two clean `SOURCE_DATE_EPOCH=0` builds produced identical wheels but non-identical sdists because
+  generated directories/metadata retained build timestamps. The sdist tar headers also recorded
+  local owner/group identity; the artifact was kept in `/tmp` and was not uploaded.
 
 ## Next Command
 
 ```bash
-rg -n "repo_root|config.example|prompts|projects" src tests pyproject.toml
+git status --short --branch && git rev-parse --verify HEAD && git log --oneline -n 5
+cat .codex/CURRENT_STATE.md && cat .codex/TASK_QUEUE.md
 ```
 
 ## Interruption Recovery
@@ -678,6 +749,13 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - Do not widen the completed `ARA-021` checkpoint into project-level output/log symlink or active
   filesystem-swap policy; those remain `ARA-022`.
 - Keep ARA-023 scoped to manual-interrupt propagation, cooperative stop status, and the associated
-  lock lifecycle; wheel asset completeness remains separate `ARA-004` work.
+  lock lifecycle; the separately completed ARA-004 packaging behavior must not be folded into it.
 - Active non-cooperating filesystem replacement remains `ARA-022`.
+- Do not publish ARA-004's temporary sdist: its tar metadata contains the local builder owner/group
+  and generated timestamps are not reproducible. ARA-026 owns that release-hardening work.
+- A pip build review created one cache entry under the user's pip cache containing a pre-fix wheel.
+  It is not tracked and was not deleted because cleanup was not authorized; never treat it as a
+  release artifact.
+- ARA-022 changes the filesystem trust/write policy and is high risk. Follow `AGENTS.md`: provide a
+  dedicated greater-than-30-minute assessment and wait for approval before implementation.
 - Do not stage with `git add -A`; stage only reviewed paths.

@@ -18,8 +18,8 @@ Expected branch: `codex/sol-autonomous-hardening`.
 ## 2. Read the durable state
 
 ```bash
-sed -n '1,240p' .codex/CURRENT_STATE.md
-sed -n '1,320p' .codex/TASK_QUEUE.md
+cat .codex/CURRENT_STATE.md
+cat .codex/TASK_QUEUE.md
 cat .codex/LAST_VALIDATION.json
 ```
 
@@ -46,10 +46,14 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-ARA-004 is approved and `IN_PROGRESS`. Resume from the highest completed checkpoint recorded in
-`CURRENT_STATE.md`; do not repeat the original local harness. It imported the editable checkout and
-advanced ignored `projects/example` state after a missing build backend. Owner approval covers the
-packaging/resource fix but does not authorize cleanup or reuse of that ignored state.
+No implementation task is active. ARA-004 is `DONE` at implementation commit `0aee55e`; exact
+local/upstream/`ls-remote` equality and Python 3.10/3.13 push/PR CI are verified. Resolve semantic
+`HEAD` and current remote evidence live; if a later state-only commit lacks remote evidence, use
+`0aee55e1a48dab3d56f0475f789c2134c548ddc5` as the conservative stable fallback.
+
+Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
+it imported the editable checkout and advanced ignored `projects/example` state after a missing
+build backend. No cleanup or reuse of that ignored state was authorized.
 
 All ARA-004 build/install/module/console/mock validation must use temporary isolated workspaces with
 source-tree imports excluded. Never seed or run against the repository's actual `projects/example`.
@@ -62,16 +66,22 @@ The last successful local full validation command was:
 make check
 ```
 
-The pre-implementation expected result is Ruff/import/safety success and `236 passed, 164 subtests
-passed`; both safety modes should scan 91 tracked files with zero findings.
+The current full expected result is Ruff/import/safety success and `246 passed, 172 subtests
+passed`; the final focused ARA-004 package/run-config/CLI/mock layer passes `35 passed, 20 subtests
+passed`. Both safety modes should scan only tracked/staged files with zero findings.
 Resolve `HEAD`, compare it with upstream and `ls-remote`, and inspect current PR checks before
 starting another task. If the current HEAD lacks successful remote evidence, use
 `last_external_verification.commit` as the conservative stable fallback. Do not restart ARA-005.
 
-Read `KI-005`, `KI-013`, and `KI-023` before continuing ARA-004. Do not delete/rewrite ignored
-`projects/example` state, and do not widen packaging scope into versions, licenses, dependency
-policy, UI/scripts distribution, or ARA-022 filesystem-swap behavior.
-Active non-cooperating filesystem replacement remains ARA-022 and was not widened into ARA-020.
+Read `KI-023`, `KI-026`, and `KI-027` before any packaging/release follow-up. Do not delete/rewrite
+ignored `projects/example` state or the recorded pip-cache residue, and do not publish the temporary
+sdist. Versions, license, dependency policy, UI/scripts distribution, and active filesystem swaps
+remain separate tasks.
+
+ARA-022 is the next unblocked queue candidate, but it is a high-risk, greater-than-30-minute
+filesystem trust/write-policy change. Under `AGENTS.md`, provide a dedicated assessment with major
+subtasks/checkpoints and wait for approval before implementation. ARA-018 remains owner-blocked;
+ARA-019, ARA-026, ARA-006, and ARA-007 remain deferred under their recorded dependencies.
 
 ## 5. Safety boundaries
 
@@ -86,4 +96,5 @@ Active non-cooperating filesystem replacement remains ARA-022 and was not widene
 git status --short --branch && git diff --check && git log --oneline -n 5
 git rev-parse --verify HEAD
 .venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
+cat .codex/TASK_QUEUE.md
 ```

@@ -182,3 +182,25 @@
   when current remote evidence is absent.
 - Compatibility: no runtime code consumes these files; additive schema-v1 fields preserve unknown
   external readers that still require the legacy 40-hex values.
+
+## 2026-07-11 - Separate installed resources, writable workspace, and Git provenance
+
+- Decision: source/editable layouts continue using the repository root for resources and workspace;
+  non-editable installs use an exact six-file `src._bundled` read-only resource allowlist and the
+  invocation CWD as their writable workspace. Git provenance has a separate explicit root and is
+  disabled for installed layouts rather than inheriting an unrelated CWD repository.
+- Mock seed policy: only an installed, implicit default `example` mock may copy the bundled sample
+  task into an absent workspace project. Explicit, partial, custom, and non-mock selections are
+  never seeded or overwritten. Installed prompts always come from the bundled canonical copies;
+  local config/task precedence remains unchanged.
+- Publication policy: stage a complete hidden sibling, flush/fsync its file, then publish with an
+  operating-system no-replace primitive (`renamex_np` on Darwin, `renameat2` on Linux, `os.rename`
+  on Windows). Missing/unknown primitives fail closed; interrupts clean only owned staging paths.
+- Reason: wheel/sdist mock startup lacked repository-only resources, while using `site-packages` as
+  a writable root or trusting CWD prompts/Git state would create mutation and provenance hazards.
+- Compatibility boundary: UI/scripts distribution, dependencies, version, license, provider,
+  prompts' canonical bytes, scoring, schemas, experiment results, historical artifacts, and KI-023
+  ignored state are unchanged.
+- Release boundary: the validated temporary sdist is not publishable because its tar metadata
+  contains local owner/group identity and nondeterministic generated timestamps. ARA-026 owns that
+  follow-up; ARA-018 still requires the owner's license decision.

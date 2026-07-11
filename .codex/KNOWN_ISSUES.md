@@ -1,6 +1,6 @@
 # Known Issues
 
-Updated: 2026-07-10 (Asia/Shanghai)
+Updated: 2026-07-11 (Asia/Shanghai)
 
 ## KI-001 - Stale invalid `.git/REBASE_HEAD`
 
@@ -36,12 +36,13 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-005 - Non-editable package assets are not yet verified
 
-- Status: verified incomplete in both wheel and sdist; approved implementation in progress
+- Status: fixed, pushed, and CI-verified
 - Severity: P2
 - Evidence: the project declares only the `src` package while runtime workflows also reference repository assets and UI/scripts.
 - Impact: wheel-installed behavior may differ from editable or cloned-checkout behavior.
-- Current action: task `ARA-004`; implement the approved separation between installed read-only
-  resources and a writable workspace, using only temporary isolated validation workspaces.
+- Current action: task `ARA-004` completed at implementation commit `0aee55e`; exact six-resource
+  wheel/sdist inventories, isolated installs, and source/editable compatibility passed. UI/scripts
+  remain intentionally outside the packaged CLI scope.
 
 ## KI-006 - Legacy ignored logs can predate path masking
 
@@ -96,12 +97,12 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-013 - Wheel-installed mock workflow cannot find repository assets
 
-- Status: reproduced in isolated wheel and sdist installs; approved implementation in progress
+- Status: fixed, pushed, and CI-verified
 - Severity: P1 for packaged distribution
 - Impact: console help works, but mock startup cannot locate `config.example.yaml`; a source checkout works.
-- Current action: task `ARA-004`; bundle only required public read-only assets and keep installed
-  writable output outside `site-packages`. Do not advertise wheel readiness until clean-install
-  validation passes.
+- Current action: task `ARA-004` completed at implementation `0aee55e`; wheel and sdist console/
+  module mock smokes passed from isolated source-excluded workspaces without package writes or
+  foreign Git provenance. Public publication remains blocked separately by ARA-018 and ARA-026.
 
 ## KI-014 - Tracked reports contain a personal absolute-path fragment
 
@@ -117,7 +118,7 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Severity: P1 automation/release reliability
 - Impact: missing config/resources can print an error while returning status 0, allowing a smoke check to pass falsely.
 - Current action: task `ARA-017` completed at implementation commit `8845adf` and remotely verified
-  checkpoint `a513e4d`. Wheel asset completeness remains separate task `ARA-004`.
+  checkpoint `a513e4d`. Wheel asset completeness was completed separately by ARA-004 at `0aee55e`.
 
 ## KI-016 - Public distribution license is absent
 
@@ -201,3 +202,24 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Current action: task `ARA-025` completed; legacy exact SHA fields remain compatible while the
   authoritative semantic HEAD reference, live worktree source, and exact external-verification
   evidence prevent recursive closeout instructions.
+
+## KI-026 - Source-distribution metadata is not identity-neutral or reproducible
+
+- Status: confirmed during ARA-004 artifact validation; publication deferred
+- Severity: P2 release integrity/privacy
+- Impact: repeated `SOURCE_DATE_EPOCH=0` builds produced different sdists because generated
+  directories/metadata retained build timestamps, and tar headers recorded the local builder
+  owner/group. Publishing that archive would expose local identity and prevent byte-for-byte
+  reproduction.
+- Current action: task `ARA-026`; do not upload the temporary ARA-004 sdist. Normalize ownership and
+  generated timestamps through the supported build/release path, then verify two isolated builds.
+
+## KI-027 - A packaging audit left one untracked pip-cache wheel entry
+
+- Status: observed local environment residue; no cleanup authorized
+- Severity: P3 local hygiene
+- Impact: one cache directory under the user's pip cache contains a pre-fix wheel and origin
+  metadata. It is outside the repository, is not a canonical artifact, and could confuse a future
+  manual audit if mistaken for the final build.
+- Current action: leave untouched unless the owner authorizes cache cleanup; future validation must
+  build into fresh temporary directories and use the recorded final artifact hashes.

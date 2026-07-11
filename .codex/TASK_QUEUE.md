@@ -1,6 +1,6 @@
 # Codex Task Queue
 
-Updated: 2026-07-10 (Asia/Shanghai)
+Updated: 2026-07-11 (Asia/Shanghai)
 
 Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
@@ -42,17 +42,22 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-004 - Verify source distribution and wheel behavior from a clean install
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P1
 - Risk: medium
 - Description: a clean wheel-layout smoke can run `--help` but `--mock` cannot find `config.example.yaml`; verify and repair the install-time resource root without changing provider semantics.
 - Related files: `pyproject.toml`, `src/`, `prompts/`, `ui/`, `scripts/`, packaging docs
-- Acceptance criteria: exact wheel/sdist contents and clean-install smoke results are recorded; any missing assets have a reproducible test before a fix.
-- Validation command: isolated build/install smoke commands selected after checking available build tooling.
-- Commit required: only if a verified packaging defect is fixed.
-- Dependencies: `ARA-001`; owner approved the >30-minute resource/workspace implementation on
-  2026-07-11. No disposition was granted for the accidentally advanced ignored
-  `projects/example` state, so all validation must use temporary isolated workspaces.
+- Acceptance criteria: exact wheel/sdist contents and clean-install smoke results are recorded; the
+  documented mock workflow works from both artifacts without writing `site-packages`, importing the
+  source checkout, trusting CWD prompts, or recording unrelated Git provenance; source/editable
+  behavior and explicit project/config selection remain compatible.
+- Validation command: focused package/CLI/mock/run-config tests, `make check`, isolated wheel/sdist
+  console/module install smokes, exact archive/RECORD/resource checks, and concurrency/fault tests.
+- Commit required: yes; completed at implementation commit
+  `0aee55e1a48dab3d56f0475f789c2134c548ddc5`.
+- Dependencies: `ARA-001`; owner approved the >30-minute implementation on 2026-07-11. The final
+  code, artifacts, remote equality, and Python 3.10/3.13 push/PR checks passed. No disposition was
+  granted for KI-023 ignored state, which remained untouched.
 
 ## ARA-008 - Redact the configured provider credential from provider events
 
@@ -282,6 +287,24 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Validation command: local equivalent plus GitHub Actions on the maintenance PR.
 - Commit required: yes.
 - Dependencies: `ARA-004`, `ARA-006`, and `ARA-018` policy outcomes.
+
+## ARA-026 - Normalize public sdist ownership and generated timestamps
+
+- Status: `DEFERRED`
+- Priority: P2 for public artifact publication
+- Risk: medium
+- Description: two isolated `SOURCE_DATE_EPOCH=0` builds produced byte-identical wheels but
+  different sdists because setuptools stamped generated directories/metadata with build time; tar
+  headers also recorded the local builder account/group.
+- Related files: `pyproject.toml`, future release/build workflow, source-distribution validation
+- Acceptance criteria: two clean builds produce identical wheels and sdists; tar ownership is
+  normalized and contains no local account; normalization occurs in the supported build path rather
+  than a post-hoc archive rewrite that could invalidate metadata or signatures.
+- Validation command: two isolated no-network builds, archive metadata/content comparison, isolated
+  wheel/sdist install smoke, and repository/artifact safety scans.
+- Commit required: yes.
+- Dependencies: coordinate with ARA-018 and ARA-019 release policy; ARA-004 does not publish its
+  temporary sdist.
 
 ## ARA-005 - Align stale future-priority documentation with implemented features
 

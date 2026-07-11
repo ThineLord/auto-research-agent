@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T17:05:30+08:00",
+  "recorded_at": "2026-07-11T18:11:00+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "08994bee99f69399f88a24bb1d0f1e2d21d4c1b0",
-  "last_known_stable_commit": "08994bee99f69399f88a24bb1d0f1e2d21d4c1b0",
+  "head_commit": "0aee55e1a48dab3d56f0475f789c2134c548ddc5",
+  "last_known_stable_commit": "0aee55e1a48dab3d56f0475f789c2134c548ddc5",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "08994bee99f69399f88a24bb1d0f1e2d21d4c1b0",
+  "state_recorded_against_commit": "0aee55e1a48dab3d56f0475f789c2134c548ddc5",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-11T14:53:00+08:00",
-    "commit": "08994bee99f69399f88a24bb1d0f1e2d21d4c1b0",
+    "verified_at": "2026-07-11T18:00:48+08:00",
+    "commit": "0aee55e1a48dab3d56f0475f789c2134c548ddc5",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29143531240,
+        "run_id": 29148635379,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "08994bee99f69399f88a24bb1d0f1e2d21d4c1b0",
+        "head_sha": "0aee55e1a48dab3d56f0475f789c2134c548ddc5",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29143532623,
+        "run_id": 29148637631,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "08994bee99f69399f88a24bb1d0f1e2d21d4c1b0",
+        "head_sha": "0aee55e1a48dab3d56f0475f789c2134c548ddc5",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,174 @@
       }
     }
   },
-  "status": "ara004_approved_evidence_revalidation_in_progress",
+  "status": "ara004_complete_pushed_remote_equal_and_ci_verified",
   "commands": [
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_package_resources.py (pre-fix)",
+      "exit_code": 1,
+      "result": "expected_failure_reproduced",
+      "summary": {
+        "subtests_failed": 2,
+        "failure": "installed mock could not find config.example.yaml",
+        "neutral_and_foreign_git_workspaces": true
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_package_resources.py tests/test_run_config.py tests/test_cli_exit_codes.py tests/test_mock_run.py",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 35,
+        "pytest_subtests_passed": 20,
+        "package_resource_tests_passed": 9,
+        "package_resource_subtests_passed": 8
+      }
+    },
+    {
+      "command": "related diagnostic, session, runner, CLI, mock, and run-config regressions",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "package_resource_tests_passed": 9,
+        "package_resource_subtests_passed": 8,
+        "run_config_and_round_loop_tests_passed": 47,
+        "round_loop_subtests_passed": 59
+      }
+    },
+    {
+      "command": "make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 56,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "pytest_tests_passed": 246,
+        "pytest_subtests_passed": 172,
+        "pytest_duration_seconds": 3.79
+      }
+    },
+    {
+      "command": "isolated final wheel and rebuilt-from-sdist install matrix",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "wheel_sha256": "02462324be35135d2b875b4e6cd3d29ae06b71790ea65e55e72814260eb8050d",
+        "sdist_sha256": "3e5917f7b2e80be550a563b29a1ae856bc9a2e38488ccf793b5281d5f9d2afd4",
+        "bundled_resource_count": 6,
+        "canonical_resource_bytes": "passed",
+        "wheel_record_hashes_and_sizes": "passed",
+        "console_and_module_help_mock_controls": 8,
+        "expected_missing_config_status_2_controls": 2,
+        "source_checkout_import_excluded": true,
+        "site_packages_unchanged": true,
+        "foreign_git_commit_recorded": false
+      }
+    },
+    {
+      "command": "ARA-004 no-replace, interrupt, and concurrency adversarial validation",
+      "exit_code": 0,
+      "result": "passed_after_corrections",
+      "summary": {
+        "interrupt_cleanup": "passed",
+        "racing_empty_target_inode_preserved": true,
+        "concurrency_threads": 8,
+        "concurrency_repetitions": 50,
+        "exactly_one_publisher_each_repetition": true,
+        "darwin_native_branch": "passed",
+        "linux_branch": "passed_in_python_3_10_and_3_13_ci",
+        "windows_branch": "static_and_mocked_review"
+      }
+    },
+    {
+      "command": "artifact, code, compatibility, and adversarial independent reviews",
+      "exit_code": 0,
+      "result": "go_for_code_no_go_for_temporary_sdist_publication",
+      "summary": {
+        "blocking_code_findings_remaining": 0,
+        "temporary_sdist_local_owner_metadata": true,
+        "temporary_artifacts_committed_or_uploaded": false,
+        "follow_up_task": "ARA-026"
+      }
+    },
+    {
+      "command": "git commit -m fix: make installed mock packages self-contained",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "implementation_commit": "0aee55e1a48dab3d56f0475f789c2134c548ddc5"
+      }
+    },
+    {
+      "command": "push plus exact local, remote-tracking, and ls-remote comparison",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "0aee55e1a48dab3d56f0475f789c2134c548ddc5",
+        "ahead": 0,
+        "behind": 0
+      }
+    },
+    {
+      "command": "GitHub Actions push and pull-request run/job verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "push_run_id": 29148635379,
+        "pull_request_run_id": 29148637631,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "install_format_lint_import_safety_test_steps": "passed_in_all_four_jobs"
+      }
+    },
+    {
+      "command": "Ruff focused lint, git diff --check, and staged repository safety scan",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_lint": "passed",
+        "diff_check": "passed",
+        "staged_tracked_files_scanned": 99,
+        "findings": 0
+      }
+    },
+    {
+      "command": "make check after ARA-004 recovery-state updates",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 56,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 99,
+        "findings": 0,
+        "pytest_tests_passed": 246,
+        "pytest_subtests_passed": 172,
+        "pytest_duration_seconds": 3.68
+      }
+    },
+    {
+      "command": "independent ARA-004 recovery-state consistency review",
+      "exit_code": 0,
+      "result": "passed_after_recovery_command_correction",
+      "summary": {
+        "blocking_findings_remaining": 0,
+        "staged_target_files": 7,
+        "ara004_status": "DONE",
+        "ci_evidence_reverified_live": true,
+        "task_and_issue_identifiers_unique": true,
+        "full_state_read_commands": true,
+        "temporary_sdist_publication_boundary": "NO-GO"
+      }
+    },
     {
       "command": "ARA-025 recovery-state semantic consistency assertions",
       "exit_code": 0,
@@ -263,6 +429,46 @@
   ],
   "failures": [
     {
+      "command": ".venv/bin/python -m pytest -q tests/test_package_resources.py (pre-fix)",
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "subtests_failed": 2,
+        "cause": "installed neutral and foreign-Git mock workspaces could not find config.example.yaml"
+      }
+    },
+    {
+      "command": "first ARA-004 make check",
+      "result": "corrected_before_commit",
+      "summary": {
+        "cause": "Ruff formatting required for src/package_resources.py",
+        "behavioral_test_failure": false
+      }
+    },
+    {
+      "command": "two rounds of independent ARA-004 adversarial review",
+      "result": "corrected_before_commit",
+      "summary": {
+        "findings": [
+          "interrupt could leave partial staging residue",
+          "source layout detection accepted insufficient markers",
+          "POSIX rename could replace a racing empty target",
+          "cleanup ownership flag had an interruption window"
+        ],
+        "blocking_findings_remaining": 0
+      }
+    },
+    {
+      "command": "two isolated SOURCE_DATE_EPOCH=0 artifact builds",
+      "result": "follow_up_required_before_publication",
+      "summary": {
+        "wheels_byte_identical": true,
+        "sdists_byte_identical": false,
+        "sdist_local_owner_group_metadata": true,
+        "temporary_sdist_published": false,
+        "follow_up_task": "ARA-026"
+      }
+    },
+    {
       "command": "initial independent final documentation review",
       "result": "corrected_before_commit",
       "summary": {
@@ -282,20 +488,29 @@
   "not_run": [
     {
       "check": "real provider smoke",
-      "reason": "Documentation-only alignment changed no provider or runtime behavior."
+      "reason": "ARA-004 is a provider-free package-resource and mock-workflow change; isolated mock, source, wheel, and sdist controls exercise the affected behavior without credentials or cost."
     },
     {
-      "check": "native Python 3.10",
-      "reason": "Local runtime is Python 3.13.14; Python 3.10 passed in GitHub Actions after push."
+      "check": "native Windows no-replace integration",
+      "reason": "No native Windows runner was available; Windows target-exists semantics received static/mocked review, while Darwin ran locally and Linux ran in Python 3.10/3.13 GitHub Actions."
+    },
+    {
+      "check": "public artifact upload",
+      "reason": "The temporary sdist contains local owner/group metadata and nondeterministic generated timestamps; ARA-018 license policy and ARA-026 archive normalization remain unresolved."
     }
   ],
   "notes": [
     "Owner approved the 45-90 minute ARA-004 package-resource and writable-workspace implementation on 2026-07-11.",
-    "KI-023 remains untouched; all ARA-004 build/install/mock validation must use temporary isolated workspaces and exclude source-tree imports.",
+    "KI-023 remained untouched; all ARA-004 build/install/mock validation used temporary isolated workspaces and excluded source-tree imports.",
     "ARA-025 uses an additive schema-v1 semantic HEAD reference and never requires a recursive state-only closeout.",
-    "Current worktree, branch, upstream, remote, and CI state must be resolved live; 3fa33a7 remains the exact conservative externally verified fallback.",
-    "Current quickstart wording now distinguishes implemented basic analytics/comparison from advanced research evaluation gaps.",
-    "README, CHANGELOG, and dated historical audit/gap reports were intentionally unchanged.",
+    "Current worktree, branch, upstream, remote, and CI state must be resolved live; 0aee55e is the exact conservative externally verified fallback for this snapshot.",
+    "ARA-004 implementation 0aee55e is pushed, remote-equal, CI-verified, and reflected in draft PR 13.",
+    "The installed runtime uses package resources read-only, the invocation CWD as workspace, and no foreign CWD Git provenance.",
+    "Only an implicit installed mock default may seed the bundled example task; explicit, partial, custom, and non-mock paths do not seed or overwrite.",
+    "Temporary final artifacts remain under /tmp and were not committed or uploaded; their hashes are recorded above.",
+    "One pre-fix wheel cache entry remains outside the repository under the user pip cache and was not deleted without authorization.",
+    "ARA-005 quickstart wording distinguishes implemented basic analytics/comparison from advanced research evaluation gaps.",
+    "ARA-005 kept README, CHANGELOG, and dated historical audit/gap reports unchanged; ARA-004 later updated README and CHANGELOG for packaging behavior.",
     "ARA-005 implementation 15d9935, recovery checkpoint 6b59091, and closeout 3fa33a7 are pushed, remotely verified, and reflected in draft PR 13.",
     "A resume-existing lifecycle appends a session even when its next round is 1.",
     "A genuinely new round-1 run keeps an empty resume_sessions list.",

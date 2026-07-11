@@ -332,3 +332,32 @@ Validation and implementation outcomes will be appended only after they are actu
   `make check` passed (`236 passed, 164 subtests passed`; 91 tracked files, zero safety findings).
 - Independent design review approved the additive model and identified four final synchronization
   blockers; all were corrected before the semantic snapshot commit.
+
+## 2026-07-11 - Self-contained installed mock package resources
+
+- Reproduced clean wheel and sdist mock startup failing with status 2 because repository-only
+  `config.example.yaml` was unavailable in both neutral and unrelated-Git temporary workspaces.
+- Added an exact six-file package-data allowlist, byte-identical canonical config/prompt/example-task
+  resources, and explicit source/editable versus installed runtime-layout detection.
+- Kept installed resources read-only, placed runtime state in the invocation workspace, prevented
+  CWD prompt trust and foreign Git provenance, and preserved explicit/partial/custom selection
+  semantics without creating `config.yaml`.
+- Made implicit installed-mock sample seeding interruption-safe and race-safe with same-parent
+  staging, flush/fsync, native atomic no-replace publication, fail-closed platform behavior, and
+  owned-staging cleanup. Eight-way concurrency produced exactly one publisher in 50 repetitions.
+- Added package-resource, CLI, mock, run-config, diagnostic, session, runner, byte-parity,
+  no-clobber, fault-injection, concurrency, foreign-Git, and source/editable compatibility tests.
+- Final `make check` passed with Ruff, imports, both repository-safety modes, and pytest (`246
+  passed, 172 subtests passed in 3.79s`; staged safety scanned 99 tracked files with zero findings).
+- Built and independently audited final wheel/sdist contents and RECORD; installed both into fresh
+  source-excluded environments and passed console/module help/mock plus missing-config controls
+  without mutating package files. Final wheel SHA-256 is
+  `02462324be35135d2b875b4e6cd3d29ae06b71790ea65e55e72814260eb8050d`; final sdist SHA-256 is
+  `3e5917f7b2e80be550a563b29a1ae856bc9a2e38488ccf793b5281d5f9d2afd4`.
+- Independent artifact, code, compatibility, and adversarial reviews reported GO after correcting
+  interrupted staging residue, source detection, POSIX target replacement, and cleanup-window
+  findings. The temporary sdist was not published because tar owner/group and generated timestamps
+  require ARA-026 release hardening.
+- Committed implementation as `0aee55e`, pushed it, verified exact local/upstream/`ls-remote`
+  equality with ahead/behind `0/0`, and confirmed push run `29148635379` plus pull-request run
+  `29148637631` passed every Python 3.10/3.13 job. Draft PR 13 remains the maintenance PR.
