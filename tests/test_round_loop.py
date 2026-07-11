@@ -362,6 +362,22 @@ class InvalidScoreAgents(FakeAgents):
         return "Judge completed without a numeric score."
 
 
+class UnrepresentableJudgeAgents(FakeAgents):
+    def judge(self, *, task: str, memory: str, revised_output: str) -> str:
+        return json.dumps(
+            {
+                "score": 10**400,
+                "rubric": {
+                    "evaluation_design_quality": 10**400,
+                    "tomorrow_actionability": 12,
+                },
+                "reasons": ["Unrepresentable score fixture."],
+                "blockers": [],
+                "next_step": "STOP",
+            }
+        )
+
+
 class RoundLoopTests(unittest.TestCase):
     def test_main_reexports_backward_compatible_api(self) -> None:
         self.assertIs(main_module.run_iterative_rounds, run_iterative_rounds)
@@ -897,6 +913,43 @@ class RoundLoopTests(unittest.TestCase):
             self.assertTrue(score_history[0]["invalid_score_this_round"])
             self.assertFalse(score_history[0]["successful_research_round"])
             self.assertFalse(score_history[0]["improved"])
+            self.assertEqual(result["best_output"], "Trusted prior best.")
+            self.assertEqual(best_output_path.read_text(encoding="utf-8"), "Trusted prior best.\n")
+
+    def test_unrepresentable_judge_numbers_follow_invalid_score_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            best_output_path = project_dir / "best_output.md"
+            best_output_path.write_text("Trusted prior best.\n", encoding="utf-8")
+
+            result = run_iterative_rounds(
+                console=Console(),
+                agents=UnrepresentableJudgeAgents(),
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="normal",
+                model_name="fake-model",
+                max_rounds=1,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+            )
+            round_metrics = json.loads(
+                (Path(result["run_root"]) / "round_metrics.json").read_text(encoding="utf-8")
+            )
+
+            self.assertEqual(result["stop_reason"], STOP_INVALID_SCORE)
+            self.assertTrue(round_metrics[0]["invalid_score_this_round"])
+            self.assertFalse(round_metrics[0]["successful_research_round"])
+            self.assertFalse(round_metrics[0]["improved"])
+            self.assertEqual(
+                round_metrics[0]["judge_rubric"],
+                {"tomorrow_actionability": 12.0},
+            )
             self.assertEqual(result["best_output"], "Trusted prior best.")
             self.assertEqual(best_output_path.read_text(encoding="utf-8"), "Trusted prior best.\n")
 

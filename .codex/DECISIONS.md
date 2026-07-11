@@ -315,3 +315,18 @@
   path would silently alter historical report values.
 - Scope: analysis/comparison API, JSON writer, and CLI paths are covered without changing global JSON
   serialization, providers, prompts, scoring, generated artifacts, experiments, or research claims.
+
+## 2026-07-12 - Treat unrepresentable Judge numbers as invalid output
+
+- Decision: contain numeric conversion `TypeError`/`ValueError`/`OverflowError` at the shared Judge
+  score/rubric coercion boundary. Treat a plain JSON-decoder `ValueError`, including Python 3.11+
+  integer digit-limit failures, the same as malformed structured JSON at both parse entrypoints.
+- Reason: a provider-returned large numeric literal could escape the parser after round artifacts
+  were saved, producing a traceback instead of the existing invalid-score stop and compatibility
+  fallbacks.
+- Compatibility: boolean/non-finite values remain invalid, finite numeric strings remain accepted,
+  out-of-range finite values remain clamped to 0..100, invalid structured scores may still fall back
+  to a legacy `SCORE:` line, and invalid rubric fields are omitted independently. The raw payload API
+  remains raw for successfully parsed JSON.
+- Scope: no schema, prompt, provider, score threshold, runner control, artifact interpretation,
+  experiment result, or historical conclusion changes.

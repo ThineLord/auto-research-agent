@@ -40,6 +40,10 @@
 
 ### Fixed
 
+* Structured Judge scores and rubric values that cannot be represented as floats, including numeric
+  literals beyond Python's JSON integer digit limit, now follow existing invalid-output handling
+  instead of raising a traceback. Valid numeric strings, clamping, legacy `SCORE:` fallback, valid
+  rubric siblings, and the raw payload API remain compatible.
 * Provider-free analysis and comparison now tolerate malformed, non-finite, and unrepresentably
   large legacy timing, token, evolution, rubric, and per-agent metric values without traceback or
   non-standard JSON. Unrepresentable elapsed totals and deltas become unavailable, representable

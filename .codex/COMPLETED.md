@@ -504,3 +504,24 @@ Validation and implementation outcomes will be appended only after they are actu
   tracked files and zero findings.
 - One independent review found a non-Mapping agent leaf traceback; it received direct/CLI coverage
   and a minimal empty-mapping fallback. Both final independent reviews returned GO.
+- Committed as `a99723c`, pushed with exact local/upstream/`ls-remote` equality, updated draft PR
+  13, and confirmed push run `29164052624` plus pull-request run `29164053862` passed every Python
+  3.10/3.13 job.
+
+## 2026-07-12 - Unrepresentable structured Judge numbers
+
+- Reproduced a 400-digit structured Judge score raising `OverflowError` after Judge output was saved
+  but before the runner could enter its existing invalid-score path; rubric coercion had the same
+  conversion gap.
+- Added parser coverage proving an invalid structured score still permits the existing trailing
+  legacy `SCORE:` fallback and invalid rubric entries are omitted without losing valid siblings.
+- Caught conversion `TypeError`/`ValueError`/`OverflowError` at the shared score/rubric coercion
+  boundary while preserving boolean/non-finite rejection, finite numeric strings, and 0..100 clamp.
+- Reproduced Python 3.11+ `json.loads` raising plain `ValueError` for a 5000-digit numeric literal;
+  both structured score and payload/rubric parse entrypoints now treat that as invalid JSON. Python
+  3.10 parses the integer and is covered by the float-overflow boundary.
+- Added a real round-loop control proving the run stops with `INVALID_SCORE`, preserves trusted best
+  output, records an invalid unsuccessful round, and retains the valid rubric sibling.
+- Related Judge/round-loop tests passed `52 passed, 75 subtests passed`; local `make check` passed
+  `323 passed, 201 subtests passed` with 100 tracked files and zero findings. Independent final
+  review returned GO.

@@ -279,7 +279,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-036 - Reject unrepresentable Judge numeric fields without crashing
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P1
 - Risk: low
 - Description: a structured Judge score or rubric integer such as `10**400` raises uncaught
@@ -288,8 +288,9 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Acceptance criteria: unrepresentable score/rubric values are rejected like other invalid or
   non-finite values; valid JSON and legacy score parsing remain unchanged; no round/process
   traceback is introduced.
-- Validation command: focused Judge parser and round-loop invalid-score regressions followed by
-  `make check`.
+- Validation command: focused Judge parser and round-loop invalid-score regressions, related Judge/
+  round-loop tests (`52 passed, 75 subtests passed`), then `make check` (`323 passed, 201 subtests
+  passed`).
 - Commit required: yes.
 - Dependencies: keep separate from ARA-035 metric artifact aggregation.
 

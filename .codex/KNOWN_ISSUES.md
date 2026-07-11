@@ -275,22 +275,24 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-035 - Legacy non-score metrics can overflow or emit non-standard JSON
 
-- Status: fixed and locally validated in the semantic current `HEAD`; resolve publication/CI live
+- Status: fixed, pushed, and CI-verified
 - Severity: P1 report/data correctness
 - Impact: malformed or extreme timings, evolution metrics, rubric values, and counters can emit
   `NaN`/`Infinity` under status 0 or raise provider-free `OverflowError` tracebacks.
-- Current action: ARA-035 now filters malformed/non-finite values, marks unrepresentable elapsed
-  totals/deltas unavailable, preserves representable extreme averages, normalizes raw legacy rubric
-  averages, and has real analysis/comparison CLI strict-JSON coverage. Full local validation and two
-  final reviews passed; verify semantic current `HEAD` remotely after recovery.
+- Current action: ARA-035 completed at `a99723c`; exact push/PR runs
+  `29164052624`/`29164053862` passed Python 3.10/3.13. Finite coercion, overflow-safe aggregates,
+  raw rubric normalization, malformed agent leaves, and strict analysis/comparison output are fixed.
 
 ## KI-036 - Unrepresentable Judge numbers raise during parsing
 
-- Status: confirmed; queued as ARA-036
+- Status: fixed and locally validated in the semantic current `HEAD`; resolve publication/CI live
 - Severity: P1 run reliability
 - Impact: structured Judge score/rubric integers outside float range raise `OverflowError` instead of
   following invalid-output handling.
-- Current action: harden score/rubric coercion and add parser plus round-loop controls.
+- Current action: ARA-036 now contains float conversion overflow and JSON integer digit-limit
+  errors, preserves valid sibling rubric fields, and follows the existing invalid-score runner path.
+  Parser/round-loop, full local validation, and independent final review passed; verify semantic
+  current `HEAD` remotely after recovery.
 
 ## KI-037 - Survey interrupt bypasses the status-130 contract
 

@@ -4,20 +4,20 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: retain the completed, locally validated ARA-035 strict legacy-metric boundary and
-  continue next with the isolated ARA-036 Judge numeric coercion task after live recovery checks.
+- Current goal: retain the completed, locally validated ARA-036 Judge numeric boundary and continue
+  next with the isolated ARA-037 survey interrupt status contract after live recovery checks.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `bdbd9d548823dab95d25114a3f6e43e4393c4396` (the exact HEAD
+- State recorded against commit: `a99723c2a6d492faa8935bc0aa24b1e06cea6de2` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `bdbd9d548823dab95d25114a3f6e43e4393c4396` (exact local,
+- Last externally verified fallback: `a99723c2a6d492faa8935bc0aa24b1e06cea6de2` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-035 is `DONE` with focused, related, broad regression,
-  full-gate, and two independent final review results passing locally. ARA-036 is the next
-  unblocked P1 task. The exact external fallback remains ARA-034 commit `bdbd9d5`; resolve the
-  semantic current `HEAD`, remote, and CI state live.
+- Active task at this snapshot: none. ARA-036 is `DONE` with parser/round-loop, related, full-gate,
+  and independent final review results passing locally. ARA-037 is the next unblocked P2 task. The
+  exact external fallback remains ARA-035 commit `a99723c`; resolve the semantic current `HEAD`,
+  remote, and CI state live.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -481,9 +481,8 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Remaining Steps
 
-- Start ARA-036 with focused Judge parser and invalid-round reproductions for unrepresentable
-  structured numeric fields; keep parser semantics isolated from the completed legacy metric
-  aggregation boundary.
+- Start ARA-037 with survey interrupt unit/subprocess controls; preserve lock release and normalize
+  the manual-interrupt exit to the existing status-130 contract without widening survey behavior.
 - Continue with the highest-priority queued P2 after ARA-036 unless newly confirmed evidence changes
   the ordering.
 - Keep ARA-018, ARA-029, and ARA-030 behind their recorded owner/configuration/long-task approval
@@ -491,6 +490,15 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Test Status
 
+- ARA-036 focused parser/round-loop and related regression passed `52 passed, 75 subtests passed`;
+  local `make check` passed Ruff format/lint, imports, both repository-safety modes, and pytest (`323
+  passed, 201 subtests passed`; 100 tracked files and zero findings).
+- Independent ARA-036 final review returned GO after checking 400-digit float overflow, 5000-digit
+  JSON decoder limits on Python 3.11+, Python 3.10 fallback behavior, valid numeric strings,
+  finite/clamp semantics, legacy score fallback, valid rubric siblings, and raw payload compatibility.
+- ARA-035 remote verification: exact local/upstream/`ls-remote` equality at `a99723c`, ahead/behind
+  `0/0`; push run `29164052624` and pull-request run `29164053862` passed Python 3.10/3.13. Draft
+  PR 13 is open, mergeable, and updated.
 - ARA-035 focused strict-JSON metric/API/CLI regression passed `59 passed, 20 subtests passed`;
   broader runner/diagnostic/UI regression passed `172 passed, 116 subtests passed`.
 - ARA-035 local `make check` passed Ruff format/lint, imports, repository-safety self-test,

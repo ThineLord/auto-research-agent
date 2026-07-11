@@ -39,6 +39,35 @@ class JudgeOutputTests(unittest.TestCase):
         self.assertEqual(parse_judge_payload(judge_text), {})
         self.assertEqual(parse_judge_rubric(judge_text), {})
 
+    def test_unrepresentable_structured_numbers_are_invalid_without_crashing(self) -> None:
+        judge_text = f"""
+{{
+  "score": {10**400},
+  "rubric": {{
+    "evaluation_design_quality": {10**400},
+    "tomorrow_actionability": "12.5",
+    "non_finite": "Infinity"
+  }},
+  "reasons": [],
+  "blockers": [],
+  "next_step": "STOP"
+}}
+SCORE: 71
+"""
+
+        self.assertEqual(parse_judge_score(judge_text), 71.0)
+        self.assertEqual(
+            parse_judge_rubric(judge_text),
+            {"tomorrow_actionability": 12.5},
+        )
+
+        structured_only = judge_text.rsplit("SCORE: 71", maxsplit=1)[0]
+        self.assertIsNone(parse_judge_score(structured_only))
+
+        oversized_json_number = '{"score":' + ("9" * 5000) + ',"rubric":{}}'
+        self.assertIsNone(parse_judge_score(oversized_json_number))
+        self.assertEqual(parse_judge_rubric(oversized_json_number), {})
+
 
 if __name__ == "__main__":
     unittest.main()
