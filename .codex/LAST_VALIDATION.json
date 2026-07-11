@@ -1,34 +1,18 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T03:32:34+08:00",
+  "recorded_at": "2026-07-11T12:41:42+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "89e95bf861f1ba501cf0d002e4210597b1526344",
-  "last_known_stable_commit": "89e95bf861f1ba501cf0d002e4210597b1526344",
-  "status": "packaging_defect_reproduced_blocked_before_implementation",
+  "head_commit": "2b6523cda3d7a7943644692e276b6fdc7270573c",
+  "last_known_stable_commit": "2b6523cda3d7a7943644692e276b6fdc7270573c",
+  "status": "ara016_implementation_committed_pending_remote_verification",
   "commands": [
     {
-      "command": "isolated PEP 517 wheel and sdist build plus exact archive inventory",
+      "command": ".venv/bin/python -m pytest -q tests/test_repo_safety.py",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "wheel_files": 31,
-        "sdist_files": 57,
-        "config_example_in_both": false,
-        "prompt_files_in_both": 0,
-        "example_project_in_both": false,
-        "ui_and_scripts_in_both": false
-      }
-    },
-    {
-      "command": "isolated wheel/sdist console and module help/mock smoke matrix",
-      "exit_code": 0,
-      "result": "defect_reproduced",
-      "summary": {
-        "help_controls_exit": 0,
-        "mock_controls_exit": 2,
-        "mock_error": "Config file not found: config.example.yaml",
-        "provider_calls": 0,
-        "neutral_workspace_artifacts": 0
+        "pytest_tests_passed": 11,
+        "pytest_duration_seconds": 0.23
       }
     },
     {
@@ -36,124 +20,93 @@
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "ruff_format_files": 52,
+        "ruff_format_files": 54,
         "ruff_lint": "passed",
         "import_smoke": "passed",
-        "pytest_tests_passed": 206,
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "pytest_tests_passed": 217,
         "pytest_subtests_passed": 134,
-        "pytest_duration_seconds": 2.18
+        "pytest_duration_seconds": 2.55
       }
     },
     {
-      "command": ".venv/bin/python -m pytest -q tests/test_llm.py tests/test_cloud_free.py tests/test_config.py",
+      "command": "repository safety worktree and staged scans",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "pytest_tests_passed": 46,
-        "pytest_subtests_passed": 44,
-        "pytest_duration_seconds": 0.66
+        "tracked_files_scanned": 91,
+        "findings": 0,
+        "binary_or_nul_files": 0,
+        "gitlinks_skipped": 0,
+        "ignored_files_enumerated": false
       }
     },
     {
-      "command": "provider-free google-genai 2.7.0 Client construction smoke",
-      "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "configured_timeout_seconds": 37,
-        "sdk_timeout_milliseconds": 37000,
-        "network_request_made": false
-      }
-    },
-    {
-      "command": "independent SDK, compatibility, and final delta-only reviews",
-      "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "credential_branches": "passed",
-        "generation_semantics": "unchanged",
-        "retry_policy": "unchanged",
-        "timeout_false_positive_regressions": "passed",
-        "final_delta_review": "green"
-      }
-    },
-    {
-      "command": "git diff --check, staged diff check, and scoped staged path/key/private-key scan",
+      "command": "Python 3.10 AST parse for scanner and focused tests",
       "exit_code": 0,
       "result": "passed"
     },
     {
-      "command": "exact local, remote-tracking, and git ls-remote SHA comparison",
+      "command": "git diff --check and staged diff check",
       "exit_code": 0,
-      "result": "passed",
+      "result": "passed"
+    },
+    {
+      "command": "independent pattern, test-design, symlink-boundary, and final quality reviews",
+      "exit_code": 0,
+      "result": "passed_after_corrections",
       "summary": {
-        "verified_commit": "e202dfb90c2e5b5d2c4fa164f450244fbd06e21b"
+        "confirmed_initial_report_hits": 4,
+        "parent_link_external_read": "fixed",
+        "unsupported_platform_swap_race": "fixed_by_fail_closed_policy",
+        "historical_evidence_wording": "corrected",
+        "final_release_blockers": 0
       }
     },
     {
-      "command": "gh pr view/checks 13 --repo ThineLord/auto-research-agent",
+      "command": "git commit -m security: add tracked repository safety gate",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "python_3_10_push": "passed",
-        "python_3_13_push": "passed",
-        "python_3_10_pull_request": "passed",
-        "python_3_13_pull_request": "passed",
-        "draft": true,
-        "mergeable": true,
-        "body_verified": true
-      }
-    },
-    {
-      "command": "exact SHA and GitHub Actions verification for ARA-004 audit checkpoint",
-      "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "verified_commit": "89e95bf861f1ba501cf0d002e4210597b1526344",
-        "python_3_10_push": "passed",
-        "python_3_13_push": "passed",
-        "python_3_10_pull_request": "passed",
-        "python_3_13_pull_request": "passed",
-        "pr_body_verified": true
+        "implementation_commit": "2b6523cda3d7a7943644692e276b6fdc7270573c"
       }
     }
   ],
   "failures": [
     {
-      "command": "initial local ARA-004 build/install harness",
-      "result": "harness_failed_and_touched_ignored_example_state",
-      "summary": {
-        "missing_build_backend": "setuptools",
-        "editable_source_imported": true,
-        "deterministic_run_id": "20260711_031915_776385",
-        "provider_calls": 0,
-        "tracked_files_changed": 0,
-        "cleanup_attempted": false
-      }
+      "command": "initial focused scanner import control",
+      "result": "expected_preimplementation_failure"
+    },
+    {
+      "command": "initial full staged-index scan",
+      "result": "expected_four_report_findings_before_redaction"
+    },
+    {
+      "command": "independent parent-directory link reproduction",
+      "result": "external_read_reproduced_then_fixed"
+    },
+    {
+      "command": "independent unsupported-platform fallback audit",
+      "result": "swap_race_reproduced_then_fallback_removed"
     }
   ],
   "not_run": [
     {
-      "check": "ARA-004 implementation, artifact regression, and post-fix full gate",
-      "reason": "The verified safe fix exceeds the 30-minute checkpoint threshold and requires owner approval; implementation has not started."
+      "check": "native Python 3.10 execution and GitHub Actions matrix",
+      "reason": "Python 3.10 is unavailable locally; the remote push and CI matrix are pending."
     },
     {
       "check": "real provider smoke",
-      "reason": "Package-resource and provider-free mock behavior require no paid or network model call."
+      "reason": "The change is provider-free repository validation and report redaction only."
     }
   ],
   "notes": [
-    "Both clean artifacts omit config.example.yaml, all four prompts, the example project, UI, and scripts.",
-    "Installed CLI root resolution points at site-packages, so adding loose data files alone would still make writable project output target the package installation.",
-    "The scoped safe design is package-internal public assets plus importlib.resources, CWD as installed workspace, and mock-only example seeding while source/editable behavior remains unchanged.",
-    "The initial local harness incident touched only ignored projects/example state; no cleanup or speculative reconstruction was attempted.",
-    "Audit checkpoint 89e95bf861f1ba501cf0d002e4210597b1526344 was pushed, its PR body was updated, and all four Python 3.10/3.13 push/pull-request jobs passed.",
-    "The installed google-genai 2.7.0 public Client accepts http_options.timeout in milliseconds; 37 configured seconds produced 37000 without a request.",
-    "All explicit-key, custom-environment, and SDK-default credential paths now pass the same transport timeout while preserving generation settings.",
-    "Timeout classification uses concrete timeout base types, explicit timed-out wording, and HTTP 408/504; misleading option text and class-name substrings remain unknown.",
-    "Native timeout and HTTP 408 retain non-retrying behavior; HTTP 504 retains its existing retryable 5xx policy.",
-    "Implementation commit 817b8a130228e09b2cfedea130ccfeb88942919c, recovery checkpoint be3721603bd2958ccf184ba5248bf0be2c888b4e, and verified-state closeout e202dfb90c2e5b5d2c4fa164f450244fbd06e21b were pushed; exact SHA equality and all four final GitHub checks were verified.",
-    "Draft PR 13 has a verified ARA-015 body, remains open, draft, and mergeable; no merge was attempted.",
-    "Direct and runner-consumed KeyboardInterrupt status remains separately queued as ARA-023; dependency policy remains ARA-019.",
-    "Ignored runtime artifacts and local configuration remain outside the validation diff."
+    "The scanner reads bytes from git-tracked worktree paths and complete stage-0 index blobs without enumerating ignored artifacts or echoing matched values.",
+    "Worktree reads use descriptor-relative no-follow traversal; platforms without the required primitives fail closed while staged-index scanning remains available.",
+    "The four report edits explicitly state that the account name is redacted and preserve the historical conclusions.",
+    "Ignored projects/example state from KI-023 was not opened, changed, staged, or cleaned.",
+    "ARA-004 remains blocked and no package, provider, prompt, metric, experiment, dependency, or canonical artifact behavior changed."
   ]
 }

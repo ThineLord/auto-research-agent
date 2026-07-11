@@ -4,20 +4,22 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: make clean wheel and source-distribution installs retain the provider-free resources
-  needed by documented CLI workflows (`ARA-004`).
+- Current goal: remove confirmed tracked personal-path fragments and add a deterministic tracked-file
+  privacy/safety gate without changing historical findings (`ARA-016`).
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `89e95bf861f1ba501cf0d002e4210597b1526344`
-- Last known stable commit: `89e95bf861f1ba501cf0d002e4210597b1526344` (exact local,
-  remote-tracking, and GitHub branch equality plus all Python 3.10/3.13 push/PR checks passed)
-- Active task: ARA-004 is `BLOCKED` before implementation. The verified safe fix now exceeds the
-  30-minute checkpoint threshold, and an accidental local mock changed ignored example-project
-  state that must not be deleted or reconstructed without owner direction.
-- Uncommitted changes: yes; only the remotely verified ARA-004 audit state closeout remains.
+- Current HEAD at state snapshot: `2b6523cda3d7a7943644692e276b6fdc7270573c`
+- Last known stable commit: `2b6523cda3d7a7943644692e276b6fdc7270573c` (locally validated
+  implementation commit; recovery checkpoint, remote push, and GitHub CI are pending)
+- Active task: ARA-016 is `IN_PROGRESS`; implementation commit `2b6523c` is locally validated after
+  focused/full tests and blocker-free independent review. Recovery checkpoint, push, PR update, and
+  remote CI verification remain. ARA-004 is separately blocked.
+- Uncommitted changes: yes; recovery metadata only.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
+- `.codex/TASK_QUEUE.md`
+- `.codex/DECISIONS.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
@@ -195,18 +197,45 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Committed and pushed the audit/blocker recovery checkpoint as `89e95bf`, verified exact local,
   remote-tracking, and GitHub SHA equality, updated draft PR 13, and confirmed Python 3.10/3.13
   passed for both push and pull-request workflows.
+- Committed and pushed the verified ARA-004 audit-state closeout as `3d77729`; exact remote SHA and
+  all four Python 3.10/3.13 push/pull-request jobs passed. Draft PR 13 points at this clean HEAD.
+- Enumerated 89 tracked blobs without opening ignored artifacts; the only confirmed privacy hits
+  were four historical local-account fragments in two tracked reports, with no high-confidence
+  provider token or private-key hit.
+- Added an initially failing scanner regression and then a stdlib-only byte scanner for the tracked
+  worktree and complete stage-0 index. Findings expose only relative path, line, and category.
+- Covered partial staging, untracked files, NUL/invalid UTF-8 content, static and parent-directory
+  symlinks, missing tracked files, operational errors, safe placeholders, and provider/key shapes.
+- Independent review reproduced an outside-repository read through a replaced symlinked parent;
+  secure `dir_fd`/no-follow traversal now blocks it. A second review proved the portable fallback
+  retained a swap race, so unsupported platforms now fail closed and have dedicated regression.
+- Reworded the four historical findings so the account is explicitly redacted in the report without
+  pretending that the redaction placeholder was the original scan input or changing conclusions.
+- Added `make repo-safety`, wired worktree/index/self-test checks into `make check` and CI, and
+  documented the tracked-only, ignored-artifact, symlink, and privacy-safe output boundaries.
+- Final independent quality review confirmed the no-follow path walk, unsupported-platform
+  fail-closed behavior, staged-index path, tests, and local/CI/documentation wiring with no blocker.
+- Committed the reviewed implementation, tests, report redaction, Make/CI wiring, changelog, and
+  public documentation as `2b6523c` with no unrelated or ignored artifacts.
 
 ## Remaining Steps
 
-- Obtain owner approval for the revised Large estimate (45–90 minutes) and proposed installed
-  workspace/resource contract.
-- Decide whether to preserve the accidental deterministic example run or authorize a best-effort
-  rollback/backup procedure; byte-exact rollback is unavailable from repository state alone.
-- After approval, add the failing artifact regression, implement in phases, run wheel/sdist clean
-  smokes and `make check`, then commit/push and verify PR CI.
+- Update and commit recovery metadata, push both commits, verify exact remote SHA, update draft PR 13,
+  and verify all Python 3.10/3.13 push and pull-request jobs.
 
 ## Test Status
 
+- ARA-016 focused regression: Ruff lint passed and `tests/test_repo_safety.py` passed (`11 passed`).
+- Scanner controls: self-test, tracked worktree, and full staged-index scans passed with 91 tracked
+  files, including the scanner and test; no tracked binary/NUL file or gitlink is currently present.
+- Final local ARA-016 `make check`: Ruff format passed (54 files), Ruff lint passed, import smoke
+  passed, both safety scans passed, and pytest passed (`217 passed, 134 subtests passed in 2.55s`).
+- `git diff --check` and staged diff checks passed. Native Python 3.10 execution remains for CI;
+  the current local environment is Python 3.13.14.
+- Python 3.10 AST parsing passed for the scanner and its test module. Final independent review reran
+  the 11 focused tests plus self/worktree/staged scans and reported no release blocker.
+- Real provider smoke was not run because this task only changes repository validation and report
+  wording; it makes no provider, prompt, metric, experiment, or runtime behavior change.
 - Final ARA-015 focused regression: `46 passed, 44 subtests passed`; focused Ruff lint and
   `git diff --check` passed.
 - Final ARA-015 `make check`: Ruff format passed (52 files), Ruff lint passed, import smoke passed,
@@ -224,6 +253,8 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - ARA-004 implementation tests were not started because the verified fix exceeds 30 minutes and
   needs an explicit checkpoint approval.
 - ARA-004 audit checkpoint `89e95bf`: all four Python 3.10/3.13 push/pull-request CI jobs passed.
+- ARA-004 verified-state closeout `3d77729`: all four Python 3.10/3.13 push/pull-request CI jobs
+  passed; its Node.js 20 action deprecation annotation remains deferred under ARA-019.
 - Current branch validation: `make check` passed at 2026-07-10T16:27:39+08:00.
 - Results: Ruff format passed (50 files), Ruff lint passed, import smoke passed, pytest passed (`139 passed, 43 subtests passed`).
 - Compare-runs targeted validation: module suite passed (`7 passed`).
@@ -359,11 +390,22 @@ Updated: 2026-07-11 (Asia/Shanghai)
   secret, tracked file, or canonical research artifact was involved. No cleanup was attempted.
 - The first audit-checkpoint GitHub run-list query returned EOF; a bounded retry succeeded and both
   workflow runs plus all four version jobs were verified successful.
+- The initial ARA-016 test import failed before the scanner existed, and the first staged-index scan
+  reported the four original report hits while the worktree scan was already clean; both were the
+  expected pre-fix controls.
+- One shell wrapper used zsh's read-only `status` parameter after a scanner probe; the scanner itself
+  correctly returned four categorized findings, and subsequent wrappers avoided that variable.
+- Independent ARA-016 review reproduced a tracked nested path reading an external file through a
+  replaced parent-directory symlink. A no-follow directory-descriptor walk and regression now make
+  that state an operational failure before external content is read.
+- The final ARA-016 audit proved the first non-`dir_fd` compatibility fallback retained an active
+  parent-swap race. The fallback was removed; unsupported platforms now fail closed before reading
+  the worktree, while the complete staged-index mode remains available.
 
 ## Next Command
 
 ```bash
-git add .codex/CURRENT_STATE.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
+git add -- .codex/CURRENT_STATE.md .codex/TASK_QUEUE.md .codex/DECISIONS.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
 ```
 
 ## Interruption Recovery

@@ -40,21 +40,22 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-`ARA-004` is `BLOCKED` before implementation at remotely verified audit checkpoint `89e95bf`. Its
-safe wheel/sdist reproduction confirmed missing bundled assets and a combined resource/workspace
-root. Read `KI-005`, `KI-013`, and `KI-023` in `.codex/KNOWN_ISSUES.md` before continuing. The last
-stable full validation command was:
+`ARA-016` is locally implemented at `2b6523c`; recovery metadata, push, PR update, or remote CI may
+still be pending depending on the interruption point. Compare HEAD/upstream and the current state
+before repeating work. The last stable full validation command was:
 
 ```bash
 make check
 ```
 
-Do not repeat the unsafe local build harness and do not delete or rewrite ignored `projects/example`
-state. Wait for the owner's two decisions: approve the revised 45–90 minute package-resource/
-workspace implementation, and choose whether to preserve or best-effort roll back deterministic run
-`20260711_031915_776385`. If implementation is approved, keep UI/scripts publication, package
-version/license, dependency policy (`ARA-019`), symlink policy (`ARA-022`), and provider behavior out
-of scope. Run artifact builds from a Git export with isolated interpreters and a neutral CWD.
+The expected result is Ruff/import/safety success and `217 passed, 134 subtests passed`. Also run
+both scanner modes; each should report 91 tracked files and zero findings. If recovery metadata is
+still uncommitted, review and stage only the named `.codex` files, then create the state checkpoint.
+If the branch is ahead, push normally and verify exact remote SHA before checking draft PR 13 and
+all Python 3.10/3.13 push/pull-request jobs.
+
+`ARA-004` remains separately blocked. Do not repeat its unsafe local build harness or delete/rewrite
+ignored `projects/example` state; read `KI-005`, `KI-013`, and `KI-023` before any packaging work.
 
 ## 5. Safety boundaries
 
@@ -66,5 +67,5 @@ of scope. Run artifact builds from a Git export with isolated interpreters and a
 ## Suggested immediate command
 
 ```bash
-git status --short --branch && git show --stat --oneline HEAD
+git status --short --branch && git log --oneline --decorate -n 5
 ```

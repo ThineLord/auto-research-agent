@@ -106,10 +106,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-014 - Tracked reports contain a personal absolute-path fragment
 
-- Status: confirmed by tracked-file scan
+- Status: fixed and locally validated; remote push/CI verification pending
 - Severity: P1 privacy/release hygiene
 - Impact: the repository embeds a real local username in historical scan examples and evidence text.
-- Current action: task `ARA-016`; redact without changing the historical conclusions and add a regression gate.
+- Current action: task `ARA-016`; implementation commit `2b6523c` redacts the account without
+  changing conclusions and adds a worktree/index gate with focused and full regression coverage.
 
 ## KI-015 - Some CLI startup failures exit successfully
 

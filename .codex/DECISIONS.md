@@ -111,3 +111,16 @@
   failures.
 - Compatibility: preserve model, prompts, generation configuration, credential selection, and the
   existing retry decision. Real provider calls and dependency constraints remain outside this fix.
+
+## 2026-07-11 - Scan tracked worktree and index without following filesystem links
+
+- Decision: validate both the tracked worktree and every stage-0 index blob with byte-oriented,
+  high-confidence path/key rules; enumerate only `git ls-files` entries and never echo matched text.
+- Reason: four tracked report fragments contained a real local account name, while an index-only or
+  UTF-8/text-only check could miss unstaged, binary, NUL, or partially staged content.
+- Filesystem boundary: worktree reads walk parent directories through descriptor-relative
+  `O_NOFOLLOW`, inspect the final node without following it, and scan a tracked symlink's link text.
+  If the platform lacks those primitives, the worktree scan fails closed; `--staged` remains usable.
+- Compatibility: ignored runtime artifacts, provider behavior, prompts, metrics, experiment values,
+  and historical conclusions remain unchanged. Reports describe the account as redacted rather than
+  pretending a placeholder was the original evidence.
