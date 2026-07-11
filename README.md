@@ -367,8 +367,9 @@ make check
 
 - 连续运行：`make continuous`
 - 安全停止：
-  - `Ctrl+C`
-  - 或创建 `projects/example/STOP_REQUESTED`（UI 按钮会自动创建）
+  - `Ctrl+C`：进程退出状态为 130；若 runner 在受保护的 agent 执行阶段捕获中断，会先完成
+    可恢复的 checkpoint、run summary/config 和 interrupted report
+  - 或创建 `projects/example/STOP_REQUESTED`（UI 按钮会自动创建）：在安全点正常退出，状态为 0
 - 恢复：`make resume`（读取 `projects/example/checkpoint.json`）
 - `make resume` 会继续 checkpoint 指向的旧 run，从下一轮开始写入同一个 run 目录；已完成轮次文件会保留。
 - 如果下一轮目录已经存在且非空，resume 会 fail-safe 停止，避免覆盖 partial/uncheckpointed 输出；先人工检查、移动或删除该目录后再恢复。

@@ -24,6 +24,10 @@
 
 ### Fixed
 
+* Manual `Ctrl+C` now exits CLI and module entrypoints with status 130. Interrupts caught during the
+  runner's protected agent-execution phase still finalize resumable checkpoint, summary/config,
+  and interruption-report artifacts before propagation, while cooperative `STOP_REQUESTED` stops
+  remain successful status 0 exits.
 * Historical benchmark reports now take recognized stop reasons from the selected run's summary,
   config, or legacy manifest. The mutable project checkpoint is used only when its run path/ID
   proves it belongs to that target; unknown/private text renders safely instead of relabeling or

@@ -70,6 +70,7 @@ from .storage import write_json_file
 
 _EXIT_OPERATION_ERROR = 1
 _EXIT_STARTUP_ERROR = 2
+_EXIT_INTERRUPTED = 130
 
 
 def _positive_round_count(value: str) -> int:
@@ -516,16 +517,17 @@ def main() -> None:
         survey_output_path = Path(survey_output).expanduser() if survey_output else None
         if survey_output_path is not None and not survey_output_path.is_absolute():
             survey_output_path = project_dir / survey_output_path
-        run_lock_path, lock_error = acquire_run_lock(
-            project_dir,
-            mode="literature_survey",
-            model_name="local-deterministic",
-        )
-        if lock_error:
-            console.print(f"[red]{lock_error}[/red]")
-            _print_run_lock_recovery_hint(console, root, project_dir)
-            raise SystemExit(_EXIT_STARTUP_ERROR)
+        run_lock_path = None
         try:
+            run_lock_path, lock_error = acquire_run_lock(
+                project_dir,
+                mode="literature_survey",
+                model_name="local-deterministic",
+            )
+            if lock_error:
+                console.print(f"[red]{lock_error}[/red]")
+                _print_run_lock_recovery_hint(console, root, project_dir)
+                raise SystemExit(_EXIT_STARTUP_ERROR)
             run_literature_survey_mode(
                 console=console,
                 project_input=project_input,
@@ -556,16 +558,17 @@ def main() -> None:
             f"[cyan]Mock mode will write normal run artifacts for {max_rounds} round(s).[/cyan]"
         )
         requested_mode = "mock"
-        run_lock_path, lock_error = acquire_run_lock(
-            project_dir,
-            mode=requested_mode,
-            model_name=model_label,
-        )
-        if lock_error:
-            console.print(f"[red]{lock_error}[/red]")
-            _print_run_lock_recovery_hint(console, root, project_dir)
-            raise SystemExit(_EXIT_STARTUP_ERROR)
+        run_lock_path = None
         try:
+            run_lock_path, lock_error = acquire_run_lock(
+                project_dir,
+                mode=requested_mode,
+                model_name=model_label,
+            )
+            if lock_error:
+                console.print(f"[red]{lock_error}[/red]")
+                _print_run_lock_recovery_hint(console, root, project_dir)
+                raise SystemExit(_EXIT_STARTUP_ERROR)
             agents = build_mock_agents(topic_context=topic_context)
             run_iterative_rounds(
                 console=console,
@@ -593,6 +596,7 @@ def main() -> None:
             console.print(
                 "[red]Manual interrupt detected in mock loop. Stop reason: MANUAL_INTERRUPT[/red]"
             )
+            raise SystemExit(_EXIT_INTERRUPTED) from None
         finally:
             release_run_lock(run_lock_path)
         return
@@ -743,17 +747,17 @@ def main() -> None:
     if benchmark_preset:
         project_metadata["benchmark_preset"] = benchmark_preset
 
-    run_lock_path, lock_error = acquire_run_lock(
-        project_dir,
-        mode=requested_mode,
-        model_name=model_label,
-    )
-    if lock_error:
-        console.print(f"[red]{lock_error}[/red]")
-        _print_run_lock_recovery_hint(console, root, project_dir)
-        raise SystemExit(_EXIT_STARTUP_ERROR)
-
+    run_lock_path = None
     try:
+        run_lock_path, lock_error = acquire_run_lock(
+            project_dir,
+            mode=requested_mode,
+            model_name=model_label,
+        )
+        if lock_error:
+            console.print(f"[red]{lock_error}[/red]")
+            _print_run_lock_recovery_hint(console, root, project_dir)
+            raise SystemExit(_EXIT_STARTUP_ERROR)
         llm = create_llm_client(
             provider=provider,
             model_name=model_name,
@@ -901,5 +905,6 @@ def main() -> None:
         console.print(
             "[red]Manual interrupt detected in main loop. Stop reason: MANUAL_INTERRUPT[/red]"
         )
+        raise SystemExit(_EXIT_INTERRUPTED) from None
     finally:
         release_run_lock(run_lock_path)

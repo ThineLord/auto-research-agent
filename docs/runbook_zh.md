@@ -158,12 +158,16 @@ touch projects/example/STOP_REQUESTED
 ```
 
 请求安全停止。程序会在安全点退出，并更新 checkpoint。
+这是协作式停止：命令正常返回状态 0，artifact 中记录 `USER_STOP_REQUESTED`。
 
 终端里直接运行的进程，也可以按：
 
 ```bash
 Ctrl+C
 ```
+
+`Ctrl+C` 返回状态 130。若 runner 在受保护的 agent 执行阶段捕获中断，会先写完可恢复的
+checkpoint、run summary/config 和 interrupted report，再把中断传播到进程边界。
 
 ## 5. 如何指定 rounds 数量
 

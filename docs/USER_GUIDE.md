@@ -288,6 +288,10 @@ make continuous
 - `projects/example/checkpoint.json`
 - `projects/example/interrupted_report.md`
 
+两者的进程语义不同：若 runner 在受保护的 agent 执行阶段捕获 `Ctrl+C`，会先完成上述
+可恢复 artifact，再返回状态 130；`STOP_REQUESTED` 是成功的协作式停止，返回状态 0 并
+记录 `USER_STOP_REQUESTED`。
+
 ## 如何恢复（resume）
 
 ```bash

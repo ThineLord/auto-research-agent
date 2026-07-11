@@ -28,7 +28,199 @@ def _project_input(project_dir: Path) -> SimpleNamespace:
     )
 
 
+class _InterruptOnTruth:
+    def __bool__(self) -> bool:
+        raise KeyboardInterrupt
+
+
 class CliExitCodeTests(unittest.TestCase):
+    def test_direct_mock_interrupt_exits_130_and_releases_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "projects" / "selected"
+            project_dir.mkdir(parents=True)
+            run_lock_path = project_dir / cli_module.RUN_LOCK_FILENAME
+            args = cli_module.parse_args(["--mock", "--project", "selected"])
+
+            def acquire_then_interrupt(*args: object, **kwargs: object) -> tuple[object, object]:
+                handle, error = original_acquire(*args, **kwargs)
+                self.assertIsNone(error)
+                return handle, _InterruptOnTruth()
+
+            original_acquire = cli_module.acquire_run_lock
+            with (
+                patch.object(cli_module, "parse_args", return_value=args),
+                patch.object(cli_module, "load_app_config", return_value=AppConfig()),
+                patch.object(
+                    cli_module,
+                    "load_project_input",
+                    return_value=_project_input(project_dir),
+                ),
+                patch.object(
+                    cli_module,
+                    "acquire_run_lock",
+                    side_effect=acquire_then_interrupt,
+                ),
+            ):
+                with self.assertRaises(SystemExit) as raised:
+                    cli_module.main()
+
+            self.assertEqual(raised.exception.code, 130)
+            self.assertFalse(run_lock_path.exists())
+
+    def test_direct_provider_interrupt_exits_130_and_releases_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "projects" / "selected"
+            project_dir.mkdir(parents=True)
+            run_lock_path = project_dir / ".run.lock"
+            args = cli_module.parse_args(["--project", "selected"])
+            with (
+                patch.object(cli_module, "parse_args", return_value=args),
+                patch.object(cli_module, "load_app_config", return_value=AppConfig()),
+                patch.object(
+                    cli_module,
+                    "load_project_input",
+                    return_value=_project_input(project_dir),
+                ),
+                patch.object(
+                    cli_module,
+                    "list_installed_ollama_models",
+                    return_value=(["qwen3:8b"], None),
+                ),
+                patch.object(
+                    cli_module,
+                    "acquire_run_lock",
+                    return_value=(run_lock_path, _InterruptOnTruth()),
+                ),
+                patch.object(cli_module, "release_run_lock") as release_lock,
+            ):
+                with self.assertRaises(SystemExit) as raised:
+                    cli_module.main()
+
+        self.assertEqual(raised.exception.code, 130)
+        release_lock.assert_called_once_with(run_lock_path)
+
+    def test_survey_interrupt_during_lock_result_releases_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "projects" / "selected"
+            project_dir.mkdir(parents=True)
+            run_lock_path = project_dir / ".run.lock"
+            args = cli_module.parse_args(["--survey", "--project", "selected"])
+            with (
+                patch.object(cli_module, "parse_args", return_value=args),
+                patch.object(cli_module, "load_app_config", return_value=AppConfig()),
+                patch.object(
+                    cli_module,
+                    "load_project_input",
+                    return_value=_project_input(project_dir),
+                ),
+                patch.object(
+                    cli_module,
+                    "acquire_run_lock",
+                    return_value=(run_lock_path, _InterruptOnTruth()),
+                ),
+                patch.object(cli_module, "release_run_lock") as release_lock,
+            ):
+                with self.assertRaises(KeyboardInterrupt):
+                    cli_module.main()
+
+        release_lock.assert_called_once_with(run_lock_path)
+
+    def test_module_entrypoint_direct_interrupt_exits_130_after_releasing_lock(self) -> None:
+        script = """
+import runpy
+import json
+import sys
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+
+import src.cli as cli
+from src.config import AppConfig
+from src.constants import RUN_LOCK_FILENAME
+
+temporary_root = tempfile.TemporaryDirectory()
+root = Path(temporary_root.name)
+project_dir = root / "projects" / "selected"
+project_dir.mkdir(parents=True)
+(project_dir / "task.md").write_text("# interrupt subprocess test\\n", encoding="utf-8")
+cli.__file__ = str(root / "src" / "cli.py")
+cli.load_app_config = lambda path: AppConfig()
+sys.argv = ["auto-research-agent", "--mock", "--project", "selected"]
+interrupting_agents = cli.build_mock_agents(topic_context="")
+interrupting_agents.draft = lambda **kwargs: (_ for _ in ()).throw(KeyboardInterrupt)
+with patch.object(cli, "build_mock_agents", return_value=interrupting_agents):
+    try:
+        runpy.run_module("src.main", run_name="__main__")
+    except SystemExit:
+        checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
+        run_root = Path(checkpoint["run_root"])
+        run_summary = json.loads((run_root / "run_summary.json").read_text(encoding="utf-8"))
+        run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+        print(f"artifact_reasons={checkpoint['stop_reason']},{run_summary['stop_reason']},{run_config['stop_reason']}")
+        print(f"can_resume={checkpoint['can_resume']},{run_summary['can_resume']},{run_config['can_resume']}")
+        print(f"interrupted_report_exists={(project_dir / 'interrupted_report.md').is_file()}")
+        print(f"lock_exists={(project_dir / RUN_LOCK_FILENAME).exists()}")
+        raise
+"""
+
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 130, result.stdout + result.stderr)
+        self.assertIn("Stop reason: MANUAL_INTERRUPT", result.stdout)
+        self.assertIn(
+            "artifact_reasons=MANUAL_INTERRUPT,MANUAL_INTERRUPT,MANUAL_INTERRUPT",
+            result.stdout,
+        )
+        self.assertIn("can_resume=True,True,True", result.stdout)
+        self.assertIn("interrupted_report_exists=True", result.stdout)
+        self.assertIn("lock_exists=False", result.stdout)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_user_requested_mock_stop_remains_successful_in_subprocess(self) -> None:
+        script = """
+import json
+import sys
+import tempfile
+from pathlib import Path
+
+import src.cli as cli
+from src.config import AppConfig
+
+temporary_root = tempfile.TemporaryDirectory()
+root = Path(temporary_root.name)
+project_dir = root / "projects" / "selected"
+project_dir.mkdir(parents=True)
+(project_dir / "task.md").write_text("# safe stop subprocess test\\n", encoding="utf-8")
+(project_dir / "STOP_REQUESTED").write_text("STOP_REQUESTED\\n", encoding="utf-8")
+cli.__file__ = str(root / "src" / "cli.py")
+cli.load_app_config = lambda path: AppConfig()
+sys.argv = ["auto-research-agent", "--mock", "--project", "selected"]
+cli.main()
+checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
+print(f"stop_reason={checkpoint['stop_reason']}")
+print(f"can_resume={checkpoint['can_resume']}")
+print(f"stop_signal_exists={(project_dir / 'STOP_REQUESTED').exists()}")
+"""
+
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("stop_reason=USER_STOP_REQUESTED", result.stdout)
+        self.assertIn("can_resume=True", result.stdout)
+        self.assertIn("stop_signal_exists=False", result.stdout)
+
     def test_module_entrypoint_missing_config_exits_two(self) -> None:
         script = """
 import sys

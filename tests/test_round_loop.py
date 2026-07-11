@@ -66,6 +66,7 @@ from src.config import AppConfig
 from src.constants import (
     STOP_CLOUD_DAILY_QUOTA,
     STOP_INVALID_SCORE,
+    STOP_MANUAL_INTERRUPT,
     STOP_MAX_ROUNDS,
     STOP_NO_IMPROVEMENT,
     STOP_OLLAMA_TIMEOUT,
@@ -156,6 +157,23 @@ class QuotaPauseAgents(FakeAgents):
         raise CloudFreeDailyQuotaExhausted(
             "Free-tier daily quota likely exhausted; safe to resume after reset."
         )
+
+
+class InterruptingAgents(FakeAgents):
+    def draft(
+        self,
+        *,
+        task: str,
+        memory: str,
+        round_index: int,
+        previous_best: str,
+        previous_judge: str,
+        drafting_mode: str = "best_guided",
+        previous_review: str = "",
+        previous_draft: str = "",
+        previous_revised: str = "",
+    ) -> str:
+        raise KeyboardInterrupt
 
 
 class StopAfterJudgeAgents(FakeAgents):
@@ -908,6 +926,41 @@ class RoundLoopTests(unittest.TestCase):
             self.assertTrue(checkpoint["can_resume"])
             self.assertTrue(checkpoint["paused_until_reset"])
             self.assertEqual(checkpoint["last_completed_round"], 0)
+
+    def test_manual_interrupt_finalizes_resumable_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+
+            with self.assertRaises(KeyboardInterrupt):
+                run_iterative_rounds(
+                    console=Console(),
+                    agents=InterruptingAgents(),
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    mode="test",
+                    model_name="fake-model",
+                    max_rounds=2,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                )
+
+            checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
+            run_root = Path(checkpoint["run_root"])
+            run_summary = json.loads((run_root / "run_summary.json").read_text(encoding="utf-8"))
+            run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+
+            for artifact in (checkpoint, run_summary, run_config):
+                self.assertEqual(artifact["stop_reason"], STOP_MANUAL_INTERRUPT)
+                self.assertTrue(artifact["can_resume"])
+            self.assertEqual(checkpoint["last_completed_round"], 0)
+            self.assertEqual(run_summary["completed_rounds"], 0)
+            self.assertEqual(run_config["completed_rounds"], 0)
+            self.assertTrue((project_dir / "interrupted_report.md").is_file())
 
     def test_stop_after_requested_rounds_keeps_exact_completed_count(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -1796,6 +1796,9 @@ def run_iterative_rounds(
             "[red]No valid score found from judge output. best_output.md was not updated.[/red]"
         )
 
+    if stop_reason == STOP_MANUAL_INTERRUPT:
+        raise KeyboardInterrupt
+
     return {
         "run_root": run_root,
         "best_round": best_round,

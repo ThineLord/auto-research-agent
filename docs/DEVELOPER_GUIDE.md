@@ -59,11 +59,16 @@ The command-line entry point is `src.cli:main`, exposed as both `python -m src.m
 CLI exit-status contract:
 
 - `0`: the requested command completed, `--help` was shown, or a documented soft fallback (such as
-  cloud-profile discovery falling back to configured seeds) completed its remaining work.
+  cloud-profile discovery falling back to configured seeds) completed its remaining work. A
+  cooperative `STOP_REQUESTED` checkpoint stop is also successful and remains status 0.
 - `1`: an explicit operation failed after startup, such as `--cloud-free-discover` being unable to
   discover models, or an unexpected runtime exception propagated to the process boundary.
 - `2`: arguments, configuration, project input, provider prerequisites, run-lock acquisition, or
   resume safety checks rejected startup. These failures print a user-facing diagnostic before exit.
+- `130`: the process received `Ctrl+C`. If the iterative runner catches the interrupt during its
+  protected agent-execution phase, it finalizes the resumable checkpoint, run summary/config, and
+  interrupted report before propagating the interrupt. Interrupts outside that protected phase do
+  not promise the same artifact completeness.
 
 The exit-status contract does not make a wheel self-contained: missing packaged configuration or
 prompt assets remain a separate packaging defect, but affected commands must now fail nonzero.

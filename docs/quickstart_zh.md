@@ -204,6 +204,8 @@ touch projects/example/STOP_REQUESTED
 ```
 
 请求研究循环在安全点停止；UI 的 `Pause / Stop Safely` 按钮也是创建这个文件。
+该协作式停止正常返回状态 0；终端 `Ctrl+C` 返回状态 130。若 runner 在受保护的 agent
+执行阶段捕获中断，会先完成可恢复 artifact 的写入。
 
 ## 5. 输出文件在哪里
 
