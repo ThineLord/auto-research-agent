@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -33,12 +34,11 @@ def _read_json_list(path: Path, *, safe_artifacts: bool = False) -> list[dict[st
 def _as_float(value: Any) -> float | None:
     if isinstance(value, bool):
         return None
-    if isinstance(value, (int, float)):
-        return float(value)
     try:
-        return float(str(value))
-    except (TypeError, ValueError):
+        numeric = float(value) if isinstance(value, (int, float)) else float(str(value))
+    except (TypeError, ValueError, OverflowError):
         return None
+    return numeric if math.isfinite(numeric) else None
 
 
 def _as_int(value: Any) -> int | None:
@@ -119,9 +119,17 @@ def load_run_summary(run_root: Path, *, safe_artifacts: bool = False) -> dict[st
     best_score = summary_best_score
     if best_score is None:
         best_score = max(scores) if scores else config_best_score
-    average_score = (
-        round(sum(scores) / len(scores), 2) if scores else _as_float(summary.get("average_score"))
-    )
+    if scores:
+        total = sum(scores)
+        if math.isfinite(total):
+            average_score = total / len(scores)
+        else:
+            scale = max(abs(score) for score in scores)
+            normalized_average = math.fsum(score / scale for score in scores) / len(scores)
+            average_score = _as_float(normalized_average * scale)
+        average_score = round(average_score, 2) if average_score is not None else None
+    else:
+        average_score = _as_float(summary.get("average_score"))
     completed_rounds = _as_int(summary.get("completed_rounds"))
     if completed_rounds is None:
         completed_rounds = _as_int(run_config.get("completed_rounds"))
@@ -268,30 +276,32 @@ def compare_runs(
     runs = [
         load_run_summary(Path(run_root), safe_artifacts=safe_artifacts) for run_root in run_roots
     ]
-    ranked = sorted(
-        runs,
-        key=lambda item: (
-            _as_float(item.get("best_score"))
-            if _as_float(item.get("best_score")) is not None
-            else -1.0,
+
+    def rank_key(item: dict[str, Any]) -> tuple[bool, float, int]:
+        score = _as_float(item.get("best_score"))
+        return (
+            score is not None,
+            score if score is not None else 0.0,
             _as_int(item.get("completed_rounds")) or 0,
-        ),
-        reverse=True,
-    )
+        )
+
+    ranked = sorted(runs, key=rank_key, reverse=True)
     best_run = ranked[0] if ranked else {}
     baseline_score = _as_float(runs[0].get("best_score")) if runs else None
     best_score = _as_float(best_run.get("best_score"))
+    best_vs_baseline_delta = (
+        _as_float(best_score - baseline_score)
+        if best_score is not None and baseline_score is not None
+        else None
+    )
     return {
         "run_count": len(runs),
         "best_run_id": best_run.get("run_id", ""),
-        "best_score": best_run.get("best_score"),
+        "best_score": best_score,
         "baseline_run_id": runs[0].get("run_id", "") if runs else "",
-        "best_vs_baseline_delta": round(
-            best_score - baseline_score,
-            2,
-        )
-        if best_score is not None and baseline_score is not None
-        else None,
+        "best_vs_baseline_delta": (
+            round(best_vs_baseline_delta, 2) if best_vs_baseline_delta is not None else None
+        ),
         "runs": runs,
     }
 

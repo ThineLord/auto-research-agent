@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -28,12 +29,11 @@ def _read_json_list(path: Path, *, safe_artifacts: bool = False) -> list[dict[st
 def _as_float(value: Any) -> float | None:
     if isinstance(value, bool):
         return None
-    if isinstance(value, (int, float)):
-        return float(value)
     try:
-        return float(str(value))
-    except (TypeError, ValueError):
+        numeric = float(value) if isinstance(value, (int, float)) else float(str(value))
+    except (TypeError, ValueError, OverflowError):
         return None
+    return numeric if math.isfinite(numeric) else None
 
 
 def _numeric_scores(round_metrics: list[dict[str, Any]]) -> list[tuple[Any, float]]:
@@ -58,9 +58,12 @@ def _score_trend(round_metrics: list[dict[str, Any]]) -> dict[str, Any]:
         }
     first_round, first_score = scores[0]
     latest_round, latest_score = scores[-1]
-    delta = round(latest_score - first_score, 2)
+    delta = _as_float(latest_score - first_score)
+    delta = round(delta, 2) if delta is not None else None
     if len(scores) == 1:
         trend = "single_round"
+    elif delta is None:
+        trend = "improved" if latest_score > first_score else "declined"
     elif delta > 0:
         trend = "improved"
     elif delta < 0:

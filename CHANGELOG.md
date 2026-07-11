@@ -40,6 +40,9 @@
 
 ### Fixed
 
+* Analysis and comparison now ignore boolean, non-finite, and unrepresentably large overall scores;
+  missing scores cannot outrank valid negative scores, overflowed deltas serialize as `null`, and
+  finite-extreme averages remain strict JSON without changing ordinary historical rounding.
 * Clean wheel and source-distribution installs now bundle the public sample configuration, four
   canonical prompts, and default example task. Installed mock runs use the current directory as a
   writable workspace, atomically seed only a wholly missing implicit example project without overwriting

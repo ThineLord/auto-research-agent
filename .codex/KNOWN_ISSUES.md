@@ -1,6 +1,6 @@
 # Known Issues
 
-Updated: 2026-07-11 (Asia/Shanghai)
+Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-001 - Stale invalid `.git/REBASE_HEAD`
 
@@ -234,10 +234,22 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## KI-031 - Resume overwrites an invalid existing run config
 
-- Status: fixed locally in ARA-031; push and CI verification pending live Git state
+- Status: fixed, pushed, and CI-verified
 - Severity: P1 resume provenance integrity
 - Impact: malformed, unreadable, non-object, or excessively nested existing `run_config.json`
   content was normalized to `{}` and replaced with current-session provenance during resume.
-- Current action: strict existing-config validation now fails before writes while preserving the
-  missing-config legacy fallback. Focused, related, full, and two independent reviews are green;
-  resolve current semantic `HEAD`, remote equality, and CI live after publication.
+- Current action: task ARA-031 completed at `78b76dc`; exact push/PR runs
+  `29161456466`/`29161457321` passed Python 3.10/3.13. Strict existing-config validation fails
+  before writes while preserving the missing-config legacy fallback.
+
+## KI-032 - Non-finite artifact scores contaminate analysis and comparison
+
+- Status: fixed and locally validated in ARA-032; publish/CI state must be resolved live
+- Severity: P1 data/report correctness
+- Impact: malformed or legacy `NaN`/`Infinity` scores can win ranking, create a false flat trend,
+  and escape as non-standard JSON. Finite extremes can also overflow derived averages/deltas, while
+  a numeric missing-score sentinel can outrank valid negative scores.
+- Current action: finite conversion, score-presence ranking, overflow-safe derived fields, and
+  strict-JSON/compatibility regressions are complete. Related tests and `make check` are green, and
+  two independent adversarial reviews returned GO; resolve semantic `HEAD`, remote equality, and
+  CI live after publication.

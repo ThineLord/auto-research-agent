@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-12T01:19:19+08:00",
+  "recorded_at": "2026-07-12T01:43:47+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "cc203032a29ee0f0020a8bc3005e715db8156212",
-  "last_known_stable_commit": "cc203032a29ee0f0020a8bc3005e715db8156212",
+  "head_commit": "78b76dcea0e8e2b67e25c192944ddc693ed41565",
+  "last_known_stable_commit": "78b76dcea0e8e2b67e25c192944ddc693ed41565",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "cc203032a29ee0f0020a8bc3005e715db8156212",
+  "state_recorded_against_commit": "78b76dcea0e8e2b67e25c192944ddc693ed41565",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-12T01:08:44+08:00",
-    "commit": "cc203032a29ee0f0020a8bc3005e715db8156212",
+    "verified_at": "2026-07-12T01:23:45+08:00",
+    "commit": "78b76dcea0e8e2b67e25c192944ddc693ed41565",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29160735068,
+        "run_id": 29161456466,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "cc203032a29ee0f0020a8bc3005e715db8156212",
+        "head_sha": "78b76dcea0e8e2b67e25c192944ddc693ed41565",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29160736165,
+        "run_id": 29161457321,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "cc203032a29ee0f0020a8bc3005e715db8156212",
+        "head_sha": "78b76dcea0e8e2b67e25c192944ddc693ed41565",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,102 @@
       }
     }
   },
-  "status": "ara031_complete_local_verified_external_fallback_cc20303",
+  "status": "ara032_validated_locally_pending_publish",
   "commands": [
+    {
+      "command": "make check after explicit ARA-032 staging and final metadata synchronization",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 57,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 100,
+        "findings": 0,
+        "pytest_tests_passed": 309,
+        "pytest_subtests_passed": 184,
+        "pytest_duration_seconds": 8.96
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_run_analytics.py tests/test_run_compare.py tests/test_metrics.py",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 26,
+        "strict_json": "passed",
+        "negative_score_ranking": "passed",
+        "finite_extreme_average_and_delta": "passed",
+        "ordinary_average_compatibility": "passed"
+      }
+    },
+    {
+      "command": "six focused ARA-032 numeric-boundary regressions",
+      "exit_code": 0,
+      "result": "passed_after_expected_pre_fix_failures",
+      "summary": {
+        "pytest_tests_passed": 6,
+        "non_finite_and_huge_values_rejected": true,
+        "missing_score_below_negative_score": true,
+        "overflowed_delta_is_null": true,
+        "three_max_float_average_is_finite": true,
+        "historical_average_46_48_preserved": true
+      }
+    },
+    {
+      "command": "two independent ARA-032 adversarial compatibility reviews",
+      "exit_code": 0,
+      "result": "passed_after_extreme_and_rounding_corrections",
+      "summary": {
+        "blocking_findings_remaining": 0,
+        "ordinary_score_groups_compared_to_legacy_path": 300000,
+        "max_float_count_matrix": "1_through_512",
+        "mixed_sign_extremes": "passed",
+        "strict_json": "passed",
+        "reviewers": 2
+      }
+    },
+    {
+      "command": "ARA-032 adversarial regressions before derived-arithmetic corrections",
+      "exit_code": 1,
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "pytest_failed": 3,
+        "causes": [
+          "missing score outranked finite negative score",
+          "finite trend delta overflowed to Infinity",
+          "finite comparison average and baseline delta overflowed to Infinity"
+        ]
+      }
+    },
+    {
+      "command": "three maximum-float average and ordinary-rounding compatibility regressions before final averaging algorithm",
+      "exit_code": 1,
+      "result": "expected_intermediate_failure",
+      "summary": {
+        "maximum_float_average_before_scaling": null,
+        "ordinary_average_under_always_scaled_path": 46.47,
+        "required_historical_ordinary_average": 46.48
+      }
+    },
+    {
+      "command": "provider-free non-finite analysis/comparison reproduction (pre-fix)",
+      "exit_code": 0,
+      "result": "expected_pre_fix_reproduction",
+      "summary": {
+        "malformed_best_score": "nan",
+        "malformed_average_score": "nan",
+        "analysis_latest_score": "Infinity",
+        "analysis_trend": "flat",
+        "valid_score_75_ranked_best": false,
+        "analysis_strict_json": "ValueError",
+        "comparison_strict_json": "ValueError",
+        "temporary_fixture_only": true
+      }
+    },
     {
       "command": "final make check after ARA-031 state and documentation synchronization",
       "exit_code": 0,
@@ -779,6 +873,15 @@
   ],
   "failures": [
     {
+      "command": "provider-free non-finite analysis/comparison reproduction (pre-fix)",
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "cause": "analysis and comparison float coercion accepted NaN and Infinity as numeric scores",
+        "impact": "malformed run could win ranking and produce non-standard JSON",
+        "provider_calls": 0
+      }
+    },
+    {
       "command": "first independent ARA-031 strict-reader review",
       "result": "corrected_before_commit",
       "summary": {
@@ -954,7 +1057,9 @@
     }
   ],
   "notes": [
-    "ARA-031 implementation and regression coverage are complete locally; current remote verification remains the exact cc20303 fallback until the semantic current HEAD is checked live.",
+    "ARA-032 is locally complete and limited to overall-score conversion, selection, ranking, trend, average, delta, and score-derived JSON output; arbitrary non-score legacy metadata remains outside scope.",
+    "ARA-032 preserves the historical finite-total average operation and uses scaled math.fsum only when the original total overflows, preventing both extreme non-finite output and ordinary 0.01 result drift.",
+    "ARA-031 is complete at remote-equal commit 78b76dc with successful push and pull-request CI runs 29161456466 and 29161457321 on Python 3.10 and 3.13.",
     "An existing empty JSON object remains accepted because ARA-031 validates preservability and object shape, not a new field-level schema; any schema migration is a separate compatibility task.",
     "ARA-031 is limited to strict preservation of an existing run_config.json on resume; general UI and analytics readers remain tolerant.",
     "ARA-032 and ARA-033 record independent analysis/comparison numeric and CLI output error boundaries discovered during the same read-only audit.",

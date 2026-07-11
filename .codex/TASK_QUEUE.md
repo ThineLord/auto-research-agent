@@ -210,15 +210,18 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-032 - Ignore non-finite scores in analysis and comparison
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P1
 - Risk: low
 - Description: `nan` and `Infinity` score values from malformed/legacy artifacts can dominate run
   ranking, produce a false flat trend, and emit non-standard analysis/comparison JSON.
 - Related files: `src/run_compare.py`, `src/run_analytics.py`, metric/analysis/compare tests
 - Acceptance criteria: only finite numeric values participate in score selection, ranking, trend,
-  and JSON output; valid legacy numeric strings remain compatible.
-- Validation command: focused strict-JSON analysis/compare regressions followed by `make check`.
+  and score-derived JSON output; valid negative scores and legacy numeric strings remain
+  compatible, representable extreme averages stay finite, and ordinary two-decimal averages retain
+  their historical result.
+- Validation command: focused strict-JSON analysis/compare regressions, related metrics tests, and
+  `make check` (`309 passed, 184 subtests passed`).
 - Commit required: yes.
 - Dependencies: complete ARA-031 without widening its resume-integrity scope.
 

@@ -424,3 +424,21 @@ Validation and implementation outcomes will be appended only after they are actu
 - Focused validation passed (`7 passed, 14 subtests passed`); complete run-config/round-loop tests
   passed (`53 passed, 66 subtests passed`); local `make check` passed (`303 passed, 184 subtests
   passed`; 100 tracked files and zero safety findings).
+
+## 2026-07-12 - Finite score analysis and comparison boundary
+
+- Reproduced provider-free malformed scores dominating comparison ranking, producing a false flat
+  trend, and escaping analysis/comparison files as non-standard `NaN`/`Infinity` JSON.
+- Rejected booleans, non-finite values and strings, and unrepresentably large numeric scores while
+  preserving finite legacy numeric strings and negative scores.
+- Made score presence the first ranking key so missing scores cannot outrank valid negative scores;
+  preserved score and completed-round ordering for otherwise comparable runs.
+- Converted overflowed trend/baseline deltas to `null` while preserving finite endpoint direction.
+- Retained the historical finite-total average operation and added an overflow-only scaled
+  `math.fsum` fallback, so ordinary two-decimal results stay unchanged and representable extreme
+  averages remain finite.
+- Added strict-JSON, huge-integer, negative-ranking, finite-extreme, and historical-rounding
+  regressions. Related tests passed `26 passed`; final `make check` passed `309 passed, 184 subtests
+  passed` with 100 tracked files and zero safety findings.
+- Two independent adversarial reviews returned GO after finding and driving fixes for the missing
+  negative-score rank, derived overflow, maximum-float average, and ordinary 0.01 rounding drift.

@@ -255,3 +255,16 @@
 - Failure boundary: errors contain only the fixed artifact name and category. Config, manifest,
   checkpoint, stop signal, histories, and run outputs remain byte-identical or absent, and no agent
   is invoked.
+
+## 2026-07-12 - Treat only finite values as scores without changing ordinary averages
+
+- Decision: reject boolean, non-finite, and unrepresentable values at analysis/comparison score
+  conversion boundaries. Missing scores rank below every finite score, including negative values.
+- Derived arithmetic: an unrepresentable delta becomes `null`; trend direction still comes from
+  the finite endpoints. Preserve the existing `sum(scores) / count` operation whenever its total is
+  finite, and use max-absolute scaling with `math.fsum` only when that total overflows.
+- Reason: input-only finite checks still allowed finite extremes to create `Infinity`, while always
+  using a numerically different mean changed ordinary paper/report-facing rounded values by 0.01.
+- Compatibility: finite legacy numeric strings, ordinary rounded averages, run ordering among
+  scored records, prompts, providers, experiment artifacts, and historical reports are unchanged.
+  Arbitrary non-score metadata sanitation remains outside ARA-032.

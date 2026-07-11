@@ -4,19 +4,18 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: preserve the completed ARA-031 fail-before-write resume guarantee and continue with
-  the highest-priority actionable task, ARA-032.
+- Current goal: preserve the locally validated ARA-032 finite-score checkpoint and continue with
+  the next unblocked task, ARA-033, only after live Git recovery checks.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `cc203032a29ee0f0020a8bc3005e715db8156212` (the exact HEAD
+- State recorded against commit: `78b76dcea0e8e2b67e25c192944ddc693ed41565` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `cc203032a29ee0f0020a8bc3005e715db8156212` (exact local,
+- Last externally verified fallback: `78b76dcea0e8e2b67e25c192944ddc693ed41565` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-031 is `DONE`: strict existing-config validation blocks
-  malformed, unreadable, non-object, `null`, and excessively nested resume config before writes;
-  a genuinely missing config still uses the legacy-manifest compatibility path. ARA-032 is `TODO`.
+- Active task at this snapshot: none. ARA-032 is `DONE` after provider-free focused, related, full,
+  and independent adversarial validation; ARA-033 is the next unblocked `TODO` task.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -435,14 +434,43 @@ Updated: 2026-07-12 (Asia/Shanghai)
   recursive-closeout instructions, active-task synchronization, semantic HEAD structure, and the
   single conservative external fallback contract.
 
+## ARA-032 Finite Score Normalization
+
+- Reproduced malformed numeric artifacts making `nan`/`Infinity` dominate ranking, create a false
+  flat trend, and escape analysis/comparison output as non-standard JSON.
+- Rejected boolean, non-finite numeric/string, and unrepresentably large numeric score values while
+  preserving finite legacy numeric strings.
+- Ranked score presence ahead of value so any valid negative score remains preferable to a missing
+  score; within scored runs, score and completed-round ordering remains unchanged.
+- Normalized overflowed trend and baseline deltas to `null` while retaining the direction inferred
+  from their finite endpoints.
+- Preserved the historical `sum(scores) / count` average whenever its total is finite. Only an
+  overflowed total uses max-absolute scaling plus `math.fsum`, keeping representable finite-extreme
+  averages such as three maximum floats finite without changing ordinary two-decimal results.
+- Added strict-JSON, negative-ranking, huge-integer, finite-extreme, and ordinary-rounding
+  regressions. Two independent adversarial reviews returned GO after the extreme-average fallback
+  and finite-total compatibility path were added.
+
 ## Remaining Steps
 
-- No task-owned ARA-031 work remains. ARA-032 is the next `TODO`, followed by ARA-033.
+- ARA-033 is next: reproduce the privacy-unsafe analysis/comparison output-write traceback and
+  define the smallest CLI-boundary normalization without changing successful exports.
 - Keep ARA-018, ARA-029, and ARA-030 behind their recorded owner/configuration/long-task approval
   gates; do not fold release or CI-configuration policy into the analysis/compare fixes.
 
 ## Test Status
 
+- ARA-032 final provider-free gate: Ruff format/lint, imports, repository-safety self-test,
+  worktree/staged safety scans, and pytest passed after explicit staging (`309 passed, 184 subtests
+  passed in 8.96s`; 100 tracked files and zero findings).
+- ARA-032 related analytics/compare/metrics suite passed `26 passed`; six focused non-finite,
+  negative-ranking, finite-extreme, and finite-total compatibility regressions passed together.
+- Two independent final reviews returned GO. One exercised 300,000 ordinary score groups against
+  the historical rounded-average path plus 1–512 maximum-float matrices; the other checked mixed
+  extreme signs, zero, negative scores, legacy strings, trend direction, and strict JSON.
+- ARA-032 pre-fix reproduction: malformed score strings produced `nan`/`Infinity`, a false `flat`
+  trend, selected the malformed run over a valid score-75 run, and raised `ValueError` under strict
+  JSON serialization.
 - ARA-031 recovery baseline: `make check` passed with Ruff, imports, both safety modes, and pytest
   (`300 passed, 177 subtests passed in 9.02s`; 100 tracked files, zero findings).
 - ARA-031 pre-fix reproduction: provider-free zero-round resume returned success and overwrote the
@@ -697,6 +725,17 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- ARA-032's initial strict-JSON tests failed twice as expected because score-derived output still
+  contained `NaN`; a later huge-integer extension exposed uncaught `OverflowError` before the
+  conversion boundary was widened.
+- Three adversarial regressions then failed as expected: an unscored run outranked a valid `-5.0`
+  run, and finite-extreme average/delta operations escaped as `Infinity`.
+- The first overflow-resistant average passed two `1e308` values but failed three maximum floats;
+  max-absolute scaling corrected that case. Independent review then found the scaled path changed a
+  historical ordinary average from `46.48` to `46.47`; the final implementation preserves the old
+  finite-total path and uses scaling only after overflow.
+- One metadata inspection used unavailable unqualified `python` and returned command-not-found; it
+  was rerun with the repository `.venv/bin/python` without modifying files.
 - `git show --no-patch --format='%H %P %s' REBASE_HEAD` failed with `fatal: bad object REBASE_HEAD` because the stale file references an unavailable object. This is not an active Git operation.
 - The first unproxied push hung without output and was interrupted safely; the command-scoped proxy retry succeeded.
 - One post-push GitHub API verification hit a TLS handshake timeout; scoped `git ls-remote` independently verified the exact remote SHA.
@@ -823,6 +862,8 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.
 - Do not change prompts, scoring semantics, provider behavior, benchmark results, or artifact interpretation as part of a maintenance-only fix.
+- ARA-032 normalizes overall score selection, ranking, trend, average, delta, and their exported
+  fields. It does not claim to sanitize arbitrary non-score metadata embedded in legacy artifacts.
 - ARA-022 blocks static link/hard-link/special-node escapes and link-based active replacement within
   its registered boundary. It is not a hostile same-UID sandbox: real-directory entry replacement,
   post-open/new-temp hard-link races, trusted-anchor ancestors, and Windows active replacement are

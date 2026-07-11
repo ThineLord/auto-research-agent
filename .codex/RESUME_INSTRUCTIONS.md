@@ -46,13 +46,12 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-ARA-031 is `DONE`: resume now rejects an existing invalid `run_config.json` before any automatic
-artifact write, while a genuinely missing config keeps legacy-manifest compatibility. ARA-032 is
-the next `TODO`; ARA-033 follows it. ARA-028 remains `DONE`. The exact fallback `cc20303` is
-remote-equal, reflected in draft PR 13, and verified by push/PR runs
-`29160735068`/`29160736165` on Python 3.10/3.13. Resume from the semantic checkpoint in
+No task is `IN_PROGRESS`. ARA-032 is `DONE` after strict-JSON, negative-ranking, finite-extreme,
+ordinary-rounding, full-gate, and independent adversarial validation; ARA-033 is the next unblocked
+`TODO`. ARA-031 and ARA-028 remain `DONE`. The exact fallback `78b76dc` is remote-equal, reflected in draft PR 13, and
+verified by push/PR runs `29161456466`/`29161457321` on Python 3.10/3.13. Resume from the semantic checkpoint in
 `CURRENT_STATE.md`; use
-`cc203032a29ee0f0020a8bc3005e715db8156212` as the conservative exact externally verified fallback
+`78b76dcea0e8e2b67e25c192944ddc693ed41565` as the conservative exact externally verified fallback
 if the semantic current `HEAD` has not yet been checked.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
@@ -70,7 +69,7 @@ The last successful local full validation command was:
 make check
 ```
 
-The current full expected result is Ruff/import/safety success and `303 passed, 184 subtests
+The current full expected result is Ruff/import/safety success and `309 passed, 184 subtests
 passed`; the ARA-028 recovery-state consistency suite passes `6 passed, 1 subtest passed`, and the
 ARA-022 focused storage/runtime/resume/survey/UI/CLI layer passes `181 passed, 104 subtests passed`.
 Both safety modes should scan only tracked/staged files with zero findings.
@@ -90,10 +89,10 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-There is no active task; ARA-032 is the highest-priority `TODO`, followed by ARA-033. ARA-018
-requires an explicit owner license/distribution decision; ARA-029 requires approval before changing
-CI configuration; ARA-030 requires separate greater-than-30-minute approval. Do not start ARA-019,
-ARA-026, ARA-006, or ARA-007 until their recorded dependencies are satisfied.
+ARA-032 is complete and ARA-033 is the next unblocked task. ARA-018 requires an explicit owner
+license/distribution decision; ARA-029 requires approval before changing CI configuration; ARA-030
+requires separate greater-than-30-minute approval. Do not start ARA-019, ARA-026, ARA-006, or
+ARA-007 until their recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
 

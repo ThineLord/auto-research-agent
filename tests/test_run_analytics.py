@@ -13,6 +13,10 @@ from src.run_analytics import analyze_run, write_run_analysis
 
 
 class RunAnalyticsTests(unittest.TestCase):
+    @staticmethod
+    def _reject_json_constant(value: str) -> None:
+        raise ValueError(f"non-standard JSON constant: {value}")
+
     def test_safe_analysis_treats_invalid_utf8_metrics_as_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             run_root = Path(tmp) / "run"
@@ -139,6 +143,78 @@ class RunAnalyticsTests(unittest.TestCase):
         self.assertEqual(analysis["score"]["latest_score"], 72.0)
         self.assertEqual(analysis["score"]["score_delta_first_to_latest"], 11.5)
         self.assertEqual(analysis["score"]["trend"], "improved")
+
+    def test_non_finite_scores_are_ignored_and_output_is_strict_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "runs" / "non-finite-scores"
+            run_root.mkdir(parents=True)
+            (run_root / "run_summary.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "non-finite-scores",
+                        "best_score": "nan",
+                        "average_score": "Infinity",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (run_root / "round_metrics.json").write_text(
+                json.dumps(
+                    [
+                        {"round": 1, "score": float("nan")},
+                        {"round": 2, "score": 60},
+                        {"round": 3, "score": "Infinity"},
+                        {"round": 4, "score": "75.0"},
+                        {"round": 5, "score": 10**400},
+                        {"round": 6, "score": "-Infinity"},
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            output_path = Path(tmp) / "analysis.json"
+
+            analysis = write_run_analysis(run_root, output_path)
+            strict_payload = json.loads(
+                output_path.read_text(encoding="utf-8"),
+                parse_constant=self._reject_json_constant,
+            )
+
+        self.assertEqual(analysis["score"]["best_score"], 75.0)
+        self.assertEqual(analysis["score"]["average_score"], 67.5)
+        self.assertEqual(analysis["score"]["first_round"], 2)
+        self.assertEqual(analysis["score"]["first_score"], 60.0)
+        self.assertEqual(analysis["score"]["latest_round"], 4)
+        self.assertEqual(analysis["score"]["latest_score"], 75.0)
+        self.assertEqual(analysis["score"]["score_delta_first_to_latest"], 15.0)
+        self.assertEqual(analysis["score"]["trend"], "improved")
+        self.assertEqual(strict_payload, analysis)
+
+    def test_finite_extreme_score_delta_does_not_escape_strict_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "runs" / "finite-extreme-scores"
+            run_root.mkdir(parents=True)
+            (run_root / "round_metrics.json").write_text(
+                json.dumps(
+                    [
+                        {"round": 1, "score": -1e308},
+                        {"round": 2, "score": 1e308},
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            output_path = Path(tmp) / "analysis.json"
+
+            analysis = write_run_analysis(run_root, output_path)
+            strict_payload = json.loads(
+                output_path.read_text(encoding="utf-8"),
+                parse_constant=self._reject_json_constant,
+            )
+
+        self.assertEqual(analysis["score"]["first_score"], -1e308)
+        self.assertEqual(analysis["score"]["latest_score"], 1e308)
+        self.assertIsNone(analysis["score"]["score_delta_first_to_latest"])
+        self.assertEqual(analysis["score"]["trend"], "improved")
+        self.assertEqual(strict_payload, analysis)
 
     def test_cli_analyze_wrapper_masks_paths_and_writes_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
