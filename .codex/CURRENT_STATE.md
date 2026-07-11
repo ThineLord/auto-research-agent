@@ -1,30 +1,31 @@
 # Codex Current State
 
-Updated: 2026-07-11 (Asia/Shanghai)
+Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: preserve the completed ARA-022 automatic-artifact boundary and wait for an explicit
-  owner policy decision before release-policy work; no unblocked implementation task remains.
+- Current goal: preserve the completed ARA-028 self-resolving recovery contract and stop at the
+  explicit approval gates for policy, CI-configuration, and larger packaging follow-ups.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `93026caef879a3b1ec1c935b362e85c77d4e7567` (the exact HEAD
+- State recorded against commit: `ca3a2e8c520bb50fa3e655c7320a3736ef502888` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `93026caef879a3b1ec1c935b362e85c77d4e7567` (exact local,
+- Last externally verified fallback: `ca3a2e8c520bb50fa3e655c7320a3736ef502888` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-022 is `DONE`: implementation `544b26a` and Python-3.10
-  portability fix `93026ca` are pushed and remote-equal; replacement push/PR runs
-  `29153023802`/`29153024964` passed Python 3.10 and 3.13. Remaining queue items are owner-blocked or
-  deferred release-policy work.
+- Active task at this snapshot: none. ARA-028 is `DONE`; the persistent cross-file consistency
+  regression passes after removing stale worktree, recursive-closeout, active-task, and fallback
+  claims. Resolve the semantic current `HEAD`, worktree, upstream, remote, and CI state live; use
+  only the exact conservative externally verified fallback recorded above.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
-## Files Changed By The Active ARA-022 Worktree
+## Live Worktree Interpretation
 
-- Only recovery-state records remain uncommitted. Resolve the exact live list with
-  `git status --short`; implementation, tests, public docs, and decisions are committed.
+- This committed snapshot does not assert a static dirty-file list. Resolve the exact live state
+  with `git status --short --branch`; a clean checkout of the commit containing this file has no
+  task-owned worktree changes.
 
 ## Completed Steps
 
@@ -424,15 +425,37 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Moved `Path` construction before the mock, reran `make check` (`294 passed, 176 subtests passed`),
   committed the portable regression as `93026ca`, pushed, and verified exact remote equality.
 
+## ARA-028 Recovery-State Regression
+
+- Recovered a clean branch at `ca3a2e8`, verified exact local/upstream/`ls-remote` equality, and
+  confirmed closeout push/PR runs `29153184085`/`29153185119` passed Python 3.10 and 3.13.
+- Reproduced four stale-state failures: the queue and active-task snapshot disagreed, the worktree
+  section claimed files remained uncommitted, remaining steps requested the already-completed
+  ARA-022 closeout, and a JSON note named an obsolete fallback commit.
+- Added a tracked recovery-state consistency regression covering live worktree sourcing,
+  recursive-closeout instructions, active-task synchronization, semantic HEAD structure, and the
+  single conservative external fallback contract.
+
 ## Remaining Steps
 
-- Create and push the state-only ARA-022 closeout commit, then verify local/upstream/`ls-remote`
-  equality and its push/PR CI without reopening implementation work.
-- Stop at the queue policy gate. ARA-018 needs the owner's legal/distribution decision; ARA-019,
-  ARA-026, ARA-006, and ARA-007 remain deferred under recorded dependencies.
+- No task-owned recovery work remains. Resolve current Git and CI state live at the next start.
+- Stop at the recorded approval gates. ARA-018 needs the owner's legal/distribution decision;
+  ARA-029 requires configuration-change approval; ARA-030 requires approval for its separately
+  scoped packaging/CI work; ARA-019, ARA-026, ARA-006, and ARA-007 remain deferred.
 
 ## Test Status
 
+- ARA-028 recovery baseline: `make check` passed with Ruff, imports, both safety modes, and pytest
+  (`294 passed, 176 subtests passed in 9.52s`; 99 tracked files, zero findings).
+- ARA-028 pre-fix regression: `4 failed, 1 passed`; each failure maps to a confirmed stale or
+  contradictory recovery-state claim, with no runtime code exercised.
+- ARA-028 focused post-fix regression: `6 passed, 1 subtest passed`; independent review exposed two
+  omitted cross-file checks and two classifier counterexamples, each added before final validation.
+- ARA-028 final provider-free gate: Ruff format/lint, imports, repository-safety self-test, worktree
+  and staged safety scans, and pytest passed after explicit staging (`300 passed, 177 subtests passed
+  in 9.07s`; 100 tracked files and zero safety findings).
+- Independent final staged-diff review: GO; both classifier counterexamples are rejected, explicit
+  fallback labels agree, shallow CI is supported, and no remaining blocker or P1/P2 was found.
 - ARA-022 start baseline: `make check` passed with Ruff, imports, both safety modes, and pytest
   (`246 passed, 172 subtests passed in 3.72s`; 99 tracked files, zero findings).
 - ARA-022 focused final layer passed (`181 passed, 104 subtests passed`); independent full pytest
@@ -759,6 +782,14 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Two clean `SOURCE_DATE_EPOCH=0` builds produced identical wheels but non-identical sdists because
   generated directories/metadata retained build timestamps. The sdist tar headers also recorded
   local owner/group identity; the artifact was kept in `/tmp` and was not uploaded.
+- The initial ARA-028 regression produced the expected four failures for stale worktree,
+  active-task, recursive-closeout, and fallback claims. Independent review then exposed two omitted
+  resume-state checks; the strengthened test failed until both cross-file inconsistencies were fixed.
+- One stale-wording audit placed a backticked task-state token inside a double-quoted zsh pattern,
+  causing a harmless `command not found`. A literal-safe rerun completed; no file or Git state changed.
+- The first synthetic recursive-closeout classifier run had one incorrect expected string with an
+  extra leading newline; the classifier output was correct, the fixture was fixed, and all six
+  focused tests passed.
 
 ## Next Command
 
@@ -792,4 +823,6 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - ARA-022 changes the filesystem trust/write policy and is high risk. Owner approval was received;
   preserve configured `runs/` storage-link compatibility and fail closed on unsupported no-follow
   primitives rather than silently widening the trust boundary.
+- Do not start ARA-029 without explicit CI-configuration approval or ARA-030 without its separate
+  greater-than-30-minute approval checkpoint; keep release policy out of both scopes.
 - Do not stage with `git add -A`; stage only reviewed paths.

@@ -202,13 +202,14 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## KI-025 - Committed recovery snapshots permanently lag their containing closeout
 
-- Status: fixed in the self-resolving recovery snapshot; verify current Git/CI state live
+- Status: fixed again with a persistent cross-file regression; verify current Git/CI state live
 - Severity: P2 recovery accuracy
 - Impact: each state-only closeout embeds its parent SHA and pending/dirty authoring state, so a
   later recovery can mistake an already pushed and CI-verified closeout for unfinished work.
-- Current action: task `ARA-025` completed; legacy exact SHA fields remain compatible while the
-  authoritative semantic HEAD reference, live worktree source, and exact external-verification
-  evidence prevent recursive closeout instructions.
+- Current action: ARA-022's state-only closeout regressed the ARA-025 contract by retaining stale
+  worktree and closeout instructions. Task `ARA-028` removed those claims, synchronized the current
+  exact fallback, and added a test that checks current/task/resume/validation state together. Legacy
+  exact SHA fields remain compatible; semantic `HEAD` and live Git/CI verification stay authoritative.
 
 ## KI-026 - Source-distribution metadata is not identity-neutral or reproducible
 

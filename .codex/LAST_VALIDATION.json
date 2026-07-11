@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T20:45:26+08:00",
+  "recorded_at": "2026-07-12T00:54:15+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "93026caef879a3b1ec1c935b362e85c77d4e7567",
-  "last_known_stable_commit": "93026caef879a3b1ec1c935b362e85c77d4e7567",
+  "head_commit": "ca3a2e8c520bb50fa3e655c7320a3736ef502888",
+  "last_known_stable_commit": "ca3a2e8c520bb50fa3e655c7320a3736ef502888",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "93026caef879a3b1ec1c935b362e85c77d4e7567",
+  "state_recorded_against_commit": "ca3a2e8c520bb50fa3e655c7320a3736ef502888",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-11T20:42:38+08:00",
-    "commit": "93026caef879a3b1ec1c935b362e85c77d4e7567",
+    "verified_at": "2026-07-12T00:40:49+08:00",
+    "commit": "ca3a2e8c520bb50fa3e655c7320a3736ef502888",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29153023802,
+        "run_id": 29153184085,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "93026caef879a3b1ec1c935b362e85c77d4e7567",
+        "head_sha": "ca3a2e8c520bb50fa3e655c7320a3736ef502888",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29153024964,
+        "run_id": 29153185119,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "93026caef879a3b1ec1c935b362e85c77d4e7567",
+        "head_sha": "ca3a2e8c520bb50fa3e655c7320a3736ef502888",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,132 @@
       }
     }
   },
-  "status": "ara022_complete_remote_equal_ci_verified",
+  "status": "ara028_complete_recovery_state_consistency_verified",
   "commands": [
+    {
+      "command": "independent final ARA-028 staged-diff review",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "blocking_findings_remaining": 0,
+        "focused_tests": "6 passed, 1 subtest passed",
+        "staged_files_scanned": 100,
+        "safety_findings": 0,
+        "fallback_labels_consistent": true,
+        "recursive_closeout_counterexamples_rejected": true,
+        "shallow_ci_supported": true
+      }
+    },
+    {
+      "command": "make check after staging the final ARA-028 recovery-state regression",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 57,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 100,
+        "findings": 0,
+        "pytest_tests_passed": 300,
+        "pytest_subtests_passed": 177,
+        "pytest_duration_seconds": 9.07
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_recovery_state.py after adversarial classifier corrections",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 6,
+        "pytest_subtests_passed": 1,
+        "fallback_matching": "explicit_labels_only",
+        "recursive_closeout_counterexamples": "passed"
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_recovery_state.py after initial cross-file synchronization",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 4,
+        "pytest_subtests_passed": 3,
+        "json_parse": "passed",
+        "git_diff_check": "passed"
+      }
+    },
+    {
+      "command": "make check before final adversarial classifier corrections",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 57,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 99,
+        "findings": 0,
+        "pytest_tests_passed": 298,
+        "pytest_subtests_passed": 179,
+        "pytest_duration_seconds": 8.98
+      }
+    },
+    {
+      "command": "ARA-028 recovery baseline and live remote/PR verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "ca3a2e8c520bb50fa3e655c7320a3736ef502888",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "ahead": 0,
+        "behind": 0,
+        "worktree_clean": true,
+        "push_run_id": 29153184085,
+        "pull_request_run_id": 29153185119,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed"
+      }
+    },
+    {
+      "command": "make check before ARA-028 recovery-state correction",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 56,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 99,
+        "findings": 0,
+        "pytest_tests_passed": 294,
+        "pytest_subtests_passed": 176,
+        "pytest_duration_seconds": 9.52
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_recovery_state.py (pre-fix)",
+      "exit_code": 1,
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "pytest_failed": 4,
+        "pytest_passed": 1,
+        "causes": [
+          "active task disagreed with the queue",
+          "committed worktree section claimed recovery files remained uncommitted",
+          "remaining steps requested the already-completed state-only closeout",
+          "a validation note named an obsolete second fallback"
+        ]
+      }
+    },
     {
       "command": "make check after ARA-022 recovery-state closeout updates",
       "exit_code": 0,
@@ -566,6 +690,45 @@
   ],
   "failures": [
     {
+      "command": "first synthetic ARA-028 recursive-closeout classifier run",
+      "result": "corrected_before_commit",
+      "summary": {
+        "pytest_failed": 1,
+        "pytest_passed": 5,
+        "pytest_subtests_passed": 1,
+        "cause": "the test fixture expected an extra leading newline while the classifier returned the correct bullet text",
+        "production_or_classifier_failure": false
+      }
+    },
+    {
+      "command": "first ARA-028 stale-wording rg audit",
+      "result": "corrected_and_rerun",
+      "summary": {
+        "cause": "backticks inside a double-quoted zsh search pattern attempted to execute the literal task-state token",
+        "file_or_git_impact": "none",
+        "replacement_scan": "literal-safe single-quoted pattern completed with only the expected regression-test sentinel match"
+      }
+    },
+    {
+      "command": "strengthened ARA-028 cross-file regression before resume synchronization",
+      "result": "expected_intermediate_failure",
+      "summary": {
+        "pytest_failed": 2,
+        "pytest_passed": 2,
+        "pytest_subtests_passed": 1,
+        "cause": "independent review exposed stale active-task and exact-fallback claims in RESUME_INSTRUCTIONS.md"
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_recovery_state.py (pre-fix)",
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "pytest_failed": 4,
+        "pytest_passed": 1,
+        "cause": "the ARA-022 closeout reintroduced stale worktree, active-task, recursive-closeout, and fallback claims that ARA-025 intended to prevent"
+      }
+    },
+    {
       "command": "GitHub Actions runs 29152939334 and 29152940413 at implementation 544b26a",
       "result": "corrected_and_replacement_ci_started",
       "summary": {
@@ -684,6 +847,8 @@
     }
   ],
   "notes": [
+    "ARA-028 removes the ARA-022 stale authored-worktree and recursive-closeout regression and adds a persistent cross-file consistency test.",
+    "Recovery-state tests now compare CURRENT_STATE, TASK_QUEUE, RESUME_INSTRUCTIONS, and LAST_VALIDATION without invoking Git, so shallow CI checkouts remain supported.",
     "Initial ARA-022 CI exposed a Python 3.10-only test construction bug; production behavior, Python 3.13 CI, and all local gates were green. The correction is committed/pushed as 93026ca and replacement CI passed.",
     "ARA-022 implementation, tests, and threat-model documentation are complete, pushed, remote-equal, reflected in draft PR 13, and Python 3.10/3.13 CI-verified.",
     "The automatic boundary registry is process-wide so worker threads and UI reruns share it; nested run roots inherit or rebase to the project anchor.",
@@ -696,7 +861,7 @@
     "Owner approved the 45-90 minute ARA-004 package-resource and writable-workspace implementation on 2026-07-11.",
     "KI-023 remained untouched; all ARA-004 build/install/mock validation used temporary isolated workspaces and excluded source-tree imports.",
     "ARA-025 uses an additive schema-v1 semantic HEAD reference and never requires a recursive state-only closeout.",
-    "Current worktree, branch, upstream, remote, and CI state must be resolved live; 0aee55e is the exact conservative externally verified fallback for this snapshot.",
+    "Current worktree, branch, upstream, remote, and CI state must be resolved live; the exact conservative externally verified fallback is recorded only in last_external_verification.commit.",
     "ARA-004 implementation 0aee55e is pushed, remote-equal, CI-verified, and reflected in draft PR 13.",
     "The installed runtime uses package resources read-only, the invocation CWD as workspace, and no foreign CWD Git provenance.",
     "Only an implicit installed mock default may seed the bundled example task; explicit, partial, custom, and non-mock paths do not seed or overwrite.",

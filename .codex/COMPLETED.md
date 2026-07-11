@@ -390,3 +390,21 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed implementation as `544b26a` and the Python-3.10 portability fix as `93026ca`, pushed
   both, verified exact local/upstream/`ls-remote` equality, updated draft PR 13, and confirmed push
   run `29153023802` plus pull-request run `29153024964` passed every Python 3.10/3.13 job.
+
+## 2026-07-12 - Persistent recovery-state consistency gate
+
+- Recovered ARA-022 closeout `ca3a2e8` as a clean, remote-equal, CI-verified baseline, then confirmed
+  its committed recovery snapshot still claimed uncommitted files and requested the already-finished
+  closeout again.
+- Added a focused regression that initially failed on stale worktree, active-task,
+  recursive-closeout, and fallback claims, then expanded it after independent review to validate
+  `CURRENT_STATE.md`, `TASK_QUEUE.md`, `RESUME_INSTRUCTIONS.md`, and `LAST_VALIDATION.json` together.
+- Replaced authored dirty-file claims with live Git sourcing, removed task-owned recursive closeout
+  steps, synchronized the exact conservative fallback, and preserved semantic `HEAD` as the
+  authoritative current commit reference.
+- Kept runtime code, ignored project state, provider behavior, artifacts, experiments, dependency,
+  license, version, and publication policy unchanged.
+- Final staged `make check` passed with Ruff, imports, both repository-safety modes, and pytest
+  (`300 passed, 177 subtests passed in 9.07s`; 100 tracked files and zero findings).
+- Independent final staged review returned GO with no remaining blocker after directly exercising
+  both unattributed commit/push counterexamples and the explicit fallback-label parser.

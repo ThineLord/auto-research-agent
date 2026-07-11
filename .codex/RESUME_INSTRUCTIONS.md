@@ -46,10 +46,11 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-ARA-022 is `DONE`. Implementation `544b26a` and Python-3.10 test portability fix `93026ca` are
-pushed, remote-equal, reflected in draft PR 13, and verified by push/PR runs
-`29153023802`/`29153024964` on Python 3.10/3.13. Resume from the exact checkpoint in
-`CURRENT_STATE.md`; use `93026caef879a3b1ec1c935b362e85c77d4e7567` as the conservative exact
+ARA-028 is `DONE`; its tracked regression keeps the current task, remaining work, worktree source,
+and fallback semantics synchronized across the recovery files. ARA-022 also remains `DONE`. Its
+closeout `ca3a2e8` is remote-equal, reflected in draft PR 13, and verified by push/PR runs
+`29153184085`/`29153185119` on Python 3.10/3.13. Resume from the semantic checkpoint in
+`CURRENT_STATE.md`; use `ca3a2e8c520bb50fa3e655c7320a3736ef502888` as the conservative exact
 externally verified fallback if the semantic current `HEAD` has not yet been checked.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
@@ -67,9 +68,10 @@ The last successful local full validation command was:
 make check
 ```
 
-The current full expected result is Ruff/import/safety success and `294 passed, 176 subtests
-passed`; the ARA-022 focused storage/runtime/resume/survey/UI/CLI layer passes `181 passed, 104
-subtests passed`. Both safety modes should scan only tracked/staged files with zero findings.
+The current full expected result is Ruff/import/safety success and `300 passed, 177 subtests
+passed`; the ARA-028 recovery-state consistency suite passes `6 passed, 1 subtest passed`, and the
+ARA-022 focused storage/runtime/resume/survey/UI/CLI layer passes `181 passed, 104 subtests passed`.
+Both safety modes should scan only tracked/staged files with zero findings.
 Resolve `HEAD`, compare it with upstream and `ls-remote`, and inspect current PR checks before
 starting another task. If the current HEAD lacks successful remote evidence, use
 `last_external_verification.commit` as the conservative stable fallback. Do not restart ARA-005.
@@ -87,8 +89,9 @@ ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019
 and ARA-007 remain deferred under their recorded dependencies.
 
 There is no unblocked implementation task in the queue. ARA-018 requires an explicit owner
-license/distribution decision; do not start ARA-019, ARA-026, ARA-006, or ARA-007 until their
-recorded policy/publication dependencies are satisfied.
+license/distribution decision; ARA-029 requires approval before changing CI configuration; ARA-030
+requires approval for its separately scoped greater-than-30-minute packaging/CI work. Do not start
+ARA-019, ARA-026, ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
 

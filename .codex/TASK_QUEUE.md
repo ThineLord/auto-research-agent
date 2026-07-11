@@ -1,6 +1,6 @@
 # Codex Task Queue
 
-Updated: 2026-07-11 (Asia/Shanghai)
+Updated: 2026-07-12 (Asia/Shanghai)
 
 Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
@@ -139,6 +139,58 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   `make check`.
 - Commit required: yes.
 - Dependencies: ARA-005 verified closeout `3fa33a7`.
+
+## ARA-028 - Prevent stale recursive closeout recovery instructions
+
+- Status: `DONE`
+- Priority: P1
+- Risk: low
+- Description: the committed ARA-022 closeout still claims recovery records remain uncommitted and
+  instructs the next run to create the closeout again, contradicting the live clean, pushed, and
+  CI-verified state and regressing ARA-025's self-resolving recovery contract.
+- Related files: `.codex/CURRENT_STATE.md`, `.codex/LAST_VALIDATION.json`, recovery-state tests and
+  completion records
+- Acceptance criteria: current recovery sections source worktree state from live Git, never request
+  their own already-completed closeout, use one authoritative conservative external fallback, and a
+  tracked regression test rejects the stale authored-state patterns.
+- Validation command: `.venv/bin/python -m pytest -q tests/test_recovery_state.py`, JSON/ancestry
+  assertions, `git diff --check`, and `make check`.
+- Commit required: yes.
+- Dependencies: ARA-025 and verified ARA-022 closeout `ca3a2e8`.
+
+## ARA-029 - Minimize CI token permissions and bound job runtime
+
+- Status: `DEFERRED`
+- Priority: P2
+- Risk: low
+- Description: the CI workflow does not explicitly restrict `GITHUB_TOKEN` to read-only contents or
+  set a job timeout, so it inherits repository defaults and the platform runtime ceiling.
+- Related files: `.github/workflows/ci.yml`, CI documentation
+- Acceptance criteria: CI has only the permissions it needs and a documented bounded timeout while
+  preserving Python 3.10/3.13 push and pull-request behavior.
+- Validation command: local YAML/action validation when available, followed by all four push/PR CI
+  jobs.
+- Commit required: yes.
+- Dependencies: explicit approval before changing configuration under the repository workflow
+  protocol; keep dependency, release, and publication policy out of scope.
+
+## ARA-030 - Add an isolated real-wheel install smoke to CI
+
+- Status: `DEFERRED`
+- Priority: P2
+- Risk: medium
+- Description: CI installs only the editable checkout, while the installed-layout unit fixture
+  copies `src/`; a future build-backend or package-data regression could therefore bypass CI despite
+  ARA-004's one-time isolated wheel verification.
+- Related files: package-resource tests, CI workflow, packaging smoke helpers
+- Acceptance criteria: a temporary source-excluded wheel install verifies its import origin, exact
+  bundled resources, console/module help, and one-round mock behavior without upload, sdist work,
+  provider calls, or repository ignored-artifact mutation.
+- Validation command: isolated wheel build/install smoke, `make check`, then Python 3.10/3.13
+  push/pull-request CI.
+- Commit required: yes.
+- Dependencies: separately approved greater-than-30-minute packaging/CI task; ARA-018, ARA-026,
+  version, dependency, and publication policy remain out of scope.
 
 ## ARA-011 - Prevent failed rounds from replacing a trusted best output
 

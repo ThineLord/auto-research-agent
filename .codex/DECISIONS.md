@@ -227,3 +227,16 @@
 - Release boundary: the validated temporary sdist is not publishable because its tar metadata
   contains local owner/group identity and nondeterministic generated timestamps. ARA-026 owns that
   follow-up; ARA-018 still requires the owner's license decision.
+
+## 2026-07-12 - Treat recovery metadata as a cross-file tested contract
+
+- Decision: keep committed worktree state live-resolved, allow at most one `IN_PROGRESS` task, and
+  require `CURRENT_STATE.md`, `TASK_QUEUE.md`, `RESUME_INSTRUCTIONS.md`, and
+  `LAST_VALIDATION.json` to agree on the active task and conservative external fallback.
+- Recursive-closeout rule: a remaining-work bullet that asks for commit, push, checkpoint, or
+  closeout work must name exactly the current `IN_PROGRESS` task. Once no task is active, committed
+  recovery state cannot retain task-owned finalization instructions.
+- Reason: the ARA-022 closeout repeated the stale authored-state pattern that ARA-025 had corrected;
+  one-time assertions did not prevent a later manual closeout from reintroducing it.
+- Compatibility: semantic `HEAD`, schema-v1 exact fallback fields, historical evidence, ignored
+  runtime state, provider behavior, artifacts, experiments, and release policy remain unchanged.
