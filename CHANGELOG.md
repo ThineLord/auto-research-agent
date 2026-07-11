@@ -4,6 +4,10 @@
 
 ### Security
 
+* Tracked reports now replace real local account names with explicit redaction wording. Local and
+  CI validation scan only files reported by `git ls-files` for personal home paths, high-confidence
+  provider/token shapes, and private-key headers without echoing matched values or reading ignored
+  runtime artifacts.
 * Provider event messages and displayed Gemini exception tracebacks now redact the exact configured
   API key, including credentials supplied through a custom environment variable, even when the
   upstream error echoes a key that does not match a known token pattern.

@@ -20,12 +20,18 @@ Useful local commands:
 make format
 make lint
 make import-check
+make repo-safety
 make test
 make check
 ```
 
 Use `make check` before committing. It matches the CI sequence: Ruff format check, Ruff lint,
-import smoke check, and `pytest -q`.
+import smoke check, a tracked-file personal-path/high-confidence-secret scan, and `pytest -q`.
+The safety scan reads the tracked worktree and complete stage-0 index, never follows tracked
+symlinks or enumerates ignored runtime artifacts, and reports only relative file names, line
+numbers, and finding categories instead of echoing matched values.
+The worktree scan requires descriptor-relative no-follow filesystem support and fails closed when
+that support is unavailable; `--staged` remains available for inspecting the complete index.
 
 ## Stable Milestone Workflow
 

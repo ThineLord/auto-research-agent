@@ -293,7 +293,8 @@ CI 使用 Python 3.10 和 3.13，执行和本地完整检查相同的步骤：
 make check
 ```
 
-这个命令会检查 Ruff 格式、Ruff lint、基础导入安全和测试套件。CI 不会启动 Ollama
+这个命令会检查 Ruff 格式、Ruff lint、基础导入、Git 跟踪文件中的个人路径/高置信密钥模式，
+以及测试套件。CI 不会启动 Ollama
 或运行需要本地模型的研究流程。
 
 ## Graphical UI

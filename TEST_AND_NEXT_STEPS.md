@@ -106,8 +106,8 @@ methodology changes until after the release candidate has been tried by humans.
 * result: Pass
 * evidence: scanned 80 source files, collected 4 unique papers, saved `survey_report.md`,
   `paper_metadata.json`, and `related_work.md`.
-* notes: `rg -n "/Users/hanzhiyou|/private/var|/tmp" projects/example/survey` found no local
-  absolute path hits.
+* notes: `rg -n` found no local absolute path hits for the macOS home prefix (account name redacted
+  in this report), `/private/var`, or `/tmp` under `projects/example/survey`.
 
 * command/check: `.venv/bin/python -m pytest tests/test_literature_survey.py -q`
 * result: Pass
@@ -175,8 +175,8 @@ methodology changes until after the release candidate has been tried by humans.
 
 * command/check: stale ignored log scan
 * result: Known legacy/stale artifact risk
-* evidence: old `projects/example/run.log` entries from pre-hardening runs contain
-  `/Users/hanzhiyou/GitHub_Repository/...`.
+* evidence: old `projects/example/run.log` entries from pre-hardening runs contain a local macOS
+  home path (account name redacted in this report).
 * notes: This is not a current-output regression, but users should avoid sharing old ignored logs
   without review.
 
@@ -323,8 +323,8 @@ methodology changes until after the release candidate has been tried by humans.
 * severity: low
 * reproducibility: Reproduced on this workspace's existing ignored artifacts.
 * affected workflow: Sharing old generated logs/artifacts after the privacy hardening release.
-* evidence: `rg` over full `projects/example/run.log` found older absolute `/Users/hanzhiyou/...`
-  entries; fresh mock log entries from this review use `projects/example/...`.
+* evidence: `rg` over full `projects/example/run.log` found older absolute macOS home paths (account
+  name redacted in this report); fresh mock log entries from this review use `projects/example/...`.
 * recommended fix: Keep code as-is. Add a human release-note reminder not to share pre-hardening
   ignored logs without review, or manually rotate old local logs outside Git.
 * whether fixed now or deferred: Deferred. Automatic deletion would be destructive.

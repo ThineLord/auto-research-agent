@@ -42,5 +42,11 @@ jobs:
       - name: Import smoke check
         run: python scripts/import_check.py
 
+      - name: Repository safety scan
+        run: |
+          python scripts/check_repo_safety.py --self-test
+          python scripts/check_repo_safety.py
+          python scripts/check_repo_safety.py --staged
+
       - name: Run tests
         run: python -m pytest -q

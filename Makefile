@@ -9,7 +9,7 @@ DEV_STAMP := $(VENV)/.install-dev.stamp
 
 .DEFAULT_GOAL := help
 
-.PHONY: help bootstrap venv install install-dev format format-check lint import-check test check ci run diagnostic continuous resume session survey mock ui
+.PHONY: help bootstrap venv install install-dev format format-check lint import-check repo-safety test check ci run diagnostic continuous resume session survey mock ui
 
 help:
 	@printf "%s\n" \
@@ -21,8 +21,9 @@ help:
 		"  make format-check  Verify Python formatting" \
 		"  make lint          Run Ruff lint checks" \
 		"  make import-check  Import all project modules" \
+		"  make repo-safety   Scan tracked files for personal paths and secrets" \
 		"  make test          Run the automated test suite" \
-		"  make check         Run formatting, lint, imports, and tests" \
+		"  make check         Run formatting, lint, imports, safety, and tests" \
 		"  make run           Run the normal research workflow" \
 		"  make diagnostic    Run the diagnostic workflow" \
 		"  make continuous    Run continuous mode" \
@@ -69,10 +70,15 @@ lint: install-dev
 import-check: install-dev
 	$(VENV_PYTHON) scripts/import_check.py
 
+repo-safety: install-dev
+	$(VENV_PYTHON) scripts/check_repo_safety.py --self-test
+	$(VENV_PYTHON) scripts/check_repo_safety.py
+	$(VENV_PYTHON) scripts/check_repo_safety.py --staged
+
 test: install-dev
 	$(VENV_PYTHON) -m pytest -q
 
-check: format-check lint import-check test
+check: format-check lint import-check repo-safety test
 
 ci: check
 
