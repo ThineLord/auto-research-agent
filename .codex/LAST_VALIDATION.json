@@ -1,18 +1,29 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T12:45:14+08:00",
+  "recorded_at": "2026-07-11T13:09:19+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "975559d1e6832c75ba1d909cc5bebe8f13335f05",
-  "last_known_stable_commit": "975559d1e6832c75ba1d909cc5bebe8f13335f05",
-  "status": "ara016_remote_verified_closeout_pending",
+  "head_commit": "588e32c6c2692e421fe5439361bbb6595584642f",
+  "last_known_stable_commit": "588e32c6c2692e421fe5439361bbb6595584642f",
+  "status": "ara014_implementation_committed_pending_remote_verification",
   "commands": [
     {
-      "command": ".venv/bin/python -m pytest -q tests/test_repo_safety.py",
+      "command": ".venv/bin/python -m pytest -q tests/test_benchmark_report.py",
       "exit_code": 0,
       "result": "passed",
       "summary": {
         "pytest_tests_passed": 11,
-        "pytest_duration_seconds": 0.23
+        "pytest_subtests_passed": 20,
+        "pytest_duration_seconds": 0.04
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_benchmark_report.py tests/test_run_compare.py tests/test_run_config.py tests/test_storage.py tests/test_run_analytics.py",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 33,
+        "pytest_subtests_passed": 14,
+        "pytest_duration_seconds": 0.13
       }
     },
     {
@@ -26,9 +37,9 @@
         "repo_safety_self_test": "passed",
         "repo_safety_worktree": "passed",
         "repo_safety_staged": "passed",
-        "pytest_tests_passed": 217,
-        "pytest_subtests_passed": 134,
-        "pytest_duration_seconds": 2.55
+        "pytest_tests_passed": 224,
+        "pytest_subtests_passed": 154,
+        "pytest_duration_seconds": 2.36
       }
     },
     {
@@ -44,9 +55,16 @@
       }
     },
     {
-      "command": "Python 3.10 AST parse for scanner and focused tests",
+      "command": "independent code, reproduction, adversarial, and final delta reviews",
       "exit_code": 0,
-      "result": "passed"
+      "result": "passed_after_corrections",
+      "summary": {
+        "historical_run_misattribution": "fixed",
+        "external_metadata_symlink_read": "fixed",
+        "markdown_private_text_injection": "fixed",
+        "credential_shaped_stop_reason": "fixed",
+        "final_release_blockers": 0
+      }
     },
     {
       "command": "git diff --check and staged diff check",
@@ -54,91 +72,51 @@
       "result": "passed"
     },
     {
-      "command": "independent pattern, test-design, symlink-boundary, and final quality reviews",
-      "exit_code": 0,
-      "result": "passed_after_corrections",
-      "summary": {
-        "confirmed_initial_report_hits": 4,
-        "parent_link_external_read": "fixed",
-        "unsupported_platform_swap_race": "fixed_by_fail_closed_policy",
-        "historical_evidence_wording": "corrected",
-        "final_release_blockers": 0
-      }
-    },
-    {
-      "command": "git commit -m security: add tracked repository safety gate",
+      "command": "git commit -m fix: scope benchmark stop reason to target run",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "implementation_commit": "2b6523cda3d7a7943644692e276b6fdc7270573c"
-      }
-    },
-    {
-      "command": "exact local, remote-tracking, and git ls-remote SHA comparison",
-      "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "verified_commit": "975559d1e6832c75ba1d909cc5bebe8f13335f05"
-      }
-    },
-    {
-      "command": "GitHub Actions push and pull-request run/job verification",
-      "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "push_run_id": 29140074284,
-        "pull_request_run_id": 29140075306,
-        "python_3_10_push": "passed",
-        "python_3_13_push": "passed",
-        "python_3_10_pull_request": "passed",
-        "python_3_13_pull_request": "passed",
-        "repository_safety_steps": "passed_in_all_four_jobs"
-      }
-    },
-    {
-      "command": "GitHub connector draft PR 13 update and readback",
-      "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "draft": true,
-        "open": true,
-        "mergeable": true,
-        "head_commit": "975559d1e6832c75ba1d909cc5bebe8f13335f05",
-        "body_contains_ara016": true
+        "implementation_commit": "588e32c6c2692e421fe5439361bbb6595584642f"
       }
     }
   ],
   "failures": [
     {
-      "command": "initial focused scanner import control",
-      "result": "expected_preimplementation_failure"
+      "command": "initial historical-run mismatch regression",
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "expected_stop_reason": "USER_STOP_REQUESTED",
+        "actual_unrelated_checkpoint_reason": "MAX_ROUNDS",
+        "pytest_failed": 1,
+        "pytest_passed": 4
+      }
     },
     {
-      "command": "initial full staged-index scan",
-      "result": "expected_four_report_findings_before_redaction"
+      "command": "first independent post-fix review",
+      "result": "external_metadata_read_and_markdown_injection_reproduced_then_fixed"
     },
     {
-      "command": "independent parent-directory link reproduction",
-      "result": "external_read_reproduced_then_fixed"
-    },
-    {
-      "command": "independent unsupported-platform fallback audit",
-      "result": "swap_race_reproduced_then_fallback_removed"
+      "command": "final sanitizer review",
+      "result": "credential_shaped_value_reproduced_then_fixed_with_official_allowlist"
     }
   ],
   "not_run": [
     {
+      "check": "GitHub Python 3.10/3.13 push and pull-request matrix",
+      "reason": "The implementation and recovery checkpoint have not been pushed yet."
+    },
+    {
       "check": "real provider smoke",
-      "reason": "The change is provider-free repository validation and report redaction only."
+      "reason": "Benchmark report metadata selection and rendering are provider-free read-only behavior."
     }
   ],
   "notes": [
-    "The scanner reads bytes from git-tracked worktree paths and complete stage-0 index blobs without enumerating ignored artifacts or echoing matched values.",
-    "Worktree reads use descriptor-relative no-follow traversal; platforms without the required primitives fail closed while staged-index scanning remains available.",
-    "The four report edits explicitly state that the account name is redacted and preserve the historical conclusions.",
-    "Ignored projects/example state from KI-023 was not opened, changed, staged, or cleaned.",
-    "ARA-004 remains blocked and no package, provider, prompt, metric, experiment, dependency, or canonical artifact behavior changed.",
-    "Implementation 2b6523c and recovery checkpoint 975559d were pushed; exact SHA equality and all four Python 3.10/3.13 jobs were verified.",
-    "Draft PR 13 was updated through the GitHub connector and remains open, draft, and mergeable; no merge was attempted."
+    "Stop reason precedence is target run summary, config, legacy manifest, then only a positively matched project checkpoint.",
+    "Project checkpoint path and ID conflicts fail closed; unowned or malformed checkpoint data cannot relabel the target.",
+    "Metadata leaves must be regular non-symlink files and pass descriptor identity checks before JSON is read.",
+    "Only official STOP_* constants are reportable; unknown, multiline, private-path, Markdown, and credential-shaped values render as unknown.",
+    "All 10 current stop constants remained reportable in the focused compatibility matrix.",
+    "Ignored runtime artifacts were not opened or modified, and no provider, prompt, metric, score, experiment, or canonical research artifact changed.",
+    "Active non-cooperating parent/path replacement remains the separately tracked ARA-022 boundary."
   ]
 }

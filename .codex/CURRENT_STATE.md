@@ -4,21 +4,22 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: remove confirmed tracked personal-path fragments and add a deterministic tracked-file
-  privacy/safety gate without changing historical findings (`ARA-016`).
+- Current goal: make historical benchmark reports source stop reason from their selected target run
+  and reject unrelated project checkpoints (`ARA-014`).
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `975559d1e6832c75ba1d909cc5bebe8f13335f05`
-- Last known stable commit: `975559d1e6832c75ba1d909cc5bebe8f13335f05` (exact local,
-  remote-tracking, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs passed)
-- Active task: ARA-016 is `DONE`; final verified-state closeout metadata is being prepared. The next
-  highest-value unblocked reproduced defect is ARA-014. ARA-004 remains separately blocked.
-- Uncommitted changes: yes; verified-state closeout metadata only.
+- Current HEAD at state snapshot: `588e32c6c2692e421fe5439361bbb6595584642f`
+- Last known stable commit: `588e32c6c2692e421fe5439361bbb6595584642f` (locally validated
+  ARA-014 implementation; recovery checkpoint, push, PR update, and remote CI remain)
+- Active task: ARA-014 is `IN_PROGRESS`; implementation commit `588e32c` passed focused/full tests
+  and blocker-free independent review. Recovery checkpoint, push, PR update, and CI remain.
+  ARA-016 is done; ARA-004 remains separately blocked.
+- Uncommitted changes: yes; recovery metadata only.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
 - `.codex/TASK_QUEUE.md`
-- `.codex/COMPLETED.md`
+- `.codex/DECISIONS.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
@@ -222,14 +223,41 @@ Updated: 2026-07-11 (Asia/Shanghai)
   pending-status evidence while preserving its open draft state.
 - Verified push run `29140074284` and pull-request run `29140075306`: Python 3.10 and 3.13 all
   passed, including the new repository-safety step in each of the four jobs.
+- Committed and pushed final ARA-016 verified-state closeout `9192df8`, verified exact SHA equality,
+  and confirmed all four Python 3.10/3.13 closeout jobs passed. Draft PR 13 was updated and remains
+  open, draft, and mergeable.
+- Reproduced ARA-014 with a temp historical run: its summary said `USER_STOP_REQUESTED`, while the
+  latest project checkpoint belonged to another run and incorrectly made the report show `MAX_ROUNDS`.
+- Added a regression that failed pre-fix (`1 failed, 4 passed`) for that exact mismatch.
+- Implemented target-run stop-reason precedence: summary, config, legacy manifest, then only a
+  checkpoint whose normalized run root and any supplied run ID match the target; otherwise unknown.
+- Made metadata reads reject symlink/non-regular leaves and descriptor-verify regular files before
+  reading, and restricted rendered stop reasons to the official `STOP_*` constant values.
+- Added absolute/repo/project/runs-relative identity, ID/path conflict, malformed/nonobject JSON,
+  config/manifest fallback, external symlink, directory/FIFO, and Markdown/private-text coverage.
+- Independent delta reviews reproduced external metadata reads, Markdown/private-text injection,
+  and a credential-shaped stop reason surviving the first sanitizer; fixed all three with no-follow
+  regular-file reads and a dynamic official `STOP_*` allowlist. Final review reported green.
+- Committed the scoped implementation, tests, changelog, and developer guidance as `588e32c` with
+  no ignored artifacts, experiment values, providers, prompts, metrics, or unrelated files.
 
 ## Remaining Steps
 
-- Commit and push this final verified-state closeout, verify exact remote SHA and its CI, then start
-  ARA-014 from the clean synchronized branch.
+- Update and commit recovery metadata, then push both commits.
+- Verify exact remote SHA, update PR 13, and verify Python 3.10/3.13 push/PR CI.
 
 ## Test Status
 
+- ARA-014 pre-fix regression: `1 failed, 4 passed`; the report borrowed the unrelated checkpoint's
+  `MAX_ROUNDS` instead of the target summary's `USER_STOP_REQUESTED`.
+- ARA-014 final focused regression: Ruff passed and `tests/test_benchmark_report.py` passed
+  (`11 passed, 20 subtests passed`). Related benchmark/config/storage/analytics tests passed
+  (`33 passed, 14 subtests passed`) before the final metadata hardening additions.
+- Final local `make check`: Ruff format/lint, import smoke, self/worktree/staged safety, and pytest
+  passed (`224 passed, 154 subtests passed in 2.36s`). Final focused rerun after strengthening the
+  symlink fixture remained `11 passed, 20 subtests passed`.
+- Current worktree and staged-index repository-safety scans passed with 91 tracked files and zero
+  findings; `git diff --check` passed. Real provider tests were not needed or run.
 - ARA-016 focused regression: Ruff lint passed and `tests/test_repo_safety.py` passed (`11 passed`).
 - Scanner controls: self-test, tracked worktree, and full staged-index scans passed with 91 tracked
   files, including the scanner and test; no tracked binary/NUL file or gitlink is currently present.
@@ -241,6 +269,8 @@ Updated: 2026-07-11 (Asia/Shanghai)
   the 11 focused tests plus self/worktree/staged scans and reported no release blocker.
 - GitHub Actions at `975559d`: Python 3.10/3.13 passed for both push and pull-request events; the
   repository-safety step passed in all four jobs.
+- Final ARA-016 closeout `9192df8`: exact remote SHA verified and Python 3.10/3.13 passed for both
+  push and pull-request events, including all four safety steps.
 - Real provider smoke was not run because this task only changes repository validation and report
   wording; it makes no provider, prompt, metric, experiment, or runtime behavior change.
 - Final ARA-015 focused regression: `46 passed, 44 subtests passed`; focused Ruff lint and
@@ -408,11 +438,18 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - The final ARA-016 audit proved the first non-`dir_fd` compatibility fallback retained an active
   parent-swap race. The fallback was removed; unsupported platforms now fail closed before reading
   the worktree, while the complete staged-index mode remains available.
+- The initial ARA-014 mismatch regression failed as expected because `write_benchmark_report`
+  unconditionally used the newer project checkpoint. Independent post-fix review then reproduced
+  external metadata symlink reads and Markdown/private-text injection through stop reason; both now
+  have focused regressions and fail-closed handling.
+- A final ARA-014 review showed the enum-style sanitizer still accepted credential-shaped text;
+  rendering is now restricted to official `STOP_*` constants, with every current constant and a
+  synthetic credential-shaped rejection covered.
 
 ## Next Command
 
 ```bash
-git add -- .codex/CURRENT_STATE.md .codex/TASK_QUEUE.md .codex/COMPLETED.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
+git add -- .codex/CURRENT_STATE.md .codex/TASK_QUEUE.md .codex/DECISIONS.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
 ```
 
 ## Interruption Recovery

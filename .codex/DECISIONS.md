@@ -124,3 +124,17 @@
 - Compatibility: ignored runtime artifacts, provider behavior, prompts, metrics, experiment values,
   and historical conclusions remain unchanged. Reports describe the account as redacted rather than
   pretending a placeholder was the original evidence.
+
+## 2026-07-11 - Bind benchmark stop reason to fixed target-run metadata
+
+- Decision: resolve report stop reason from the selected run's fixed `run_summary.json`,
+  `run_config.json`, then legacy `run_manifest.json`; use the mutable project checkpoint only when
+  its normalized root and any supplied run ID positively match the target.
+- Reason: project checkpoint represents the latest run and can silently relabel a historical report.
+  Run-local final metadata is the authoritative target-specific evidence.
+- Safety boundary: read only regular non-symlink metadata leaves with descriptor identity checks,
+  and render only official `STOP_*` constant values. Unknown, private, injected, malformed, or
+  unrelated values become `unknown` rather than being copied into Markdown.
+- Compatibility: all current stop constants, absolute/repository/project/runs-relative checkpoint
+  paths, ID-only legacy checkpoints, and legacy manifest fallback remain covered. Active parent/path
+  replacement remains the separately tracked ARA-022 threat boundary.

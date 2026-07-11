@@ -137,10 +137,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-018 - Historical benchmark report can use another run's stop reason
 
-- Status: reproduced by read-only audit
+- Status: fixed and locally validated; remote push/CI verification pending
 - Severity: P2
 - Impact: a historical target run can be mislabeled from the project's latest checkpoint.
-- Current action: task `ARA-014`.
+- Current action: task `ARA-014`; implementation commit `588e32c` uses fixed target-run metadata and
+  only a positively correlated project checkpoint, with privacy-safe metadata/output handling.
 
 ## KI-019 - Resume can rewrite original run-manifest provenance
 

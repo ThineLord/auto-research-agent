@@ -40,23 +40,23 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-`ARA-016` implementation `2b6523c` and recovery checkpoint `975559d` are pushed and remotely
-verified. All Python 3.10/3.13 push and pull-request jobs passed, including the new safety step.
-Only the final state closeout may remain depending on the interruption point. Compare HEAD/upstream
-and the current state before repeating work. The last stable full validation command was:
+`ARA-014` is locally implemented at `588e32c`; recovery metadata, push, PR update, or remote CI may
+still be pending depending on the interruption point. Compare HEAD/upstream and the current state
+before repeating work. The last stable full validation command was:
 
 ```bash
 make check
 ```
 
-The expected result is Ruff/import/safety success and `217 passed, 134 subtests passed`. Also run
-both scanner modes; each should report 91 tracked files and zero findings. If verified-state metadata
-is still uncommitted, review and stage only the named `.codex` files, then create the closeout commit.
-If the branch is ahead, push normally and verify exact remote SHA plus CI. Once clean and synchronized,
-resume with ARA-014, the highest-value unblocked reproduced defect in the current queue.
+The expected result is Ruff/import/safety success and `224 passed, 154 subtests passed`. Focused
+benchmark validation should report `11 passed, 20 subtests passed`; both safety modes should scan 91
+tracked files with zero findings. If recovery metadata is uncommitted, review and stage only the
+named `.codex` files, then create the checkpoint. If the branch is ahead, push normally, verify exact
+remote SHA, update draft PR 13, and check all Python 3.10/3.13 push/pull-request jobs.
 
 `ARA-004` remains separately blocked. Do not repeat its unsafe local build harness or delete/rewrite
 ignored `projects/example` state; read `KI-005`, `KI-013`, and `KI-023` before any packaging work.
+Active non-cooperating filesystem replacement remains ARA-022 and was not widened into ARA-014.
 
 ## 5. Safety boundaries
 
