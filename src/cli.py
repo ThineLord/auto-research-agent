@@ -616,6 +616,12 @@ def main() -> None:
                 config=config.literature_survey,
                 output_path=survey_output_path,
             )
+        except KeyboardInterrupt:
+            console.print(
+                "[red]Manual interrupt detected in literature survey. "
+                "Stop reason: MANUAL_INTERRUPT[/red]"
+            )
+            raise SystemExit(_EXIT_INTERRUPTED) from None
         except OSError:
             console.print(
                 "[red]Survey artifact error: an automatic output path is unsafe or "

@@ -4,20 +4,20 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: retain the completed, locally validated ARA-036 Judge numeric boundary and continue
-  next with the isolated ARA-037 survey interrupt status contract after live recovery checks.
+- Current goal: retain the completed, locally validated ARA-037 survey interrupt contract and
+  continue next with the isolated ARA-038 cloud-free lazy/write error boundary after live checks.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `a99723c2a6d492faa8935bc0aa24b1e06cea6de2` (the exact HEAD
+- State recorded against commit: `3d13b2fb87c824920b2ed8a63a1662a0e0032ab6` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `a99723c2a6d492faa8935bc0aa24b1e06cea6de2` (exact local,
+- Last externally verified fallback: `3d13b2fb87c824920b2ed8a63a1662a0e0032ab6` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-036 is `DONE` with parser/round-loop, related, full-gate,
-  and independent final review results passing locally. ARA-037 is the next unblocked P2 task. The
-  exact external fallback remains ARA-035 commit `a99723c`; resolve the semantic current `HEAD`,
-  remote, and CI state live.
+- Active task at this snapshot: none. ARA-037 is `DONE` with direct/real-module, related, full-gate,
+  and independent review results passing locally. ARA-038 is the next unblocked P2 task. The exact
+  external fallback remains ARA-036 commit `3d13b2f`; resolve semantic current `HEAD`, remote, and
+  CI state live.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -481,8 +481,8 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Remaining Steps
 
-- Start ARA-037 with survey interrupt unit/subprocess controls; preserve lock release and normalize
-  the manual-interrupt exit to the existing status-130 contract without widening survey behavior.
+- Start ARA-038 with lazy-pager and discovery/profile artifact-write failure injections; retain the
+  documented explicit-discovery status 1 and profile-fallback status 0 contracts.
 - Continue with the highest-priority queued P2 after ARA-036 unless newly confirmed evidence changes
   the ordering.
 - Keep ARA-018, ARA-029, and ARA-030 behind their recorded owner/configuration/long-task approval
@@ -490,6 +490,15 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Test Status
 
+- ARA-037 focused direct/real-module interrupt tests passed `2 passed`; survey/CLI regression passed
+  `36 passed, 20 subtests passed`; local `make check` passed Ruff/import/safety and pytest (`324
+  passed, 201 subtests passed`; 100 tracked files and zero findings).
+- Independent ARA-037 review returned GO after verifying status 130, fixed path-safe diagnostic,
+  real and mocked lock release, real `src.main` compatibility, unchanged OSError status 1, and
+  unchanged successful survey behavior.
+- ARA-036 remote verification: exact local/upstream/`ls-remote` equality at `3d13b2f`, ahead/behind
+  `0/0`; push run `29164348550` and pull-request run `29164349968` passed Python 3.10/3.13. Draft
+  PR 13 is open, mergeable, and updated.
 - ARA-036 focused parser/round-loop and related regression passed `52 passed, 75 subtests passed`;
   local `make check` passed Ruff format/lint, imports, both repository-safety modes, and pytest (`323
   passed, 201 subtests passed`; 100 tracked files and zero findings).

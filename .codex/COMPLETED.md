@@ -525,3 +525,19 @@ Validation and implementation outcomes will be appended only after they are actu
 - Related Judge/round-loop tests passed `52 passed, 75 subtests passed`; local `make check` passed
   `323 passed, 201 subtests passed` with 100 tracked files and zero findings. Independent final
   review returned GO.
+- Committed as `3d13b2f`, pushed with exact local/upstream/`ls-remote` equality, updated draft PR
+  13, and confirmed push run `29164348550` plus pull-request run `29164349968` passed every Python
+  3.10/3.13 job.
+
+## 2026-07-12 - Literature survey manual-interrupt exit contract
+
+- Reproduced a survey `KeyboardInterrupt` exiting the real module process with signal status `-2`
+  and a traceback containing source paths; the existing `finally` still released the run lock.
+- Added a survey-local interrupt boundary that prints a fixed `MANUAL_INTERRUPT` diagnostic and
+  raises the existing CLI interrupted status 130 before the unchanged lock-release `finally`.
+- Updated the direct lock-result interrupt control and added a real `src.main` subprocess using the
+  actual run lock; it proves status 130, no traceback, fixed diagnostic, and lock removal.
+- Preserved successful survey status 0 and the existing path-safe artifact-I/O status 1 behavior.
+- Focused tests passed `2 passed`; related survey/CLI tests passed `36 passed, 20 subtests passed`;
+  local `make check` passed `324 passed, 201 subtests passed` with 100 tracked files and zero
+  findings. Independent final review returned GO.

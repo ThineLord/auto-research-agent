@@ -285,22 +285,23 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-036 - Unrepresentable Judge numbers raise during parsing
 
-- Status: fixed and locally validated in the semantic current `HEAD`; resolve publication/CI live
+- Status: fixed, pushed, and CI-verified
 - Severity: P1 run reliability
 - Impact: structured Judge score/rubric integers outside float range raise `OverflowError` instead of
   following invalid-output handling.
-- Current action: ARA-036 now contains float conversion overflow and JSON integer digit-limit
-  errors, preserves valid sibling rubric fields, and follows the existing invalid-score runner path.
-  Parser/round-loop, full local validation, and independent final review passed; verify semantic
-  current `HEAD` remotely after recovery.
+- Current action: ARA-036 completed at `3d13b2f`; exact push/PR runs
+  `29164348550`/`29164349968` passed Python 3.10/3.13. Float/JSON numeric limits, invalid-score
+  handling, valid rubric siblings, and compatibility controls are fixed.
 
 ## KI-037 - Survey interrupt bypasses the status-130 contract
 
-- Status: confirmed; queued as ARA-037
+- Status: fixed and locally validated in the semantic current `HEAD`; resolve publication/CI live
 - Severity: P2 automation/privacy
 - Impact: survey `KeyboardInterrupt` releases the lock but exits as signal status `-2` with traceback
   and source paths instead of the documented 130 diagnostic.
-- Current action: normalize the survey branch while preserving lock release.
+- Current action: ARA-037 now converts survey `KeyboardInterrupt` to status 130 with a fixed path-safe
+  diagnostic inside the existing lock lifecycle. Direct/real-module, related/full validation, and
+  independent review passed; verify semantic current `HEAD` remotely after recovery.
 
 ## KI-038 - Cloud-free lazy iteration and artifact writes escape error boundaries
 

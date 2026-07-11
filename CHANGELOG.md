@@ -40,6 +40,9 @@
 
 ### Fixed
 
+* Literature Survey Mode manual interrupts now emit the standard `MANUAL_INTERRUPT` diagnostic and
+  exit 130 without traceback or path disclosure, while preserving release of the real run lock.
+  Successful surveys and artifact-I/O status 1 behavior remain unchanged.
 * Structured Judge scores and rubric values that cannot be represented as floats, including numeric
   literals beyond Python's JSON integer digit limit, now follow existing invalid-output handling
   instead of raising a traceback. Valid numeric strings, clamping, legacy `SCORE:` fallback, valid

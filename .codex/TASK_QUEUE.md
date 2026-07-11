@@ -296,7 +296,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-037 - Normalize survey manual interrupts to status 130
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P2
 - Risk: low
 - Description: a `KeyboardInterrupt` inside Literature Survey Mode releases its lock but exits as
@@ -304,7 +304,8 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Related files: `src/cli.py`, CLI interrupt tests, survey tests
 - Acceptance criteria: survey interruption emits the standard fixed diagnostic, exits 130 without
   traceback or absolute paths, and still releases the real run lock.
-- Validation command: unit and subprocess interrupt regressions, survey/CLI tests, then `make check`.
+- Validation command: direct and real module subprocess interrupt regressions, survey/CLI tests
+  (`36 passed, 20 subtests passed`), then `make check` (`324 passed, 201 subtests passed`).
 - Commit required: yes.
 - Dependencies: ARA-023 interrupt contract and ARA-033 privacy-safe CLI precedent.
 

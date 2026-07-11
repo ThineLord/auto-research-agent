@@ -343,10 +343,51 @@ class CliExitCodeTests(unittest.TestCase):
                 ),
                 patch.object(cli_module, "release_run_lock") as release_lock,
             ):
-                with self.assertRaises(KeyboardInterrupt):
+                with self.assertRaises(SystemExit) as raised:
                     cli_module.main()
 
+        self.assertEqual(raised.exception.code, 130)
         release_lock.assert_called_once_with(run_lock_path)
+
+    def test_module_entrypoint_survey_interrupt_exits_130_and_releases_lock(self) -> None:
+        script = """
+import runpy
+import sys
+import tempfile
+from pathlib import Path
+import src.cli as cli
+from src.config import AppConfig
+from src.constants import RUN_LOCK_FILENAME
+from src.package_resources import RuntimeLayout
+
+temporary_root = tempfile.TemporaryDirectory()
+root = Path(temporary_root.name)
+project_dir = root / "projects" / "selected"
+project_dir.mkdir(parents=True)
+(project_dir / "task.md").write_text("# Survey interrupt test", encoding="utf-8")
+cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, root, root, True)
+cli.load_app_config = lambda path: AppConfig()
+cli.run_literature_survey_mode = lambda **kwargs: (_ for _ in ()).throw(KeyboardInterrupt)
+sys.argv = ["auto-research-agent", "--survey", "--project", "selected"]
+try:
+    runpy.run_module("src.main", run_name="__main__")
+except SystemExit:
+    print(f"lock_exists={(project_dir / RUN_LOCK_FILENAME).exists()}")
+    raise
+"""
+
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 130, result.stdout + result.stderr)
+        self.assertIn("Stop reason: MANUAL_INTERRUPT", result.stdout)
+        self.assertIn("lock_exists=False", result.stdout)
+        self.assertNotIn("Traceback", result.stderr)
 
     def test_module_entrypoint_direct_interrupt_exits_130_after_releasing_lock(self) -> None:
         script = """

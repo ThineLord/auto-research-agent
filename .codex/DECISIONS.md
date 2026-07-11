@@ -330,3 +330,14 @@
   remains raw for successfully parsed JSON.
 - Scope: no schema, prompt, provider, score threshold, runner control, artifact interpretation,
   experiment result, or historical conclusion changes.
+
+## 2026-07-12 - Normalize survey interrupts inside the lock lifecycle
+
+- Decision: catch `KeyboardInterrupt` in the Literature Survey Mode `try/finally`, print a fixed
+  `MANUAL_INTERRUPT` diagnostic, and raise the shared interrupted status 130. Leave lock release in
+  the existing `finally` so real and mocked ownership paths retain one cleanup mechanism.
+- Reason: uncaught survey interrupts returned signal status `-2` with a traceback and source paths,
+  unlike mock/provider runner paths and the documented automation contract.
+- Compatibility: normal survey completion remains status 0, survey artifact `OSError` remains the
+  existing path-safe status 1, and no survey inputs, outputs, discovery logic, locks, configuration,
+  provider behavior, or artifacts change.
