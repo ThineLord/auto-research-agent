@@ -186,6 +186,11 @@ schema-additive and must not reinterpret or rescale the Judge's top-level score.
   next-round directory status/safety action. Resumed runs also record retained-history status and
   source fields. Existing histories remain opaque append-only records; unsafe arrays fail closed
   before run config, manifest, checkpoint, round, or summary writes.
+- Resume treats the canonical run-directory basename as the run identity. A present checkpoint
+  `run_id` must match it; a missing ID is derived from it. Existing legacy manifests are parsed
+  before the first write, retain creation-time and unknown fields, and merge current resume metadata.
+  Unreadable, malformed, overly nested, identity-conflicting, or unmergeable manifests fail closed
+  instead of being replaced.
 - `src/resume_safety.py` defines the shared resume path boundary used by CLI preview, the runner,
   and the UI. A resumable root is an existing absolute per-run directory directly under the
   selected project's resolved `runs/` directory. Root containment is checked before directory

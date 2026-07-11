@@ -150,6 +150,8 @@ make resume
 - `checkpoint.run_root` 只接受当前项目 `runs/<run_id>` 下既有的绝对目录；相对路径、跨项目/穿越路径、
   普通文件会在扫描候选目录前阻塞。resume 消费的 config/legacy manifest/summary/metrics/history、
   上一轮上下文和计划 round 目录若为逃逸符号链接或无效文件类型也会阻塞；CLI 返回状态 2，UI 禁用 Resume。
+- checkpoint 显式 `run_id` 必须匹配 canonical run 目录名。旧 manifest 的创建期字段和未知扩展
+  会保留；无法解析、身份冲突或无法合并时，resume 会在任何 artifact 写入前 fail closed。
 
 如果误启动了长任务：
 

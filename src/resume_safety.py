@@ -11,6 +11,7 @@ UNSAFE_RUN_ROOT = "unsafe_run_root"
 STALE_RUN_ROOT = "stale_run_root"
 INVALID_RUN_ROOT = "invalid_run_root"
 INACCESSIBLE_RUN_ROOT = "inaccessible_run_root"
+RUN_ID_MISMATCH = "run_id_mismatch"
 UNSAFE_ROUND_PATH = "unsafe_round_path"
 INVALID_ROUND_PATH = "invalid_round_path"
 INACCESSIBLE_ROUND_PATH = "inaccessible_round_path"
@@ -25,6 +26,7 @@ RESUME_PATH_MESSAGES = {
     STALE_RUN_ROOT: "checkpoint run_root does not exist",
     INVALID_RUN_ROOT: "checkpoint run_root must be a directory",
     INACCESSIBLE_RUN_ROOT: "checkpoint run_root is not readable and writable",
+    RUN_ID_MISMATCH: "checkpoint run_id must match the canonical run directory name",
     UNSAFE_ROUND_PATH: "checkpoint round paths must stay inside the selected run directory",
     INVALID_ROUND_PATH: "checkpoint round path must be a directory",
     INACCESSIBLE_ROUND_PATH: "checkpoint round directory is not safely accessible",

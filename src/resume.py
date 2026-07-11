@@ -12,6 +12,7 @@ from .agents import ResearchAgents
 from .config import DEFAULT_DRAFTING_MODE
 from .resume_safety import (
     RESUME_PATH_MESSAGES,
+    RUN_ID_MISMATCH,
     UNSAFE_ARTIFACT_PATH,
     UNSAFE_ROUND_PATH,
     resume_artifact_links_are_safe,
@@ -209,10 +210,15 @@ def build_resume_preview(
         project_dir=project_dir,
         run_root_value=checkpoint.get("run_root"),
     )
-    run_id = str(
-        checkpoint.get("run_id")
-        or (run_root_path.name if run_root_path and run_root_error != "unsafe_run_root" else "")
-    ).strip()
+    checkpoint_run_id = checkpoint.get("run_id")
+    checkpoint_has_run_id = checkpoint_run_id not in (None, "")
+    canonical_run_id = run_root_path.name if run_root_path and run_root_error is None else ""
+    run_id_mismatch = bool(
+        checkpoint_has_run_id
+        and canonical_run_id
+        and (not isinstance(checkpoint_run_id, str) or checkpoint_run_id != canonical_run_id)
+    )
+    run_id = canonical_run_id or (checkpoint_run_id if isinstance(checkpoint_run_id, str) else "")
     stop_reason = str(checkpoint.get("stop_reason", "") or "unknown")
     run_config_path = run_root_path / "run_config.json" if run_root_path else None
     run_summary_path = run_root_path / "run_summary.json" if run_root_path else None
@@ -222,7 +228,7 @@ def build_resume_preview(
         else None
     )
     previous_round_error: str | None = None
-    if run_root_path is not None and run_root_error is None:
+    if run_root_path is not None and run_root_error is None and not run_id_mismatch:
         run_artifact_paths = (
             run_config_path,
             run_summary_path,
@@ -251,7 +257,10 @@ def build_resume_preview(
                 previous_round_error = UNSAFE_ARTIFACT_PATH
     next_round_path = (
         run_root_path / f"round_{next_round:02d}"
-        if run_root_path and run_root_error is None and previous_round_error is None
+        if run_root_path
+        and run_root_error is None
+        and not run_id_mismatch
+        and previous_round_error is None
         else None
     )
     next_round_info = inspect_next_round_directory(next_round_path, repo_root)
@@ -309,6 +318,15 @@ def build_resume_preview(
                 "can_resume": False,
                 "blocked_reason": run_root_error,
                 "message": RESUME_PATH_MESSAGES[run_root_error],
+            }
+        )
+        return preview
+    if run_id_mismatch:
+        preview.update(
+            {
+                "can_resume": False,
+                "blocked_reason": RUN_ID_MISMATCH,
+                "message": RESUME_PATH_MESSAGES[RUN_ID_MISMATCH],
             }
         )
         return preview

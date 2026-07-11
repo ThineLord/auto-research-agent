@@ -1132,6 +1132,260 @@ class RoundLoopTests(unittest.TestCase):
                 )
             self.assertEqual(run_config["resume_sessions"][0]["start_round"], 4)
 
+    def test_resume_preserves_legacy_manifest_provenance_and_unknown_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            run_root = project_dir / "runs" / "legacy-run"
+            previous_round = run_root / "round_01"
+            previous_round.mkdir(parents=True)
+            (previous_round / "04_judge.md").write_text("legacy judge\n", encoding="utf-8")
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            (project_dir / "best_output.md").write_text("Legacy best.\n", encoding="utf-8")
+            history = [
+                {
+                    "round": 1,
+                    "score": 80.0,
+                    "improved": True,
+                    "successful_research_round": True,
+                }
+            ]
+            (run_root / "round_metrics.json").write_text(json.dumps(history), encoding="utf-8")
+            (project_dir / "score_history.json").write_text(json.dumps(history), encoding="utf-8")
+            original_manifest = {
+                "run_id": "legacy-run",
+                "run_root": str(run_root),
+                "mode": "session",
+                "model": "original-model",
+                "drafting_mode": "fresh_with_review",
+                "started_at": "2026-06-20T01:02:03+00:00",
+                "project": {"project_name": "original-project", "legacy_project": True},
+                "resume_metadata": {"legacy_resume_marker": {"preserve": True}},
+                "legacy_extension": {"nested": [1, {"preserve": "exactly"}]},
+                "run_config": "legacy-run-config-pointer",
+            }
+            manifest_path = run_root / "run_manifest.json"
+            manifest_path.write_text(json.dumps(original_manifest), encoding="utf-8")
+            (project_dir / "checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "legacy-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 1,
+                        "best_score": 80.0,
+                        "best_round_path": str(previous_round),
+                        "can_resume": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            resumed = run_resume_mode(
+                console=Console(),
+                agents=RecordingAgents(),
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                model_name="current-model",
+                max_rounds=2,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+                project_metadata={"project_name": "current-project"},
+            )
+
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertTrue(resumed)
+            for key in (
+                "run_id",
+                "mode",
+                "model",
+                "drafting_mode",
+                "started_at",
+                "project",
+                "legacy_extension",
+            ):
+                self.assertEqual(manifest[key], original_manifest[key])
+            self.assertEqual(manifest["run_root"], str(run_root.resolve()))
+            self.assertEqual(manifest["run_config"], str(run_root.resolve() / "run_config.json"))
+            self.assertEqual(
+                manifest["resume_metadata"]["legacy_resume_marker"],
+                {"preserve": True},
+            )
+            self.assertEqual(
+                manifest["resume_metadata"]["lifecycle_action"],
+                "resume_existing_run",
+            )
+            self.assertEqual(manifest["resume_metadata"]["resume_from_round"], 2)
+
+    def test_resume_preview_requires_checkpoint_id_to_match_canonical_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            run_root = project_dir / "runs" / "canonical-run"
+            run_root.mkdir(parents=True)
+            alias_root = run_root.parent / "legacy-alias"
+            alias_root.symlink_to(run_root, target_is_directory=True)
+
+            for name, checkpoint_root, checkpoint_id in (
+                ("direct mismatch", run_root, "different-run"),
+                ("symlink alias", alias_root, "legacy-alias"),
+                ("non-string id", run_root, 7),
+            ):
+                with self.subTest(name=name):
+                    preview = build_resume_preview(
+                        project_dir=project_dir,
+                        checkpoint={
+                            "run_id": checkpoint_id,
+                            "run_root": str(checkpoint_root),
+                            "last_completed_round": 0,
+                            "can_resume": True,
+                        },
+                    )
+
+                    self.assertFalse(preview["can_resume"])
+                    self.assertEqual(preview["blocked_reason"], "run_id_mismatch")
+                    self.assertNotIn(str(Path(tmp)), preview["message"])
+
+            derived_preview = build_resume_preview(
+                project_dir=project_dir,
+                checkpoint={
+                    "run_root": str(alias_root),
+                    "last_completed_round": 0,
+                    "can_resume": True,
+                },
+            )
+            self.assertTrue(derived_preview["can_resume"])
+            self.assertEqual(derived_preview["run_id"], "canonical-run")
+            self.assertEqual(Path(derived_preview["run_root"]), run_root.resolve())
+
+    def test_resume_rejects_unpreservable_legacy_manifest_before_writes(self) -> None:
+        deeply_nested_manifest = b'{"nested":' * 150 + b"0" + b"}" * 150
+        cases = {
+            "invalid_json": b'{"run_id":',
+            "invalid_utf8": b"\xff\xfe",
+            "non_object": b"[]",
+            "deep_json": deeply_nested_manifest,
+            "mismatched_run_id": b'{"run_id": "different-run"}',
+            "invalid_run_id_type": b'{"run_id": 7}',
+            "invalid_resume_metadata": (
+                b'{"run_id": "resume-run", "resume_metadata": "legacy-text"}'
+            ),
+        }
+        for name, manifest_bytes in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
+                project_dir = Path(tmp) / "project"
+                run_root = project_dir / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                memory_path = project_dir / "memory.md"
+                memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                manifest_path = run_root / "run_manifest.json"
+                manifest_path.write_bytes(manifest_bytes)
+                checkpoint_path = project_dir / "checkpoint.json"
+                checkpoint_bytes = json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 0,
+                        "best_score": -1,
+                        "can_resume": True,
+                    }
+                ).encode()
+                checkpoint_path.write_bytes(checkpoint_bytes)
+                agents = RecordingAgents()
+
+                with self.assertRaises(ResumeHistoryError) as caught:
+                    run_resume_mode(
+                        console=Console(),
+                        agents=agents,
+                        task_text="Design a privacy-aware memory adapter.",
+                        project_dir=project_dir,
+                        memory_path=memory_path,
+                        model_name="fake-model",
+                        max_rounds=1,
+                        stop_if_no_improvement_rounds=10,
+                        global_max_runtime_seconds=60,
+                        per_agent_timeout_seconds=300,
+                    )
+
+                self.assertEqual(agents.draft_rounds, [])
+                self.assertEqual(manifest_path.read_bytes(), manifest_bytes)
+                self.assertEqual(checkpoint_path.read_bytes(), checkpoint_bytes)
+                self.assertFalse((run_root / "run_config.json").exists())
+                self.assertFalse((run_root / "run_summary.json").exists())
+                self.assertFalse((run_root / "round_01").exists())
+                self.assertIn("run_manifest.json", str(caught.exception))
+                self.assertNotIn(str(Path(tmp)), str(caught.exception))
+
+    def test_repeated_resume_does_not_invent_sparse_manifest_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            run_root = project_dir / "runs" / "sparse-run"
+            run_root.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            manifest_path = run_root / "run_manifest.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "run_id": "sparse-run",
+                        "legacy_extension": {"preserve": True},
+                        "resume_metadata": {"legacy_resume_marker": "keep"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            checkpoint_path = project_dir / "checkpoint.json"
+            checkpoint_path.write_text(
+                json.dumps(
+                    {
+                        "run_id": "sparse-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 0,
+                        "best_score": -1,
+                        "can_resume": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            for session_index in (1, 2):
+                (project_dir / "STOP_REQUESTED").write_text("STOP_REQUESTED\n", encoding="utf-8")
+                resumed = run_resume_mode(
+                    console=Console(),
+                    agents=RecordingAgents(),
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    model_name=f"current-model-{session_index}",
+                    max_rounds=1,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                    project_metadata={"project_name": f"current-project-{session_index}"},
+                    drafting_mode="continue_from_previous_draft",
+                )
+
+                self.assertTrue(resumed)
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                for creation_field in (
+                    "mode",
+                    "model",
+                    "drafting_mode",
+                    "started_at",
+                    "project",
+                ):
+                    self.assertNotIn(creation_field, manifest)
+                self.assertEqual(manifest["legacy_extension"], {"preserve": True})
+                self.assertEqual(manifest["resume_metadata"]["legacy_resume_marker"], "keep")
+                self.assertEqual(
+                    manifest["resume_metadata"]["lifecycle_action"],
+                    "resume_existing_run",
+                )
+                self.assertEqual(manifest["run_id"], "sparse-run")
+                self.assertEqual(manifest["run_root"], str(run_root.resolve()))
+                self.assertFalse((project_dir / "STOP_REQUESTED").exists())
+
     def test_resume_rejects_run_roots_outside_the_selected_project(self) -> None:
         unsafe_kinds = (
             "absolute",

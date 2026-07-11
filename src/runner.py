@@ -175,6 +175,79 @@ def _read_resume_round_text(path: Path) -> str:
         return ""
 
 
+def _read_resume_manifest(path: Path, *, canonical_run_id: str) -> Optional[Dict[str, Any]]:
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError, RecursionError) as exc:
+        raise ResumeHistoryError(f"{path.name} is unreadable or invalid JSON") from exc
+    if not isinstance(payload, dict):
+        raise ResumeHistoryError(f"{path.name} must contain a JSON object")
+    if not _resume_json_nesting_is_safe(payload):
+        raise ResumeHistoryError(f"{path.name} exceeds the supported JSON nesting depth")
+
+    manifest_run_id = payload.get("run_id")
+    if manifest_run_id not in (None, "") and (
+        not isinstance(manifest_run_id, str) or manifest_run_id != canonical_run_id
+    ):
+        raise ResumeHistoryError(f"{path.name} run_id does not match the canonical run directory")
+    manifest_resume_metadata = payload.get("resume_metadata")
+    if manifest_resume_metadata is not None and not isinstance(manifest_resume_metadata, dict):
+        raise ResumeHistoryError(f"{path.name} resume_metadata must contain a JSON object")
+    return dict(payload)
+
+
+def _build_run_manifest(
+    *,
+    existing_manifest: Optional[Dict[str, Any]],
+    existing_run_config: Dict[str, Any],
+    resumes_existing_run: bool,
+    run_id: str,
+    run_root: Path,
+    mode: str,
+    model_name: str,
+    drafting_mode: str,
+    started_at: str,
+    project_metadata: Optional[Dict[str, Any]],
+    run_config_path: Path,
+    resume_metadata: Dict[str, Any],
+) -> Dict[str, Any]:
+    manifest = dict(existing_manifest or {})
+    defaults: Dict[str, Any] = {}
+    if not resumes_existing_run:
+        defaults = {
+            "mode": mode,
+            "model": model_name,
+            "drafting_mode": drafting_mode,
+            "started_at": started_at,
+            "project": project_metadata or {},
+        }
+    elif existing_manifest is None and existing_run_config:
+        for key in ("mode", "drafting_mode", "started_at", "project"):
+            if key in existing_run_config:
+                defaults[key] = existing_run_config[key]
+        existing_model = existing_run_config.get("model")
+        if isinstance(existing_model, dict):
+            original_model_name = existing_model.get("name") or existing_model.get("label")
+            if original_model_name not in (None, ""):
+                defaults["model"] = str(original_model_name)
+    for key, value in defaults.items():
+        manifest.setdefault(key, value)
+
+    merged_resume_metadata = dict(manifest.get("resume_metadata") or {})
+    merged_resume_metadata.update(resume_metadata)
+    manifest.update(
+        {
+            "run_id": run_id,
+            "run_root": str(run_root),
+            "run_config": str(run_config_path),
+            "resume_metadata": merged_resume_metadata,
+        }
+    )
+    return manifest
+
+
 def _resume_json_values_equal(left: Any, right: Any) -> bool:
     if isinstance(left, bool) ^ isinstance(right, bool):
         return False
@@ -728,6 +801,14 @@ def run_iterative_rounds(
         initial_best_output=initial_best_output,
         checkpoint_preview=resume_metadata,
     )
+    existing_run_manifest = (
+        _read_resume_manifest(
+            run_root / "run_manifest.json",
+            canonical_run_id=run_id,
+        )
+        if resumes_existing_run
+        else None
+    )
     existing_run_config = read_run_config(run_root)
     existing_run_summary = read_json_file(run_root / "run_summary.json")
     resumes_existing_run = base_resume_metadata["lifecycle_action"] == "resume_existing_run"
@@ -851,17 +932,20 @@ def run_iterative_rounds(
     )
     write_json_file(
         run_root / "run_manifest.json",
-        {
-            "run_id": run_id,
-            "run_root": str(run_root),
-            "mode": mode,
-            "model": model_name,
-            "drafting_mode": drafting_mode,
-            "started_at": started_at_iso,
-            "project": project_metadata or {},
-            "run_config": str(run_config_path),
-            "resume_metadata": base_resume_metadata,
-        },
+        _build_run_manifest(
+            existing_manifest=existing_run_manifest,
+            existing_run_config=existing_run_config,
+            resumes_existing_run=resumes_existing_run,
+            run_id=run_id,
+            run_root=run_root,
+            mode=mode,
+            model_name=model_name,
+            drafting_mode=drafting_mode,
+            started_at=started_at_iso,
+            project_metadata=project_metadata,
+            run_config_path=run_config_path,
+            resume_metadata=base_resume_metadata,
+        ),
     )
     if project_metadata:
         _log(

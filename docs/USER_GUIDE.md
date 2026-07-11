@@ -346,6 +346,9 @@ CLI `--resume` 会先打印 resume preview，包括 run id/root、last completed
 stop reason、是否可 resume、下一轮目录状态和安全动作。UI 的 Resume 区域也显示同样信息，
 并会提示缺失、stale、路径不安全的 checkpoint 或 partial next-round directory；这些检查失败时
 Resume 按钮会禁用。
+checkpoint 若显式提供 `run_id`，必须与 canonical run 目录名一致；省略时会安全推导。resume
+会保留旧 `run_manifest.json` 的创建期 provenance 和未知扩展字段；若 manifest 无法无损读取或
+合并，会在写入任何新 artifact 前停止。
 
 如果要看本次 run 总览和每轮指标，查看：
 

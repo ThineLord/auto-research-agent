@@ -24,6 +24,10 @@
 
 ### Fixed
 
+* Resuming a legacy run now preserves its original manifest provenance and unknown extension fields
+  while merging current resume metadata. Existing manifests that cannot be preserved fail before
+  writes, and an explicit checkpoint run ID must match the canonical run-directory identity;
+  missing IDs continue to derive safely from that directory.
 * Manual `Ctrl+C` now exits CLI and module entrypoints with status 130. Interrupts caught during the
   runner's protected agent-execution phase still finalize resumable checkpoint, summary/config,
   and interruption-report artifacts before propagation, while cooperative `STOP_REQUESTED` stops
