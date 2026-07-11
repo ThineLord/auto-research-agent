@@ -4,24 +4,25 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: make historical benchmark reports source stop reason from their selected target run
-  and reject unrelated project checkpoints (`ARA-014`).
+- Current goal: make direct CLI interrupts return status 130 while preserving runner safe-stop
+  artifacts and successful user-requested stops (`ARA-023`).
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `c893e63f21a1f103ec7085e788206e3b2a4bc61f`
-- Last known stable commit: `c893e63f21a1f103ec7085e788206e3b2a4bc61f` (exact local,
-  remote-tracking, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs passed)
-- Active task: ARA-014 is `DONE`; final verified-state closeout metadata is being prepared. The next
-  unblocked P2 will be selected after this clean checkpoint. ARA-004 remains separately blocked.
-- Uncommitted changes: yes; verified-state closeout metadata only.
+- Current HEAD at state snapshot: `4cae84e398821763a4680b99faa2aacb37550bfe`
+- Last known stable commit: `4cae84e398821763a4680b99faa2aacb37550bfe` (locally validated
+  implementation; remote push and Python 3.10/3.13 CI verification pending)
+- Active task: ARA-023 is `IN_PROGRESS`; implementation `4cae84e` is committed after the regression
+  matrix, documentation, full local gate, and independent re-review passed. Recovery checkpoint,
+  push, PR update, and CI verification remain. ARA-020/022 remain queued; ARA-004 remains blocked.
+- Uncommitted changes: yes; ARA-023 recovery metadata only.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
-- `.codex/TASK_QUEUE.md`
-- `.codex/COMPLETED.md`
+- `.codex/DECISIONS.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
+- `.codex/TASK_QUEUE.md`
 
 ## Completed Steps
 
@@ -245,14 +246,52 @@ Updated: 2026-07-11 (Asia/Shanghai)
   it remains open, draft, and mergeable.
 - Verified push run `29140847860` and pull-request run `29140848882`: Python 3.10 and 3.13 all
   passed, including repository-safety and test steps in each of the four jobs.
+- Committed and pushed final ARA-014 verified-state closeout `2dd56f9`, verified exact SHA equality,
+  and confirmed all four Python 3.10/3.13 closeout jobs passed. Draft PR 13 was updated and remains
+  open, draft, and mergeable.
+- Reproduced both CLI interrupt handlers printing `MANUAL_INTERRUPT`, releasing the lock, and then
+  returning process status 0; reproduced runner-consumed interrupts completing resumable artifacts
+  but likewise returning success.
+- Added red regressions for mock/provider interrupt status and runner propagation before changing
+  implementation; the expected pre-fix run failed all three new interrupt assertions.
+- Made runner-caught manual interrupts propagate only after checkpoint, run summary/config, and
+  interrupted report finalization; both CLI boundaries translate them to `SystemExit(130)`.
+- Kept cooperative `STOP_REQUESTED` as successful status 0 with `USER_STOP_REQUESTED`, resumable
+  artifacts, signal cleanup, and no reclassification from shared `can_resume`/report fields.
+- Moved survey/mock/provider lock acquisition and error evaluation inside their lifecycle
+  `try/finally` blocks after review found an interrupt cleanup window; a real-lock regression proves
+  metadata removal before temporary-directory cleanup.
+- Added an end-to-end module subprocess fault injection, direct handler controls, runner artifact
+  assertions, session final-report suppression, and an actual provider-free safe-stop subprocess.
+- Documented statuses 0/1/2/130 and limited artifact-completeness wording to the runner's protected
+  agent-execution phase.
+- Related regression passed (`63 passed, 61 subtests passed`); final `make check` passed with Ruff,
+  imports, self/worktree/staged safety, and pytest (`231 passed, 154 subtests passed`).
+- Two independent post-fix audits reported GO after the lock-lifecycle and documentation-boundary
+  corrections; `git diff --check` passed and ignored project artifacts were not touched.
+- Staged only the 11 reviewed code/test/public-documentation paths, passed staged diff and repository
+  safety checks, and committed implementation `4cae84e398821763a4680b99faa2aacb37550bfe`
+  (`fix: propagate manual interrupt status`).
 
 ## Remaining Steps
 
-- Commit and push this final verified-state closeout, verify exact SHA and CI, then select the next
-  highest-value unblocked P2 from the synchronized queue.
+- Commit this recovery metadata as a separate checkpoint.
+- Push implementation and checkpoint, verify exact local/remote/GitHub SHA equality, update draft PR
+  13, and verify all Python 3.10/3.13 push and pull-request jobs before marking ARA-023 done.
 
 ## Test Status
 
+- ARA-023 pre-fix interrupt regression: `3 failed, 1 passed, 50 deselected`; both CLI boundaries
+  returned normally and runner did not re-propagate after safe artifact finalization.
+- ARA-023 final related regression: `63 passed, 61 subtests passed in 1.49s` across CLI exit,
+  round-loop, mock, and session modules.
+- ARA-023 final `make check`: Ruff format passed (54 files), Ruff lint passed, import smoke passed,
+  both repository-safety scans passed, and pytest passed (`231 passed, 154 subtests passed in 2.64s`).
+- End-to-end temporary-project subprocesses proved manual status 130 plus three finalized resumable
+  artifacts/report/lock cleanup, and cooperative safe-stop status 0 plus signal cleanup. No provider
+  call, real credential, ignored repository artifact, prompt, score, metric, or experiment changed.
+- Independent implementation and test/docs reviews reran focused tests and reported GO after the
+  protected-phase wording and acquisition-lifecycle fixes; `git diff --check` passed.
 - ARA-014 pre-fix regression: `1 failed, 4 passed`; the report borrowed the unrelated checkpoint's
   `MAX_ROUNDS` instead of the target summary's `USER_STOP_REQUESTED`.
 - ARA-014 final focused regression: Ruff passed and `tests/test_benchmark_report.py` passed
@@ -265,6 +304,8 @@ Updated: 2026-07-11 (Asia/Shanghai)
   findings; `git diff --check` passed. Real provider tests were not needed or run.
 - GitHub Actions at `c893e63`: Python 3.10/3.13 passed for both push and pull-request events; safety
   and test steps passed in all four jobs.
+- Final ARA-014 closeout `2dd56f9`: exact remote SHA verified and Python 3.10/3.13 passed for both
+  push and pull-request events, including all safety and test steps.
 - ARA-016 focused regression: Ruff lint passed and `tests/test_repo_safety.py` passed (`11 passed`).
 - Scanner controls: self-test, tracked worktree, and full staged-index scans passed with 91 tracked
   files, including the scanner and test; no tracked binary/NUL file or gitlink is currently present.
@@ -452,11 +493,17 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - A final ARA-014 review showed the enum-style sanitizer still accepted credential-shaped text;
   rendering is now restricted to official `STOP_*` constants, with every current constant and a
   synthetic credential-shaped rejection covered.
+- Initial ARA-023 regressions failed because the mock/provider handlers swallowed `KeyboardInterrupt`
+  and the runner returned after recording `MANUAL_INTERRUPT`; these were expected pre-fix failures.
+- The first two ARA-023 subprocess fixtures embedded unescaped newlines and failed with a local
+  `SyntaxError`; the fixture strings were corrected before any behavioral result was accepted.
+- Independent ARA-023 review found acquisition/error checks outside the lock lifecycle and docs
+  overstating the protected interrupt window; both received focused corrections and green re-review.
 
 ## Next Command
 
 ```bash
-git add -- .codex/CURRENT_STATE.md .codex/TASK_QUEUE.md .codex/COMPLETED.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
+git add -- .codex/CURRENT_STATE.md .codex/DECISIONS.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md .codex/TASK_QUEUE.md
 ```
 
 ## Interruption Recovery
@@ -471,7 +518,7 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - Do not change prompts, scoring semantics, provider behavior, benchmark results, or artifact interpretation as part of a maintenance-only fix.
 - Do not widen the completed `ARA-021` checkpoint into project-level output/log symlink or active
   filesystem-swap policy; those remain `ARA-022`.
-- Keep ARA-017 scoped to non-interrupt startup/input failures. Direct and runner-consumed
-  `KeyboardInterrupt` process status remains `ARA-023`; wheel asset completeness remains `ARA-004`.
+- Keep ARA-023 scoped to manual-interrupt propagation, cooperative stop status, and the associated
+  lock lifecycle; wheel asset completeness remains separate `ARA-004` work.
 - Active non-cooperating filesystem replacement remains `ARA-022`.
 - Do not stage with `git add -A`; stage only reviewed paths.

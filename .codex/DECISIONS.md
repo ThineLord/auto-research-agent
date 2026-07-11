@@ -138,3 +138,18 @@
 - Compatibility: all current stop constants, absolute/repository/project/runs-relative checkpoint
   paths, ID-only legacy checkpoints, and legacy manifest fallback remain covered. Active parent/path
   replacement remains the separately tracked ARA-022 threat boundary.
+
+## 2026-07-11 - Distinguish manual interrupts from cooperative checkpoint stops
+
+- Decision: every manual `KeyboardInterrupt` reaching a supported CLI boundary exits with status
+  130. When the runner catches an interrupt during its protected agent-execution phase, it first
+  finalizes checkpoint, summary/config, and interrupted-report artifacts, then re-propagates it.
+- Reason: returning success for `Ctrl+C` makes automation unable to distinguish an interrupted run,
+  while propagating before finalization would discard the existing safe-resume guarantee.
+- Cooperative boundary: `STOP_REQUESTED` remains a successful status 0 stop with
+  `USER_STOP_REQUESTED`; shared `can_resume` and interrupted-report fields do not determine status.
+- Lock boundary: survey, mock, and provider acquisition/error evaluation are inside their lifecycle
+  `try/finally` blocks. A second interrupt during finalization or an interrupt outside the runner's
+  protected agent phase does not promise complete run artifacts.
+- Compatibility: statuses 0/1/2, artifact schemas, provider/prompt/scoring behavior, and historical
+  experiment interpretation remain unchanged.

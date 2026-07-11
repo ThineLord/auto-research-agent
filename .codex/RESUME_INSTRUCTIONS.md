@@ -40,25 +40,25 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-`ARA-014` implementation `588e32c` and recovery checkpoint `c893e63` are pushed and remotely
-verified. All Python 3.10/3.13 push and pull-request jobs passed. Only the final state closeout may
-remain depending on the interruption point. Compare HEAD/upstream and the current state before
-repeating work. The last stable full validation command was:
+`ARA-023` implementation `4cae84e` is locally committed and validated; its recovery checkpoint,
+push, PR update, and CI verification may remain depending on the interruption point. Compare
+HEAD/upstream and the current state before repeating work. The last successful local full
+validation command was:
 
 ```bash
 make check
 ```
 
-The expected result is Ruff/import/safety success and `224 passed, 154 subtests passed`. Focused
-benchmark validation should report `11 passed, 20 subtests passed`; both safety modes should scan 91
-tracked files with zero findings. If recovery metadata is uncommitted, review and stage only the
-named `.codex` files, then create the closeout. If the branch is ahead, push normally and verify exact
-remote SHA plus CI. Once clean and synchronized, select the next highest-value unblocked P2 from
-`.codex/TASK_QUEUE.md` rather than reopening completed ARA-014 work.
+The expected result is Ruff/import/safety success and `231 passed, 154 subtests passed`. Focused
+CLI/round/mock/session validation should report `63 passed, 61 subtests passed`; both safety modes
+should scan 91 tracked files with zero findings. If only recovery metadata is uncommitted, stage the
+six named `.codex` files and create a separate checkpoint commit. If the branch is ahead, push
+normally and verify exact remote SHA plus CI, then update draft PR 13. Do not restart ARA-023 from
+the initial audit or duplicate implementation commit `4cae84e`.
 
 `ARA-004` remains separately blocked. Do not repeat its unsafe local build harness or delete/rewrite
 ignored `projects/example` state; read `KI-005`, `KI-013`, and `KI-023` before any packaging work.
-Active non-cooperating filesystem replacement remains ARA-022 and was not widened into ARA-014.
+Active non-cooperating filesystem replacement remains ARA-022 and was not widened into ARA-023.
 
 ## 5. Safety boundaries
 
@@ -70,5 +70,5 @@ Active non-cooperating filesystem replacement remains ARA-022 and was not widene
 ## Suggested immediate command
 
 ```bash
-git status --short --branch && git log --oneline --decorate -n 5
+git status --short --branch && git diff --check
 ```
