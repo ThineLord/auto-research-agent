@@ -82,6 +82,7 @@ class StorageTests(unittest.TestCase):
             self.assertNotIn("private.md", [path.name for path in files])
 
     def test_windows_reparse_attribute_is_classified_as_a_link(self) -> None:
+        path = Path("automatic-directory")
         metadata = SimpleNamespace(
             st_mode=stat.S_IFDIR,
             st_file_attributes=0x0400,
@@ -89,7 +90,7 @@ class StorageTests(unittest.TestCase):
         with patch.object(storage_module.os, "name", "nt"):
             self.assertTrue(
                 storage_module._path_is_link_or_junction(
-                    Path("automatic-directory"),
+                    path,
                     metadata,
                 )
             )
