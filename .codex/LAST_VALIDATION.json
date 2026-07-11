@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T14:27:07+08:00",
+  "recorded_at": "2026-07-11T14:29:36+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "15d99351ebef8fc7cccb38acd4205f8cc7e23917",
-  "last_known_stable_commit": "0112e108292847ddde864150331db4c3b05a9aed",
-  "status": "ara005_local_verified_checkpoint_pending",
+  "head_commit": "6b590918b6ad7fc0e0ce4a83e4d011b7b479f0c8",
+  "last_known_stable_commit": "6b590918b6ad7fc0e0ce4a83e4d011b7b479f0c8",
+  "status": "ara005_remote_verified_closeout_pending",
   "commands": [
     {
       "command": "targeted current-document stale-wording search plus git diff --check",
@@ -48,6 +48,40 @@
       "summary": {
         "implementation_commit": "15d99351ebef8fc7cccb38acd4205f8cc7e23917",
         "files_changed": 1
+      }
+    },
+    {
+      "command": "git commit -m chore: checkpoint ARA-005 docs alignment",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "recovery_checkpoint": "6b590918b6ad7fc0e0ce4a83e4d011b7b479f0c8",
+        "files_changed": 5
+      }
+    },
+    {
+      "command": "push plus exact local, remote-tracking, and ls-remote comparison",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "6b590918b6ad7fc0e0ce4a83e4d011b7b479f0c8",
+        "ahead": 0,
+        "behind": 0
+      }
+    },
+    {
+      "command": "GitHub Actions push and pull-request run/job verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "push_run_id": 29142879222,
+        "pull_request_run_id": 29142880135,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "repository_safety_steps": "passed_in_all_four_jobs",
+        "test_steps": "passed_in_all_four_jobs"
       }
     },
     {
@@ -164,13 +198,13 @@
     },
     {
       "check": "native Python 3.10",
-      "reason": "Local runtime is Python 3.13.14; Python 3.10 will be covered by GitHub Actions after push."
+      "reason": "Local runtime is Python 3.13.14; Python 3.10 passed in GitHub Actions after push."
     }
   ],
   "notes": [
     "Current quickstart wording now distinguishes implemented basic analytics/comparison from advanced research evaluation gaps.",
     "README, CHANGELOG, and dated historical audit/gap reports were intentionally unchanged.",
-    "Implementation 15d9935 is locally committed; recovery checkpoint, push, CI, and PR refresh are pending.",
+    "Implementation 15d9935 and recovery checkpoint 6b59091 are pushed and remotely verified; only final closeout and PR refresh are pending.",
     "A resume-existing lifecycle appends a session even when its next round is 1.",
     "A genuinely new round-1 run keeps an empty resume_sessions list.",
     "The existing start_round greater than 1 compatibility branch remains intact.",

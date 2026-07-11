@@ -311,5 +311,6 @@ Validation and implementation outcomes will be appended only after they are actu
   lifecycle-action wording, exact drafting-mode names, and `final_session_report.md`; final result GO.
 - Targeted stale-wording search and `git diff --check` passed; final `make check` passed with `236
   passed, 164 subtests passed`, and both safety scans reported 91 files with zero findings.
-- Committed the documentation implementation as `15d9935`; remote push and CI verification remain
-  pending at this recovery checkpoint.
+- Committed implementation as `15d9935` and recovery state as `6b59091`, pushed both, verified exact
+  local/tracking/GitHub SHA equality, and confirmed all four Python 3.10/3.13 push and pull-request
+  jobs passed, including safety and test steps.

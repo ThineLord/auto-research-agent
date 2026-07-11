@@ -7,13 +7,13 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Current goal: align stale future-priority documentation with the already implemented comparison,
   analytics, and dashboard features without overstating research readiness (`ARA-005`).
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `15d99351ebef8fc7cccb38acd4205f8cc7e23917`
-- Last known stable commit: `0112e108292847ddde864150331db4c3b05a9aed` (exact local,
+- Current HEAD at state snapshot: `6b590918b6ad7fc0e0ce4a83e4d011b7b479f0c8`
+- Last known stable commit: `6b590918b6ad7fc0e0ce4a83e4d011b7b479f0c8` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task: ARA-005 is `DONE`; locally verified recovery metadata is being prepared before push.
+- Active task: ARA-005 is `DONE`; final remotely verified closeout metadata is being prepared.
   ARA-004 remains blocked.
-- Uncommitted changes: yes; ARA-005 recovery metadata only.
+- Uncommitted changes: yes; ARA-005 verified-state closeout metadata only.
 
 ## Modified Files
 
@@ -21,7 +21,6 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - `.codex/COMPLETED.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
-- `.codex/TASK_QUEUE.md`
 
 ## Completed Steps
 
@@ -345,11 +344,16 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Staged only `docs/quickstart_zh.md`, verified its cached diff and staged safety scan, and committed
   implementation `15d99351ebef8fc7cccb38acd4205f8cc7e23917`
   (`docs: align implemented analytics roadmap`).
+- Committed recovery checkpoint `6b590918b6ad7fc0e0ce4a83e4d011b7b479f0c8`, pushed both
+  ARA-005 commits, and verified exact local, remote-tracking, `ls-remote`, and GitHub branch SHA
+  equality with ahead/behind `0/0` and a clean worktree.
+- Verified push run `29142879222` and pull-request run `29142880135`: Python 3.10 and 3.13 passed
+  every formatting, lint, import, repository-safety, and test step in all four jobs.
 
 ## Remaining Steps
 
-- Commit this ARA-005 recovery checkpoint, push the implementation and checkpoint, verify exact
-  remote SHA and Python 3.10/3.13 push/PR CI, update draft PR 13, then record the verified closeout.
+- Commit and push this final verified-state closeout, verify exact SHA and Python 3.10/3.13 CI,
+  update draft PR 13, then select the next bounded task.
 
 ## Test Status
 
@@ -361,6 +365,8 @@ Updated: 2026-07-11 (Asia/Shanghai)
   passed in 2.69s`).
 - ARA-005 independent read-only evidence audit and final corrected-diff review: GO; README,
   CHANGELOG, and dated historical reports remain unchanged.
+- GitHub Actions at `6b59091`: push run `29142879222` and pull-request run `29142880135` passed on
+  Python 3.10 and 3.13, including repository-safety and test steps in all four jobs.
 - ARA-024 pre-fix regression: `2 failed`; direct and real zero-round resume both omitted the session.
 - ARA-024 related regression: `47 passed, 59 subtests passed`.
 - Final ARA-024 `make check`: Ruff format passed (54 files), Ruff lint passed, imports passed, both
@@ -613,7 +619,7 @@ Updated: 2026-07-11 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git add -- .codex/CURRENT_STATE.md .codex/COMPLETED.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md .codex/TASK_QUEUE.md
+git add -- .codex/CURRENT_STATE.md .codex/COMPLETED.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
 ```
 
 ## Interruption Recovery
