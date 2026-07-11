@@ -192,6 +192,50 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Dependencies: separately approved greater-than-30-minute packaging/CI task; ARA-018, ARA-026,
   version, dependency, and publication policy remain out of scope.
 
+## ARA-031 - Fail closed on invalid existing run config during resume
+
+- Status: `DONE`
+- Priority: P1
+- Risk: medium
+- Description: resume treats an existing malformed, unreadable, or non-object `run_config.json` as
+  missing, rebuilds it, and overwrites the original provenance before any provider work.
+- Related files: `src/run_config.py`, `src/runner.py`, `tests/test_round_loop.py`, recovery records
+- Acceptance criteria: missing run config retains legacy-manifest compatibility, but an existing
+  invalid run config blocks resume before any automatic artifact write; original config, manifest,
+  checkpoint, stop signal, and other run state remain byte-identical and no agent is invoked.
+- Validation command: focused invalid-config resume regression, related run-config/resume/round-loop
+  tests, `git diff --check`, and `make check`.
+- Commit required: yes.
+- Dependencies: ARA-010, ARA-020, ARA-022, and the clean verified baseline `cc20303`.
+
+## ARA-032 - Ignore non-finite scores in analysis and comparison
+
+- Status: `TODO`
+- Priority: P1
+- Risk: low
+- Description: `nan` and `Infinity` score values from malformed/legacy artifacts can dominate run
+  ranking, produce a false flat trend, and emit non-standard analysis/comparison JSON.
+- Related files: `src/run_compare.py`, `src/run_analytics.py`, metric/analysis/compare tests
+- Acceptance criteria: only finite numeric values participate in score selection, ranking, trend,
+  and JSON output; valid legacy numeric strings remain compatible.
+- Validation command: focused strict-JSON analysis/compare regressions followed by `make check`.
+- Commit required: yes.
+- Dependencies: complete ARA-031 without widening its resume-integrity scope.
+
+## ARA-033 - Normalize analysis and comparison output write failures at the CLI boundary
+
+- Status: `TODO`
+- Priority: P2
+- Risk: low
+- Description: provider-free analysis/comparison output failures currently expose a traceback and
+  absolute local path instead of a privacy-safe operational error.
+- Related files: `src/cli.py`, CLI exit-code and analysis/comparison tests
+- Acceptance criteria: unavailable output parents return the documented operational status without
+  traceback or local path disclosure; successful output behavior remains unchanged.
+- Validation command: subprocess CLI regressions followed by `make check`.
+- Commit required: yes.
+- Dependencies: complete ARA-032 so shared analysis/compare tests remain isolated by root cause.
+
 ## ARA-011 - Prevent failed rounds from replacing a trusted best output
 
 - Status: `DONE`

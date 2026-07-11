@@ -408,3 +408,19 @@ Validation and implementation outcomes will be appended only after they are actu
   (`300 passed, 177 subtests passed in 9.07s`; 100 tracked files and zero findings).
 - Independent final staged review returned GO with no remaining blocker after directly exercising
   both unattributed commit/push counterexamples and the explicit fallback-label parser.
+
+## 2026-07-12 - Fail-before-write invalid run-config resume handling
+
+- Reproduced a provider-free zero-round resume replacing malformed existing `run_config.json` with
+  newly generated provenance while no agent was invoked.
+- Added strict existing-config mode only for resume. Invalid JSON, invalid UTF-8, arrays, `null`,
+  excessive nesting, and read failures now produce path-safe `ResumeHistoryError` failures before
+  any automatic artifact write; a truly missing file still falls back to the legacy manifest.
+- Added unit compatibility coverage plus an end-to-end preservation matrix that keeps config,
+  manifest, checkpoint, and stop-signal bytes unchanged, creates no log/history/summary/metrics/
+  round artifacts, and invokes no agent.
+- Independent review found and reproduced a JSON `null`/missing sentinel collision; an identity-only
+  sentinel and `null` regressions corrected it before final validation. Both final reviews are GO.
+- Focused validation passed (`7 passed, 14 subtests passed`); complete run-config/round-loop tests
+  passed (`53 passed, 66 subtests passed`); local `make check` passed (`303 passed, 184 subtests
+  passed`; 100 tracked files and zero safety findings).

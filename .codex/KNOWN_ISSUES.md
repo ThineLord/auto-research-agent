@@ -231,3 +231,13 @@ Updated: 2026-07-11 (Asia/Shanghai)
   manual audit if mistaken for the final build.
 - Current action: leave untouched unless the owner authorizes cache cleanup; future validation must
   build into fresh temporary directories and use the recorded final artifact hashes.
+
+## KI-031 - Resume overwrites an invalid existing run config
+
+- Status: fixed locally in ARA-031; push and CI verification pending live Git state
+- Severity: P1 resume provenance integrity
+- Impact: malformed, unreadable, non-object, or excessively nested existing `run_config.json`
+  content was normalized to `{}` and replaced with current-session provenance during resume.
+- Current action: strict existing-config validation now fails before writes while preserving the
+  missing-config legacy fallback. Focused, related, full, and two independent reviews are green;
+  resolve current semantic `HEAD`, remote equality, and CI live after publication.

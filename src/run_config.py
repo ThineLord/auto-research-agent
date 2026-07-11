@@ -14,6 +14,10 @@ from .storage import read_regular_text
 RUN_CONFIG_SCHEMA_VERSION = 1
 
 
+class InvalidRunConfigError(ValueError):
+    """Raised when an existing run config cannot be preserved safely."""
+
+
 class _InheritGitRoot:
     """Sentinel for compatibility with callers that only provide repo_root."""
 
@@ -212,6 +216,7 @@ def read_run_config(
     *,
     safe_artifacts: bool = False,
     anchor: Path | None = None,
+    strict_existing: bool = False,
 ) -> dict[str, Any]:
     def read_path(path: Path) -> str:
         if safe_artifacts:
@@ -219,14 +224,21 @@ def read_run_config(
         return path.read_text(encoding="utf-8")
 
     run_config_path = run_root / "run_config.json"
+    missing = object()
     try:
         data = json.loads(read_path(run_config_path))
     except FileNotFoundError:
-        data = None
-    except (OSError, UnicodeError, json.JSONDecodeError):
+        data = missing
+    except (OSError, UnicodeError, ValueError, RecursionError):
+        if strict_existing:
+            raise InvalidRunConfigError("run_config.json is unreadable or invalid JSON") from None
         return {}
-    if data is not None:
-        return data if isinstance(data, dict) else {}
+    if data is not missing:
+        if isinstance(data, dict):
+            return data
+        if strict_existing:
+            raise InvalidRunConfigError("run_config.json must contain a JSON object")
+        return {}
 
     manifest_path = run_root / "run_manifest.json"
     try:

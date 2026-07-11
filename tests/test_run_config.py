@@ -7,7 +7,12 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from src.run_config import build_initial_run_config, collect_prompt_file_hashes, read_run_config
+from src.run_config import (
+    InvalidRunConfigError,
+    build_initial_run_config,
+    collect_prompt_file_hashes,
+    read_run_config,
+)
 
 
 class RunConfigTests(unittest.TestCase):
@@ -105,8 +110,10 @@ class RunConfigTests(unittest.TestCase):
             )
 
             config = read_run_config(run_root)
+            strict_config = read_run_config(run_root, strict_existing=True)
 
         self.assertEqual(config["schema_version"], 0)
+        self.assertEqual(strict_config, config)
         self.assertEqual(config["compatibility"]["source"], "run_manifest.json")
         self.assertTrue(config["compatibility"]["run_config_missing"])
         self.assertEqual(config["model"]["name"], "qwen3:8b")
@@ -126,6 +133,43 @@ class RunConfigTests(unittest.TestCase):
             (run_root / "run_manifest.json").mkdir()
 
             self.assertEqual(read_run_config(run_root), {})
+
+    def test_read_run_config_strict_mode_rejects_an_existing_non_object(self) -> None:
+        for content in ("[]\n", "null\n"):
+            with self.subTest(content=content), tempfile.TemporaryDirectory() as tmp:
+                run_root = Path(tmp) / "runs" / "invalid-run-config"
+                run_root.mkdir(parents=True)
+                (run_root / "run_config.json").write_text(content, encoding="utf-8")
+
+                self.assertEqual(read_run_config(run_root), {})
+                with self.assertRaisesRegex(
+                    InvalidRunConfigError,
+                    "run_config.json must contain a JSON object",
+                ) as caught:
+                    read_run_config(run_root, strict_existing=True)
+
+                self.assertNotIn(str(Path(tmp)), str(caught.exception))
+
+    def test_read_run_config_strict_mode_masks_existing_read_failures(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "runs" / "unreadable-run-config"
+            private_path = Path(tmp) / "private" / "run_config.json"
+            with patch(
+                "src.run_config.read_regular_text",
+                side_effect=PermissionError(str(private_path)),
+            ):
+                self.assertEqual(read_run_config(run_root, safe_artifacts=True), {})
+                with self.assertRaisesRegex(
+                    InvalidRunConfigError,
+                    "run_config.json is unreadable or invalid JSON",
+                ) as caught:
+                    read_run_config(
+                        run_root,
+                        safe_artifacts=True,
+                        strict_existing=True,
+                    )
+
+        self.assertNotIn(str(Path(tmp)), str(caught.exception))
 
 
 if __name__ == "__main__":

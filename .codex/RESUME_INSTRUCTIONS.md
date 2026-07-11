@@ -46,12 +46,14 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-ARA-028 is `DONE`; its tracked regression keeps the current task, remaining work, worktree source,
-and fallback semantics synchronized across the recovery files. ARA-022 also remains `DONE`. Its
-closeout `ca3a2e8` is remote-equal, reflected in draft PR 13, and verified by push/PR runs
-`29153184085`/`29153185119` on Python 3.10/3.13. Resume from the semantic checkpoint in
-`CURRENT_STATE.md`; use `ca3a2e8c520bb50fa3e655c7320a3736ef502888` as the conservative exact
-externally verified fallback if the semantic current `HEAD` has not yet been checked.
+ARA-031 is `DONE`: resume now rejects an existing invalid `run_config.json` before any automatic
+artifact write, while a genuinely missing config keeps legacy-manifest compatibility. ARA-032 is
+the next `TODO`; ARA-033 follows it. ARA-028 remains `DONE`. The exact fallback `cc20303` is
+remote-equal, reflected in draft PR 13, and verified by push/PR runs
+`29160735068`/`29160736165` on Python 3.10/3.13. Resume from the semantic checkpoint in
+`CURRENT_STATE.md`; use
+`cc203032a29ee0f0020a8bc3005e715db8156212` as the conservative exact externally verified fallback
+if the semantic current `HEAD` has not yet been checked.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
 it imported the editable checkout and advanced ignored `projects/example` state after a missing
@@ -68,7 +70,7 @@ The last successful local full validation command was:
 make check
 ```
 
-The current full expected result is Ruff/import/safety success and `300 passed, 177 subtests
+The current full expected result is Ruff/import/safety success and `303 passed, 184 subtests
 passed`; the ARA-028 recovery-state consistency suite passes `6 passed, 1 subtest passed`, and the
 ARA-022 focused storage/runtime/resume/survey/UI/CLI layer passes `181 passed, 104 subtests passed`.
 Both safety modes should scan only tracked/staged files with zero findings.
@@ -88,10 +90,10 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-There is no unblocked implementation task in the queue. ARA-018 requires an explicit owner
-license/distribution decision; ARA-029 requires approval before changing CI configuration; ARA-030
-requires approval for its separately scoped greater-than-30-minute packaging/CI work. Do not start
-ARA-019, ARA-026, ARA-006, or ARA-007 until their recorded dependencies are satisfied.
+There is no active task; ARA-032 is the highest-priority `TODO`, followed by ARA-033. ARA-018
+requires an explicit owner license/distribution decision; ARA-029 requires approval before changing
+CI configuration; ARA-030 requires separate greater-than-30-minute approval. Do not start ARA-019,
+ARA-026, ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
 

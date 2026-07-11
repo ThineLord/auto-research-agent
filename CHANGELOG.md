@@ -73,6 +73,10 @@
 * Resuming an existing run now retains and appends prior round metrics and score history, preserves
   best-round and cumulative runtime metadata, restores previous-round drafting context, and fails
   closed before writes when an existing history file is malformed or unsafe to append to.
+* Resume now distinguishes a genuinely missing `run_config.json` from an existing file that is
+  unreadable, malformed, non-object, or excessively nested. Invalid existing config blocks before
+  any automatic artifact write instead of being replaced with newly generated provenance; missing
+  config retains the legacy-manifest compatibility path.
 * Run acquisition now holds a cross-process OS guard for the full run lifecycle and records an
   owner token plus guard identity in `active_run.json`. Concurrent cooperating contenders cannot
   both acquire, crashed owners are recoverable without stale-file deletion races, malformed legacy

@@ -51,6 +51,7 @@ from .resume_safety import (
 from .run_config import (
     INHERIT_GIT_ROOT,
     GitRootSetting,
+    InvalidRunConfigError,
     build_initial_run_config,
     finalize_run_config,
     read_run_config,
@@ -819,7 +820,16 @@ def run_iterative_rounds(
         if resumes_existing_run
         else None
     )
-    existing_run_config = read_run_config(run_root, safe_artifacts=True)
+    try:
+        existing_run_config = read_run_config(
+            run_root,
+            safe_artifacts=True,
+            strict_existing=resumes_existing_run,
+        )
+    except InvalidRunConfigError as exc:
+        raise ResumeHistoryError(str(exc)) from None
+    if resumes_existing_run and not _resume_json_nesting_is_safe(existing_run_config):
+        raise ResumeHistoryError("run_config.json exceeds the supported JSON nesting depth")
     existing_run_summary = read_json_file(run_root / "run_summary.json")
     resumes_existing_run = base_resume_metadata["lifecycle_action"] == "resume_existing_run"
     score_history: List[Dict[str, Any]] = []

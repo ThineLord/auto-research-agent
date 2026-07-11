@@ -4,20 +4,19 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: preserve the completed ARA-028 self-resolving recovery contract and stop at the
-  explicit approval gates for policy, CI-configuration, and larger packaging follow-ups.
+- Current goal: preserve the completed ARA-031 fail-before-write resume guarantee and continue with
+  the highest-priority actionable task, ARA-032.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `ca3a2e8c520bb50fa3e655c7320a3736ef502888` (the exact HEAD
+- State recorded against commit: `cc203032a29ee0f0020a8bc3005e715db8156212` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `ca3a2e8c520bb50fa3e655c7320a3736ef502888` (exact local,
+- Last externally verified fallback: `cc203032a29ee0f0020a8bc3005e715db8156212` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-028 is `DONE`; the persistent cross-file consistency
-  regression passes after removing stale worktree, recursive-closeout, active-task, and fallback
-  claims. Resolve the semantic current `HEAD`, worktree, upstream, remote, and CI state live; use
-  only the exact conservative externally verified fallback recorded above.
+- Active task at this snapshot: none. ARA-031 is `DONE`: strict existing-config validation blocks
+  malformed, unreadable, non-object, `null`, and excessively nested resume config before writes;
+  a genuinely missing config still uses the legacy-manifest compatibility path. ARA-032 is `TODO`.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -438,13 +437,24 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Remaining Steps
 
-- No task-owned recovery work remains. Resolve current Git and CI state live at the next start.
-- Stop at the recorded approval gates. ARA-018 needs the owner's legal/distribution decision;
-  ARA-029 requires configuration-change approval; ARA-030 requires approval for its separately
-  scoped packaging/CI work; ARA-019, ARA-026, ARA-006, and ARA-007 remain deferred.
+- No task-owned ARA-031 work remains. ARA-032 is the next `TODO`, followed by ARA-033.
+- Keep ARA-018, ARA-029, and ARA-030 behind their recorded owner/configuration/long-task approval
+  gates; do not fold release or CI-configuration policy into the analysis/compare fixes.
 
 ## Test Status
 
+- ARA-031 recovery baseline: `make check` passed with Ruff, imports, both safety modes, and pytest
+  (`300 passed, 177 subtests passed in 9.02s`; 100 tracked files, zero findings).
+- ARA-031 pre-fix reproduction: provider-free zero-round resume returned success and overwrote the
+  malformed config while invoking no agent; the regenerated `started_at` replaced original
+  provenance instead of blocking before writes.
+- ARA-031 focused reader/resume validation: `7 passed, 46 deselected, 14 subtests passed`; complete
+  run-config/round-loop regression: `53 passed, 66 subtests passed`.
+- ARA-031 full provider-free gate: Ruff format/lint, imports, repository-safety self-test, worktree
+  and staged safety scans, and pytest passed (`303 passed, 184 subtests passed in 9.11s`; 100 tracked
+  files and zero findings before final metadata staging).
+- Two independent reviews returned GO after one reviewer reproduced the JSON `null`/missing-sentinel
+  collision; the sentinel and unit/end-to-end `null` cases were added before the final gate.
 - ARA-028 recovery baseline: `make check` passed with Ruff, imports, both safety modes, and pytest
   (`294 passed, 176 subtests passed in 9.52s`; 99 tracked files, zero findings).
 - ARA-028 pre-fix regression: `4 failed, 1 passed`; each failure maps to a confirmed stale or
@@ -790,6 +800,10 @@ Updated: 2026-07-12 (Asia/Shanghai)
 - The first synthetic recursive-closeout classifier run had one incorrect expected string with an
   extra leading newline; the classifier output was correct, the fixture was fixed, and all six
   focused tests passed.
+- The ARA-031 pre-fix regression failed all five invalid-config subcases as expected because resume
+  did not raise and replaced the existing file. The first independent review then found JSON
+  `null` still shared the missing-file sentinel; an identity-only sentinel and `null` regressions
+  corrected that gap before final validation.
 
 ## Next Command
 

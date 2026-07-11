@@ -240,3 +240,18 @@
   one-time assertions did not prevent a later manual closeout from reintroducing it.
 - Compatibility: semantic `HEAD`, schema-v1 exact fallback fields, historical evidence, ignored
   runtime state, provider behavior, artifacts, experiments, and release policy remain unchanged.
+
+## 2026-07-12 - Preserve invalid existing run config instead of rebuilding it
+
+- Decision: keep the general run-config reader tolerant, but let the resume runner request strict
+  handling for an existing `run_config.json`. Missing and existing are distinguished by an identity
+  sentinel; malformed, unreadable, non-object, `null`, and excessively nested existing content
+  raises the existing `ResumeHistoryError` boundary before automatic writes.
+- Reason: mapping invalid existing content to `{}` made resume treat corruption as absence and
+  replace provenance with current-session values, creating silent data loss.
+- Compatibility: a genuinely missing config still falls back to `run_manifest.json`; ordinary UI,
+  analytics, comparison, and other tolerant readers retain their existing behavior. An empty JSON
+  object remains an object under this task; field-level schema migration is out of scope.
+- Failure boundary: errors contain only the fixed artifact name and category. Config, manifest,
+  checkpoint, stop signal, histories, and run outputs remain byte-identical or absent, and no agent
+  is invoked.

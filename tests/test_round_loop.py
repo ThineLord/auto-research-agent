@@ -1360,6 +1360,85 @@ class RoundLoopTests(unittest.TestCase):
                 self.assertIn("run_manifest.json", str(caught.exception))
                 self.assertNotIn(str(Path(tmp)), str(caught.exception))
 
+    def test_resume_rejects_invalid_existing_run_config_before_writes(self) -> None:
+        deeply_nested_config = b'{"nested":' * 150 + b"0" + b"}" * 150
+        cases = {
+            "invalid_json": b'{"schema_version": 1, "started_at": ',
+            "invalid_utf8": b"\xff\xfe",
+            "non_object": b"[]",
+            "null": b"null",
+            "deep_json": deeply_nested_config,
+        }
+        for name, config_bytes in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
+                project_dir = Path(tmp) / "project"
+                run_root = project_dir / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                memory_path = project_dir / "memory.md"
+                memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                config_path = run_root / "run_config.json"
+                config_path.write_bytes(config_bytes)
+                manifest_path = run_root / "run_manifest.json"
+                manifest_path.write_text(
+                    json.dumps(
+                        {
+                            "run_id": "resume-run",
+                            "started_at": "2026-01-01T00:00:00+00:00",
+                            "legacy_extension": {"preserve": True},
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                checkpoint_path = project_dir / "checkpoint.json"
+                checkpoint_path.write_text(
+                    json.dumps(
+                        {
+                            "run_id": "resume-run",
+                            "run_root": str(run_root),
+                            "last_completed_round": 0,
+                            "best_score": -1,
+                            "can_resume": True,
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                stop_path = project_dir / "STOP_REQUESTED"
+                stop_path.write_text("STOP_REQUESTED\n", encoding="utf-8")
+                original_bytes = {
+                    path: path.read_bytes()
+                    for path in (config_path, manifest_path, checkpoint_path, stop_path)
+                }
+                agents = RecordingAgents()
+
+                with self.assertRaises(ResumeHistoryError) as caught:
+                    run_resume_mode(
+                        console=Console(),
+                        agents=agents,
+                        task_text="Design a privacy-aware memory adapter.",
+                        project_dir=project_dir,
+                        memory_path=memory_path,
+                        model_name="fake-model",
+                        max_rounds=1,
+                        stop_if_no_improvement_rounds=10,
+                        global_max_runtime_seconds=60,
+                        per_agent_timeout_seconds=300,
+                    )
+
+                self.assertEqual(agents.draft_rounds, [])
+                for path, expected_bytes in original_bytes.items():
+                    self.assertEqual(path.read_bytes(), expected_bytes)
+                for unexpected_path in (
+                    project_dir / "run.log",
+                    project_dir / "score_history.json",
+                    project_dir / "research_state.json",
+                    run_root / "run_summary.json",
+                    run_root / "round_metrics.json",
+                    run_root / "round_01",
+                ):
+                    self.assertFalse(unexpected_path.exists())
+                self.assertIn("run_config.json", str(caught.exception))
+                self.assertNotIn(str(Path(tmp)), str(caught.exception))
+
     def test_repeated_resume_does_not_invent_sparse_manifest_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_dir = Path(tmp) / "project"
