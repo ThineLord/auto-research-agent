@@ -603,3 +603,21 @@ Validation and implementation outcomes will be appended only after they are actu
   passed, 56 subtests passed`; local `make check` passed `329 passed, 215 subtests passed` with 100
   tracked files and zero findings. Two independent final reviews returned GO; no provider call was
   made.
+- Committed as `ba4b2c1`, pushed with exact local/upstream/`ls-remote` equality, updated draft PR
+  13, and confirmed push run `29166208230` plus pull-request run `29166209758` passed every Python
+  3.10/3.13 job.
+
+## 2026-07-12 - All-blocked cloud recommendation handling
+
+- Reproduced unreachable, daily-quota, billing/safety, and token-context profiles being excluded
+  from scoring but immediately selected again by the no-scored-candidate fallback; all four controls
+  failed before the fix.
+- Reused one blocking predicate across Quality's fast path, normal Auto/Quality/Volume scoring, and
+  `choose_fallback_model`, including profile-level unsafe-text results. When every candidate is
+  blocked, both automatic recommendation and runtime fallback now return no selection.
+- Preserved healthy, missing-profile, ordinary rate-limited, and mixed blocked/unprofiled behavior;
+  Manual remains no automatic recommendation. UI keeps the picker/manual effective model and now
+  distinguishes Manual mode from a non-manual no-eligible result.
+- Related cloud-free/CLI/UI/recovery tests passed `121 passed, 68 subtests passed`; local `make
+  check` passed `330 passed, 227 subtests passed` with 100 tracked files and zero findings. Two
+  independent final reviews and extended property matrices returned GO; no provider call was made.

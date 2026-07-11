@@ -133,6 +133,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "cloud_free_profile_saved": "Saved profile artifact with {count} candidates.",
         "cloud_free_recommendation": "Recommended `{model}`: {reason}",
         "cloud_free_manual_mode": "Manual preset uses the selected or typed cloud model.",
+        "cloud_free_no_eligible_recommendation": (
+            "No eligible automatic recommendation; using the selected or typed cloud model."
+        ),
         "cloud_free_runtime_status": "Cloud free runtime status",
         "cloud_free_status": "Status",
         "cloud_free_delay": "Delay (s)",

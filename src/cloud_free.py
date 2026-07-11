@@ -737,6 +737,16 @@ def _model_score_capacity_bonus(model: CloudModelInfo | None) -> float:
     return bonus
 
 
+def _profile_blocks_recommendation(profile: CloudModelProfile) -> bool:
+    return (
+        not profile.safe_text_generation
+        or not profile.reachable
+        or profile.safety_tool_billing_error
+        or profile.daily_quota_exhausted
+        or profile.token_context_error
+    )
+
+
 def recommend_free_cloud_model(
     *,
     candidates: Sequence[CloudModelInfo],
@@ -753,7 +763,9 @@ def recommend_free_cloud_model(
         return None
     if preset == FREE_RUNNER_QUALITY and "gemini-3.5-flash" in by_id:
         profile = profile_by_id.get("gemini-3.5-flash")
-        if profile is None or (profile.reachable and profile.structured_output_works):
+        if profile is None or (
+            not _profile_blocks_recommendation(profile) and profile.structured_output_works
+        ):
             return CloudModelRecommendation(
                 model_id="gemini-3.5-flash",
                 preset=preset,
@@ -764,12 +776,7 @@ def recommend_free_cloud_model(
     scored: list[CloudModelRecommendation] = []
     for candidate in safe_candidates:
         profile = profile_by_id.get(candidate.model_id)
-        if profile and (
-            not profile.reachable
-            or profile.safety_tool_billing_error
-            or profile.daily_quota_exhausted
-            or profile.token_context_error
-        ):
+        if profile and _profile_blocks_recommendation(profile):
             continue
         score = 0.0
         reasons = []
@@ -814,17 +821,7 @@ def recommend_free_cloud_model(
         )
 
     if not scored:
-        fallback_id = (
-            "gemini-2.5-flash-lite"
-            if "gemini-2.5-flash-lite" in by_id
-            else safe_candidates[0].model_id
-        )
-        return CloudModelRecommendation(
-            model_id=fallback_id,
-            preset=preset,
-            reason="No profiled winner; using safe fallback candidate.",
-            score=1.0,
-        )
+        return None
     return max(scored, key=lambda item: (item.score, item.model_id))
 
 
@@ -844,10 +841,16 @@ def choose_fallback_model(
         if not candidate.safe_text_generation or candidate.blocked_reason
     ]
     blocked_ids = {candidate.model_id for candidate in blocked}
+    profile_by_id = {profile.model_id: profile for profile in profiles}
     available = [
         candidate
         for candidate in candidates
-        if candidate.safe_text_generation and candidate.model_id != current_model
+        if candidate.safe_text_generation
+        and candidate.model_id != current_model
+        and (
+            (profile := profile_by_id.get(candidate.model_id)) is None
+            or not _profile_blocks_recommendation(profile)
+        )
     ]
     recommendation = recommend_free_cloud_model(
         candidates=available,

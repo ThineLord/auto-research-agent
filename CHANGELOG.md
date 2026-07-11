@@ -40,6 +40,10 @@
 
 ### Fixed
 
+* Automatic cloud-free recommendation and runtime fallback now return no selection when every safe
+  candidate has a profile blocked by reachability, quota, billing/safety, token-context, or unsafe-
+  text results. Mixed unprofiled and healthy candidates remain eligible, Quality uses the same guard,
+  and the UI distinguishes Manual mode from “no eligible automatic recommendation.”
 * Cached cloud-free recommendation now distrusts discovery metadata when its current safe candidate
   membership differs from a non-empty profile artifact. CLI and UI ignore stale discovery in that
   case, retain only currently allowed configured/profiled candidates, and re-evaluate cached model

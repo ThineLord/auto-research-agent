@@ -385,3 +385,18 @@
 - Boundary: this is membership reconciliation, not proof that equal-ID artifacts share a generation.
   No schema, timestamp, artifact file, migration, deletion, provider, or preset changes are made;
   project/external-refresh UI session identity remains queued separately as ARA-042.
+
+## 2026-07-12 - Treat an all-blocked cloud profile set as no recommendation
+
+- Decision: define one blocking predicate for unsafe-text, unreachable, daily-quota, billing/safety,
+  and token-context profiles. Apply it to Quality's preferred-model shortcut, ordinary scoring, and
+  runtime fallback eligibility.
+- Reason: every non-blocked safe candidate always enters the scored list, so an empty scored list
+  means all candidates were explicitly blocked; selecting a seed in that branch contradicted the
+  same profile evidence and could trigger a predictably failing provider attempt.
+- Compatibility: missing-profile candidates remain eligible, healthy profiles keep their scoring,
+  non-daily rate limiting retains its lower-score behavior, Manual remains manual, and mixed pools
+  may still choose an eligible unprofiled candidate. UI preserves picker/manual selection when no
+  automatic result exists and reports that state accurately.
+- Scope: no provider retry, scheduler, artifact schema/file, configuration, preset, prompt, score,
+  experiment result, or historical conclusion changes.

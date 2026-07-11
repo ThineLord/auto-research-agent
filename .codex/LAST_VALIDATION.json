@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-12T03:57:11+08:00",
+  "recorded_at": "2026-07-12T04:11:10+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "9191a357d24dd6caa4fed04038de99c7ffa2ae60",
-  "last_known_stable_commit": "9191a357d24dd6caa4fed04038de99c7ffa2ae60",
+  "head_commit": "ba4b2c1e18aa19d0aa09848c06550db5539c2c91",
+  "last_known_stable_commit": "ba4b2c1e18aa19d0aa09848c06550db5539c2c91",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "9191a357d24dd6caa4fed04038de99c7ffa2ae60",
+  "state_recorded_against_commit": "ba4b2c1e18aa19d0aa09848c06550db5539c2c91",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-12T03:40:20+08:00",
-    "commit": "9191a357d24dd6caa4fed04038de99c7ffa2ae60",
+    "verified_at": "2026-07-12T04:01:25+08:00",
+    "commit": "ba4b2c1e18aa19d0aa09848c06550db5539c2c91",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29165593346,
+        "run_id": 29166208230,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "9191a357d24dd6caa4fed04038de99c7ffa2ae60",
+        "head_sha": "ba4b2c1e18aa19d0aa09848c06550db5539c2c91",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29165594723,
+        "run_id": 29166209758,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "9191a357d24dd6caa4fed04038de99c7ffa2ae60",
+        "head_sha": "ba4b2c1e18aa19d0aa09848c06550db5539c2c91",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,87 @@
       }
     }
   },
-  "status": "ara040_done_local_validation_passed_publication_pending",
+  "status": "ara043_done_local_validation_passed_publication_pending",
   "commands": [
+    {
+      "command": "ARA-043 pre-fix blocking-profile recommendation regression",
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "pytest_subtests_failed": 4,
+        "blocking_profiles": [
+          "unreachable",
+          "daily_quota",
+          "billing_safety",
+          "token_context"
+        ],
+        "known_failed_candidate_reselected": true
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_cloud_free.py tests/test_cli_exit_codes.py tests/test_ui_helpers.py tests/test_recovery_state.py",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 121,
+        "pytest_subtests_passed": 68,
+        "auto_quality_volume_blocking": "passed",
+        "runtime_fallback_blocking": "passed",
+        "mixed_unprofiled": "passed",
+        "healthy_profile": "passed",
+        "missing_profile": "passed",
+        "ordinary_rate_limit": "passed",
+        "ui_no_eligible_message": "passed",
+        "manual_message": "passed"
+      }
+    },
+    {
+      "command": "make check after ARA-043 implementation and recovery-state synchronization",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 57,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 100,
+        "findings": 0,
+        "pytest_tests_passed": 330,
+        "pytest_subtests_passed": 227,
+        "pytest_duration_seconds": 11.73
+      }
+    },
+    {
+      "command": "two independent ARA-043 final reviews",
+      "result": "passed",
+      "summary": {
+        "contract_review": "GO",
+        "cli_ui_review": "GO",
+        "extended_property_checks": 320,
+        "recommendation_and_fallback_blocking": "passed",
+        "provider_called": false
+      }
+    },
+    {
+      "command": "ARA-040 publication, remote equality, CI, and draft PR verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "ba4b2c1e18aa19d0aa09848c06550db5539c2c91",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29166208230,
+        "pull_request_run_id": 29166209758,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "draft_pr_13_updated": true
+      }
+    },
     {
       "command": "ARA-040 pre-fix two-process stale discovery and fallback profile probe",
       "exit_code": 0,
@@ -1833,6 +1912,10 @@
   ],
   "not_run": [
     {
+      "check": "real provider smoke for ARA-043",
+      "reason": "Recommendation and runtime fallback eligibility are deterministic pure profile/candidate decisions; direct matrices cover the affected behavior without credentials or cost."
+    },
+    {
       "check": "real provider smoke for ARA-040",
       "reason": "Cached candidate reconciliation is deterministic local artifact selection; real two-process disk fixtures cover the stale-discovery boundary without credentials or cost."
     },
@@ -1878,7 +1961,9 @@
     }
   ],
   "notes": [
-    "ARA-040 is complete and locally validated with no active task; publication remains pending and ARA-043 is the next unblocked P2 before ARA-042.",
+    "ARA-043 is complete and locally validated with no active task; publication remains pending and ARA-042 is the next unblocked P2.",
+    "ARA-043 uses one blocking predicate for Quality, normal scoring, and runtime fallback; all-blocked returns no selection while mixed unprofiled and healthy candidates remain eligible.",
+    "ARA-040 is complete at remote-equal commit ba4b2c1 with successful push and pull-request CI runs 29166208230 and 29166209758 on Python 3.10 and 3.13.",
     "ARA-040 is a cached candidate-membership guard, not proof of artifact generation provenance; exact membership retains discovery metadata, while mismatch ignores discovery without changing files or schemas.",
     "ARA-042 separately owns project/external-refresh identity for Streamlit session caches, and ARA-043 owns the existing all-blocked-profile fallback recommendation behavior.",
     "ARA-039 is complete at remote-equal commit 9191a35 with successful push and pull-request CI runs 29165593346 and 29165594723 on Python 3.10 and 3.13.",

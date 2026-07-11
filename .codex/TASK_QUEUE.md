@@ -395,7 +395,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-043 - Respect blocking profiles when every cached candidate failed
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P2
 - Risk: medium
 - Description: `recommend_free_cloud_model` falls back to a safe seed after every candidate was
@@ -405,8 +405,9 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Acceptance criteria: when every candidate has a blocking profile, automatic recommendation is
   unavailable rather than selecting one of those candidates; genuinely unprofiled safe candidates
   retain the documented fallback behavior.
-- Validation command: all-blocked/partially-profiled/exact-cohort recommendation matrix,
-  cloud-free/CLI/UI tests, then `make check`.
+- Validation command: auto/quality/volume blocking and recommendation/fallback property matrices,
+  cloud-free/CLI/UI/recovery tests (`121 passed, 68 subtests passed`), then `make check` (`330
+  passed, 227 subtests passed`).
 - Commit required: yes.
 - Dependencies: ARA-040 cached membership guard; no provider call.
 

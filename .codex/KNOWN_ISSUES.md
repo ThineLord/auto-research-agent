@@ -325,14 +325,13 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-040 - Cloud fallback profile can retain stale discovery provenance
 
-- Status: fixed and locally validated; publication pending
+- Status: fixed, pushed, and CI-verified
 - Severity: P2 selection consistency
 - Impact: a new fallback profile can coexist with stale discovery data and cause a later process to
   reselect a model deliberately excluded in the current process.
-- Current action: ARA-040 applies a non-destructive membership guard in CLI and UI recommendation
-  paths. Exact unique membership retains discovery metadata; mismatched/noncanonical membership
-  ignores discovery and intersects current safe configured candidates with profile IDs. Cached model
-  safety is recalculated under current policy; no generation-provenance claim or schema change is made.
+- Current action: ARA-040 completed at `ba4b2c1`; exact push/PR runs
+  `29166208230`/`29166209758` passed Python 3.10/3.13. CLI/UI membership reconciliation, current
+  policy reclassification, and no-schema compatibility are verified.
 
 ## KI-041 - Resume startup metadata can split across generations
 
@@ -355,10 +354,11 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-043 - All blocked profiles can still produce a fallback recommendation
 
-- Status: confirmed; queued as ARA-043
+- Status: fixed and locally validated; publication pending
 - Severity: P2 provider reliability
 - Impact: after quota/unreachable/billing-safety/token-context profiles exclude every candidate, the
   fallback branch can select one of the same blocked safe seeds and trigger a predictably failing
   provider attempt.
-- Current action: distinguish “no scored profile but unprofiled candidate exists” from “every
-  candidate has a blocking profile” without changing manual selection or provider retry policy.
+- Current action: ARA-043 applies one blocking predicate to quality fast-path, normal scoring, and
+  runtime fallback. All-blocked returns no recommendation/fallback; mixed unprofiled and healthy
+  candidates retain existing behavior. UI distinguishes Manual from no eligible automatic result.

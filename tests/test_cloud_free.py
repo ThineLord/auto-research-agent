@@ -10,6 +10,7 @@ from rich.console import Console
 
 import src.cli as cli_module
 from src.cloud_free import (
+    FREE_RUNNER_AUTO,
     FREE_RUNNER_QUALITY,
     FREE_RUNNER_VOLUME,
     CloudFreeConfig,
@@ -360,6 +361,80 @@ class CloudFreePolicyTests(unittest.TestCase):
         self.assertIsNotNone(volume)
         self.assertEqual(volume.model_id, "gemma-3-high-tpm")
 
+    def test_all_blocked_profiles_do_not_fallback_to_known_failed_candidate(self) -> None:
+        candidate = classify_model(model_id="gemini-3.5-flash")
+        blocking_profiles = {
+            "unreachable": CloudModelProfile(model_id=candidate.model_id),
+            "daily_quota": CloudModelProfile(
+                model_id=candidate.model_id,
+                reachable=True,
+                structured_output_works=True,
+                daily_quota_exhausted=True,
+            ),
+            "billing_safety": CloudModelProfile(
+                model_id=candidate.model_id,
+                reachable=True,
+                structured_output_works=True,
+                safety_tool_billing_error=True,
+            ),
+            "token_context": CloudModelProfile(
+                model_id=candidate.model_id,
+                reachable=True,
+                structured_output_works=True,
+                token_context_error=True,
+            ),
+        }
+        for reason, profile in blocking_profiles.items():
+            for preset in (FREE_RUNNER_AUTO, FREE_RUNNER_QUALITY, FREE_RUNNER_VOLUME):
+                with self.subTest(reason=reason, preset=preset):
+                    self.assertIsNone(
+                        recommend_free_cloud_model(
+                            candidates=[candidate],
+                            profiles=[profile],
+                            preset=preset,
+                        )
+                    )
+            self.assertIsNone(
+                choose_fallback_model(
+                    current_model="different-current-model",
+                    candidates=[candidate],
+                    profiles=[profile],
+                )
+            )
+
+        unprofiled = classify_model(model_id="gemini-2.5-flash-lite")
+        mixed = recommend_free_cloud_model(
+            candidates=[candidate, unprofiled],
+            profiles=[blocking_profiles["unreachable"]],
+        )
+        self.assertIsNotNone(mixed)
+        self.assertEqual(mixed.model_id, unprofiled.model_id)
+        self.assertEqual(
+            choose_fallback_model(
+                current_model="different-current-model",
+                candidates=[candidate, unprofiled],
+                profiles=[blocking_profiles["unreachable"]],
+            ),
+            unprofiled.model_id,
+        )
+
+        healthy = recommend_free_cloud_model(
+            candidates=[candidate],
+            profiles=[
+                CloudModelProfile(
+                    model_id=candidate.model_id,
+                    reachable=True,
+                    structured_output_works=True,
+                )
+            ],
+        )
+        self.assertIsNotNone(healthy)
+        self.assertEqual(healthy.model_id, candidate.model_id)
+        self.assertEqual(
+            recommend_free_cloud_model(candidates=[candidate]).model_id,
+            candidate.model_id,
+        )
+
     def test_cached_candidate_pool_excludes_stale_discovery_outside_profile_cohort(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_dir = Path(tmp)
@@ -399,8 +474,7 @@ class CloudFreePolicyTests(unittest.TestCase):
                 [candidate.model_id for candidate in reconciled],
                 ["gemini-2.5-flash-lite", "gemini-3.5-flash"],
             )
-            self.assertIsNotNone(recommendation)
-            self.assertNotEqual(recommendation.model_id, "gemma-3-high-tpm")
+            self.assertIsNone(recommendation)
 
             exact_profiles = [
                 CloudModelProfile(model_id=candidate.model_id) for candidate in stale_candidates

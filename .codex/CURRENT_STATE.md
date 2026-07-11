@@ -4,19 +4,19 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: retain the completed, locally validated ARA-040 cached-membership guard, publish
-  that work, and continue with isolated ARA-043 all-blocked recommendation handling.
+- Current goal: retain the completed, locally validated ARA-043 all-blocked recommendation contract,
+  publish that work, and continue with isolated ARA-042 UI cache identity handling.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `9191a357d24dd6caa4fed04038de99c7ffa2ae60` (the exact HEAD
+- State recorded against commit: `ba4b2c1e18aa19d0aa09848c06550db5539c2c91` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `9191a357d24dd6caa4fed04038de99c7ffa2ae60` (exact local,
+- Last externally verified fallback: `ba4b2c1e18aa19d0aa09848c06550db5539c2c91` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-040 is `DONE` with related, full-gate, and two independent
-  reviews passing locally; publication is pending. ARA-039 remains the exact external fallback at
-  `9191a35`, verified by push/PR runs `29165593346`/`29165594723` on Python 3.10/3.13.
+- Active task at this snapshot: none. ARA-043 is `DONE` with related, full-gate, and two independent
+  reviews passing locally; publication is pending. ARA-040 remains the exact external fallback at
+  `ba4b2c1`, verified by push/PR runs `29166208230`/`29166209758` on Python 3.10/3.13.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -516,17 +516,35 @@ Updated: 2026-07-12 (Asia/Shanghai)
   cases plus a real two-process disk round trip. No artifact schema, file, deletion, or migration
   changed. Two independent reviews returned GO.
 
+## ARA-043 All-Blocked Recommendation Contract
+
+- Reproduced four blocking profile classes being skipped during scoring and then selected again by
+  the no-scored seed fallback.
+- Centralized blocking checks across Quality, ordinary scoring, and runtime fallback. All-blocked
+  pools return no selection; mixed unprofiled, healthy, missing-profile, and ordinary rate-limit
+  behavior remains compatible.
+- UI now distinguishes Manual from non-manual no-eligible results while retaining picker/manual
+  effective selection. Extended property probes and two independent reviews returned GO.
+
 ## Remaining Steps
 
 - Resolve the semantic current HEAD publication, exact remote equality, and CI state live before
-  starting ARA-043, then record the new externally verified fallback.
-- Continue with ARA-043 before the broader UI-cache ARA-042; do not cross owner/configuration
-  approval gates.
+  starting ARA-042, then record the new externally verified fallback.
+- Continue with ARA-042; do not cross owner/configuration approval gates.
 - Keep ARA-018, ARA-029, and ARA-030 behind their recorded owner/configuration/long-task approval
   gates; do not fold release or CI-configuration policy into the analysis/compare fixes.
 
 ## Test Status
 
+- ARA-043 all-blocked Auto/Quality/Volume, runtime fallback, mixed/unprofiled, healthy, no-profile,
+  UI/i18n, and recovery regression passed `121 passed, 68 subtests passed`.
+- ARA-043 local `make check` passed Ruff format/lint, imports, repository-safety self-test,
+  worktree/staged scans, and pytest (`330 passed, 227 subtests passed`; 100 tracked files and zero
+  findings). Two independent final reviews returned GO after recommendation/fallback property
+  matrices and CLI/UI effective-model checks. No provider call was made.
+- ARA-040 remote verification: exact local/upstream/`ls-remote` equality at `ba4b2c1`, ahead/behind
+  `0/0`; push run `29166208230` and pull-request run `29166209758` passed Python 3.10/3.13. Draft
+  PR 13 is open, mergeable, and updated.
 - ARA-040 two-process and exact/no-profile/partial/unsafe/duplicate/legacy/current-policy controls
   plus cloud-free/CLI/UI/recovery regression passed `120 passed, 56 subtests passed`.
 - ARA-040 local `make check` passed Ruff format/lint, imports, repository-safety self-test,
@@ -877,6 +895,14 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- The initial ARA-043 blocking-profile regression failed four subtests as expected because each
+  excluded candidate was immediately returned by the no-scored seed fallback.
+- Independent ARA-043 review found the Quality fast path and `choose_fallback_model` could bypass the
+  initial fix, and UI mislabeled a non-manual no-eligible result as Manual. One shared blocking
+  predicate plus explicit UI messaging closed all three before final validation.
+- One independent review command referenced nonexistent `tests/test_i18n.py` and collected no tests;
+  the reviewer reran the real cloud-free/CLI/UI suites and a direct i18n fallback probe successfully.
+  No repository file or accepted validation result was affected.
 - The ARA-040 pre-fix two-process probe loaded a new seed-only fallback profile beside stale
   discovery and recommended `gemma-3-high-tpm`; this was the confirmed silent selection failure.
 - Independent ARA-040 review found that normalizing legacy `models/...` profile IDs could falsely

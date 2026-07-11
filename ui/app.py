@@ -1982,8 +1982,10 @@ def main() -> None:
                         reason=cloud_free_recommendation.reason,
                     )
                 )
-            else:
+            elif selected_free_runner_preset == FREE_RUNNER_MANUAL:
                 st.info(t("cloud_free_manual_mode"))
+            else:
+                st.info(t("cloud_free_no_eligible_recommendation"))
 
         selected_cloud_model = st.session_state.get("selected_cloud_model_picker")
         if selected_cloud_model not in cloud_models:
