@@ -7,18 +7,18 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Current goal: preserve original legacy run-manifest provenance and identity across resume while
   retaining unknown compatibility fields (`ARA-020`).
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `3b98c61d7cd7531266144d1d46d3c5aad29220c4`
-- Last known stable commit: `3b98c61d7cd7531266144d1d46d3c5aad29220c4` (locally validated
-  implementation; remote push and Python 3.10/3.13 CI verification pending)
-- Active task: ARA-020 is `IN_PROGRESS`; implementation `3b98c61` is committed after the regression
-  matrix, docs, independent re-review, and full local gate passed. Recovery checkpoint, push, PR
-  update, and CI verification remain. ARA-022 remains queued; ARA-004 remains blocked.
-- Uncommitted changes: yes; ARA-020 recovery metadata only.
+- Current HEAD at state snapshot: `c1e8c57bc762d17ee9c26297160bd453b80fa294`
+- Last known stable commit: `c1e8c57bc762d17ee9c26297160bd453b80fa294` (exact local,
+  remote-tracking, `ls-remote`, and GitHub PR head equality plus all Python 3.10/3.13 push/PR jobs
+  passed)
+- Active task: ARA-020 is `DONE`; final verified-state closeout metadata is being prepared. ARA-024
+  is the next bounded provenance task after this checkpoint; ARA-004 remains blocked.
+- Uncommitted changes: yes; verified-state closeout metadata only.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
-- `.codex/DECISIONS.md`
+- `.codex/COMPLETED.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
@@ -302,11 +302,16 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Staged only the nine reviewed code/test/public-documentation paths, passed staged diff and safety
   checks, and committed implementation `3b98c61d7cd7531266144d1d46d3c5aad29220c4`
   (`fix: preserve run manifest provenance on resume`).
+- Committed recovery checkpoint `c1e8c57`, pushed both commits, and verified exact local,
+  remote-tracking, `ls-remote`, and GitHub PR head SHA equality.
+- Verified push run `29142234694` and pull-request run `29142235674`: Python 3.10 and 3.13 all
+  passed, including formatting, lint, import, repository-safety, and test steps in all four jobs.
+- Updated and read back draft PR 13 with ARA-020 scope/evidence; it remains open, draft, and mergeable.
 
 ## Remaining Steps
 
-- Commit this recovery metadata as a separate checkpoint.
-- Push, verify exact SHA, update draft PR 13, and verify Python 3.10/3.13 push/PR jobs.
+- Commit and push this final verified-state closeout, verify exact SHA and CI, then start bounded
+  task ARA-024 from the synchronized queue.
 
 ## Test Status
 
@@ -318,6 +323,8 @@ Updated: 2026-07-11 (Asia/Shanghai)
   both repository-safety scans passed, and pytest passed (`235 passed, 164 subtests passed in 2.68s`).
 - Two independent reviewers reported GO after reproducing and correcting sparse-manifest current-
   session contamination. Provider calls and ignored project artifacts were not used.
+- GitHub Actions at `c1e8c57`: Python 3.10/3.13 passed for both push and pull-request events;
+  formatting, lint, imports, repository safety, and tests passed in all four jobs.
 - ARA-023 pre-fix interrupt regression: `3 failed, 1 passed, 50 deselected`; both CLI boundaries
   returned normally and runner did not re-propagate after safe artifact finalization.
 - ARA-023 final related regression: `63 passed, 61 subtests passed in 1.49s` across CLI exit,
@@ -548,7 +555,7 @@ Updated: 2026-07-11 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git add -- .codex/CURRENT_STATE.md .codex/DECISIONS.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md .codex/TASK_QUEUE.md
+git add -- .codex/CURRENT_STATE.md .codex/COMPLETED.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md .codex/TASK_QUEUE.md
 ```
 
 ## Interruption Recovery

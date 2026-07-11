@@ -91,7 +91,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-020 - Preserve legacy run-manifest provenance across resume
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P2
 - Risk: medium
 - Description: resume rebuilds `run_manifest.json` from the current session and can replace the original start time, mode, and unknown legacy fields even though `run_config.json` preserves session history; an in-runs symlink alias can also leave checkpoint `run_id` inconsistent with the canonical root identity.

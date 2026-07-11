@@ -257,3 +257,25 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed implementation as `4cae84e` and recovery state as `37b3749`, pushed both, verified exact
   local/tracking/GitHub SHA equality, updated draft PR 13, and confirmed all four Python 3.10/3.13
   push and pull-request jobs passed, including safety and test steps.
+
+## 2026-07-11 - Legacy run-manifest provenance across resume
+
+- Reproduced resume replacing original manifest mode/model/drafting/start/project and unknown
+  fields, while checkpoint preview accepted IDs inconsistent with the canonical run root.
+- Made canonical `run_root.name` the single identity; explicit checkpoint/manifest IDs must match,
+  while missing IDs derive safely and configured storage/canonical-ID aliases remain compatible.
+- Parsed and snapshotted existing raw manifests before the first write, preserved creation-time and
+  unknown fields, canonicalized ID/root/config pointers, and merged current resume metadata.
+- Made malformed, invalid UTF-8, nonobject, overly nested, identity-conflicting, or unmergeable
+  manifests fail without modifying config, manifest, checkpoint, round, or summary artifacts.
+- Prevented valid sparse manifests from inheriting current resume mode/model/time/project, including
+  across two consecutive resumes after run_config exists.
+- Added full legacy, sparse/repeated, direct/alias/non-string/missing ID, fail-before-write, and
+  consumer/UI compatibility regressions without provider calls or ignored repository artifacts.
+- Focused tests passed with `4 passed, 10 subtests passed`; related tests passed with `119 passed,
+  100 subtests passed`; final `make check` passed with `235 passed, 164 subtests passed`.
+- Two independent reviews reported GO after the sparse-provenance correction; both safety scans
+  reported 91 tracked files and zero findings.
+- Committed implementation as `3b98c61` and recovery state as `c1e8c57`, pushed both, verified exact
+  local/tracking/GitHub SHA equality, updated draft PR 13, and confirmed all four Python 3.10/3.13
+  push and pull-request jobs passed, including safety and test steps.

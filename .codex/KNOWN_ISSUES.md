@@ -145,11 +145,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-019 - Resume can rewrite original run-manifest provenance
 
-- Status: fixed and locally validated at implementation `3b98c61`; push/CI verification pending
+- Status: fixed, pushed, and CI-verified
 - Severity: P2
 - Impact: rebuilding `run_manifest.json` during resume can replace original start/mode provenance and discard unknown legacy fields, even though `run_config.json` retains resume sessions; a safe in-runs path alias can also disagree with checkpoint `run_id`.
-- Current action: task `ARA-020`; commit recovery state, push implementation `3b98c61`, then verify
-  Python 3.10/3.13 CI.
+- Current action: task `ARA-020` completed at implementation `3b98c61` and remotely verified
+  checkpoint `c1e8c57` with Python 3.10/3.13 push and PR jobs passing.
 
 ## KI-020 - UI artifact viewers can follow external checkpoint references
 
