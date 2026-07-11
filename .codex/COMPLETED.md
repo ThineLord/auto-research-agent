@@ -541,3 +541,23 @@ Validation and implementation outcomes will be appended only after they are actu
 - Focused tests passed `2 passed`; related survey/CLI tests passed `36 passed, 20 subtests passed`;
   local `make check` passed `324 passed, 201 subtests passed` with 100 tracked files and zero
   findings. Independent final review returned GO.
+- Committed as `cd21143`, pushed with exact local/upstream/`ls-remote` equality, updated draft PR
+  13, and confirmed push run `29164609427` plus pull-request run `29164610776` passed every Python
+  3.10/3.13 job.
+
+## 2026-07-12 - Cloud-free lazy discovery and artifact-write containment
+
+- Reproduced a fake SDK pager yielding one model before raising outside the discovery error tuple;
+  explicit discovery leaked a traceback, and profile mode could not enter its documented configured-
+  seed fallback.
+- Reproduced `OSError` at explicit discovery save, profile discovery-cache save, successful profile
+  result save, and discovery-error fallback profile save; all four leaked traceback/path details.
+- Consumed lazy model iterators and converted model records inside a safe classified-error boundary.
+  Iterator acquisition alone retains compatibility with legacy non-iterable `.models` wrappers, so
+  iterator-time `TypeError` cannot become a false-success empty discovery.
+- Converted each automatic discovery/profile artifact-write `OSError` to status 1 with one fixed,
+  path-free diagnostic. Explicit discovery remains status 1, and profile discovery failure retains
+  status-0 configured-seed fallback when profiling and result persistence succeed.
+- Focused tests passed `3 passed, 6 subtests passed`; related cloud-free/CLI tests passed `50 passed,
+  34 subtests passed`; local `make check` passed `326 passed, 207 subtests passed` with 100 tracked
+  files and zero findings. Two independent final reviews returned GO; no provider call was made.

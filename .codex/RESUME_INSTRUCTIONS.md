@@ -46,12 +46,12 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-There is no active task. ARA-037 is `DONE` with direct/real-module, lock-release, and full-gate
-validation passing locally; ARA-038 is the next unblocked P2 task. ARA-036 remains `DONE` at
-`3d13b2f`, remote-equal, reflected in draft PR 13, and verified by push/PR runs
-`29164348550`/`29164349968` on Python 3.10/3.13. Resume from the semantic checkpoint in
+There is no active task. ARA-038 is `DONE` with focused, related, full-gate, and independent review
+results passing locally; publish and verify that checkpoint before starting ARA-039. ARA-037 is
+`DONE` at `cd21143`, remote-equal, reflected in draft PR 13, and verified by push/PR runs
+`29164609427`/`29164610776` on Python 3.10/3.13. Resume from the semantic checkpoint in
 `CURRENT_STATE.md`; use
-`3d13b2fb87c824920b2ed8a63a1662a0e0032ab6` as the conservative exact externally verified fallback
+`cd2114325d748241abe156da8864d492246613a6` as the conservative exact externally verified fallback
 if the semantic current `HEAD` has not yet been checked.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
@@ -69,7 +69,7 @@ The last successful local full validation command was:
 make check
 ```
 
-The current full expected result is Ruff/import/safety success and `324 passed, 201 subtests
+The current full expected result is Ruff/import/safety success and `326 passed, 207 subtests
 passed`; the ARA-028 recovery-state consistency suite passes `6 passed, 1 subtest passed`, and the
 ARA-022 focused storage/runtime/resume/survey/UI/CLI layer passes `181 passed, 104 subtests passed`.
 Both safety modes should scan only tracked/staged files with zero findings.
@@ -89,10 +89,10 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-ARA-037 is complete and no task is currently `IN_PROGRESS`; ARA-038 is the next P2 task. ARA-018
-requires an explicit owner license/distribution decision; ARA-029 requires approval before changing
-CI configuration; ARA-030 and ARA-041 require separate greater-than-30-minute approval. Do not
-start ARA-019, ARA-026, ARA-006, or ARA-007 until their recorded dependencies are satisfied.
+No task is currently `IN_PROGRESS`; ARA-039 is the next unblocked P2 after ARA-038 publication.
+ARA-018 requires an explicit owner license/distribution decision; ARA-029 requires approval before
+changing CI configuration; ARA-030 and ARA-041 require separate greater-than-30-minute approval.
+Do not start ARA-019, ARA-026, ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
 

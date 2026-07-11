@@ -1020,19 +1020,26 @@ def discover_free_cloud_models(
     except Exception as exc:  # noqa: BLE001
         return [], _redact_known_secrets(_safe_error_message(exc), (api_key,))
 
-    discovered: list[CloudModelInfo] = []
     try:
-        iterator = list(raw_models)
-    except TypeError:
-        iterator = list(getattr(raw_models, "models", []) or [])
-    for raw_model in iterator:
-        discovered.append(
-            model_info_from_sdk_model(
-                raw_model,
-                allowed_patterns=config.allowed_model_patterns,
-                blocked_patterns=config.blocked_model_patterns,
+        try:
+            model_iterator = iter(raw_models)
+        except TypeError:
+            nested_models = getattr(raw_models, "models", None)
+            if nested_models is None:
+                raise
+            model_iterator = iter(nested_models or ())
+
+        discovered: list[CloudModelInfo] = []
+        for raw_model in model_iterator:
+            discovered.append(
+                model_info_from_sdk_model(
+                    raw_model,
+                    allowed_patterns=config.allowed_model_patterns,
+                    blocked_patterns=config.blocked_model_patterns,
+                )
             )
-        )
+    except Exception as exc:  # noqa: BLE001
+        return [], classify_gemini_error(exc).public_message
     return discovered, ""
 
 

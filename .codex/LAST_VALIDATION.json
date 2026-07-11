@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-12T03:02:59+08:00",
+  "recorded_at": "2026-07-12T03:17:49+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "3d13b2fb87c824920b2ed8a63a1662a0e0032ab6",
-  "last_known_stable_commit": "3d13b2fb87c824920b2ed8a63a1662a0e0032ab6",
+  "head_commit": "cd2114325d748241abe156da8864d492246613a6",
+  "last_known_stable_commit": "cd2114325d748241abe156da8864d492246613a6",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "3d13b2fb87c824920b2ed8a63a1662a0e0032ab6",
+  "state_recorded_against_commit": "cd2114325d748241abe156da8864d492246613a6",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-12T02:57:37+08:00",
-    "commit": "3d13b2fb87c824920b2ed8a63a1662a0e0032ab6",
+    "verified_at": "2026-07-12T03:06:16+08:00",
+    "commit": "cd2114325d748241abe156da8864d492246613a6",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29164348550,
+        "run_id": 29164609427,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "3d13b2fb87c824920b2ed8a63a1662a0e0032ab6",
+        "head_sha": "cd2114325d748241abe156da8864d492246613a6",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29164349968,
+        "run_id": 29164610776,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "3d13b2fb87c824920b2ed8a63a1662a0e0032ab6",
+        "head_sha": "cd2114325d748241abe156da8864d492246613a6",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,102 @@
       }
     }
   },
-  "status": "ara037_done_local_validation_passed_remote_verification_live",
+  "status": "ara038_done_local_validation_passed_publication_pending",
   "commands": [
+    {
+      "command": "ARA-038 pre-fix fake lazy-pager and automatic artifact-write fault matrix",
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "lazy_iteration_escaped_error_tuple": true,
+        "explicit_discovery_save_traceback": true,
+        "profile_discovery_save_traceback": true,
+        "profile_result_save_traceback": true,
+        "profile_fallback_result_save_traceback": true,
+        "absolute_path_disclosed": true
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_cloud_free.py::CloudFreePolicyTests::test_lazy_discovery_iteration_returns_redacted_error_tuple tests/test_cli_exit_codes.py::CliExitCodeTests::test_cloud_artifact_write_failures_exit_one_without_path_disclosure tests/test_cli_exit_codes.py::CliExitCodeTests::test_cloud_profile_discovery_failure_remains_a_successful_fallback",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 3,
+        "pytest_subtests_passed": 6
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_cloud_free.py tests/test_cli_exit_codes.py plus targeted Ruff and git diff --check",
+      "exit_code": 0,
+      "result": "passed_after_format",
+      "summary": {
+        "pytest_tests_passed": 50,
+        "pytest_subtests_passed": 34,
+        "ruff_format": "passed",
+        "ruff_lint": "passed",
+        "diff_check": "passed",
+        "interim_format_only_failure": "tests/test_cloud_free.py was formatted before the final pass"
+      }
+    },
+    {
+      "command": "make check after ARA-038 implementation and recovery-state synchronization",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 57,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 100,
+        "findings": 0,
+        "pytest_tests_passed": 326,
+        "pytest_subtests_passed": 207,
+        "pytest_duration_seconds": 10.54
+      }
+    },
+    {
+      "command": "two independent ARA-038 final reviews",
+      "result": "passed",
+      "summary": {
+        "write_boundary_review": "GO",
+        "lazy_iteration_review": "GO",
+        "iterator_time_type_error_false_success_closed": true,
+        "legacy_models_wrapper_preserved": true,
+        "all_four_artifact_write_stages_checked": true,
+        "provider_called": false
+      }
+    },
+    {
+      "command": ".venv/bin/python -m json.tool .codex/LAST_VALIDATION.json and .venv/bin/python -m pytest -q tests/test_recovery_state.py",
+      "exit_code": 0,
+      "result": "passed_after_state_wording_correction",
+      "summary": {
+        "json_parse": "passed",
+        "pytest_tests_passed": 6,
+        "pytest_subtests_passed": 1,
+        "interim_failure": "Remaining Steps initially requested publication work for a task already marked DONE"
+      }
+    },
+    {
+      "command": "ARA-037 publication, remote equality, CI, and draft PR verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "cd2114325d748241abe156da8864d492246613a6",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29164609427,
+        "pull_request_run_id": 29164610776,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "draft_pr_13_updated": true
+      }
+    },
     {
       "command": "make check after ARA-037 implementation and recovery-state synchronization",
       "exit_code": 0,
@@ -1565,6 +1659,10 @@
   ],
   "not_run": [
     {
+      "check": "real provider smoke for ARA-038",
+      "reason": "Discovery iteration and artifact-write boundaries are deterministic and covered with fake SDK pagers plus temporary write failures; no credential, cost, or external service is required."
+    },
+    {
       "check": "real provider smoke for ARA-037",
       "reason": "Literature Survey Mode is deterministic and provider-free; a real src.main subprocess with the actual run lock covers the affected interrupt boundary without credentials or cost."
     },
@@ -1598,8 +1696,10 @@
     }
   ],
   "notes": [
-    "ARA-037 is complete and locally validated in semantic current HEAD; current publication and CI state must be resolved live, while 3d13b2f remains the exact conservative externally verified fallback.",
-    "ARA-038 cloud-free lazy iteration and artifact-write containment is the next unblocked P2 task.",
+    "ARA-038 is complete and locally validated with no active task; publication remains pending and ARA-039 is the next unblocked P2.",
+    "ARA-038 preserves explicit discovery status 1, profile discovery-error seed fallback status 0, legacy non-iterable models wrappers, and fixed path-free status 1 for all four automatic artifact-write failure stages.",
+    "ARA-040 separately owns cross-process discovery/profile provenance cohorts; ARA-038 does not silently invalidate or migrate existing artifacts.",
+    "ARA-037 is complete at remote-equal commit cd21143 with successful push and pull-request CI runs 29164609427 and 29164610776 on Python 3.10 and 3.13.",
     "ARA-036 is complete at remote-equal commit 3d13b2f with successful push and pull-request CI runs 29164348550 and 29164349968 on Python 3.10 and 3.13.",
     "ARA-035 is complete at remote-equal commit a99723c with successful push and pull-request CI runs 29164052624 and 29164053862 on Python 3.10 and 3.13.",
     "ARA-034 is complete at remote-equal commit bdbd9d5 with successful push and pull-request CI runs 29163467415 and 29163468552 on Python 3.10 and 3.13.",

@@ -311,7 +311,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-038 - Contain cloud discovery lazy-iteration and artifact-write failures
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P2
 - Risk: medium
 - Description: SDK lazy-pager iteration and discovery/profile artifact `OSError` failures escape the
@@ -321,7 +321,8 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Acceptance criteria: lazy iteration is covered by the safe discovery error result; explicit
   discovery remains status 1, profile fallback remains status 0, and artifact-write failures use a
   fixed path-free status-1 diagnostic.
-- Validation command: injected lazy-pager/write failures, cloud-free/CLI tests, then `make check`.
+- Validation command: injected lazy-pager/write failures (`3 passed, 6 subtests passed`), cloud-free/
+  CLI tests (`50 passed, 34 subtests passed`), then `make check` (`326 passed, 207 subtests passed`).
 - Commit required: yes.
 - Dependencies: ARA-033 output-error contract; no real provider call.
 

@@ -1047,6 +1047,80 @@ except SystemExit:
 
         self.assertIsNone(result)
 
+    def test_cloud_artifact_write_failures_exit_one_without_path_disclosure(self) -> None:
+        for stage in (
+            "discovery",
+            "profile_discovery",
+            "profile_result",
+            "profile_fallback_result",
+        ):
+            with self.subTest(stage=stage), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                project_dir = root / "projects" / "selected"
+                project_dir.mkdir(parents=True)
+                mode_arg = (
+                    "--cloud-free-discover" if stage == "discovery" else "--cloud-free-profile"
+                )
+                args = cli_module.parse_args([mode_arg, "--project", "selected"])
+                private_error = OSError(f"private artifact path: {root}")
+                discovery_write_error = (
+                    private_error if stage in {"discovery", "profile_discovery"} else None
+                )
+                profile_error = (
+                    private_error
+                    if stage in {"profile_result", "profile_fallback_result"}
+                    else None
+                )
+                discovery_result = (
+                    ([], "discovery unavailable")
+                    if stage == "profile_fallback_result"
+                    else ([], "")
+                )
+                with (
+                    patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True),
+                    patch.object(cli_module, "Console") as console_class,
+                    patch.object(cli_module, "parse_args", return_value=args),
+                    patch.object(cli_module, "load_app_config", return_value=AppConfig()),
+                    patch.object(
+                        cli_module,
+                        "load_project_input",
+                        return_value=_project_input(project_dir),
+                    ),
+                    patch.object(
+                        cli_module,
+                        "discover_free_cloud_models",
+                        return_value=discovery_result,
+                    ),
+                    patch.object(
+                        cli_module,
+                        "save_discovery_artifact",
+                        side_effect=discovery_write_error,
+                        return_value=project_dir / "artifacts" / "cloud_free_models.json",
+                    ) as save_discovery,
+                    patch.object(
+                        cli_module, "profile_free_cloud_models", return_value=[]
+                    ) as profile_models,
+                    patch.object(
+                        cli_module,
+                        "save_profile_artifact",
+                        side_effect=profile_error,
+                    ),
+                    patch.object(cli_module, "recommend_free_cloud_model", return_value=None),
+                ):
+                    with self.assertRaises(SystemExit) as raised:
+                        cli_module.main()
+
+                rendered = " ".join(
+                    str(call) for call in console_class.return_value.print.call_args_list
+                )
+                self.assertEqual(raised.exception.code, 1)
+                self.assertIn("Cloud artifact error", rendered)
+                self.assertNotIn(str(root), rendered)
+                self.assertNotIn("private artifact path", rendered)
+                if stage == "profile_fallback_result":
+                    save_discovery.assert_not_called()
+                    profile_models.assert_called_once()
+
     def test_lock_contention_exits_two_for_each_locking_entrypoint(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_dir = Path(tmp) / "projects" / "selected"

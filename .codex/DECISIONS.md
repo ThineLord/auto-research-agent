@@ -341,3 +341,18 @@
 - Compatibility: normal survey completion remains status 0, survey artifact `OSError` remains the
   existing path-safe status 1, and no survey inputs, outputs, discovery logic, locks, configuration,
   provider behavior, or artifacts change.
+
+## 2026-07-12 - Contain cloud discovery consumption and automatic artifact writes
+
+- Decision: keep initial client construction and model-list invocation compatibility unchanged, but
+  consume the returned iterator and convert its model records inside a classified public-error
+  boundary. Fall back to a legacy `.models` collection only when obtaining the outer iterator fails;
+  never reinterpret an iteration-time `TypeError` as legacy success.
+- Artifact boundary: map `OSError` from each automatic discovery/profile save stage to the shared
+  operation-failure status 1 and a fixed diagnostic without path or exception chaining. Do not catch
+  provider/profile computation errors as artifact failures.
+- Compatibility: explicit discovery errors remain status 1; profile discovery errors still use
+  configured candidate seeds and can finish with status 0. Discovery/profile schemas, selection,
+  pricing policy, provider calls, model metadata, and existing artifacts remain unchanged.
+- Scope: the possibility of retaining stale discovery beside a new fallback profile is a separate
+  provenance-cohort problem queued as ARA-040, not silently changed under ARA-038.

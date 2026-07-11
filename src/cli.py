@@ -732,7 +732,13 @@ def main() -> None:
         if error:
             console.print(f"[red]Cloud model discovery failed: {error}[/red]")
             raise SystemExit(_EXIT_OPERATION_ERROR)
-        artifact = save_discovery_artifact(project_dir, discovered)
+        try:
+            artifact = save_discovery_artifact(project_dir, discovered)
+        except OSError:
+            console.print(
+                "[red]Cloud artifact error: automatic output is unsafe or unavailable.[/red]"
+            )
+            raise SystemExit(_EXIT_OPERATION_ERROR) from None
         candidates = build_candidate_pool(
             discovered_models=discovered,
             configured_models=gemini_config.models,
@@ -758,7 +764,13 @@ def main() -> None:
             )
             discovered = []
         else:
-            save_discovery_artifact(project_dir, discovered)
+            try:
+                save_discovery_artifact(project_dir, discovered)
+            except OSError:
+                console.print(
+                    "[red]Cloud artifact error: automatic output is unsafe or unavailable.[/red]"
+                )
+                raise SystemExit(_EXIT_OPERATION_ERROR) from None
         candidates = build_candidate_pool(
             discovered_models=discovered,
             configured_models=gemini_config.models,
@@ -771,7 +783,13 @@ def main() -> None:
             api_key=gemini_config.api_key,
             timeout_seconds=timeout_seconds,
         )
-        artifact = save_profile_artifact(project_dir, profiles)
+        try:
+            artifact = save_profile_artifact(project_dir, profiles)
+        except OSError:
+            console.print(
+                "[red]Cloud artifact error: automatic output is unsafe or unavailable.[/red]"
+            )
+            raise SystemExit(_EXIT_OPERATION_ERROR) from None
         recommendation = recommend_free_cloud_model(
             candidates=safe_candidates,
             profiles=profiles,

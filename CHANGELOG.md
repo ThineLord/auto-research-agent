@@ -40,6 +40,10 @@
 
 ### Fixed
 
+* Cloud-free model discovery now contains SDK lazy-pager iteration and model-conversion failures in
+  its existing safe error result, so explicit discovery exits 1 while profile mode can retain its
+  configured-seed fallback. Automatic discovery/profile artifact write failures now use a fixed,
+  path-free status-1 diagnostic instead of traceback or local path disclosure.
 * Literature Survey Mode manual interrupts now emit the standard `MANUAL_INTERRUPT` diagnostic and
   exit 130 without traceback or path disclosure, while preserving release of the real run lock.
   Successful surveys and artifact-I/O status 1 behavior remain unchanged.

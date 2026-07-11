@@ -21,6 +21,7 @@ from src.cloud_free import (
     choose_fallback_model,
     classify_gemini_error,
     classify_model,
+    discover_free_cloud_models,
     filter_safe_text_models,
     load_discovery_artifact,
     load_profile_artifact,
@@ -93,6 +94,58 @@ class CloudFreePolicyTests(unittest.TestCase):
             [model.model_id for model in safe],
             ["gemini-3.5-flash", "gemma-3-1b-it"],
         )
+
+    def test_lazy_discovery_iteration_returns_redacted_error_tuple(self) -> None:
+        secret = "LOCAL-DISCOVERY-SECRET"
+        private_path = "/private/discovery/provider/cache"
+
+        class FailingPager:
+            models: list[object] = []
+
+            def __init__(self, error: Exception) -> None:
+                self.error = error
+
+            def __iter__(self):
+                yield SimpleNamespace(name="models/gemini-3.5-flash")
+                raise self.error
+
+        for lazy_error in (
+            RuntimeError(f"lazy pager failed with api_key={secret} path={private_path}"),
+            TypeError(f"lazy pager type failure at {private_path}"),
+        ):
+            with self.subTest(error=lazy_error.__class__.__name__):
+                wrapper = SimpleNamespace(
+                    _ensure_api_key_available=lambda: None,
+                    _create_client=lambda: SimpleNamespace(
+                        models=SimpleNamespace(list=lambda: FailingPager(lazy_error))
+                    ),
+                )
+                with patch("src.cloud_free._create_genai_client", return_value=wrapper):
+                    discovered, error = discover_free_cloud_models(
+                        api_key_env="GEMINI_API_KEY",
+                        api_key=secret,
+                    )
+
+                self.assertEqual(discovered, [])
+                self.assertTrue(error)
+                self.assertNotIn(secret, error)
+                self.assertNotIn(private_path, error)
+
+        legacy_wrapper = SimpleNamespace(models=[SimpleNamespace(name="models/gemini-3.5-flash")])
+        wrapper = SimpleNamespace(
+            _ensure_api_key_available=lambda: None,
+            _create_client=lambda: SimpleNamespace(
+                models=SimpleNamespace(list=lambda: legacy_wrapper)
+            ),
+        )
+        with patch("src.cloud_free._create_genai_client", return_value=wrapper):
+            discovered, error = discover_free_cloud_models(
+                api_key_env="GEMINI_API_KEY",
+                api_key=secret,
+            )
+
+        self.assertEqual([model.model_id for model in discovered], ["gemini-3.5-flash"])
+        self.assertEqual(error, "")
 
     def test_model_discovery_metadata_handles_missing_fields(self) -> None:
         info = model_info_from_sdk_model(SimpleNamespace(name="models/gemma-3-1b-it"))

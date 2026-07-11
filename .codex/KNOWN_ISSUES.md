@@ -295,21 +295,24 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-037 - Survey interrupt bypasses the status-130 contract
 
-- Status: fixed and locally validated in the semantic current `HEAD`; resolve publication/CI live
+- Status: fixed, pushed, and CI-verified
 - Severity: P2 automation/privacy
 - Impact: survey `KeyboardInterrupt` releases the lock but exits as signal status `-2` with traceback
   and source paths instead of the documented 130 diagnostic.
-- Current action: ARA-037 now converts survey `KeyboardInterrupt` to status 130 with a fixed path-safe
-  diagnostic inside the existing lock lifecycle. Direct/real-module, related/full validation, and
-  independent review passed; verify semantic current `HEAD` remotely after recovery.
+- Current action: ARA-037 completed at `cd21143`; exact push/PR runs
+  `29164609427`/`29164610776` passed Python 3.10/3.13. Status 130, fixed diagnostic, real-module
+  behavior, and lock release are verified.
 
 ## KI-038 - Cloud-free lazy iteration and artifact writes escape error boundaries
 
-- Status: confirmed; queued as ARA-038
+- Status: fixed and locally validated; publication pending
 - Severity: P2 CLI/privacy
 - Impact: lazy SDK iteration and discovery/profile artifact writes can leak tracebacks/paths, and
   lazy failure prevents the documented profile seed fallback.
-- Current action: contain provider-free lazy/write failures with existing status semantics.
+- Current action: ARA-038 now contains lazy iteration/model-conversion failures as a safe public
+  discovery result and maps all four automatic discovery/profile artifact-write stages to fixed
+  path-free status 1. Explicit discovery remains status 1 and profile discovery fallback remains
+  status 0; focused, related, full-gate, and two independent reviews passed without a provider call.
 
 ## KI-039 - Unreadable prior-round context is silently discarded on resume
 

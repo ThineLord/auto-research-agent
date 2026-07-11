@@ -4,20 +4,19 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: retain the completed, locally validated ARA-037 survey interrupt contract and
-  continue next with the isolated ARA-038 cloud-free lazy/write error boundary after live checks.
+- Current goal: retain the completed, locally validated ARA-038 cloud-free error boundaries,
+  publish that checkpoint, and continue with isolated ARA-039 resume-context handling.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `3d13b2fb87c824920b2ed8a63a1662a0e0032ab6` (the exact HEAD
+- State recorded against commit: `cd2114325d748241abe156da8864d492246613a6` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `3d13b2fb87c824920b2ed8a63a1662a0e0032ab6` (exact local,
+- Last externally verified fallback: `cd2114325d748241abe156da8864d492246613a6` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-037 is `DONE` with direct/real-module, related, full-gate,
-  and independent review results passing locally. ARA-038 is the next unblocked P2 task. The exact
-  external fallback remains ARA-036 commit `3d13b2f`; resolve semantic current `HEAD`, remote, and
-  CI state live.
+- Active task at this snapshot: none. ARA-038 is `DONE` with focused, related, full-gate, and two
+  independent reviews passing locally; publication is pending. ARA-037 remains the exact external
+  fallback at `cd21143`, verified by push/PR runs `29164609427`/`29164610776` on Python 3.10/3.13.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -479,17 +478,42 @@ Updated: 2026-07-12 (Asia/Shanghai)
 - Direct byte-snapshot and real module CLI tests prove no project artifact write, no agent access,
   status 2, no traceback, and lock release. Two independent reviews returned GO.
 
+## ARA-038 Cloud Discovery And Artifact Error Boundaries
+
+- Reproduced SDK pagers that yielded one model and then raised, allowing lazy iteration exceptions
+  to escape the discovery tuple and preventing profile mode's configured-seed fallback.
+- Reproduced `OSError` at explicit discovery save, profile discovery-cache save, successful profile
+  result save, and discovery-error fallback profile save; each emitted traceback and absolute paths.
+- Kept initial client/list-call compatibility while consuming lazy iterators inside a safe boundary.
+  Iterator and model-conversion failures now return an empty discovery result plus the existing
+  classified public message; only iterator acquisition may use the legacy non-iterable `.models`
+  wrapper fallback.
+- Mapped the four automatic artifact-write stages to the existing operation-error status 1 with one
+  fixed path-free diagnostic. Explicit discovery failure remains status 1, while a discovery error
+  in profile mode still uses configured seeds and returns status 0 when profiling and saving succeed.
+- Provider-free focused, related, full-gate, and two independent adversarial reviews passed. The
+  separate discovery/profile provenance-cohort risk remains queued as ARA-040.
+
 ## Remaining Steps
 
-- Start ARA-038 with lazy-pager and discovery/profile artifact-write failure injections; retain the
-  documented explicit-discovery status 1 and profile-fallback status 0 contracts.
-- Continue with the highest-priority queued P2 after ARA-036 unless newly confirmed evidence changes
-  the ordering.
+- Resolve the semantic current HEAD publication, exact remote equality, and CI state live before
+  starting ARA-039, then record the new externally verified fallback.
+- Continue with ARA-039, the highest-priority unblocked P2, unless new evidence changes ordering.
 - Keep ARA-018, ARA-029, and ARA-030 behind their recorded owner/configuration/long-task approval
   gates; do not fold release or CI-configuration policy into the analysis/compare fixes.
 
 ## Test Status
 
+- ARA-038 focused lazy-iteration/artifact-write/profile-fallback regression passed `3 passed, 6
+  subtests passed`; related cloud-free/CLI regression passed `50 passed, 34 subtests passed`.
+- ARA-038 local `make check` passed Ruff format/lint, imports, repository-safety self-test,
+  worktree/staged scans, and pytest (`326 passed, 207 subtests passed`; 100 tracked files and zero
+  findings). Two independent final reviews returned GO after checking iterator-time `TypeError`,
+  legacy wrapper compatibility, model conversion, all four write stages, status semantics, and
+  key/path privacy. No provider call was made.
+- ARA-037 remote verification: exact local/upstream/`ls-remote` equality at `cd21143`, ahead/behind
+  `0/0`; push run `29164609427` and pull-request run `29164610776` passed Python 3.10/3.13. Draft
+  PR 13 is open, mergeable, and updated.
 - ARA-037 focused direct/real-module interrupt tests passed `2 passed`; survey/CLI regression passed
   `36 passed, 20 subtests passed`; local `make check` passed Ruff/import/safety and pytest (`324
   passed, 201 subtests passed`; 100 tracked files and zero findings).
@@ -809,6 +833,15 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- The initial ARA-038 fake lazy pager raised after its first item and escaped with a traceback; four
+  injected artifact-write `OSError` stages also escaped with paths. These were the expected pre-fix
+  failures. Independent review then found an iterator-time `TypeError` could be mistaken for a
+  legacy `.models` wrapper; separating iterator acquisition from consumption closed that edge.
+- The first post-fix targeted Ruff format check requested formatting in `tests/test_cloud_free.py`;
+  the file was formatted and the related tests plus full gate then passed.
+- The first recovery-state consistency run rejected a Remaining Steps bullet that named a completed
+  task together with publication work; it was rewritten as live semantic-HEAD verification, and the
+  final recovery-state suite passed `6 passed, 1 subtest passed`.
 - The initial ARA-034 regressions failed two tests and seven subtests as expected: truthy malformed
   flags entered the runner, huge/non-finite scores raised or propagated, and the module control
   exited 1 after agent access and writes. The final focused and full gates pass.
