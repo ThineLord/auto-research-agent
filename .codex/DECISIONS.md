@@ -153,3 +153,17 @@
   protected agent phase does not promise complete run artifacts.
 - Compatibility: statuses 0/1/2, artifact schemas, provider/prompt/scoring behavior, and historical
   experiment interpretation remain unchanged.
+
+## 2026-07-11 - Preserve raw manifest provenance and canonicalize resume identity
+
+- Decision: the resolved run-directory basename is the single resume identity. A nonempty
+  checkpoint or existing-manifest `run_id` must match it; missing IDs are derived canonically.
+- Manifest policy: parse and snapshot an existing raw manifest before the first resume write,
+  preserve creation-time and unknown fields, canonicalize only ID/root/config pointers, and merge
+  existing then current resume metadata. Unpreservable manifests fail closed without replacement.
+- Sparse policy: an existing sparse manifest remains sparse. A missing manifest may use fields
+  already persisted in run config; only a genuinely new run uses current creation-session defaults.
+- Reason: rebuilding from normalized/current inputs erased historical provenance, while filling
+  absent legacy fields from a resume session fabricated provenance that never existed.
+- Compatibility: configured `runs/` storage links and leaf aliases remain usable with canonical ID;
+  current session mode/model/time stay in run config, and consumer fallback remains unchanged.

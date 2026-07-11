@@ -145,10 +145,11 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-019 - Resume can rewrite original run-manifest provenance
 
-- Status: confirmed by read-only audit; separate from history-array integrity
+- Status: fixed and locally validated at implementation `3b98c61`; push/CI verification pending
 - Severity: P2
 - Impact: rebuilding `run_manifest.json` during resume can replace original start/mode provenance and discard unknown legacy fields, even though `run_config.json` retains resume sessions; a safe in-runs path alias can also disagree with checkpoint `run_id`.
-- Current action: task `ARA-020`; preserve existing fields with additive resume metadata and define canonical run identity before changing manifest behavior.
+- Current action: task `ARA-020`; commit recovery state, push implementation `3b98c61`, then verify
+  Python 3.10/3.13 CI.
 
 ## KI-020 - UI artifact viewers can follow external checkpoint references
 
@@ -182,3 +183,12 @@ Updated: 2026-07-10 (Asia/Shanghai)
 - Current action: preserve all touched files as-is until the owner chooses to keep the transparent
   mock checkpoint or authorizes a backed-up best-effort rollback. Repository history cannot restore
   the prior ignored state byte-for-byte.
+
+## KI-024 - Zero-round resume omits a run-config resume session entry
+
+- Status: confirmed by code-path audit; deferred from ARA-020
+- Severity: P3 provenance completeness
+- Impact: resuming a checkpoint with `last_completed_round=0` records resume lifecycle metadata and
+  current-session time but does not append `resume_sessions` because the next round is still 1.
+- Current action: task `ARA-024`; distinguish new-run round 1 from resume-existing-run round 1 and
+  add a session entry without changing round execution or legacy manifest semantics.

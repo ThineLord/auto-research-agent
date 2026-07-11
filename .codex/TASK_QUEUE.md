@@ -91,7 +91,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-020 - Preserve legacy run-manifest provenance across resume
 
-- Status: `TODO`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: medium
 - Description: resume rebuilds `run_manifest.json` from the current session and can replace the original start time, mode, and unknown legacy fields even though `run_config.json` preserves session history; an in-runs symlink alias can also leave checkpoint `run_id` inconsistent with the canonical root identity.
@@ -100,6 +100,21 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Validation command: focused resume/run-config tests followed by `make check`.
 - Commit required: yes.
 - Dependencies: `ARA-010`.
+
+## ARA-024 - Record zero-round resume sessions in run config
+
+- Status: `TODO`
+- Priority: P3
+- Risk: low
+- Description: `build_initial_run_config` appends `resume_sessions` only when `start_round > 1`, so
+  resuming an existing zero-round checkpoint at round 1 lacks a session-array entry even though
+  lifecycle metadata correctly says `resume_existing_run`.
+- Related files: `src/run_config.py`, runner/resume provenance tests
+- Acceptance criteria: a zero-round resume records its session start and round 1 in
+  `resume_sessions`, while a genuinely new run at round 1 still has no resume entry.
+- Validation command: focused run-config/round-loop tests followed by `make check`.
+- Commit required: yes.
+- Dependencies: `ARA-020`.
 
 ## ARA-011 - Prevent failed rounds from replacing a trusted best output
 
