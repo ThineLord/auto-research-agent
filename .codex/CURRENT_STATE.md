@@ -4,18 +4,20 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: preserve the locally validated ARA-033 CLI output-error checkpoint; no unblocked
-  implementation task remains without owner/configuration/long-task approval.
+- Current goal: retain the completed, locally validated ARA-034 literal-boolean resume boundary and
+  continue next with the isolated ARA-035 finite legacy-metric task after live recovery checks.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `21fea1102b63f3ce457f0ee455c62c849607eab9` (the exact HEAD
+- State recorded against commit: `f44687eb03fbc971adc762d12437aefc58f576a8` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `21fea1102b63f3ce457f0ee455c62c849607eab9` (exact local,
+- Last externally verified fallback: `f44687eb03fbc971adc762d12437aefc58f576a8` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-033 is `DONE` after provider-free subprocess, related,
-  full, and independent contract validation. All remaining tasks are `DEFERRED` or `BLOCKED`.
+- Active task at this snapshot: none. ARA-034 is `DONE` with focused, related, full-gate, and two
+  independent review results passing locally. ARA-035 is the next unblocked P1 task. The exact
+  external fallback remains ARA-033 commit `f44687e`; resolve the semantic current `HEAD`, remote,
+  and CI state live.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -465,16 +467,44 @@ Updated: 2026-07-12 (Asia/Shanghai)
   reviews returned GO after checking exit semantics, failed writes, success paths, and symlink
   compatibility.
 
+## ARA-034 Explicit Resume Eligibility Boundary
+
+- Reproduced `"false"`, `"true"`, and integer `1` checkpoint flags entering the iterative runner;
+  the end-to-end control invoked all agent stages, wrote a new round, and replaced checkpoint state.
+- Reproduced a 400-digit preview score raising `OverflowError` and Infinity/NaN passing through the
+  previous float conversion.
+- Required identity with literal boolean `true`; all other types return the existing
+  `not_resume_eligible` result before the runner or any agent stage. Preview score conversion now
+  catches overflow and accepts only finite non-boolean values, preserving finite numeric strings.
+- Direct byte-snapshot and real module CLI tests prove no project artifact write, no agent access,
+  status 2, no traceback, and lock release. Two independent reviews returned GO.
+
 ## Remaining Steps
 
-- There is no unblocked implementation task. ARA-029 requires explicit CI-configuration approval;
-  ARA-030 requires a separate greater-than-30-minute approval; ARA-018 requires an owner license
-  decision, and its dependent release tasks remain deferred.
+- Start ARA-035 with a provider-free strict-JSON reproduction for legacy non-score metrics; keep its
+  aggregation semantics isolated from the completed ARA-034 recovery boundary and ARA-036 Judge
+  parsing boundary.
+- Continue with ARA-036 after ARA-035 unless a newly confirmed higher-priority risk supersedes it.
 - Keep ARA-018, ARA-029, and ARA-030 behind their recorded owner/configuration/long-task approval
   gates; do not fold release or CI-configuration policy into the analysis/compare fixes.
 
 ## Test Status
 
+- ARA-034 focused preview/end-to-end/CLI regressions passed `3 passed, 11 subtests passed`; the
+  pre-fix run had failed for truthy strings/integer, huge/non-finite scores, agent access, writes,
+  and CLI status exactly as expected.
+- ARA-034 related resume/CLI/UI regression passed `137 passed, 114 subtests passed`; final local
+  `make check` passed Ruff format/lint, imports, repository-safety self-test, worktree/staged scans,
+  and pytest (`314 passed, 199 subtests passed`; 100 tracked files and zero findings).
+- Two independent ARA-034 reviews returned GO. They verified identity-true semantics, finite-score
+  compatibility, no runner/agent-stage invocation, byte preservation, CLI status 2, no traceback,
+  and run-lock release. No real provider call was made.
+- ARA-034 pre-fix provider-free probe: checkpoint `can_resume: "false"` produced
+  `preview.can_resume=True`, `run_resume_mode=True`, and invoked the runner; a 400-digit integer
+  `best_score` raised `OverflowError`.
+- ARA-033 remote verification: exact local/upstream/`ls-remote` equality at `f44687e`, ahead/behind
+  `0/0`; push run `29162704235` and pull-request run `29162705572` passed Python 3.10/3.13. Draft PR
+  13 is open, mergeable, and updated.
 - ARA-033 focused failure boundary passed `2 passed, 23 deselected, 4 subtests passed`; related
   CLI/analysis/comparison/storage regression passed `72 passed, 22 subtests passed`.
 - ARA-033 full provider-free gate passed Ruff format/lint, imports, repository-safety self-test,
@@ -750,6 +780,12 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- The initial ARA-034 regressions failed two tests and seven subtests as expected: truthy malformed
+  flags entered the runner, huge/non-finite scores raised or propagated, and the module control
+  exited 1 after agent access and writes. The final focused and full gates pass.
+- One post-fix `rg` audit put a backticked task-state token inside a double-quoted zsh pattern, so
+  zsh attempted the token as a command. It had no file or Git impact and was immediately rerun with
+  a literal single-quoted pattern.
 - ARA-033 pre-fix provider-free subprocesses for analysis and comparison each returned 1 but emitted
   a traceback containing both temporary and repository absolute paths. The first regression failed
   two subtests as expected; an additional unresolved-`~user` regression also failed two subtests

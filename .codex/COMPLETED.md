@@ -457,3 +457,24 @@ Validation and implementation outcomes will be appended only after they are actu
   CLI/analysis/comparison/storage tests passed `72 passed, 22 subtests passed`; local `make check`
   passed `311 passed, 188 subtests passed` with 100 tracked files and zero safety findings.
 - Two independent final reviews returned GO after running failure, success, and symlink matrices.
+
+## 2026-07-12 - Explicit resume eligibility and finite preview score
+
+- Reproduced malformed checkpoint values `"false"`, `"true"`, and integer `1` being treated as
+  resume-eligible; the end-to-end control invoked all agent stages, wrote a new round, and replaced
+  the explicitly ineligible checkpoint.
+- Reproduced a 400-digit preview score raising `OverflowError`, while Infinity and NaN propagated
+  into resume metadata.
+- Required checkpoint `can_resume` to be the literal JSON boolean `true`; every other type now
+  returns the existing ineligible-checkpoint result before runner or agent-stage invocation and
+  before any project artifact write.
+- Made preview score conversion catch unrepresentable integers and reject non-finite or boolean
+  values while preserving finite legacy numeric strings and the existing `-1.0` safe default.
+- Added direct preview, byte-preservation end-to-end, and real module CLI regressions. The CLI test
+  verifies status 2, no traceback, no agent access, unchanged checkpoint bytes, no run config, and
+  released run lock.
+- Focused tests passed (`3 passed, 11 subtests passed`); related resume/CLI/UI tests passed (`137
+  passed, 114 subtests passed`); full `make check` passed (`314 passed, 199 subtests passed`; 100
+  tracked files and zero safety findings).
+- Two independent final reviews returned GO after checking literal-type semantics, valid-checkpoint
+  compatibility, finite-score behavior, artifact preservation, CLI exit status, and lock release.

@@ -695,6 +695,73 @@ cli.main()
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertNotIn("Traceback", result.stderr)
 
+    def test_module_entrypoint_rejects_non_boolean_resume_flag_without_writes(self) -> None:
+        script = """
+import json
+import sys
+import tempfile
+from pathlib import Path
+from types import SimpleNamespace
+import src.cli as cli
+from src.config import AppConfig
+from src.constants import RUN_LOCK_FILENAME
+from src.package_resources import RuntimeLayout
+
+temporary_root = tempfile.TemporaryDirectory()
+root = Path(temporary_root.name)
+project_dir = root / "projects" / "selected"
+run_root = project_dir / "runs" / "resume-run"
+run_root.mkdir(parents=True)
+(project_dir / "task.md").write_text("# Resume flag test", encoding="utf-8")
+checkpoint_path = project_dir / "checkpoint.json"
+checkpoint_bytes = json.dumps(
+    {
+        "run_id": "resume-run",
+        "run_root": str(run_root),
+        "last_completed_round": 0,
+        "best_score": -1,
+        "can_resume": "false",
+    }
+).encode()
+checkpoint_path.write_bytes(checkpoint_bytes)
+agent_marker = project_dir / "agent_called"
+
+class UnexpectedAgents:
+    def __getattr__(self, name):
+        agent_marker.write_text(name, encoding="utf-8")
+        raise AssertionError(f"resume agent unexpectedly accessed: {name}")
+
+cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, root, root, True)
+cli.load_app_config = lambda path: AppConfig()
+cli.list_installed_ollama_models = lambda: (["qwen3:8b"], None)
+cli.create_llm_client = lambda **kwargs: SimpleNamespace(timeout_seconds=1)
+cli.ResearchAgents.from_prompt_dir = lambda **kwargs: UnexpectedAgents()
+sys.argv = ["auto-research-agent", "--resume", "--project", "selected"]
+try:
+    cli.main()
+except SystemExit:
+    print(f"agent_called={agent_marker.exists()}")
+    print(f"checkpoint_unchanged={checkpoint_path.read_bytes() == checkpoint_bytes}")
+    print(f"run_config_exists={(run_root / 'run_config.json').exists()}")
+    print(f"lock_exists={(project_dir / RUN_LOCK_FILENAME).exists()}")
+    raise
+"""
+
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("agent_called=False", result.stdout)
+        self.assertIn("checkpoint_unchanged=True", result.stdout)
+        self.assertIn("run_config_exists=False", result.stdout)
+        self.assertIn("lock_exists=False", result.stdout)
+        self.assertNotIn("Traceback", result.stderr)
+
     def test_config_and_project_startup_errors_exit_two(self) -> None:
         cases = (
             (

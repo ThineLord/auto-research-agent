@@ -1302,6 +1302,101 @@ class RoundLoopTests(unittest.TestCase):
             self.assertEqual(derived_preview["run_id"], "canonical-run")
             self.assertEqual(Path(derived_preview["run_root"]), run_root.resolve())
 
+    def test_resume_preview_requires_literal_true_and_finite_best_score(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            base_checkpoint = {
+                "run_id": "resume-run",
+                "run_root": str(run_root),
+                "last_completed_round": 0,
+            }
+
+            for invalid_flag in ("false", "true", 1, 0, [], {}):
+                with self.subTest(can_resume=invalid_flag):
+                    preview = build_resume_preview(
+                        project_dir=project_dir,
+                        checkpoint={**base_checkpoint, "can_resume": invalid_flag},
+                    )
+
+                    self.assertFalse(preview["can_resume"])
+                    self.assertEqual(preview["blocked_reason"], "not_resume_eligible")
+
+            valid_preview = build_resume_preview(
+                project_dir=project_dir,
+                checkpoint={
+                    **base_checkpoint,
+                    "can_resume": True,
+                    "best_score": "80.5",
+                },
+            )
+            self.assertTrue(valid_preview["can_resume"])
+            self.assertEqual(valid_preview["best_score"], 80.5)
+
+            for invalid_score in (10**400, "Infinity", float("inf"), float("nan"), True):
+                with self.subTest(best_score=invalid_score):
+                    preview = build_resume_preview(
+                        project_dir=project_dir,
+                        checkpoint={
+                            **base_checkpoint,
+                            "can_resume": True,
+                            "best_score": invalid_score,
+                        },
+                    )
+
+                    self.assertTrue(preview["can_resume"])
+                    self.assertEqual(preview["best_score"], -1.0)
+
+    def test_non_boolean_resume_eligibility_blocks_before_agents_or_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            checkpoint_path = project_dir / "checkpoint.json"
+            checkpoint_path.write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 0,
+                        "best_score": -1,
+                        "can_resume": "false",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            before = {
+                path.relative_to(project_dir): path.read_bytes()
+                for path in project_dir.rglob("*")
+                if path.is_file()
+            }
+            agents = RecordingAgents()
+
+            resume_started = run_resume_mode(
+                console=Console(),
+                agents=agents,
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                model_name="fake-model",
+                max_rounds=1,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+            )
+            after = {
+                path.relative_to(project_dir): path.read_bytes()
+                for path in project_dir.rglob("*")
+                if path.is_file()
+            }
+
+            self.assertFalse(resume_started)
+            self.assertEqual(agents.draft_rounds, [])
+            self.assertEqual(after, before)
+
     def test_resume_rejects_unpreservable_legacy_manifest_before_writes(self) -> None:
         deeply_nested_manifest = b'{"nested":' * 150 + b"0" + b"}" * 150
         cases = {

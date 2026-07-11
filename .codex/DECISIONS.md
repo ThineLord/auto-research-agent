@@ -279,3 +279,20 @@
 - Boundary: do not catch analysis/comparison computation or terminal-rendering failures, and do not
   suppress errors in the storage layer. Successful exports and explicitly authorized output-parent
   symlinks retain their existing behavior.
+
+## 2026-07-12 - Require an identity-true resume eligibility flag
+
+- Decision: treat a checkpoint as resume-eligible only when `can_resume is True`; do not coerce
+  strings, integers, arrays, objects, or other values by truthiness. Convert preview `best_score`
+  only when it is non-boolean, representable as a float, and finite; otherwise use the established
+  `-1.0` default.
+- Reason: tolerant truthiness turned malformed values such as `"false"` into authorization to run
+  agents and replace checkpoint state, while unbounded float conversion could crash or propagate
+  Infinity/NaN before the recovery decision.
+- Failure boundary: invalid eligibility returns the existing `not_resume_eligible` preview and CLI
+  status 2 before the iterative runner or any agent stage. Project artifacts remain byte-identical,
+  and the acquired CLI run lock is released by its existing lifecycle boundary.
+- Compatibility: literal JSON `true`, finite numeric values and strings, checkpoint schema, run
+  execution, providers, prompts, score semantics, experiment artifacts, and historical conclusions
+  remain unchanged. Client/agent container construction order is a separate existing CLI behavior;
+  no provider call or agent stage occurs for an ineligible checkpoint.

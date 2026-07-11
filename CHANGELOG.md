@@ -40,6 +40,10 @@
 
 ### Fixed
 
+* Resume now treats only the JSON boolean `true` as an eligible checkpoint flag; strings, numbers,
+  and container values fail closed before the runner or any agent stage can write artifacts. Huge,
+  boolean, NaN, and infinite preview scores use the existing safe default instead of crashing or
+  propagating non-finite state, while finite legacy numeric strings remain compatible.
 * Analysis and comparison exports now report unavailable or unresolvable explicit output paths as
   privacy-safe operation failures (status 1) instead of emitting tracebacks and local paths;
   successful output and explicitly selected parent symlinks remain supported.

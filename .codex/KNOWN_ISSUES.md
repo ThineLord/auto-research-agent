@@ -255,10 +255,80 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-033 - Provider-free export failures leak traceback and local paths
 
-- Status: fixed and locally validated in ARA-033; publish/CI state must be resolved live
+- Status: fixed, pushed, and CI-verified
 - Severity: P2 privacy/CLI reliability
 - Impact: an unavailable analysis/comparison output parent or unresolved home shortcut returns the
   correct status 1 but exposes a Python traceback with temporary and repository absolute paths.
-- Current action: explicit output resolution/write failures now use fixed path-free diagnostics and
-  status 1. Failure, success, symlink, related, full, and two independent reviews are green; resolve
-  semantic `HEAD`, remote equality, and CI live after publication.
+- Current action: task ARA-033 completed at `f44687e`; exact push/PR runs
+  `29162704235`/`29162705572` passed Python 3.10/3.13. Explicit output resolution/write failures use
+  fixed path-free diagnostics and status 1.
+
+## KI-034 - Non-boolean resume eligibility is treated as true
+
+- Status: fixed and locally validated in the semantic current `HEAD`; resolve publication/CI live
+- Severity: P1 recovery integrity
+- Impact: values such as `"false"`, `"true"`, or `1` can start agents and overwrite an explicitly
+  ineligible checkpoint; huge/non-finite preview scores can crash or propagate invalid state.
+- Current action: ARA-034 now requires identity with boolean `true`, converts only finite
+  representable preview scores, and has direct plus CLI fail-before-write/agent regression
+  coverage. The full local gate and two independent reviews passed; verify the semantic current
+  `HEAD` against the remote and CI after recovery.
+
+## KI-035 - Legacy non-score metrics can overflow or emit non-standard JSON
+
+- Status: confirmed; queued as ARA-035
+- Severity: P1 report/data correctness
+- Impact: malformed or extreme timings, evolution metrics, rubric values, and counters can emit
+  `NaN`/`Infinity` under status 0 or raise provider-free `OverflowError` tracebacks.
+- Current action: add finite-aware coercion, overflow-safe aggregation, and strict-JSON controls
+  without changing ordinary metric results.
+
+## KI-036 - Unrepresentable Judge numbers raise during parsing
+
+- Status: confirmed; queued as ARA-036
+- Severity: P1 run reliability
+- Impact: structured Judge score/rubric integers outside float range raise `OverflowError` instead of
+  following invalid-output handling.
+- Current action: harden score/rubric coercion and add parser plus round-loop controls.
+
+## KI-037 - Survey interrupt bypasses the status-130 contract
+
+- Status: confirmed; queued as ARA-037
+- Severity: P2 automation/privacy
+- Impact: survey `KeyboardInterrupt` releases the lock but exits as signal status `-2` with traceback
+  and source paths instead of the documented 130 diagnostic.
+- Current action: normalize the survey branch while preserving lock release.
+
+## KI-038 - Cloud-free lazy iteration and artifact writes escape error boundaries
+
+- Status: confirmed; queued as ARA-038
+- Severity: P2 CLI/privacy
+- Impact: lazy SDK iteration and discovery/profile artifact writes can leak tracebacks/paths, and
+  lazy failure prevents the documented profile seed fallback.
+- Current action: contain provider-free lazy/write failures with existing status semantics.
+
+## KI-039 - Unreadable prior-round context is silently discarded on resume
+
+- Status: confirmed; queued as ARA-039
+- Severity: P2 reproducibility
+- Impact: invalid UTF-8 in existing prior-round Judge context becomes an empty prompt context after
+  startup metadata has already changed.
+- Current action: define missing-file compatibility and fail before writes on existing unreadable
+  context.
+
+## KI-040 - Cloud fallback profile can retain stale discovery provenance
+
+- Status: confirmed; queued as ARA-040
+- Severity: P2 selection consistency
+- Impact: a new fallback profile can coexist with stale discovery data and cause a later process to
+  reselect a model deliberately excluded in the current process.
+- Current action: bind discovery/profile artifacts to one verifiable cohort after ARA-038.
+
+## KI-041 - Resume startup metadata can split across generations
+
+- Status: confirmed; architecture decision deferred as ARA-041
+- Severity: P2 recovery consistency
+- Impact: a manifest write failure after config replacement leaves only `run_config.json` claiming
+  a new running resume session although no agent ran and other state remains old.
+- Current action: require explicit approval for a cross-file recoverable transaction design and
+  per-write fault-injection matrix.

@@ -240,6 +240,134 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Commit required: yes.
 - Dependencies: complete ARA-032 so shared analysis/compare tests remain isolated by root cause.
 
+## ARA-034 - Require an explicit boolean resume eligibility flag
+
+- Status: `DONE`
+- Priority: P1
+- Risk: medium
+- Description: checkpoint values such as `"false"`, `"true"`, or `1` are truthy, so a malformed
+  `can_resume` field can start agents and overwrite an explicitly ineligible checkpoint. A huge or
+  non-finite `best_score` can also crash or contaminate the preview before the fail-safe decision.
+- Related files: `src/resume.py`, resume/round-loop tests, CLI exit-code tests, recovery records
+- Acceptance criteria: only JSON boolean `true` is resume-eligible; every other type fails before
+  runner/agent invocation or artifact writes. Preview `best_score` accepts only finite representable
+  numbers, and malformed values use the existing safe default without traceback.
+- Validation command: focused preview/end-to-end/CLI regressions (`3 passed, 11 subtests passed`),
+  related resume/CLI/UI tests (`137 passed, 114 subtests passed`), recovery-state consistency, then
+  `make check` (`314 passed, 199 subtests passed`).
+- Commit required: yes.
+- Dependencies: clean, remote-equal ARA-033 checkpoint `f44687e`.
+
+## ARA-035 - Keep legacy metric aggregates finite and strict JSON
+
+- Status: `TODO`
+- Priority: P1
+- Risk: medium
+- Description: non-score legacy timings, evolution values, rubric values, and token counters can
+  propagate `NaN`/`Infinity`, overflow derived totals, or raise `OverflowError` during provider-free
+  analysis/comparison.
+- Related files: `src/metrics.py`, `src/run_compare.py`, metric/analysis/compare tests
+- Acceptance criteria: malformed/non-finite legacy metric values are skipped or use documented
+  unavailable defaults; finite ordinary aggregates retain their historical results; derived
+  overflow never emits non-standard JSON or traceback.
+- Validation command: strict-JSON numeric-boundary matrix, CLI analysis/compare subprocess tests,
+  related metrics tests, then `make check`.
+- Commit required: yes.
+- Dependencies: complete ARA-034 without combining recovery and metric semantics.
+
+## ARA-036 - Reject unrepresentable Judge numeric fields without crashing
+
+- Status: `TODO`
+- Priority: P1
+- Risk: low
+- Description: a structured Judge score or rubric integer such as `10**400` raises uncaught
+  `OverflowError` during float coercion instead of being classified as invalid Judge output.
+- Related files: `src/judge_output.py`, Judge parser tests, runner invalid-score tests
+- Acceptance criteria: unrepresentable score/rubric values are rejected like other invalid or
+  non-finite values; valid JSON and legacy score parsing remain unchanged; no round/process
+  traceback is introduced.
+- Validation command: focused Judge parser and round-loop invalid-score regressions followed by
+  `make check`.
+- Commit required: yes.
+- Dependencies: keep separate from ARA-035 metric artifact aggregation.
+
+## ARA-037 - Normalize survey manual interrupts to status 130
+
+- Status: `TODO`
+- Priority: P2
+- Risk: low
+- Description: a `KeyboardInterrupt` inside Literature Survey Mode releases its lock but exits as
+  signal status `-2` with traceback/path disclosure instead of the documented status 130 contract.
+- Related files: `src/cli.py`, CLI interrupt tests, survey tests
+- Acceptance criteria: survey interruption emits the standard fixed diagnostic, exits 130 without
+  traceback or absolute paths, and still releases the real run lock.
+- Validation command: unit and subprocess interrupt regressions, survey/CLI tests, then `make check`.
+- Commit required: yes.
+- Dependencies: ARA-023 interrupt contract and ARA-033 privacy-safe CLI precedent.
+
+## ARA-038 - Contain cloud discovery lazy-iteration and artifact-write failures
+
+- Status: `TODO`
+- Priority: P2
+- Risk: medium
+- Description: SDK lazy-pager iteration and discovery/profile artifact `OSError` failures escape the
+  documented cloud-free error contract with traceback/path disclosure; profile cannot use its
+  documented configured-seed fallback when lazy iteration fails.
+- Related files: `src/cloud_free.py`, `src/cli.py`, cloud-free and CLI exit-code tests
+- Acceptance criteria: lazy iteration is covered by the safe discovery error result; explicit
+  discovery remains status 1, profile fallback remains status 0, and artifact-write failures use a
+  fixed path-free status-1 diagnostic.
+- Validation command: injected lazy-pager/write failures, cloud-free/CLI tests, then `make check`.
+- Commit required: yes.
+- Dependencies: ARA-033 output-error contract; no real provider call.
+
+## ARA-039 - Fail before writes on unreadable prior-round resume context
+
+- Status: `TODO`
+- Priority: P2
+- Risk: medium
+- Description: invalid UTF-8 in an existing prior-round Judge artifact is silently converted to an
+  empty drafting context, and resume continues after writing new startup metadata.
+- Related files: `src/runner.py`, `src/storage.py`, resume history/context tests
+- Acceptance criteria: an existing but unreadable prior-round context artifact blocks resume before
+  automatic writes or agent invocation; genuinely missing legacy context follows an explicit
+  compatibility policy.
+- Validation command: byte-preservation invalid-UTF8/read-failure matrix, resume/round-loop tests,
+  then `make check`.
+- Commit required: yes.
+- Dependencies: ARA-034 strict checkpoint eligibility first.
+
+## ARA-040 - Keep cloud profile fallback artifacts in one provenance cohort
+
+- Status: `TODO`
+- Priority: P2
+- Risk: medium
+- Description: a discovery failure can save a new fallback profile while retaining stale discovery
+  data, causing the next process to recommend a model deliberately excluded by the current fallback.
+- Related files: `src/cloud_free.py`, cloud artifact schemas/loaders, cloud-free CLI tests
+- Acceptance criteria: fallback discovery/profile artifacts share verifiable generation provenance
+  or stale discovery is invalidated safely; a later process cannot reintroduce the ignored model.
+- Validation command: two-process stale-cache reproduction and compatibility controls followed by
+  `make check`.
+- Commit required: yes.
+- Dependencies: complete ARA-038 error-boundary work first.
+
+## ARA-041 - Make resume startup metadata recoverable across multi-file failure
+
+- Status: `DEFERRED`
+- Priority: P2
+- Risk: high
+- Description: a failure writing `run_manifest.json` after `run_config.json` can leave only the
+  config advanced to running/resume-session state while checkpoint, manifest, and histories remain
+  old, even though no agent was invoked.
+- Related files: `src/runner.py`, run-config/manifest/checkpoint writers, fault-injection tests
+- Acceptance criteria: every startup write-point failure leaves a documented recoverable state or
+  restores the complete prior metadata generation; no file silently claims an unstarted session.
+- Validation command: per-write fault-injection matrix, recovery/resume tests, then `make check`.
+- Commit required: yes.
+- Dependencies: explicit approval for a greater-than-30-minute, cross-file transaction design; do
+  not fold into ARA-034 or other local validation fixes.
+
 ## ARA-011 - Prevent failed rounds from replacing a trusted best output
 
 - Status: `DONE`

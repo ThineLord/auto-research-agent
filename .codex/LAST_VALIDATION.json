@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-12T02:00:55+08:00",
+  "recorded_at": "2026-07-12T02:22:53+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "21fea1102b63f3ce457f0ee455c62c849607eab9",
-  "last_known_stable_commit": "21fea1102b63f3ce457f0ee455c62c849607eab9",
+  "head_commit": "f44687eb03fbc971adc762d12437aefc58f576a8",
+  "last_known_stable_commit": "f44687eb03fbc971adc762d12437aefc58f576a8",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "21fea1102b63f3ce457f0ee455c62c849607eab9",
+  "state_recorded_against_commit": "f44687eb03fbc971adc762d12437aefc58f576a8",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-12T01:47:24+08:00",
-    "commit": "21fea1102b63f3ce457f0ee455c62c849607eab9",
+    "verified_at": "2026-07-12T02:15:41+08:00",
+    "commit": "f44687eb03fbc971adc762d12437aefc58f576a8",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29162165065,
+        "run_id": 29162704235,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "21fea1102b63f3ce457f0ee455c62c849607eab9",
+        "head_sha": "f44687eb03fbc971adc762d12437aefc58f576a8",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29162166082,
+        "run_id": 29162705572,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "21fea1102b63f3ce457f0ee455c62c849607eab9",
+        "head_sha": "f44687eb03fbc971adc762d12437aefc58f576a8",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,124 @@
       }
     }
   },
-  "status": "ara033_validated_locally_pending_publish",
+  "status": "ara034_done_local_validation_passed_remote_verification_live",
   "commands": [
+    {
+      "command": "make check after ARA-034 implementation and recovery-state synchronization",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 57,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 100,
+        "findings": 0,
+        "pytest_tests_passed": 314,
+        "pytest_subtests_passed": 199,
+        "pytest_duration_seconds": 9.9
+      }
+    },
+    {
+      "command": "two independent ARA-034 recovery-contract and regression-quality reviews",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "reviewers": 2,
+        "blocking_findings_remaining": 0,
+        "literal_true_only": "passed",
+        "finite_score_compatibility": "passed",
+        "artifact_bytes_preserved": "passed",
+        "cli_exit_code_2": "passed",
+        "run_lock_released": "passed",
+        "agent_stage_invocations": 0
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_round_loop.py tests/test_cli_exit_codes.py tests/test_ui_helpers.py",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 137,
+        "pytest_subtests_passed": 114,
+        "resume_compatibility": "passed",
+        "cli_status_and_lock_release": "passed",
+        "ui_resume_preview": "passed"
+      }
+    },
+    {
+      "command": "focused ARA-034 preview, end-to-end, and CLI regressions",
+      "exit_code": 0,
+      "result": "passed_after_expected_pre_fix_failures",
+      "summary": {
+        "pytest_tests_passed": 3,
+        "pytest_subtests_passed": 11,
+        "literal_true_only": true,
+        "finite_numeric_string_compatible": true,
+        "huge_non_finite_boolean_scores_defaulted": true,
+        "agent_stage_invocations": 0,
+        "project_artifacts_unchanged": true,
+        "cli_exit_code": 2,
+        "traceback_disclosed": false,
+        "run_lock_released": true,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-033 publication, remote equality, CI, and draft PR verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "f44687eb03fbc971adc762d12437aefc58f576a8",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29162704235,
+        "pull_request_run_id": 29162705572,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "draft_pr_13_updated": true
+      }
+    },
+    {
+      "command": "provider-free non-boolean resume eligibility and huge preview score reproduction",
+      "exit_code": 0,
+      "result": "expected_pre_fix_reproduction",
+      "summary": {
+        "string_false_preview_can_resume": true,
+        "string_false_run_resume_returned": true,
+        "runner_called": true,
+        "huge_best_score": "OverflowError",
+        "temporary_fixture_only": true,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "post-ARA-033 three-lane provider-free boundary audit",
+      "exit_code": 0,
+      "result": "confirmed_new_work",
+      "summary": {
+        "p1_confirmed": [
+          "non-boolean resume eligibility fail-open",
+          "non-finite legacy metric aggregation",
+          "unrepresentable Judge numeric coercion"
+        ],
+        "p2_confirmed": [
+          "survey interrupt status and traceback",
+          "cloud lazy-iteration and artifact-write errors",
+          "unreadable prior-round context",
+          "stale cloud fallback provenance",
+          "split resume startup metadata"
+        ],
+        "ignored_runtime_touched": false,
+        "provider_calls": 0
+      }
+    },
     {
       "command": "make check after explicit ARA-033 staging and final metadata synchronization",
       "exit_code": 0,
@@ -976,6 +1092,28 @@
   ],
   "failures": [
     {
+      "command": "first post-fix stale-state wording scan",
+      "result": "corrected_and_rerun",
+      "summary": {
+        "cause": "a backticked task-state token inside a double-quoted zsh pattern was interpreted as command substitution",
+        "file_or_git_impact": "none",
+        "replacement_scan": "literal-safe single-quoted pattern completed with only the expected completed-task dependency match"
+      }
+    },
+    {
+      "command": "focused ARA-034 regressions before implementation",
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "cause": "resume eligibility and preview score conversion used tolerant truthiness and unbounded float coercion",
+        "impact": "malformed flags invoked the runner and agents and wrote artifacts; huge and non-finite scores raised or propagated invalid state",
+        "pytest_failed": 2,
+        "pytest_subtests_failed": 7,
+        "cli_return_code": 1,
+        "provider_calls": 0,
+        "corrected_before_commit": true
+      }
+    },
+    {
       "command": "provider-free ARA-033 output failure subprocesses (pre-fix)",
       "result": "corrected_before_commit",
       "summary": {
@@ -1152,6 +1290,10 @@
   ],
   "not_run": [
     {
+      "check": "real provider smoke for ARA-034",
+      "reason": "Resume eligibility is decided from local checkpoint metadata before any runner or agent stage; provider-free direct and real module subprocess tests cover the affected boundary without credentials or cost."
+    },
+    {
       "check": "native Windows ARA-022 integration",
       "reason": "No native Windows runner was available; reparse-point classification and component-level static behavior are unit-tested/reviewed, while active replacement is explicitly outside the Windows guarantee."
     },
@@ -1169,8 +1311,9 @@
     }
   ],
   "notes": [
-    "ARA-033 is locally complete and limited to privacy-safe CLI normalization of explicit analysis/comparison output argument expansion, parent resolution, and JSON-write failures; successful exports and lower-level helpers remain compatible.",
-    "No unblocked TODO remains after ARA-033; ARA-029, ARA-030, and ARA-018 retain their explicit configuration, long-task, and owner-decision gates.",
+    "ARA-034 is complete and locally validated in semantic current HEAD; current publication and CI state must be resolved live, while f44687e remains the exact conservative externally verified fallback.",
+    "ARA-034 is limited to literal-boolean checkpoint eligibility and finite preview best_score normalization before any resume runner/agent-stage/write; history/context validation remains separately queued as ARA-039 and split startup metadata as ARA-041.",
+    "ARA-033 is complete at remote-equal commit f44687e with successful push and pull-request CI runs 29162704235 and 29162705572 on Python 3.10 and 3.13.",
     "ARA-032 is complete at remote-equal commit 21fea11 with successful push and pull-request CI runs 29162165065 and 29162166082 on Python 3.10 and 3.13.",
     "ARA-032 preserves the historical finite-total average operation and uses scaled math.fsum only when the original total overflows, preventing both extreme non-finite output and ordinary 0.01 result drift.",
     "ARA-031 is complete at remote-equal commit 78b76dc with successful push and pull-request CI runs 29161456466 and 29161457321 on Python 3.10 and 3.13.",

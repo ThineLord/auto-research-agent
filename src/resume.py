@@ -45,9 +45,10 @@ def _safe_float(value: Any, default: float = -1.0) -> float:
     if isinstance(value, bool):
         return default
     try:
-        return float(value)
-    except (TypeError, ValueError):
+        parsed = float(value)
+    except (TypeError, ValueError, OverflowError):
         return default
+    return parsed if math.isfinite(parsed) else default
 
 
 def _strict_round_int(value: Any) -> int | None:
@@ -217,6 +218,7 @@ def build_resume_preview(
         }
     next_round = last_completed_round + 1
     best_round = _checkpoint_best_round(checkpoint)
+    checkpoint_can_resume = checkpoint.get("can_resume") is True
     run_root_path, run_root_error = validate_resume_run_root(
         project_dir=project_dir,
         run_root_value=checkpoint.get("run_root"),
@@ -296,7 +298,7 @@ def build_resume_preview(
         "next_round": next_round,
         "resume_from_round": next_round,
         "stop_reason": stop_reason,
-        "can_resume": bool(checkpoint.get("can_resume")),
+        "can_resume": checkpoint_can_resume,
         "best_score": _safe_float(checkpoint.get("best_score"), -1.0),
         "best_round": best_round,
         "best_round_path": (
@@ -314,7 +316,7 @@ def build_resume_preview(
         "next_round_missing_expected_files": next_round_info["missing_expected_files"],
     }
 
-    if not checkpoint.get("can_resume"):
+    if not checkpoint_can_resume:
         preview.update(
             {
                 "can_resume": False,
