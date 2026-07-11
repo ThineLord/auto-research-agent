@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T13:36:16+08:00",
+  "recorded_at": "2026-07-11T13:41:31+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "4cae84e398821763a4680b99faa2aacb37550bfe",
-  "last_known_stable_commit": "4cae84e398821763a4680b99faa2aacb37550bfe",
-  "status": "ara023_implementation_committed_checkpoint_pending",
+  "head_commit": "37b3749685da5ab390717ca563f5822b8021f4bd",
+  "last_known_stable_commit": "37b3749685da5ab390717ca563f5822b8021f4bd",
+  "status": "ara023_remote_verified_closeout_pending",
   "commands": [
     {
       "command": ".venv/bin/python -m pytest -q tests/test_cli_exit_codes.py tests/test_round_loop.py tests/test_mock_run.py tests/test_session.py",
@@ -77,6 +77,50 @@
       }
     },
     {
+      "command": "git commit -m chore: checkpoint ARA-023 interrupt status",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "recovery_checkpoint": "37b3749685da5ab390717ca563f5822b8021f4bd",
+        "files_changed": 6
+      }
+    },
+    {
+      "command": "push plus exact local, remote-tracking, ls-remote, and GitHub PR head comparison",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "37b3749685da5ab390717ca563f5822b8021f4bd"
+      }
+    },
+    {
+      "command": "GitHub Actions push and pull-request run/job verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "push_run_id": 29141545223,
+        "pull_request_run_id": 29141546331,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "repository_safety_steps": "passed_in_all_four_jobs",
+        "test_steps": "passed_in_all_four_jobs"
+      }
+    },
+    {
+      "command": "GitHub connector draft PR 13 update and readback",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "draft": true,
+        "open": true,
+        "mergeable": true,
+        "head_commit": "37b3749685da5ab390717ca563f5822b8021f4bd",
+        "body_contains_ara023": true
+      }
+    },
+    {
       "command": "git diff --check",
       "exit_code": 0,
       "result": "passed"
@@ -128,6 +172,7 @@
     "Cooperative STOP_REQUESTED remains a successful status 0 USER_STOP_REQUESTED stop.",
     "Survey, mock, and provider lock acquisition/error evaluation are inside lifecycle try/finally blocks.",
     "Ignored repository artifacts were not opened or modified, and no provider, prompt, score, metric, experiment result, or artifact schema changed.",
-    "Implementation 4cae84e is committed; recovery checkpoint, push, PR update, and CI verification are still pending."
+    "Implementation 4cae84e and recovery checkpoint 37b3749 are pushed and remotely verified; only the final state closeout is pending.",
+    "Draft PR 13 is open, draft, and mergeable; no merge was attempted."
   ]
 }

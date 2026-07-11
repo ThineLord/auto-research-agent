@@ -234,3 +234,26 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed implementation as `588e32c` and recovery state as `c893e63`, pushed both, verified exact
   local/tracking/GitHub SHA equality, updated draft PR 13, and confirmed all four Python 3.10/3.13
   push and pull-request jobs passed, including safety and test steps.
+
+## 2026-07-11 - Manual interrupt process-status propagation
+
+- Reproduced mock and provider CLI handlers swallowing `KeyboardInterrupt` and returning status 0;
+  runner-consumed interrupts finalized resumable artifacts but also returned success.
+- Made runner-caught manual interrupts propagate after checkpoint, run summary/config, and
+  interrupted-report finalization, then translated them to status 130 at both CLI boundaries.
+- Preserved cooperative `STOP_REQUESTED` as successful status 0 with `USER_STOP_REQUESTED`,
+  resumable artifacts, and signal cleanup; shared resume/report fields do not determine status.
+- Moved survey/mock/provider lock acquisition and error evaluation inside lifecycle `try/finally`
+  blocks and verified real lock metadata is removed across the earliest post-acquisition interrupt.
+- Added direct and end-to-end module status controls, runner artifact assertions, an actual
+  provider-free safe-stop subprocess, and session final-report suppression after interruption.
+- Documented the 0/1/2/130 contract and limited artifact-completeness promises to the runner's
+  protected agent-execution phase.
+- Related regression passed with `63 passed, 61 subtests passed`; final `make check` passed with
+  `231 passed, 154 subtests passed`; both safety scans reported 91 tracked files and zero findings.
+- Two independent reviews reported GO after closing lock-lifecycle and documentation-boundary
+  findings. No provider, prompt, score, metric, artifact schema, experiment, or ignored project
+  artifact changed.
+- Committed implementation as `4cae84e` and recovery state as `37b3749`, pushed both, verified exact
+  local/tracking/GitHub SHA equality, updated draft PR 13, and confirmed all four Python 3.10/3.13
+  push and pull-request jobs passed, including safety and test steps.

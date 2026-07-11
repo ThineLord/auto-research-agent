@@ -166,13 +166,12 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-022 - Manual interrupts can still produce process status 0
 
-- Status: fixed and locally validated at implementation `4cae84e`; push/CI verification pending
+- Status: fixed, pushed, and CI-verified
 - Severity: P2 automation semantics
 - Impact: direct interrupts caught by the CLI and runner-consumed safe interrupts do not yet share a
   documented process-status contract, so changing only one path could make automation inconsistent.
-- Current action: task `ARA-023`; commit recovery state, push the status-130 implementation, and
-  verify CI while
-  preserving cooperative `STOP_REQUESTED` status 0 and the protected-phase artifact boundary.
+- Current action: task `ARA-023` completed at implementation `4cae84e` and remotely verified
+  checkpoint `37b3749`; cooperative `STOP_REQUESTED` remains status 0.
 
 ## KI-023 - A maintenance smoke advanced ignored example-project state
 

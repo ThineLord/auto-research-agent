@@ -151,7 +151,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-023 - Define interrupt-to-process-status propagation
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P2
 - Risk: medium
 - Description: CLI-level `KeyboardInterrupt` handlers print a manual-interrupt stop reason and then

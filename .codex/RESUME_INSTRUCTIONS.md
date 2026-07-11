@@ -40,10 +40,10 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-`ARA-023` implementation `4cae84e` is locally committed and validated; its recovery checkpoint,
-push, PR update, and CI verification may remain depending on the interruption point. Compare
-HEAD/upstream and the current state before repeating work. The last successful local full
-validation command was:
+`ARA-023` implementation `4cae84e` and recovery checkpoint `37b3749` are pushed and remotely
+verified. All Python 3.10/3.13 push and pull-request jobs passed. Only the final verified-state
+closeout may remain depending on the interruption point. Compare HEAD/upstream and the current state
+before repeating work. The last successful local full validation command was:
 
 ```bash
 make check
@@ -51,10 +51,10 @@ make check
 
 The expected result is Ruff/import/safety success and `231 passed, 154 subtests passed`. Focused
 CLI/round/mock/session validation should report `63 passed, 61 subtests passed`; both safety modes
-should scan 91 tracked files with zero findings. If only recovery metadata is uncommitted, stage the
-six named `.codex` files and create a separate checkpoint commit. If the branch is ahead, push
-normally and verify exact remote SHA plus CI, then update draft PR 13. Do not restart ARA-023 from
-the initial audit or duplicate implementation commit `4cae84e`.
+should scan 91 tracked files with zero findings. If verified closeout metadata is uncommitted, stage
+only the six named `.codex` files and create the closeout commit. If the branch is ahead, push
+normally and verify exact remote SHA plus CI. Once clean and synchronized, select the next highest-
+value unblocked P2 from `.codex/TASK_QUEUE.md`; do not restart ARA-023.
 
 `ARA-004` remains separately blocked. Do not repeat its unsafe local build harness or delete/rewrite
 ignored `projects/example` state; read `KI-005`, `KI-013`, and `KI-023` before any packaging work.

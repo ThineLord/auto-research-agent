@@ -7,18 +7,18 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Current goal: make direct CLI interrupts return status 130 while preserving runner safe-stop
   artifacts and successful user-requested stops (`ARA-023`).
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `4cae84e398821763a4680b99faa2aacb37550bfe`
-- Last known stable commit: `4cae84e398821763a4680b99faa2aacb37550bfe` (locally validated
-  implementation; remote push and Python 3.10/3.13 CI verification pending)
-- Active task: ARA-023 is `IN_PROGRESS`; implementation `4cae84e` is committed after the regression
-  matrix, documentation, full local gate, and independent re-review passed. Recovery checkpoint,
-  push, PR update, and CI verification remain. ARA-020/022 remain queued; ARA-004 remains blocked.
-- Uncommitted changes: yes; ARA-023 recovery metadata only.
+- Current HEAD at state snapshot: `37b3749685da5ab390717ca563f5822b8021f4bd`
+- Last known stable commit: `37b3749685da5ab390717ca563f5822b8021f4bd` (exact local,
+  remote-tracking, `ls-remote`, and GitHub PR head equality plus all Python 3.10/3.13 push/PR jobs
+  passed)
+- Active task: ARA-023 is `DONE`; final verified-state closeout metadata is being prepared. The next
+  unblocked P2 will be selected after this checkpoint is pushed and verified. ARA-004 remains blocked.
+- Uncommitted changes: yes; verified-state closeout metadata only.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
-- `.codex/DECISIONS.md`
+- `.codex/COMPLETED.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
@@ -272,12 +272,16 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Staged only the 11 reviewed code/test/public-documentation paths, passed staged diff and repository
   safety checks, and committed implementation `4cae84e398821763a4680b99faa2aacb37550bfe`
   (`fix: propagate manual interrupt status`).
+- Committed recovery checkpoint `37b3749`, pushed both commits, and verified exact local,
+  remote-tracking, `ls-remote`, and GitHub PR head SHA equality.
+- Verified push run `29141545223` and pull-request run `29141546331`: Python 3.10 and 3.13 all
+  passed, including formatting, lint, import, repository-safety, and test steps in all four jobs.
+- Updated and read back draft PR 13 with ARA-023 scope/evidence; it remains open, draft, and mergeable.
 
 ## Remaining Steps
 
-- Commit this recovery metadata as a separate checkpoint.
-- Push implementation and checkpoint, verify exact local/remote/GitHub SHA equality, update draft PR
-  13, and verify all Python 3.10/3.13 push and pull-request jobs before marking ARA-023 done.
+- Commit and push this final verified-state closeout, verify exact SHA and CI, then select the next
+  highest-value unblocked P2 from the synchronized queue.
 
 ## Test Status
 
@@ -292,6 +296,8 @@ Updated: 2026-07-11 (Asia/Shanghai)
   call, real credential, ignored repository artifact, prompt, score, metric, or experiment changed.
 - Independent implementation and test/docs reviews reran focused tests and reported GO after the
   protected-phase wording and acquisition-lifecycle fixes; `git diff --check` passed.
+- GitHub Actions at `37b3749`: Python 3.10/3.13 passed for both push and pull-request events;
+  formatting, lint, imports, repository safety, and tests passed in all four jobs.
 - ARA-014 pre-fix regression: `1 failed, 4 passed`; the report borrowed the unrelated checkpoint's
   `MAX_ROUNDS` instead of the target summary's `USER_STOP_REQUESTED`.
 - ARA-014 final focused regression: Ruff passed and `tests/test_benchmark_report.py` passed
@@ -503,7 +509,7 @@ Updated: 2026-07-11 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git add -- .codex/CURRENT_STATE.md .codex/DECISIONS.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md .codex/TASK_QUEUE.md
+git add -- .codex/CURRENT_STATE.md .codex/COMPLETED.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md .codex/TASK_QUEUE.md
 ```
 
 ## Interruption Recovery
