@@ -16,7 +16,12 @@ from .constants import STOP_CLOUD_DAILY_QUOTA, STOP_MAX_ROUNDS
 from .judge_output import parse_judge_rubric
 from .llm import LLMClientProtocol
 from .metrics import build_agent_io_metrics, summarize_agent_io_metrics, summarize_round_metrics
-from .run_config import build_initial_run_config, finalize_run_config
+from .run_config import (
+    INHERIT_GIT_ROOT,
+    GitRootSetting,
+    build_initial_run_config,
+    finalize_run_config,
+)
 from .runtime import log_run as _log
 from .runtime import shorten_text_by_words as _shorten_text_by_words
 from .storage import (
@@ -74,6 +79,7 @@ def run_diagnostic_mode(
     topic_snapshot: Dict[str, object] | None = None,
     prompt_dir: Path | None = None,
     repo_root: Path | None = None,
+    git_root: GitRootSetting = INHERIT_GIT_ROOT,
     drafting_mode: str = DEFAULT_DRAFTING_MODE,
 ) -> None:
     run_started = time.monotonic()
@@ -141,6 +147,7 @@ def run_diagnostic_mode(
         project_metadata=project_metadata,
         prompt_dir=prompt_dir,
         repo_root=repo_root,
+        git_root=git_root,
         started_at=started_at_iso,
         resume_metadata=_diagnostic_resume_metadata(
             completed_rounds=0,

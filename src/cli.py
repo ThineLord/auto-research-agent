@@ -59,6 +59,11 @@ from .mock_run import (
     build_mock_agents,
     mock_model_parameters,
 )
+from .package_resources import (
+    PackageResourceError,
+    resolve_runtime_layout,
+    seed_default_mock_project,
+)
 from .project_input import ProjectInputError, load_project_input
 from .resume import run_resume_mode
 from .run_analytics import analyze_run
@@ -392,7 +397,12 @@ def main() -> None:
     args = parse_args()
     configure_logging()
     console = Console()
-    root = Path(__file__).resolve().parent.parent
+    try:
+        layout = resolve_runtime_layout(cli_file=__file__)
+    except PackageResourceError as exc:
+        console.print(f"[red]Package resource error: {exc}[/red]")
+        raise SystemExit(_EXIT_STARTUP_ERROR) from None
+    root = layout.workspace_root
     if getattr(args, "compare_runs", None):
         _run_compare_cli(args, console, root)
         return
@@ -405,7 +415,7 @@ def main() -> None:
         config = load_app_config(config_path)
     except (ConfigValidationError, FileNotFoundError) as exc:
         if getattr(args, "mock", False) and isinstance(exc, FileNotFoundError):
-            config_path = root / "config.example.yaml"
+            config_path = layout.config_example_path
             try:
                 config = load_app_config(config_path)
             except (ConfigValidationError, FileNotFoundError) as fallback_exc:
@@ -488,9 +498,25 @@ def main() -> None:
         "keywords": list(config.topic.keywords),
     }
 
+    try:
+        project_seeded = seed_default_mock_project(
+            layout,
+            mock_mode=getattr(args, "mock", False),
+            project_name=project_name,
+            explicit_project=args.project is not None,
+        )
+    except PackageResourceError as exc:
+        console.print(f"[red]Project input error: {exc}[/red]")
+        raise SystemExit(_EXIT_STARTUP_ERROR) from None
+    if project_seeded:
+        console.print(
+            "[yellow]Installed mock workspace seeded projects/example/task.md from the "
+            "bundled example; existing files were not changed.[/yellow]"
+        )
+
     project_dir = root / "projects" / project_name
     memory_path = project_dir / "memory.md"
-    prompts_dir = root / "prompts"
+    prompts_dir = layout.prompts_dir
 
     try:
         project_input = load_project_input(
@@ -589,6 +615,7 @@ def main() -> None:
                 topic_snapshot=topic_snapshot,
                 prompt_dir=prompts_dir,
                 repo_root=root,
+                git_root=layout.git_root,
                 drafting_mode=drafting_mode,
                 max_consecutive_provider_quota_failures=max_provider_quota_failures,
             )
@@ -797,6 +824,7 @@ def main() -> None:
                     topic_snapshot=topic_snapshot,
                     prompt_dir=prompts_dir,
                     repo_root=root,
+                    git_root=layout.git_root,
                     drafting_mode=drafting_mode,
                     max_consecutive_provider_quota_failures=max_provider_quota_failures,
                 )
@@ -828,6 +856,7 @@ def main() -> None:
                 topic_snapshot=topic_snapshot,
                 prompt_dir=prompts_dir,
                 repo_root=root,
+                git_root=layout.git_root,
                 drafting_mode=drafting_mode,
                 max_consecutive_provider_quota_failures=max_provider_quota_failures,
             )
@@ -848,6 +877,7 @@ def main() -> None:
                 topic_snapshot=topic_snapshot,
                 prompt_dir=prompts_dir,
                 repo_root=root,
+                git_root=layout.git_root,
                 drafting_mode=drafting_mode,
             )
             return
@@ -874,6 +904,7 @@ def main() -> None:
                 topic_snapshot=topic_snapshot,
                 prompt_dir=prompts_dir,
                 repo_root=root,
+                git_root=layout.git_root,
                 drafting_mode=drafting_mode,
                 max_consecutive_provider_quota_failures=max_provider_quota_failures,
             )
@@ -898,6 +929,7 @@ def main() -> None:
             topic_snapshot=topic_snapshot,
             prompt_dir=prompts_dir,
             repo_root=root,
+            git_root=layout.git_root,
             drafting_mode=drafting_mode,
             max_consecutive_provider_quota_failures=max_provider_quota_failures,
         )

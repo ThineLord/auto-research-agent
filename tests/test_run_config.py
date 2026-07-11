@@ -5,11 +5,37 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from src.run_config import build_initial_run_config, collect_prompt_file_hashes, read_run_config
 
 
 class RunConfigTests(unittest.TestCase):
+    def test_explicit_git_root_is_separate_from_display_repo_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "run"
+            repo_root = Path(tmp) / "workspace"
+            with patch("src.run_config.git_commit_hash", return_value=None) as git_hash:
+                build_initial_run_config(
+                    run_id="run",
+                    run_root=run_root,
+                    mode="mock",
+                    model_name="mock",
+                    repo_root=repo_root,
+                    git_root=None,
+                )
+            git_hash.assert_called_once_with(None)
+
+            with patch("src.run_config.git_commit_hash", return_value=None) as git_hash:
+                build_initial_run_config(
+                    run_id="run",
+                    run_root=run_root,
+                    mode="mock",
+                    model_name="mock",
+                    repo_root=repo_root,
+                )
+            git_hash.assert_called_once_with(repo_root)
+
     def test_round_one_resume_session_depends_on_lifecycle_not_round_number(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             run_root = Path(tmp) / "runs" / "selected"

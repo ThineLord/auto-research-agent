@@ -70,8 +70,13 @@ CLI exit-status contract:
   interrupted report before propagating the interrupt. Interrupts outside that protected phase do
   not promise the same artifact completeness.
 
-The exit-status contract does not make a wheel self-contained: missing packaged configuration or
-prompt assets remain a separate packaging defect, but affected commands must now fail nonzero.
+Source checkouts and editable installs keep the checkout root as both resource root and writable
+workspace. Non-editable wheel/source-distribution installs instead read an explicit package-data
+allowlist (`config.example.yaml`, four canonical prompts, and the example task) while using the
+current directory as the writable workspace. Only an installed, implicit default `--mock` run may
+atomically seed a wholly missing `projects/example/task.md`; existing or explicitly selected
+projects are never overwritten. Installed runs leave source Git provenance empty rather than
+recording an unrelated workspace repository.
 
 Core modules:
 

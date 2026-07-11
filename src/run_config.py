@@ -12,6 +12,14 @@ from typing import Any, Mapping
 RUN_CONFIG_SCHEMA_VERSION = 1
 
 
+class _InheritGitRoot:
+    """Sentinel for compatibility with callers that only provide repo_root."""
+
+
+INHERIT_GIT_ROOT = _InheritGitRoot()
+GitRootSetting = Path | None | _InheritGitRoot
+
+
 def utc_now_iso() -> str:
     return datetime.now().astimezone().isoformat()
 
@@ -86,6 +94,7 @@ def build_initial_run_config(
     project_metadata: Mapping[str, Any] | None = None,
     prompt_dir: Path | None = None,
     repo_root: Path | None = None,
+    git_root: GitRootSetting = INHERIT_GIT_ROOT,
     started_at: str | None = None,
     existing_run_config: Mapping[str, Any] | None = None,
     resume_metadata: Mapping[str, Any] | None = None,
@@ -117,6 +126,8 @@ def build_initial_run_config(
     if model_parameters:
         model.update(_json_safe(model_parameters))
 
+    effective_git_root = repo_root if git_root is INHERIT_GIT_ROOT else git_root
+
     return {
         "schema_version": RUN_CONFIG_SCHEMA_VERSION,
         "run_id": run_id,
@@ -138,7 +149,7 @@ def build_initial_run_config(
         "topic": _json_safe(topic_snapshot or {}),
         "prompt_files": collect_prompt_file_hashes(prompt_dir),
         "git": {
-            "commit": git_commit_hash(repo_root),
+            "commit": git_commit_hash(effective_git_root),
         },
         "project": _json_safe(project_metadata or {}),
         "resume_metadata": _json_safe(resume_metadata or {}),

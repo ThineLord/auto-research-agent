@@ -24,6 +24,10 @@
 
 ### Fixed
 
+* Clean wheel and source-distribution installs now bundle the public sample configuration, four
+  canonical prompts, and default example task. Installed mock runs use the current directory as a
+  writable workspace, atomically seed only a wholly missing implicit example project without overwriting
+  existing input, and do not record an unrelated workspace Git commit as source provenance.
 * Resuming an existing zero-round checkpoint now appends a round-1 entry to run-config
   `resume_sessions`; a genuinely new round-1 run still has no resume-session entry.
 * Resuming a legacy run now preserves its original manifest provenance and unknown extension fields

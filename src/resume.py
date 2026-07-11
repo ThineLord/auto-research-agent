@@ -19,6 +19,7 @@ from .resume_safety import (
     validate_resume_round_dir,
     validate_resume_run_root,
 )
+from .run_config import INHERIT_GIT_ROOT, GitRootSetting
 from .runner import ResumeHistoryError, run_iterative_rounds
 from .storage import read_json_file
 
@@ -399,6 +400,7 @@ def run_resume_mode(
     topic_snapshot: dict[str, Any] | None = None,
     prompt_dir: Path | None = None,
     repo_root: Path | None = None,
+    git_root: GitRootSetting = INHERIT_GIT_ROOT,
     drafting_mode: str = DEFAULT_DRAFTING_MODE,
     max_consecutive_provider_quota_failures: int = 2,
 ) -> bool:
@@ -448,6 +450,7 @@ def run_resume_mode(
             topic_snapshot=topic_snapshot,
             prompt_dir=prompt_dir,
             repo_root=repo_root,
+            git_root=git_root,
             drafting_mode=drafting_mode,
             max_consecutive_provider_quota_failures=max_consecutive_provider_quota_failures,
             resume_metadata=preview,

@@ -48,7 +48,13 @@ from .resume_safety import (
     validate_resume_round_dir,
     validate_resume_run_root,
 )
-from .run_config import build_initial_run_config, finalize_run_config, read_run_config
+from .run_config import (
+    INHERIT_GIT_ROOT,
+    GitRootSetting,
+    build_initial_run_config,
+    finalize_run_config,
+    read_run_config,
+)
 from .runtime import log_run as _log
 from .runtime import stop_requested as _stop_requested
 from .storage import (
@@ -710,6 +716,7 @@ def run_iterative_rounds(
     topic_snapshot: Optional[Dict[str, Any]] = None,
     prompt_dir: Optional[Path] = None,
     repo_root: Optional[Path] = None,
+    git_root: GitRootSetting = INHERIT_GIT_ROOT,
     drafting_mode: str = DEFAULT_DRAFTING_MODE,
     max_consecutive_draft_timeouts: int = 1,
     max_consecutive_provider_quota_failures: int = 2,
@@ -918,6 +925,7 @@ def run_iterative_rounds(
         project_metadata=project_metadata,
         prompt_dir=prompt_dir,
         repo_root=repo_root,
+        git_root=git_root,
         started_at=started_at_iso,
         existing_run_config=existing_run_config,
         resume_metadata=base_resume_metadata,

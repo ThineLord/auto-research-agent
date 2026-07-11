@@ -137,13 +137,14 @@ from unittest.mock import patch
 import src.cli as cli
 from src.config import AppConfig
 from src.constants import RUN_LOCK_FILENAME
+from src.package_resources import RuntimeLayout
 
 temporary_root = tempfile.TemporaryDirectory()
 root = Path(temporary_root.name)
 project_dir = root / "projects" / "selected"
 project_dir.mkdir(parents=True)
 (project_dir / "task.md").write_text("# interrupt subprocess test\\n", encoding="utf-8")
-cli.__file__ = str(root / "src" / "cli.py")
+cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, root, root, True)
 cli.load_app_config = lambda path: AppConfig()
 sys.argv = ["auto-research-agent", "--mock", "--project", "selected"]
 interrupting_agents = cli.build_mock_agents(topic_context="")
@@ -191,6 +192,7 @@ from pathlib import Path
 
 import src.cli as cli
 from src.config import AppConfig
+from src.package_resources import RuntimeLayout
 
 temporary_root = tempfile.TemporaryDirectory()
 root = Path(temporary_root.name)
@@ -198,7 +200,7 @@ project_dir = root / "projects" / "selected"
 project_dir.mkdir(parents=True)
 (project_dir / "task.md").write_text("# safe stop subprocess test\\n", encoding="utf-8")
 (project_dir / "STOP_REQUESTED").write_text("STOP_REQUESTED\\n", encoding="utf-8")
-cli.__file__ = str(root / "src" / "cli.py")
+cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, root, root, True)
 cli.load_app_config = lambda path: AppConfig()
 sys.argv = ["auto-research-agent", "--mock", "--project", "selected"]
 cli.main()
@@ -227,9 +229,11 @@ import sys
 import tempfile
 from pathlib import Path
 import src.cli as cli
+from src.package_resources import RuntimeLayout
 
 temporary_root = tempfile.TemporaryDirectory()
-cli.__file__ = str(Path(temporary_root.name) / "src" / "cli.py")
+root = Path(temporary_root.name)
+cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, root, root, True)
 sys.argv = ["auto-research-agent"]
 cli.main()
 """
@@ -251,11 +255,12 @@ import sys
 import tempfile
 from pathlib import Path
 import src.cli as cli
+from src.package_resources import RuntimeLayout
 
 temporary_root = tempfile.TemporaryDirectory()
 root = Path(temporary_root.name)
 (root / "config.yaml").write_bytes(b"\\xff\\xfe")
-cli.__file__ = str(root / "src" / "cli.py")
+cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, root, root, True)
 sys.argv = ["auto-research-agent"]
 cli.main()
 """
@@ -318,13 +323,14 @@ import tempfile
 from pathlib import Path
 import src.cli as cli
 from src.config import AppConfig
+from src.package_resources import RuntimeLayout
 
 temporary_root = tempfile.TemporaryDirectory()
 root = Path(temporary_root.name)
 project_dir = root / "projects" / "bad-input"
 project_dir.mkdir(parents=True)
 (project_dir / "task.md").write_bytes(b"\\xff\\xfe")
-cli.__file__ = str(root / "src" / "cli.py")
+cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, root, root, True)
 cli.load_app_config = lambda path: AppConfig()
 sys.argv = ["auto-research-agent", "--mock", "--project", "bad-input"]
 cli.main()
@@ -350,6 +356,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import src.cli as cli
 from src.config import AppConfig
+from src.package_resources import RuntimeLayout
 
 temporary_root = tempfile.TemporaryDirectory()
 root = Path(temporary_root.name)
@@ -357,7 +364,7 @@ project_dir = root / "projects" / "selected"
 project_dir.mkdir(parents=True)
 (project_dir / "task.md").write_text("# Resume test", encoding="utf-8")
 (project_dir / "checkpoint.json").write_bytes(b"\\xff\\xfe")
-cli.__file__ = str(root / "src" / "cli.py")
+cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, root, root, True)
 cli.load_app_config = lambda path: AppConfig()
 cli.list_installed_ollama_models = lambda: (["qwen3:8b"], None)
 cli.create_llm_client = lambda **kwargs: SimpleNamespace(timeout_seconds=1)

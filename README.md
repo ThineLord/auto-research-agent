@@ -51,6 +51,11 @@ Mock mode 会复用正常 round runner，写入 `run_config.json`、`round_metri
 `run_summary.json`、`checkpoint.json` 和 `score_history.json`，但 provider 记录为 `mock`，
 不会调用 Ollama、Gemini、网络或 API key。默认只跑 2 轮；需要时用 `--max-rounds` 覆盖。
 
+从本仓库构建的 wheel 或 source distribution 做非 editable 安装后，也可以在一个空的可写
+目录运行 `auto-research-agent --mock --max-rounds 1`。首次隐式使用默认 example 项目时，CLI
+会把公开示例 `task.md` 写入当前目录的 `projects/example/`；不会创建 `config.yaml`，也不会
+覆盖已有或显式选择的项目。真实 provider 运行仍需要在该工作目录准备本地配置和项目输入。
+
 ## Stable Workflow
 
 当前稳定里程碑的推荐工作流：
