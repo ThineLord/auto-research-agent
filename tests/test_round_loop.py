@@ -60,6 +60,7 @@ if find_spec("yaml") is None:
 
 import src.cli as cli_module
 import src.main as main_module
+import src.resume as resume_module
 from src.cli import parse_args
 from src.cloud_free import CloudFreeDailyQuotaExhausted
 from src.config import AppConfig
@@ -1132,6 +1133,48 @@ class RoundLoopTests(unittest.TestCase):
                 )
             self.assertEqual(run_config["resume_sessions"][0]["start_round"], 4)
 
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_resume_mode_rejects_linked_project_ancestor_before_checkpoint_read(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            outside_project = root / "outside-projects" / "selected"
+            outside_project.mkdir(parents=True)
+            external_checkpoint = outside_project / "checkpoint.json"
+            external_checkpoint.write_text(
+                '{"run_id": "private", "can_resume": true}\n',
+                encoding="utf-8",
+            )
+            (root / "projects").symlink_to(
+                root / "outside-projects",
+                target_is_directory=True,
+            )
+            project_dir = root / "projects" / "selected"
+
+            with patch.object(
+                resume_module,
+                "read_json_file",
+                side_effect=AssertionError("external checkpoint must not be read"),
+            ) as read_checkpoint:
+                with self.assertRaises(OSError):
+                    run_resume_mode(
+                        console=Console(),
+                        agents=RecordingAgents(),
+                        task_text="must not run",
+                        project_dir=project_dir,
+                        memory_path=project_dir / "memory.md",
+                        model_name="fake-model",
+                        max_rounds=1,
+                        stop_if_no_improvement_rounds=1,
+                        global_max_runtime_seconds=1,
+                        per_agent_timeout_seconds=1,
+                    )
+
+            read_checkpoint.assert_not_called()
+            self.assertEqual(
+                external_checkpoint.read_text(encoding="utf-8"),
+                '{"run_id": "private", "can_resume": true}\n',
+            )
+
     def test_resume_preserves_legacy_manifest_provenance_and_unknown_fields(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_dir = Path(tmp) / "project"
@@ -1737,6 +1780,60 @@ class RoundLoopTests(unittest.TestCase):
             self.assertEqual(Path(preview["run_root"]), run_root.resolve())
             self.assertEqual(preview["next_round_status"], "missing")
 
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_runner_creates_and_resumes_under_configured_runs_storage_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "projects" / "selected"
+            project_dir.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            external_runs = repo_root / "configured-run-storage"
+            external_runs.mkdir()
+            (project_dir / "runs").symlink_to(external_runs, target_is_directory=True)
+
+            first = run_iterative_rounds(
+                console=Console(),
+                agents=FakeAgents([60]),
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="test",
+                model_name="fake-model",
+                max_rounds=1,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+                repo_root=repo_root,
+            )
+            run_root = Path(first["run_root"])
+            second = run_iterative_rounds(
+                console=Console(),
+                agents=FakeAgents([70]),
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="resume",
+                model_name="fake-model",
+                max_rounds=2,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+                start_round=2,
+                run_root_override=run_root,
+                initial_best_score=float(first["best_score"]),
+                repo_root=repo_root,
+            )
+
+            self.assertEqual(run_root.parent, external_runs.resolve())
+            for round_index in (1, 2):
+                round_dir = run_root / f"round_{round_index:02d}"
+                self.assertTrue(round_dir.is_dir())
+                for filename in ("01_draft.md", "02_review.md", "03_revised.md", "04_judge.md"):
+                    self.assertTrue((round_dir / filename).is_file())
+            self.assertEqual(second["completed_rounds"], 2)
+            self.assertTrue((project_dir / "checkpoint.json").is_file())
+
     def test_resume_preview_blocks_unreadable_next_round_without_leaking_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
@@ -1751,9 +1848,8 @@ class RoundLoopTests(unittest.TestCase):
                 "can_resume": True,
             }
 
-            with patch.object(
-                Path,
-                "iterdir",
+            with patch(
+                "src.storage.os.listdir",
                 side_effect=PermissionError(str(next_round)),
             ):
                 preview = build_resume_preview(

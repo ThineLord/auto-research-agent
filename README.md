@@ -86,7 +86,14 @@ Mock mode 会复用正常 round runner，写入 `run_config.json`、`round_metri
   拒绝逃逸符号链接或无效文件类型；UI 使用同一 preview 并禁用不安全 checkpoint 的 Resume 按钮。
 - UI 的 latest metadata、analytics 和 output browser 只从验证后的 checkpoint run root 派生固定
   artifact 文件名；checkpoint/summary 中冗余的外部路径不会参与选址，不安全的 run/round 文件会显示
-  为不可用而不会被读取。此边界不改变项目级日志、历史输出等本地 artifact 的既有信任策略。
+  为不可用而不会被读取。普通运行也会拒绝链接的 project/task、固定 artifact 叶节点、自动输出目录和
+  特殊文件；配置好的 `project/runs` 外部存储链接仍会解析到真实目录后使用。
+- POSIX 上自动 artifact 的读取、追加、替换和目录创建会从可信的 `projects/` 或已解析 run-storage
+  锚点逐层执行不跟随链接的 descriptor-relative 操作，进程内线程/UI rerun 共享该边界，嵌套 run
+  会继承项目锚点。锚点以上的工作区祖先仍属于可信本地文件系统边界；同 UID 恶意进程把一个真实目录
+  entry 换成另一个真实目录、打开后再制造 hard link 等主动攻击不在保证范围内。Windows 会拒绝静态
+  链接/特殊节点，但不承诺抵抗并发恶意路径替换。显式
+  `--analyze-run` / `--compare-runs` 输入和输出仍是用户授权路径。
 
 ## What To Demo First
 

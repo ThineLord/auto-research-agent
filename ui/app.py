@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import stat
 import sys
 from pathlib import Path
 from typing import Any, Sequence
@@ -61,7 +62,17 @@ from src.runtime import (
     run_project_tests,
     start_background_process,
 )
-from src.storage import read_file_text, read_json_file, tail_file_lines, write_file_text
+from src.storage import (
+    artifact_path_exists,
+    artifact_path_is_safe,
+    ensure_artifact_paths_safe,
+    ensure_project_runtime_paths_safe,
+    list_artifact_directories,
+    read_file_text,
+    read_json_file,
+    tail_file_lines,
+    write_file_text,
+)
 from ui.i18n import LANGUAGE_LABELS, translate
 from ui.theme import DEFAULT_THEME, THEME_LABEL_KEYS, build_theme_css, normalize_theme
 
@@ -119,6 +130,10 @@ def output_display_path(path: Path) -> str:
 
 def create_stop_signal(stop_signal_path: Path) -> bool:
     try:
+        ensure_project_runtime_paths_safe(
+            stop_signal_path.parent,
+            anchor=stop_signal_path.parent.parent,
+        )
         write_file_text(stop_signal_path, "STOP_REQUESTED\n")
     except OSError:
         return False
@@ -142,8 +157,15 @@ def default_project_index(projects: list[str], configured_project_name: str) -> 
     return 0
 
 
+def discover_project_names(projects_dir: Path) -> list[str]:
+    try:
+        return sorted(name for _mtime, name, _path in list_artifact_directories(projects_dir))
+    except OSError:
+        return []
+
+
 def input_text_or_placeholder(path: Path, placeholder_key: str) -> str:
-    if path.exists():
+    if artifact_path_is_safe(path, allow_missing=False):
         return read_file_text(path)
     return t(placeholder_key)
 
@@ -772,12 +794,14 @@ def resolve_run_artifact_paths(project_dir: Path, checkpoint: dict[str, Any]) ->
             )
         }
     elif run_scope_valid:
-        # Project-level artifact symlink policy is tracked separately from checkpoint scope.
         artifact_safety = {
-            "run_config": True,
-            "run_summary": True,
-            "round_metrics": True,
-            "run_manifest": True,
+            name: artifact_path_is_safe(path, allow_missing=True)
+            for name, path in (
+                ("run_config", run_config_path),
+                ("run_summary", run_summary_path),
+                ("round_metrics", round_metrics_path),
+                ("run_manifest", run_manifest_path),
+            )
         }
     else:
         artifact_safety = {
@@ -933,15 +957,21 @@ def build_run_metadata_rows(project_dir: Path, checkpoint: dict[str, Any]) -> li
 
 
 def discover_project_run_roots(project_dir: Path, *, limit: int = 12) -> list[Path]:
-    runs_dir = project_dir / "runs"
-    if not runs_dir.exists():
+    try:
+        runs_root = ensure_project_runtime_paths_safe(project_dir)
+        if runs_root is None:
+            return []
+        run_roots = list_artifact_directories(runs_root)
+    except OSError:
         return []
-    run_roots = [path for path in runs_dir.iterdir() if path.is_dir()]
-    return sorted(
-        run_roots,
-        key=lambda path: (path.stat().st_mtime, path.name),
-        reverse=True,
-    )[:limit]
+    return [
+        path
+        for _, _, path in sorted(
+            run_roots,
+            key=lambda item: (item[0], item[1]),
+            reverse=True,
+        )[:limit]
+    ]
 
 
 def _count_text(value: Any) -> str:
@@ -958,7 +988,26 @@ def _artifact_path_display(value: Any) -> str:
 
 
 def build_run_comparison_rows(run_roots: Sequence[Path]) -> list[dict[str, Any]]:
-    comparison = compare_runs([Path(run_root) for run_root in run_roots])
+    safe_run_roots = []
+    for run_root_value in run_roots:
+        run_root = Path(run_root_value)
+        try:
+            root_metadata = run_root.lstat()
+        except OSError:
+            continue
+        if not stat.S_ISDIR(root_metadata.st_mode):
+            continue
+        if all(
+            artifact_path_is_safe(run_root / filename, allow_missing=True)
+            for filename in (
+                "run_config.json",
+                "run_summary.json",
+                "run_manifest.json",
+                "round_metrics.json",
+            )
+        ):
+            safe_run_roots.append(run_root)
+    comparison = compare_runs(safe_run_roots, safe_artifacts=True)
     rows: list[dict[str, Any]] = []
     for run in comparison.get("runs", []):
         if not isinstance(run, dict):
@@ -1032,7 +1081,7 @@ def build_run_analytics_dashboard(project_dir: Path, checkpoint: dict[str, Any])
         and run_root.exists()
         and _has_run_artifacts(run_root)
     ):
-        analysis = analyze_run(run_root)
+        analysis = analyze_run(run_root, safe_artifacts=True)
     rounds = analysis.get("rounds") if isinstance(analysis.get("rounds"), dict) else {}
     score = analysis.get("score") if isinstance(analysis.get("score"), dict) else {}
     robustness = analysis.get("robustness") if isinstance(analysis.get("robustness"), dict) else {}
@@ -1430,14 +1479,19 @@ def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[
     resolved_catalog = []
     for item in catalog:
         path = item["path"]
-        path_safe = bool(item.get("path_safe", True))
+        path_safe = bool(item.get("path_safe", True)) and (
+            path is None or artifact_path_is_safe(path, allow_missing=True)
+        )
+        path_exists = bool(
+            path_safe and path is not None and artifact_path_is_safe(path, allow_missing=False)
+        )
         resolved_catalog.append(
             {
                 "label": item["label"],
                 "label_key": item["label_key"],
-                "path": path,
+                "path": path if path_safe else None,
                 "kind": detect_output_kind(path) if path is not None else "text",
-                "exists": bool(path_safe and path is not None and path.exists()),
+                "exists": path_exists,
                 "missing_key": item.get("missing_key", "output_not_generated"),
             }
         )
@@ -1445,10 +1499,11 @@ def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[
 
 
 def load_score_history_rows(score_history_path: Path) -> list[dict[str, Any]]:
-    if not score_history_path.exists():
-        return []
     try:
-        payload = json.loads(read_file_text(score_history_path))
+        content = read_file_text(score_history_path)
+        if not content:
+            return []
+        payload = json.loads(content)
     except json.JSONDecodeError:
         return []
     if not isinstance(payload, list):
@@ -1533,8 +1588,13 @@ def render_live_progress_and_logs(
     stop_signal_path: Path,
     default_model: str,
 ) -> None:
+    try:
+        ensure_project_runtime_paths_safe(proj_path, anchor=proj_path.parent)
+    except OSError:
+        st.warning(t("unsafe_project_paths"))
+        return
     run_meta = get_active_process_meta(run_meta_path(proj_path))
-    checkpoint = read_json_file(checkpoint_path) if checkpoint_path.exists() else {}
+    checkpoint = read_json_file(checkpoint_path)
     run_log_text = tail_file_lines(run_log_path, max_lines=240)
 
     progress = infer_running_stage(
@@ -1552,7 +1612,12 @@ def render_live_progress_and_logs(
     st.write(t("drafting_mode_line", mode=progress["drafting_mode"]))
     st.write(t("last_successful_agent", agent=progress["last_successful_agent"]))
     st.write(t("stop_reason", reason=progress["stop_reason"]))
-    st.write(t("stop_signal_present", present=stop_signal_path.exists()))
+    st.write(
+        t(
+            "stop_signal_present",
+            present=artifact_path_exists(stop_signal_path, allow_directory=True),
+        )
+    )
     st.write(t("selected_model", model=st.session_state.get("selected_model", default_model)))
     cloud_free_status = checkpoint.get("cloud_free", {})
     if isinstance(cloud_free_status, dict) and cloud_free_status:
@@ -1613,11 +1678,7 @@ def main() -> None:
         else:
             st.info(t("quick_tests_help"))
 
-    projects = (
-        sorted([p.name for p in PROJECTS_DIR.iterdir() if p.is_dir()])
-        if PROJECTS_DIR.exists()
-        else []
-    )
+    projects = discover_project_names(PROJECTS_DIR)
     default_index = default_project_index(projects, app_config.project_name)
     selected_project = st.selectbox(
         t("project_selector"), projects, index=default_index if projects else None
@@ -1637,6 +1698,11 @@ def main() -> None:
         )
 
     proj_path = project_path(selected_project)
+    try:
+        ensure_project_runtime_paths_safe(proj_path, anchor=PROJECTS_DIR)
+    except OSError:
+        st.error(t("unsafe_project_paths"))
+        return
     st.write(t("project_path", path=project_display_path(proj_path)))
 
     task_path = proj_path / "task.md"
@@ -1647,7 +1713,7 @@ def main() -> None:
     stop_signal_path = proj_path / "STOP_REQUESTED"
     run_meta = get_active_process_meta(run_meta_path(proj_path))
     model_job_meta = get_active_process_meta(model_job_meta_path(proj_path))
-    checkpoint = read_json_file(checkpoint_path) if checkpoint_path.exists() else {}
+    checkpoint = read_json_file(checkpoint_path)
 
     col_input_left, col_input_right = st.columns(2)
     with col_input_left:
@@ -1656,7 +1722,7 @@ def main() -> None:
             value=input_text_or_placeholder(task_path, "task_placeholder"),
             height=260,
         )
-        if not task_path.exists():
+        if not artifact_path_is_safe(task_path, allow_missing=False):
             st.caption(t("task_missing_help"))
     with col_input_right:
         memory_text = st.text_area(
@@ -1664,12 +1730,17 @@ def main() -> None:
             value=input_text_or_placeholder(memory_path, "memory_placeholder"),
             height=260,
         )
-        if not memory_path.exists():
+        if not artifact_path_is_safe(memory_path, allow_missing=False):
             st.caption(t("memory_optional_help"))
     if st.button(t("save_input")):
-        write_file_text(task_path, task_text)
-        write_file_text(memory_path, memory_text)
-        st.success(t("input_saved"))
+        try:
+            ensure_artifact_paths_safe((task_path, memory_path))
+            write_file_text(task_path, task_text)
+            write_file_text(memory_path, memory_text)
+        except OSError:
+            st.error(t("input_save_failed"))
+        else:
+            st.success(t("input_saved"))
 
     st.subheader(t("run_controls"))
     run_active = bool(run_meta)

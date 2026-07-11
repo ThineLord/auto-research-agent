@@ -15,6 +15,59 @@ from src.run_compare import compare_runs, load_run_summary, write_run_comparison
 
 
 class RunCompareTests(unittest.TestCase):
+    def test_safe_run_loading_treats_invalid_utf8_as_missing_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "run"
+            run_root.mkdir()
+            (run_root / "run_summary.json").write_bytes(b"\xff\xfe")
+
+            summary = load_run_summary(run_root, safe_artifacts=True)
+
+            self.assertEqual(summary["metadata_status"], "missing")
+            self.assertIsNone(summary["best_score"])
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_explicit_run_alias_and_output_parent_symlink_remain_authorized(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            physical_run = root / "physical-run"
+            physical_run.mkdir()
+            (physical_run / "run_config.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "canonical-run",
+                        "model": {"provider": "mock", "name": "expected-model"},
+                        "runtime": {"max_rounds": 3},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (physical_run / "run_summary.json").write_text(
+                json.dumps({"run_id": "canonical-run", "best_score": 77}),
+                encoding="utf-8",
+            )
+            run_alias = root / "run-alias"
+            run_alias.symlink_to(physical_run, target_is_directory=True)
+            outside_output = root / "outside-output"
+            outside_output.mkdir()
+            linked_output = root / "linked-output"
+            linked_output.symlink_to(outside_output, target_is_directory=True)
+
+            summary = load_run_summary(run_alias)
+            comparison = write_run_comparison(
+                [run_alias],
+                linked_output / "comparison.json",
+            )
+
+            self.assertEqual(summary["run_id"], "canonical-run")
+            self.assertEqual(summary["provider"], "mock")
+            self.assertEqual(summary["model"], "expected-model")
+            self.assertEqual(summary["max_rounds"], 3)
+            self.assertEqual(
+                json.loads((outside_output / "comparison.json").read_text(encoding="utf-8")),
+                comparison,
+            )
+
     def test_cli_rejects_a_single_compare_run(self) -> None:
         stderr = StringIO()
 

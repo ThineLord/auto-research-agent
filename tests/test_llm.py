@@ -22,6 +22,21 @@ class FakeGeminiQuotaError(RuntimeError):
 
 
 class LlmClientTests(unittest.TestCase):
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_provider_event_append_does_not_follow_a_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            external = root / "external-events.jsonl"
+            external.write_text("before\n", encoding="utf-8")
+            event_path = root / "provider_events.jsonl"
+            event_path.symlink_to(external)
+
+            with self.assertRaises(OSError):
+                llm_module._write_provider_event(event_path, {"event": "SHOULD_NOT_ESCAPE"})
+
+            self.assertTrue(event_path.is_symlink())
+            self.assertEqual(external.read_text(encoding="utf-8"), "before\n")
+
     def test_generate_omits_response_format_by_default(self) -> None:
         response = SimpleNamespace(
             raise_for_status=lambda: None,

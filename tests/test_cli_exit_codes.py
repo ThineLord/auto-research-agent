@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import src.cli as cli_module
-from src.config import AppConfig, ConfigValidationError
+from src.config import AppConfig, ConfigValidationError, LiteratureSurveyConfig
 from src.project_input import ProjectInputError
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -34,6 +34,224 @@ class _InterruptOnTruth:
 
 
 class CliExitCodeTests(unittest.TestCase):
+    def test_project_preflight_os_errors_exit_two_before_runtime_setup(self) -> None:
+        for error in (PermissionError("denied"), FileNotFoundError("missing")):
+            with self.subTest(error=error.__class__.__name__), tempfile.TemporaryDirectory() as tmp:
+                project_dir = Path(tmp) / "projects" / "selected"
+                project_dir.mkdir(parents=True)
+                args = cli_module.parse_args(["--mock", "--project", "selected"])
+
+                with (
+                    patch.object(cli_module, "parse_args", return_value=args),
+                    patch.object(cli_module, "load_app_config", return_value=AppConfig()),
+                    patch.object(
+                        cli_module,
+                        "load_project_input",
+                        return_value=_project_input(project_dir),
+                    ),
+                    patch.object(
+                        cli_module,
+                        "ensure_project_runtime_paths_safe",
+                        side_effect=error,
+                    ),
+                    patch.object(cli_module, "acquire_run_lock") as acquire_run_lock,
+                    patch.object(cli_module, "build_mock_agents") as build_mock_agents,
+                ):
+                    with self.assertRaises(SystemExit) as raised:
+                        cli_module.main()
+
+                self.assertEqual(raised.exception.code, 2)
+                acquire_run_lock.assert_not_called()
+                build_mock_agents.assert_not_called()
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_project_preflight_preserves_lock_path_recovery_diagnostics(self) -> None:
+        cases = (
+            ("active_run.json", "Stale run lock could not be cleared"),
+            ("active_run.guard", "Run lock guard could not be acquired"),
+        )
+        for filename, expected_message in cases:
+            with self.subTest(filename=filename), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                project_dir = root / "projects" / "selected"
+                project_dir.mkdir(parents=True)
+                external = root / f"external-{filename}"
+                external.write_text("PRIVATE_SENTINEL\n", encoding="utf-8")
+                (project_dir / filename).symlink_to(external)
+                args = cli_module.parse_args(["--mock", "--project", "selected"])
+
+                with (
+                    patch.object(cli_module, "Console") as console_class,
+                    patch.object(cli_module, "parse_args", return_value=args),
+                    patch.object(cli_module, "load_app_config", return_value=AppConfig()),
+                    patch.object(
+                        cli_module,
+                        "load_project_input",
+                        return_value=_project_input(project_dir),
+                    ),
+                    patch.object(cli_module, "acquire_run_lock") as acquire_run_lock,
+                    patch.object(cli_module, "build_mock_agents") as build_mock_agents,
+                ):
+                    with self.assertRaises(SystemExit) as raised:
+                        cli_module.main()
+
+                rendered = " ".join(
+                    str(call) for call in console_class.return_value.print.call_args_list
+                )
+                self.assertEqual(raised.exception.code, 2)
+                self.assertIn(expected_message, rendered)
+                self.assertIn("move aside stale lock paths", rendered)
+                self.assertNotIn(str(root), rendered)
+                acquire_run_lock.assert_not_called()
+                build_mock_agents.assert_not_called()
+                self.assertEqual(external.read_text(encoding="utf-8"), "PRIVATE_SENTINEL\n")
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_unsafe_runtime_artifact_exits_two_before_lock_or_provider_setup(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project_dir = root / "projects" / "selected"
+            project_dir.mkdir(parents=True)
+            external_log = root / "external.log"
+            external_log.write_text("PRIVATE_LOG_SENTINEL\n", encoding="utf-8")
+            (project_dir / "run.log").symlink_to(external_log)
+            args = cli_module.parse_args(["--mock", "--project", "selected"])
+
+            with (
+                patch.object(cli_module, "parse_args", return_value=args),
+                patch.object(cli_module, "load_app_config", return_value=AppConfig()),
+                patch.object(
+                    cli_module,
+                    "load_project_input",
+                    return_value=_project_input(project_dir),
+                ),
+                patch.object(cli_module, "acquire_run_lock") as acquire_run_lock,
+                patch.object(cli_module, "build_mock_agents") as build_mock_agents,
+            ):
+                with self.assertRaises(SystemExit) as raised:
+                    cli_module.main()
+
+            self.assertEqual(raised.exception.code, 2)
+            acquire_run_lock.assert_not_called()
+            build_mock_agents.assert_not_called()
+            self.assertEqual(
+                external_log.read_text(encoding="utf-8"),
+                "PRIVATE_LOG_SENTINEL\n",
+            )
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_unsafe_runtime_artifact_blocks_normal_provider_preflight(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project_dir = root / "projects" / "selected"
+            project_dir.mkdir(parents=True)
+            external_log = root / "external.log"
+            external_log.write_text("PRIVATE_LOG_SENTINEL\n", encoding="utf-8")
+            (project_dir / "run.log").symlink_to(external_log)
+            args = cli_module.parse_args(["--project", "selected"])
+
+            with (
+                patch.object(cli_module, "parse_args", return_value=args),
+                patch.object(cli_module, "load_app_config", return_value=AppConfig()),
+                patch.object(
+                    cli_module,
+                    "load_project_input",
+                    return_value=_project_input(project_dir),
+                ),
+                patch.object(
+                    cli_module,
+                    "list_installed_ollama_models",
+                    return_value=([], "should-not-reach"),
+                ) as list_models,
+                patch.object(cli_module, "create_llm_client") as create_client,
+                patch.object(cli_module, "acquire_run_lock") as acquire_run_lock,
+                patch.object(cli_module.ResearchAgents, "from_prompt_dir") as build_agents,
+            ):
+                with self.assertRaises(SystemExit) as raised:
+                    cli_module.main()
+
+            self.assertEqual(raised.exception.code, 2)
+            list_models.assert_not_called()
+            create_client.assert_not_called()
+            acquire_run_lock.assert_not_called()
+            build_agents.assert_not_called()
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_unsafe_nested_cloud_artifact_blocks_discovery_preflight(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project_dir = root / "projects" / "selected"
+            artifacts_dir = project_dir / "artifacts"
+            artifacts_dir.mkdir(parents=True)
+            external_profile = root / "external-profile.json"
+            external_profile.write_text('{"private": true}\n', encoding="utf-8")
+            (artifacts_dir / "cloud_free_profile.json").symlink_to(external_profile)
+            args = cli_module.parse_args(["--cloud-free-profile", "--project", "selected"])
+
+            with (
+                patch.object(cli_module, "parse_args", return_value=args),
+                patch.object(cli_module, "load_app_config", return_value=AppConfig()),
+                patch.object(
+                    cli_module,
+                    "load_project_input",
+                    return_value=_project_input(project_dir),
+                ),
+                patch.object(cli_module, "discover_free_cloud_models") as discover_models,
+                patch.object(cli_module, "acquire_run_lock") as acquire_run_lock,
+            ):
+                with self.assertRaises(SystemExit) as raised:
+                    cli_module.main()
+
+            self.assertEqual(raised.exception.code, 2)
+            discover_models.assert_not_called()
+            acquire_run_lock.assert_not_called()
+            self.assertEqual(
+                external_profile.read_text(encoding="utf-8"),
+                '{"private": true}\n',
+            )
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_unsafe_automatic_survey_output_exits_one_and_releases_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project_dir = root / "projects" / "selected"
+            outside = root / "outside"
+            project_dir.mkdir(parents=True)
+            outside.mkdir()
+            (project_dir / "linked").symlink_to(outside, target_is_directory=True)
+            args = cli_module.parse_args(["--survey", "--project", "selected"])
+            lock_handle = project_dir / "test-lock"
+
+            with (
+                patch.object(cli_module, "parse_args", return_value=args),
+                patch.object(
+                    cli_module,
+                    "load_app_config",
+                    return_value=AppConfig(
+                        literature_survey=LiteratureSurveyConfig(
+                            output_dir="linked/nested",
+                        )
+                    ),
+                ),
+                patch.object(
+                    cli_module,
+                    "load_project_input",
+                    return_value=_project_input(project_dir),
+                ),
+                patch.object(
+                    cli_module,
+                    "acquire_run_lock",
+                    return_value=(lock_handle, None),
+                ),
+                patch.object(cli_module, "release_run_lock") as release_run_lock,
+            ):
+                with self.assertRaises(SystemExit) as raised:
+                    cli_module.main()
+
+            self.assertEqual(raised.exception.code, 1)
+            release_run_lock.assert_called_once_with(lock_handle)
+            self.assertFalse((outside / "nested").exists())
+
     def test_direct_mock_interrupt_exits_130_and_releases_lock(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_dir = Path(tmp) / "projects" / "selected"

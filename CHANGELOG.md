@@ -21,6 +21,22 @@
   validated canonical checkpoint run root. Redundant external checkpoint/summary references and
   unsafe run or round artifact links become unavailable without being read; configured `runs/`
   storage symlinks and safe legacy in-run metadata remain supported.
+* Automatic project runtime I/O now rejects linked project/task inputs, linked or hard-linked fixed
+  artifact leaves, blocking special files, and linked automatic output directories before provider
+  or background-process startup. POSIX reads, appends, coordination files, directory traversal and
+  creation, unlink, and atomic replacement walk from a process-wide registered `projects/` or
+  resolved external run-storage anchor with no-follow descriptor-relative operations and identity
+  checks; worker threads share boundaries and nested run roots inherit the project anchor. Survey
+  discovery uses descriptor-rooted, pruned traversal and retains lexical source paths for safe reads.
+  Background log and
+  process-metadata leaves are both preflighted before `Popen`, and a post-start metadata failure
+  terminates the child. The configured external `runs/` storage-link contract and stale-directory
+  tolerance remain. Windows performs component-level static rejection but retains a documented
+  active-swap limitation; hostile same-UID replacement with another real directory is also outside
+  the POSIX guarantee.
+* UI project discovery and comparison skip linked project/run directories and securely reopen fixed
+  run metadata leaves, closing validation/read replacement windows. Explicit CLI analysis,
+  comparison, run-directory aliases, and export parents remain user-authorized paths.
 
 ### Fixed
 

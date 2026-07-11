@@ -11,7 +11,7 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import yaml
 
@@ -31,8 +31,10 @@ from src.runtime import (
     release_run_lock,
     run_project_tests,
     start_background_process,
+    stop_requested,
 )
 from src.storage import (
+    ensure_project_runtime_paths_safe,
     read_file_text,
     read_json_file,
     tail_file_lines,
@@ -101,6 +103,33 @@ class SharedUiBackendHelperTests(unittest.TestCase):
 
             self.assertEqual(get_active_process_meta(meta_path), {})
             self.assertTrue(meta_path.exists())
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_get_active_process_meta_rejects_linked_project_ancestor(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            outside_project = root / "outside-projects" / "selected"
+            outside_project.mkdir(parents=True)
+            external_meta = outside_project / "ui_run_process.json"
+            external_meta.write_text('{"pid": 0, "private": true}\n', encoding="utf-8")
+            (root / "projects").symlink_to(
+                root / "outside-projects",
+                target_is_directory=True,
+            )
+            meta_path = root / "projects" / "selected" / "ui_run_process.json"
+
+            with patch.object(
+                runtime_module,
+                "read_json_file",
+                side_effect=AssertionError("external metadata must not be read"),
+            ) as read_meta:
+                self.assertEqual(get_active_process_meta(meta_path), {})
+
+            read_meta.assert_not_called()
+            self.assertEqual(
+                external_meta.read_text(encoding="utf-8"),
+                '{"pid": 0, "private": true}\n',
+            )
 
     def test_is_pid_running_treats_zombie_process_as_stale(self) -> None:
         with (
@@ -207,6 +236,80 @@ class SharedUiBackendHelperTests(unittest.TestCase):
             self.assertIn("Failed to start run process", result.error or "")
             self.assertIn("IsADirectoryError", result.error or "")
             self.assertNotIn(str(root), result.error or "")
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_start_background_process_rejects_unsafe_meta_before_popen(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            external_meta = root / "external-meta.json"
+            external_meta.write_text('{"private": true}\n', encoding="utf-8")
+            meta_path = root / "ui_run_process.json"
+            meta_path.symlink_to(external_meta)
+
+            with patch.object(runtime_module.subprocess, "Popen") as popen:
+                result = start_background_process(
+                    command=["python", "-c", "print(1)"],
+                    cwd=root,
+                    log_path=root / "run.log",
+                    meta_path=meta_path,
+                    kind="run",
+                )
+
+            popen.assert_not_called()
+            self.assertIsNone(result.pid)
+            self.assertEqual(external_meta.read_text(encoding="utf-8"), '{"private": true}\n')
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_start_background_process_rejects_linked_project_ancestor(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            outside_project = root / "outside-projects" / "selected"
+            outside_project.mkdir(parents=True)
+            (root / "projects").symlink_to(
+                root / "outside-projects",
+                target_is_directory=True,
+            )
+            project_dir = root / "projects" / "selected"
+
+            with patch.object(runtime_module.subprocess, "Popen") as popen:
+                result = start_background_process(
+                    command=["python", "-c", "print(1)"],
+                    cwd=root,
+                    log_path=project_dir / "run.log",
+                    meta_path=project_dir / "ui_run_process.json",
+                    kind="run",
+                )
+
+            popen.assert_not_called()
+            self.assertIsNone(result.pid)
+            self.assertFalse((outside_project / "run.log").exists())
+            self.assertFalse((outside_project / "ui_run_process.json").exists())
+
+    def test_start_background_process_cleans_up_if_meta_persistence_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            process = MagicMock(pid=456)
+
+            with (
+                patch.object(runtime_module.subprocess, "Popen", return_value=process),
+                patch.object(
+                    runtime_module,
+                    "write_json_file",
+                    side_effect=OSError("simulated metadata failure"),
+                ),
+            ):
+                result = start_background_process(
+                    command=["python", "-c", "print(1)"],
+                    cwd=root,
+                    log_path=root / "run.log",
+                    meta_path=root / "ui_run_process.json",
+                    kind="run",
+                )
+
+            self.assertIsNone(result.pid)
+            process.terminate.assert_called_once_with()
+            process.wait.assert_called_once_with(timeout=5)
+            process.kill.assert_not_called()
 
     def test_run_lock_reports_stale_directory_without_deleting_it(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1134,6 +1237,60 @@ release_run_lock(handle)
         metrics_item = next(item for item in catalog if item["label"] == "Round metrics")
         self.assertEqual(metrics_item["missing_key"], "missing_round_metrics")
 
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_live_progress_rejects_linked_project_before_automatic_reads(self) -> None:
+        import ui.app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            outside_project = root / "outside-projects" / "selected"
+            outside_project.mkdir(parents=True)
+            (outside_project / "checkpoint.json").write_text(
+                '{"private": "SENTINEL"}\n',
+                encoding="utf-8",
+            )
+            (outside_project / "run.log").write_text(
+                "PRIVATE_LOG_SENTINEL\n",
+                encoding="utf-8",
+            )
+            (root / "projects").symlink_to(
+                root / "outside-projects",
+                target_is_directory=True,
+            )
+            project = root / "projects" / "selected"
+
+            with (
+                patch.object(
+                    ui_app,
+                    "get_active_process_meta",
+                    side_effect=AssertionError("metadata read must not start"),
+                ) as get_meta,
+                patch.object(
+                    ui_app,
+                    "read_json_file",
+                    side_effect=AssertionError("checkpoint must not be read"),
+                ) as read_checkpoint,
+                patch.object(
+                    ui_app,
+                    "tail_file_lines",
+                    side_effect=AssertionError("logs must not be read"),
+                ) as read_log,
+                patch.object(ui_app.st, "warning") as warning,
+            ):
+                ui_app.render_live_progress_and_logs(
+                    proj_path=project,
+                    run_log_path=project / "run.log",
+                    model_job_log_path=project / "model_ops.log",
+                    checkpoint_path=project / "checkpoint.json",
+                    stop_signal_path=project / "STOP_REQUESTED",
+                    default_model="mock",
+                )
+
+            warning.assert_called_once()
+            get_meta.assert_not_called()
+            read_checkpoint.assert_not_called()
+            read_log.assert_not_called()
+
     def test_ui_disables_resume_for_unsafe_checkpoint_paths(self) -> None:
         import ui.app as ui_app
 
@@ -1477,9 +1634,9 @@ release_run_lock(handle)
                 self.assertEqual(path.resolve().parent, canonical_run_root)
                 return read_json_list(path)
 
-            def guarded_analyze(path: Path) -> dict[str, object]:
+            def guarded_analyze(path: Path, **kwargs: object) -> dict[str, object]:
                 self.assertEqual(path.resolve(), canonical_run_root)
-                return analyze(path)
+                return analyze(path, **kwargs)
 
             with (
                 patch.object(ui_app, "read_json_file", side_effect=guarded_read_json),
@@ -1614,6 +1771,138 @@ release_run_lock(handle)
         self.assertFalse(dashboard["available"])
         self.assertNotIn("888", json.dumps(dashboard))
         self.assertNotIn("private-score-history", json.dumps(dashboard))
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_ui_skips_linked_run_discovery_and_project_output_links(self) -> None:
+        from ui import app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project_dir = root / "project"
+            runs_dir = project_dir / "runs"
+            outside_run = root / "outside-run"
+            runs_dir.mkdir(parents=True)
+            outside_run.mkdir()
+            (outside_run / "run_summary.json").write_text(
+                json.dumps({"run_id": "PRIVATE_RUN", "best_score": 999}),
+                encoding="utf-8",
+            )
+            (runs_dir / "linked-run").symlink_to(outside_run, target_is_directory=True)
+
+            external_best = root / "external-best.md"
+            external_best.write_text("PRIVATE_BEST_SENTINEL\n", encoding="utf-8")
+            (project_dir / "best_output.md").symlink_to(external_best)
+
+            self.assertEqual(ui_app.discover_project_run_roots(project_dir), [])
+            catalog = ui_app.build_output_catalog(project_dir, {})
+            best = next(item for item in catalog if item["label"] == "Best output")
+            self.assertFalse(best["exists"])
+            self.assertIsNone(best["path"])
+            self.assertEqual(external_best.read_text(encoding="utf-8"), "PRIVATE_BEST_SENTINEL\n")
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_ui_discovered_run_comparison_rejects_linked_metadata_leaves(self) -> None:
+        from ui import app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project_dir = root / "project"
+            run_root = project_dir / "runs" / "physical-run"
+            run_root.mkdir(parents=True)
+            external_summary = root / "private-summary.json"
+            external_summary.write_text(
+                json.dumps({"run_id": "PRIVATE_RUN", "best_score": 999}),
+                encoding="utf-8",
+            )
+            (run_root / "run_summary.json").symlink_to(external_summary)
+
+            discovered = ui_app.discover_project_run_roots(project_dir)
+            self.assertEqual([path.resolve() for path in discovered], [run_root.resolve()])
+            comparison_rows = ui_app.build_run_comparison_rows(discovered)
+
+            self.assertEqual(comparison_rows, [])
+            self.assertNotIn("PRIVATE_RUN", json.dumps(comparison_rows))
+            self.assertNotIn("999", json.dumps(comparison_rows))
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_ui_comparison_secure_read_rejects_leaf_swap_after_preflight(self) -> None:
+        from ui import app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_root = root / "run"
+            run_root.mkdir()
+            summary_path = run_root / "run_summary.json"
+            summary_path.write_text(
+                json.dumps({"run_id": "SAFE_RUN", "best_score": 10}),
+                encoding="utf-8",
+            )
+            external_summary = root / "private-summary.json"
+            external_summary.write_text(
+                json.dumps({"run_id": "PRIVATE_RACE", "best_score": 999}),
+                encoding="utf-8",
+            )
+            original_compare = ui_app.compare_runs
+
+            def swap_then_compare(
+                run_roots: object,
+                **kwargs: object,
+            ) -> dict[str, object]:
+                summary_path.unlink()
+                summary_path.symlink_to(external_summary)
+                return original_compare(run_roots, **kwargs)
+
+            with patch.object(
+                ui_app,
+                "compare_runs",
+                side_effect=swap_then_compare,
+            ):
+                rows = ui_app.build_run_comparison_rows([run_root])
+
+            rendered = json.dumps(rows)
+            self.assertNotIn("PRIVATE_RACE", rendered)
+            self.assertNotIn("999", rendered)
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_ui_project_discovery_rejects_linked_projects_root(self) -> None:
+        from ui import app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            outside_projects = root / "outside-projects"
+            (outside_projects / "selected").mkdir(parents=True)
+            projects = root / "projects"
+            projects.symlink_to(outside_projects, target_is_directory=True)
+
+            self.assertEqual(ui_app.discover_project_names(projects), [])
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_ui_project_discovery_does_not_cross_root_swap_window(self) -> None:
+        from ui import app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            projects = root / "projects"
+            (projects / "safe-name").mkdir(parents=True)
+            outside_projects = root / "outside-projects"
+            (outside_projects / "private-name").mkdir(parents=True)
+            trusted_projects = root / "trusted-projects"
+            original_lstat = Path.lstat
+            swapped = False
+
+            def lstat_then_swap(path: Path) -> os.stat_result:
+                nonlocal swapped
+                metadata = original_lstat(path)
+                if path == projects and not swapped:
+                    projects.rename(trusted_projects)
+                    projects.symlink_to(outside_projects, target_is_directory=True)
+                    swapped = True
+                return metadata
+
+            with patch.object(Path, "lstat", autospec=True, side_effect=lstat_then_swap):
+                names = ui_app.discover_project_names(projects)
+
+            self.assertNotIn("private-name", names)
 
     def test_ui_run_artifacts_reject_external_leaf_symlinks(self) -> None:
         import ui.app as ui_app
@@ -1832,6 +2121,40 @@ release_run_lock(handle)
 
         self.assertEqual(display_path, "<repo>/STOP_REQUESTED")
         self.assertNotIn(str(Path(tmp)), display_path)
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_create_stop_signal_rejects_linked_project_ancestor(self) -> None:
+        import ui.app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            outside_project = root / "outside-projects" / "selected"
+            outside_project.mkdir(parents=True)
+            (root / "projects").symlink_to(
+                root / "outside-projects",
+                target_is_directory=True,
+            )
+            stop_path = root / "projects" / "selected" / "STOP_REQUESTED"
+
+            self.assertFalse(ui_app.create_stop_signal(stop_path))
+            self.assertFalse((outside_project / "STOP_REQUESTED").exists())
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_stop_requested_rejects_external_marker_after_project_ancestor_swap(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            projects = root / "projects"
+            project = projects / "selected"
+            project.mkdir(parents=True)
+            trusted_projects = root / "trusted-projects"
+            outside_project = root / "outside-projects" / "selected"
+            outside_project.mkdir(parents=True)
+            (outside_project / "STOP_REQUESTED").write_text("stop\n", encoding="utf-8")
+            ensure_project_runtime_paths_safe(project)
+            projects.rename(trusted_projects)
+            projects.symlink_to(root / "outside-projects", target_is_directory=True)
+
+            self.assertFalse(stop_requested(project / "STOP_REQUESTED"))
 
     def test_ui_run_comparison_helpers_mask_paths_and_flatten_fields(self) -> None:
         import ui.app as ui_app

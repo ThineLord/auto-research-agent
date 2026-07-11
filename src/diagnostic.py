@@ -27,6 +27,7 @@ from .runtime import shorten_text_by_words as _shorten_text_by_words
 from .storage import (
     append_log_line,
     display_path,
+    ensure_project_runtime_paths_safe,
     get_memory_for_prompt,
     make_round_dir,
     make_run_root,
@@ -82,6 +83,7 @@ def run_diagnostic_mode(
     git_root: GitRootSetting = INHERIT_GIT_ROOT,
     drafting_mode: str = DEFAULT_DRAFTING_MODE,
 ) -> None:
+    ensure_project_runtime_paths_safe(project_dir)
     run_started = time.monotonic()
     started_at_iso = datetime.now().astimezone().isoformat()
     log_path = project_dir / "run.log"

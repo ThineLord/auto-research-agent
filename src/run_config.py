@@ -9,6 +9,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
 
+from .storage import read_regular_text
+
 RUN_CONFIG_SCHEMA_VERSION = 1
 
 
@@ -205,21 +207,33 @@ def finalize_run_config(
     return finalized
 
 
-def read_run_config(run_root: Path) -> dict[str, Any]:
+def read_run_config(
+    run_root: Path,
+    *,
+    safe_artifacts: bool = False,
+    anchor: Path | None = None,
+) -> dict[str, Any]:
+    def read_path(path: Path) -> str:
+        if safe_artifacts:
+            return read_regular_text(path, anchor=anchor)
+        return path.read_text(encoding="utf-8")
+
     run_config_path = run_root / "run_config.json"
-    if run_config_path.exists():
-        try:
-            data = json.loads(run_config_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return {}
+    try:
+        data = json.loads(read_path(run_config_path))
+    except FileNotFoundError:
+        data = None
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return {}
+    if data is not None:
         return data if isinstance(data, dict) else {}
 
     manifest_path = run_root / "run_manifest.json"
-    if not manifest_path.exists():
-        return {}
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        manifest = json.loads(read_path(manifest_path))
+    except FileNotFoundError:
+        return {}
+    except (OSError, UnicodeError, json.JSONDecodeError):
         return {}
     if not isinstance(manifest, dict):
         return {}

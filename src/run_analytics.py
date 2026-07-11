@@ -7,13 +7,18 @@ from pathlib import Path
 from typing import Any
 
 from .run_compare import load_run_summary
-from .storage import write_json_file
+from .storage import read_regular_text, write_json_file
 
 
-def _read_json_list(path: Path) -> list[dict[str, Any]]:
+def _read_json_list(path: Path, *, safe_artifacts: bool = False) -> list[dict[str, Any]]:
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        content = (
+            read_regular_text(path, missing_ok=True)
+            if safe_artifacts
+            else path.read_text(encoding="utf-8")
+        )
+        payload = json.loads(content) if content else []
+    except (OSError, UnicodeError, json.JSONDecodeError):
         return []
     if not isinstance(payload, list):
         return []
@@ -72,11 +77,14 @@ def _score_trend(round_metrics: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def analyze_run(run_root: Path) -> dict[str, Any]:
+def analyze_run(run_root: Path, *, safe_artifacts: bool = False) -> dict[str, Any]:
     """Summarize one run without provider calls or scoring reinterpretation."""
     run_root = Path(run_root)
-    summary = load_run_summary(run_root)
-    round_metrics = _read_json_list(run_root / "round_metrics.json")
+    summary = load_run_summary(run_root, safe_artifacts=safe_artifacts)
+    round_metrics = _read_json_list(
+        run_root / "round_metrics.json",
+        safe_artifacts=safe_artifacts,
+    )
     score_trend = _score_trend(round_metrics)
     return {
         "analysis_version": 1,
@@ -140,5 +148,6 @@ def analyze_run(run_root: Path) -> dict[str, Any]:
 
 def write_run_analysis(run_root: Path, output_path: Path) -> dict[str, Any]:
     analysis = analyze_run(run_root)
-    write_json_file(output_path, analysis)
+    authorized_output_path = output_path.parent.resolve(strict=False) / output_path.name
+    write_json_file(authorized_output_path, analysis)
     return analysis

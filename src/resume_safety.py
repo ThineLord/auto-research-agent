@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 from typing import Any, Iterable
 
+from .storage import artifact_path_is_safe
+
 MISSING_RUN_ROOT = "missing_run_root"
 UNSAFE_RUN_ROOT = "unsafe_run_root"
 STALE_RUN_ROOT = "stale_run_root"
@@ -121,12 +123,17 @@ def resume_artifact_links_are_safe(
     """Reject leaf symlinks or paths that resolve outside their expected parent."""
     try:
         canonical_parent = parent_dir.resolve(strict=False)
+        parent_exists = canonical_parent.exists()
         for path in paths:
             if (
                 path.is_symlink()
                 or path.resolve(strict=False).parent != canonical_parent
-                or (path.exists() and not path.is_file())
-                or (path.exists() and not os.access(path, os.R_OK))
+                or (parent_exists and not artifact_path_is_safe(path, allow_missing=True))
+                or (
+                    parent_exists
+                    and artifact_path_is_safe(path, allow_missing=False)
+                    and not os.access(path, os.R_OK)
+                )
             ):
                 return False
     except (OSError, RuntimeError, ValueError):

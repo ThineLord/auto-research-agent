@@ -8,18 +8,23 @@ from typing import Any, Sequence
 
 from .metrics import JUDGE_RUBRIC_KEYS, summarize_round_metrics
 from .run_config import read_run_config
-from .storage import write_json_file
+from .storage import read_regular_text, write_json_file
 
 
-def _read_json(path: Path) -> Any:
+def _read_json(path: Path, *, safe_artifacts: bool = False) -> Any:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        content = (
+            read_regular_text(path, missing_ok=True)
+            if safe_artifacts
+            else path.read_text(encoding="utf-8")
+        )
+        return json.loads(content) if content else {}
+    except (OSError, UnicodeError, json.JSONDecodeError):
         return {}
 
 
-def _read_json_list(path: Path) -> list[dict[str, Any]]:
-    data = _read_json(path)
+def _read_json_list(path: Path, *, safe_artifacts: bool = False) -> list[dict[str, Any]]:
+    data = _read_json(path, safe_artifacts=safe_artifacts)
     if not isinstance(data, list):
         return []
     return [item for item in data if isinstance(item, dict)]
@@ -95,19 +100,19 @@ def _error_rounds(summary: dict[str, Any], round_metrics: Sequence[dict[str, Any
     return [entry.get("round") for entry in round_metrics if entry.get("errors")]
 
 
-def load_run_summary(run_root: Path) -> dict[str, Any]:
+def load_run_summary(run_root: Path, *, safe_artifacts: bool = False) -> dict[str, Any]:
     run_root = Path(run_root)
     run_summary_path = run_root / "run_summary.json"
     run_config_path = run_root / "run_config.json"
     round_metrics_path = run_root / "round_metrics.json"
-    summary = _read_json(run_summary_path)
+    summary = _read_json(run_summary_path, safe_artifacts=safe_artifacts)
     summary = summary if isinstance(summary, dict) else {}
-    run_config = read_run_config(run_root)
+    run_config = read_run_config(run_root, safe_artifacts=safe_artifacts)
     model_config = run_config.get("model")
     model_config = model_config if isinstance(model_config, dict) else {}
     runtime_config = run_config.get("runtime")
     runtime_config = runtime_config if isinstance(runtime_config, dict) else {}
-    round_metrics = _read_json_list(round_metrics_path)
+    round_metrics = _read_json_list(round_metrics_path, safe_artifacts=safe_artifacts)
     scores = _score_values(round_metrics)
     summary_best_score = _as_float(summary.get("best_score"))
     config_best_score = _as_float(run_config.get("best_score"))
@@ -255,8 +260,14 @@ def load_run_summary(run_root: Path) -> dict[str, Any]:
     }
 
 
-def compare_runs(run_roots: Sequence[Path]) -> dict[str, Any]:
-    runs = [load_run_summary(Path(run_root)) for run_root in run_roots]
+def compare_runs(
+    run_roots: Sequence[Path],
+    *,
+    safe_artifacts: bool = False,
+) -> dict[str, Any]:
+    runs = [
+        load_run_summary(Path(run_root), safe_artifacts=safe_artifacts) for run_root in run_roots
+    ]
     ranked = sorted(
         runs,
         key=lambda item: (
@@ -287,5 +298,6 @@ def compare_runs(run_roots: Sequence[Path]) -> dict[str, Any]:
 
 def write_run_comparison(run_roots: Sequence[Path], output_path: Path) -> dict[str, Any]:
     comparison = compare_runs(run_roots)
-    write_json_file(output_path, comparison)
+    authorized_output_path = output_path.parent.resolve(strict=False) / output_path.name
+    write_json_file(authorized_output_path, comparison)
     return comparison

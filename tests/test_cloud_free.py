@@ -317,6 +317,34 @@ class CloudFreePolicyTests(unittest.TestCase):
             self.assertNotIn(secret, path.read_text(encoding="utf-8"))
             self.assertNotIn("api_key", path.read_text(encoding="utf-8").lower())
 
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_cloud_artifact_helpers_reject_linked_project_ancestor(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            outside_project = root / "outside-projects" / "selected"
+            artifacts = outside_project / "artifacts"
+            artifacts.mkdir(parents=True)
+            external_profile = artifacts / "cloud_free_profile.json"
+            external_profile.write_text('[{"private": true}]\n', encoding="utf-8")
+            (root / "projects").symlink_to(
+                root / "outside-projects",
+                target_is_directory=True,
+            )
+            project_dir = root / "projects" / "selected"
+
+            with self.assertRaises(OSError):
+                save_profile_artifact(
+                    project_dir,
+                    [CloudModelProfile(model_id="must-not-write")],
+                )
+
+            self.assertEqual(load_profile_artifact(project_dir), [])
+            self.assertEqual(load_discovery_artifact(project_dir), [])
+            self.assertEqual(
+                external_profile.read_text(encoding="utf-8"),
+                '[{"private": true}]\n',
+            )
+
     def test_stale_cloud_free_artifact_paths_return_empty_lists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_dir = Path(tmp)

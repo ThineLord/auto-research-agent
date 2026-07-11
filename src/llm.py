@@ -29,6 +29,7 @@ from .config import (
     MODEL_PROVIDER_OLLAMA,
     GeminiConfig,
 )
+from .storage import append_file_text
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +53,7 @@ def _write_provider_event(path: Path | None, payload: Dict[str, Any]) -> None:
     if path is None:
         return
     event = {"time": datetime.now().isoformat(), **payload}
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as file:
-        file.write(json.dumps(event, ensure_ascii=False, default=str) + "\n")
+    append_file_text(path, json.dumps(event, ensure_ascii=False, default=str) + "\n")
 
 
 class LLMClientProtocol(Protocol):

@@ -12,7 +12,13 @@ from .config import DEFAULT_DRAFTING_MODE
 from .llm import LLMClientProtocol
 from .run_config import INHERIT_GIT_ROOT, GitRootSetting
 from .runner import run_iterative_rounds
-from .storage import display_path, get_memory_for_prompt, read_json_file, write_text
+from .storage import (
+    display_path,
+    ensure_project_runtime_paths_safe,
+    get_memory_for_prompt,
+    read_json_file,
+    write_text,
+)
 
 
 def _clip_words(text: str, max_words: int) -> str:
@@ -221,6 +227,7 @@ def run_session_mode(
     drafting_mode: str = DEFAULT_DRAFTING_MODE,
     max_consecutive_provider_quota_failures: int = 2,
 ) -> None:
+    ensure_project_runtime_paths_safe(project_dir)
     console.rule("Research Session Mode")
     memory_for_prompt = get_memory_for_prompt(memory_path)
 

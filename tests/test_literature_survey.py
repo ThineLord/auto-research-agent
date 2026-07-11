@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from rich.console import Console
 
+import src.literature_survey as survey_module
 from src.config import LiteratureSurveyConfig
 from src.literature_survey import (
     collect_papers,
@@ -17,6 +20,97 @@ from src.project_input import load_project_input
 
 
 class LiteratureSurveyTests(unittest.TestCase):
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_collection_rejects_project_ancestor_swap_after_boundary_registration(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            projects = root / "projects"
+            project_dir = projects / "survey_demo"
+            project_dir.mkdir(parents=True)
+            (project_dir / "task.md").write_text("# Trusted task\n", encoding="utf-8")
+            outside_project = root / "outside-projects" / "survey_demo"
+            outside_project.mkdir(parents=True)
+            (outside_project / "task.md").write_text(
+                "| Title | Authors |\n|---|---|\n| Private Sentinel Study | External Author |\n",
+                encoding="utf-8",
+            )
+            trusted_projects = root / "trusted-projects"
+            original_preflight = survey_module.ensure_project_runtime_paths_safe
+
+            def preflight_then_swap(path: Path) -> Path | None:
+                result = original_preflight(path)
+                projects.rename(trusted_projects)
+                projects.symlink_to(root / "outside-projects", target_is_directory=True)
+                return result
+
+            with patch.object(
+                survey_module,
+                "ensure_project_runtime_paths_safe",
+                side_effect=preflight_then_swap,
+            ):
+                with self.assertRaises(OSError):
+                    collect_papers(
+                        project_dir,
+                        LiteratureSurveyConfig(max_source_files=1, max_papers=1),
+                    )
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_automatic_nested_output_rejects_symlinked_component(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project_dir = root / "projects" / "survey_demo"
+            outside = root / "outside"
+            project_dir.mkdir(parents=True)
+            outside.mkdir()
+            (project_dir / "task.md").write_text("# Survey\n", encoding="utf-8")
+            (project_dir / "linked").symlink_to(outside, target_is_directory=True)
+            project_input = load_project_input(
+                root=root,
+                project_name="survey_demo",
+                explicit_project=True,
+            )
+
+            with self.assertRaises(OSError):
+                run_literature_survey_mode(
+                    console=Console(),
+                    project_input=project_input,
+                    config=LiteratureSurveyConfig(output_dir="linked/nested"),
+                )
+
+            self.assertFalse((outside / "nested").exists())
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_automatic_output_preflights_all_leaves_before_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project_dir = root / "projects" / "survey_demo"
+            survey_dir = project_dir / "survey"
+            survey_dir.mkdir(parents=True)
+            (project_dir / "task.md").write_text("# Survey\n", encoding="utf-8")
+            report_path = survey_dir / "survey_report.md"
+            report_path.write_text("ORIGINAL_REPORT\n", encoding="utf-8")
+            external_manifest = root / "external-manifest.json"
+            external_manifest.write_text('{"private": true}\n', encoding="utf-8")
+            (survey_dir / "survey_manifest.json").symlink_to(external_manifest)
+            project_input = load_project_input(
+                root=root,
+                project_name="survey_demo",
+                explicit_project=True,
+            )
+
+            with self.assertRaises(OSError):
+                run_literature_survey_mode(
+                    console=Console(),
+                    project_input=project_input,
+                    config=LiteratureSurveyConfig(),
+                )
+
+            self.assertEqual(report_path.read_text(encoding="utf-8"), "ORIGINAL_REPORT\n")
+            self.assertEqual(
+                external_manifest.read_text(encoding="utf-8"),
+                '{"private": true}\n',
+            )
+
     def test_survey_collects_deduplicates_and_writes_structured_outputs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -109,9 +203,37 @@ Future Work: Add privacy stress tests
                 LiteratureSurveyConfig(max_source_files=1, max_papers=1),
             )
 
-            self.assertEqual(source_files, [(project_dir / "task.md").resolve()])
+            self.assertEqual(
+                source_files,
+                [Path(os.path.abspath(project_dir / "task.md"))],
+            )
             self.assertEqual(papers, [])
             self.assertIn("no paper metadata", generate_related_work(papers).lower())
+
+    def test_collection_preserves_lexical_sort_order_before_source_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "projects" / "ordered"
+            nested = project_dir / "a"
+            nested.mkdir(parents=True)
+            (project_dir / "a.md").write_text("# Root source\n", encoding="utf-8")
+            (nested / "z.md").write_text("# Nested source\n", encoding="utf-8")
+
+            _papers, source_files = collect_papers(
+                project_dir,
+                LiteratureSurveyConfig(
+                    include_task=False,
+                    include_memory=False,
+                    include_project_markdown=False,
+                    include_run_outputs=False,
+                    source_globs=("**/*.md",),
+                    max_source_files=1,
+                ),
+            )
+
+            self.assertEqual(
+                source_files,
+                [Path(os.path.abspath(project_dir / "a.md"))],
+            )
 
     def test_reference_metadata_and_identifier_aliases_are_normalized(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

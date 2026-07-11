@@ -21,7 +21,12 @@ from .resume_safety import (
 )
 from .run_config import INHERIT_GIT_ROOT, GitRootSetting
 from .runner import ResumeHistoryError, run_iterative_rounds
-from .storage import read_json_file
+from .storage import (
+    artifact_path_is_safe,
+    ensure_project_runtime_paths_safe,
+    list_artifact_entry_names,
+    read_json_file,
+)
 
 ROUND_OUTPUT_FILES = ("01_draft.md", "02_review.md", "03_revised.md", "04_judge.md")
 NEXT_ROUND_FAIL_SAFE_ACTION = "fail_safe_require_user_action"
@@ -119,20 +124,9 @@ def inspect_next_round_directory(
         }
     assert safe_round_path is not None
     next_round_path = safe_round_path
-    if not next_round_path.exists():
-        return {
-            "path": str(next_round_path),
-            "display_path": display_path,
-            "exists": False,
-            "status": "missing",
-            "blocks_resume": False,
-            "safety_action": "proceed_create_round_dir",
-            "existing_files": [],
-            "missing_expected_files": list(ROUND_OUTPUT_FILES),
-        }
-
     try:
-        entries = sorted(next_round_path.iterdir(), key=lambda path: path.name)
+        existing_names = list_artifact_entry_names(next_round_path, missing_ok=True)
+        directory_exists = next_round_path.exists()
     except OSError:
         return {
             "path": "",
@@ -146,7 +140,19 @@ def inspect_next_round_directory(
             "existing_files": [],
             "missing_expected_files": list(ROUND_OUTPUT_FILES),
         }
-    if not entries:
+    if not directory_exists:
+        return {
+            "path": str(next_round_path),
+            "display_path": display_path,
+            "exists": False,
+            "status": "missing",
+            "blocks_resume": False,
+            "safety_action": "proceed_create_round_dir",
+            "existing_files": [],
+            "missing_expected_files": list(ROUND_OUTPUT_FILES),
+        }
+
+    if not existing_names:
         return {
             "path": str(next_round_path),
             "display_path": display_path,
@@ -158,8 +164,11 @@ def inspect_next_round_directory(
             "missing_expected_files": list(ROUND_OUTPUT_FILES),
         }
 
-    existing_names = [path.name for path in entries]
-    expected_present = [name for name in ROUND_OUTPUT_FILES if (next_round_path / name).exists()]
+    expected_present = [
+        name
+        for name in ROUND_OUTPUT_FILES
+        if artifact_path_is_safe(next_round_path / name, allow_missing=False)
+    ]
     missing_expected = [name for name in ROUND_OUTPUT_FILES if name not in expected_present]
     unexpected_entries = [name for name in existing_names if name not in ROUND_OUTPUT_FILES]
     status = (
@@ -186,6 +195,7 @@ def build_resume_preview(
     checkpoint: dict[str, Any],
     repo_root: Path | None = None,
 ) -> dict[str, Any]:
+    ensure_project_runtime_paths_safe(project_dir)
     checkpoint_path = project_dir / "checkpoint.json"
     if not checkpoint:
         return {
@@ -404,6 +414,9 @@ def run_resume_mode(
     drafting_mode: str = DEFAULT_DRAFTING_MODE,
     max_consecutive_provider_quota_failures: int = 2,
 ) -> bool:
+    # Establish the project trust boundary before the first automatic artifact read.
+    # ``build_resume_preview`` repeats this check so it remains safe as a public helper.
+    ensure_project_runtime_paths_safe(project_dir)
     checkpoint_path = project_dir / "checkpoint.json"
     checkpoint = read_json_file(checkpoint_path)
     preview = build_resume_preview(

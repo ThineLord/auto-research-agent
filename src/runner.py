@@ -60,14 +60,19 @@ from .runtime import stop_requested as _stop_requested
 from .storage import (
     append_log_line,
     display_path,
+    ensure_project_runtime_paths_safe,
     get_memory_for_prompt,
+    list_artifact_entry_names,
     make_round_dir,
     make_run_root,
     parse_score,
+    read_file_text,
     read_json_file,
+    read_regular_text,
     read_text,
     save_round_outputs,
     summarize_round_memory,
+    unlink_artifact_file,
     update_project_memory,
     update_research_state,
     write_interrupted_report,
@@ -106,7 +111,7 @@ def _validate_pending_resume_round_dir(run_root: Path, round_index: int) -> Path
     if path_error or round_dir is None:
         raise ResumeHistoryError(RESUME_PATH_MESSAGES[path_error or UNSAFE_ROUND_PATH])
     try:
-        has_entries = round_dir.exists() and any(round_dir.iterdir())
+        has_entries = bool(list_artifact_entry_names(round_dir, missing_ok=True))
     except OSError:
         raise ResumeHistoryError("pending round directory cannot be inspected safely") from None
     if has_entries:
@@ -143,11 +148,11 @@ def _history_float(value: Any) -> float | None:
 
 
 def _read_resume_history(path: Path, *, start_round: int) -> List[Dict[str, Any]] | None:
-    if not path.exists():
-        return None
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, RecursionError) as exc:
+        payload = json.loads(read_regular_text(path))
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeError, ValueError, RecursionError) as exc:
         raise ResumeHistoryError(f"{path.name} is unreadable or invalid JSON") from exc
     if not isinstance(payload, list):
         raise ResumeHistoryError(f"{path.name} must contain a JSON array")
@@ -175,17 +180,14 @@ def _read_resume_history(path: Path, *, start_round: int) -> List[Dict[str, Any]
 
 
 def _read_resume_round_text(path: Path) -> str:
-    try:
-        return path.read_text(encoding="utf-8").strip()
-    except (OSError, UnicodeError):
-        return ""
+    return read_file_text(path).strip()
 
 
 def _read_resume_manifest(path: Path, *, canonical_run_id: str) -> Optional[Dict[str, Any]]:
-    if not path.exists():
-        return None
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(read_regular_text(path))
+    except FileNotFoundError:
+        return None
     except (OSError, UnicodeError, ValueError, RecursionError) as exc:
         raise ResumeHistoryError(f"{path.name} is unreadable or invalid JSON") from exc
     if not isinstance(payload, dict):
@@ -726,6 +728,7 @@ def run_iterative_rounds(
         raise ValueError("max_rounds must be >= 1")
     if isinstance(start_round, bool) or not isinstance(start_round, int) or start_round < 1:
         raise ValueError("start_round must be >= 1")
+    ensure_project_runtime_paths_safe(project_dir)
 
     # Termination guarantee:
     # 1) The only round loop is a bounded for-loop over [1..max_rounds].
@@ -816,7 +819,7 @@ def run_iterative_rounds(
         if resumes_existing_run
         else None
     )
-    existing_run_config = read_run_config(run_root)
+    existing_run_config = read_run_config(run_root, safe_artifacts=True)
     existing_run_summary = read_json_file(run_root / "run_summary.json")
     resumes_existing_run = base_resume_metadata["lifecycle_action"] == "resume_existing_run"
     score_history: List[Dict[str, Any]] = []
@@ -1061,7 +1064,7 @@ def run_iterative_rounds(
 
         if resumes_existing_run:
             round_dir = _validate_pending_resume_round_dir(run_root, round_index)
-            round_dir.mkdir(parents=True, exist_ok=True)
+            round_dir = make_round_dir(run_root, round_index, allow_existing=round_dir.exists())
         else:
             round_dir = make_round_dir(run_root, round_index)
         _log(console, log_path, mode, f"round_enter round={round_index}")
@@ -1875,11 +1878,10 @@ def run_iterative_rounds(
             stop_time=datetime.now().isoformat(),
             repo_root=repo_root,
         )
-        if stop_signal_path.exists():
-            try:
-                stop_signal_path.unlink()
-            except OSError:
-                pass
+        try:
+            unlink_artifact_file(stop_signal_path)
+        except OSError:
+            pass
 
     if best_output:
         console.print(f"[bold cyan]Best score:[/bold cyan] {best_score:.2f}")

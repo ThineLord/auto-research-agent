@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import re
+import stat
 import tempfile
+import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from threading import RLock
+from typing import Any, BinaryIO, Dict, List, Optional, Sequence, TextIO
 
 from .judge_output import parse_judge_score
 
@@ -30,52 +34,726 @@ DEFAULT_RESEARCH_KEYWORDS = [
     "implementation",
     "experiment",
 ]
+PROJECT_RUNTIME_FILE_NAMES = (
+    "memory.md",
+    "best_output.md",
+    "score_history.json",
+    "research_state.json",
+    "run_analysis.json",
+    "run_comparison.json",
+    "current_plan.md",
+    "final_session_report.md",
+    "run.log",
+    "model_ops.log",
+    "checkpoint.json",
+    "interrupted_report.md",
+    "STOP_REQUESTED",
+    "active_run.json",
+    "active_run.guard",
+    "ui_run_process.json",
+    "ui_model_job_process.json",
+    "provider_events.jsonl",
+)
+PROJECT_RUNTIME_DIRECTORY_NAMES = ("artifacts", "outputs", "logs", "cache", "survey")
+PROJECT_RUNTIME_NESTED_FILE_PATHS = (
+    Path("artifacts/cloud_free_models.json"),
+    Path("artifacts/cloud_free_profile.json"),
+)
 
 
-def _atomic_write_text(path: Path, content: str) -> None:
-    """Durably replace a text file without truncating the previous version on failure."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path: Path | None = None
+class UnsafeArtifactPathError(OSError):
+    """Raised when automatic runtime I/O encounters a link or non-regular node."""
+
+
+_ARTIFACT_BOUNDARIES: tuple[tuple[Path, Path], ...] = ()
+_ARTIFACT_BOUNDARIES_LOCK = RLock()
+
+
+def _lexical_absolute(path: Path) -> Path:
+    return Path(os.path.abspath(os.fspath(Path(path).expanduser())))
+
+
+def _register_artifact_boundary(root: Path, anchor: Path) -> None:
+    global _ARTIFACT_BOUNDARIES
+    root = _lexical_absolute(root)
+    anchor = _lexical_absolute(anchor)
+    with _ARTIFACT_BOUNDARIES_LOCK:
+        inherited_matches: list[tuple[int, Path]] = []
+        for registered_root, registered_anchor in _ARTIFACT_BOUNDARIES:
+            if registered_root == root:
+                continue
+            try:
+                root.relative_to(registered_root)
+            except ValueError:
+                continue
+            inherited_matches.append((len(registered_root.parts), registered_anchor))
+        if inherited_matches:
+            anchor = max(inherited_matches, key=lambda item: item[0])[1]
+        try:
+            root.relative_to(anchor)
+        except ValueError as exc:
+            raise _unsafe_path_error("boundary") from exc
+
+        boundaries: list[tuple[Path, Path]] = []
+        for registered_root, registered_anchor in _ARTIFACT_BOUNDARIES:
+            if registered_root == root:
+                continue
+            try:
+                registered_root.relative_to(root)
+                anchor_is_nested = registered_anchor.is_relative_to(root)
+            except ValueError:
+                anchor_is_nested = False
+            if anchor_is_nested:
+                registered_anchor = anchor
+            boundaries.append((registered_root, registered_anchor))
+        boundaries.append((root, anchor))
+        _ARTIFACT_BOUNDARIES = tuple(boundaries)
+
+
+def _registered_artifact_anchor(path: Path) -> Path | None:
+    path = _lexical_absolute(path)
+    matches: list[tuple[int, Path]] = []
+    with _ARTIFACT_BOUNDARIES_LOCK:
+        boundaries = _ARTIFACT_BOUNDARIES
+    for root, anchor in boundaries:
+        try:
+            path.relative_to(root)
+        except ValueError:
+            continue
+        matches.append((len(root.parts), anchor))
+    return max(matches, default=(0, None), key=lambda item: item[0])[1]
+
+
+def artifact_boundary_is_registered(path: Path) -> bool:
+    """Return whether an automatic artifact path has a process-wide trusted anchor."""
+    return _registered_artifact_anchor(path) is not None
+
+
+def _supports_descriptor_relative_io() -> bool:
+    return (
+        os.name != "nt"
+        and hasattr(os, "O_DIRECTORY")
+        and hasattr(os, "O_NOFOLLOW")
+        and os.open in os.supports_dir_fd
+        and os.stat in os.supports_dir_fd
+        and os.stat in os.supports_follow_symlinks
+        and os.unlink in os.supports_dir_fd
+        and os.mkdir in os.supports_dir_fd
+    )
+
+
+def _directory_open_flags() -> int:
+    return (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+
+
+def _unsafe_path_error(kind: str) -> UnsafeArtifactPathError:
+    return UnsafeArtifactPathError(f"unsafe automatic artifact {kind}")
+
+
+def _validate_regular_metadata(metadata: os.stat_result, *, kind: str) -> None:
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+        raise _unsafe_path_error(kind)
+
+
+def _path_is_link_or_junction(path: Path, metadata: os.stat_result) -> bool:
+    if stat.S_ISLNK(metadata.st_mode):
+        return True
+    if os.name != "nt":
+        return False
+    file_attributes = int(getattr(metadata, "st_file_attributes", 0))
+    reparse_attribute = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x0400))
+    if file_attributes & reparse_attribute:
+        return True
+    if path.is_symlink():
+        return True
+    is_junction = getattr(os.path, "isjunction", None)
+    return bool(is_junction(path)) if callable(is_junction) else False
+
+
+def _open_directory_from_anchor(
+    directory: Path,
+    *,
+    anchor: Path,
+    create: bool,
+) -> int | None:
+    directory = _lexical_absolute(directory)
+    anchor = _lexical_absolute(anchor)
     try:
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            dir=path.parent,
-            prefix=f".{path.name}.",
-            suffix=".tmp",
-            delete=False,
-        ) as temp_file:
-            temp_path = Path(temp_file.name)
-            temp_file.write(content)
-            temp_file.flush()
-            os.fsync(temp_file.fileno())
-        os.replace(temp_path, path)
+        relative = directory.relative_to(anchor)
+    except ValueError as exc:
+        raise _unsafe_path_error("outside trusted anchor") from exc
+
+    if _supports_descriptor_relative_io():
+        descriptor = -1
+        try:
+            descriptor = os.open(anchor, _directory_open_flags())
+            for component in relative.parts:
+                try:
+                    next_descriptor = os.open(
+                        component,
+                        _directory_open_flags(),
+                        dir_fd=descriptor,
+                    )
+                except FileNotFoundError:
+                    if not create:
+                        raise
+                    try:
+                        os.mkdir(component, dir_fd=descriptor)
+                    except FileExistsError:
+                        pass
+                    next_descriptor = os.open(
+                        component,
+                        _directory_open_flags(),
+                        dir_fd=descriptor,
+                    )
+                os.close(descriptor)
+                descriptor = next_descriptor
+            return descriptor
+        except FileNotFoundError:
+            if descriptor >= 0:
+                os.close(descriptor)
+            raise
+        except OSError as exc:
+            if descriptor >= 0:
+                os.close(descriptor)
+            raise _unsafe_path_error("parent directory") from exc
+
+    if os.name != "nt":
+        raise _unsafe_path_error("descriptor-relative I/O unavailable")
+
+    current = anchor
+    try:
+        anchor_metadata = current.lstat()
+    except OSError as exc:
+        raise _unsafe_path_error("trusted anchor") from exc
+    if _path_is_link_or_junction(current, anchor_metadata) or not stat.S_ISDIR(
+        anchor_metadata.st_mode
+    ):
+        raise _unsafe_path_error("trusted anchor")
+    for component in relative.parts:
+        current /= component
+        try:
+            metadata = current.lstat()
+        except FileNotFoundError:
+            if not create:
+                raise
+            try:
+                current.mkdir()
+            except OSError as exc:
+                raise _unsafe_path_error("parent directory") from exc
+            metadata = current.lstat()
+        except OSError as exc:
+            raise _unsafe_path_error("parent directory") from exc
+        if _path_is_link_or_junction(current, metadata) or not stat.S_ISDIR(metadata.st_mode):
+            raise _unsafe_path_error("parent directory")
+    return None
+
+
+def _open_parent_directory(
+    path: Path,
+    *,
+    create: bool,
+    anchor: Path | None = None,
+) -> int | None:
+    path = _lexical_absolute(path)
+    selected_anchor = anchor or _registered_artifact_anchor(path)
+    if selected_anchor is not None:
+        return _open_directory_from_anchor(
+            path.parent,
+            anchor=selected_anchor,
+            create=create,
+        )
+
+    if create:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    if _supports_descriptor_relative_io():
+        try:
+            return os.open(path.parent, _directory_open_flags())
+        except FileNotFoundError:
+            if not create:
+                raise
+            raise _unsafe_path_error("parent directory") from None
+        except OSError as exc:
+            raise _unsafe_path_error("parent directory") from exc
+
+    # Windows keeps its historical path-based behavior but rejects every static link or
+    # non-directory parent. Active hostile replacement remains a documented platform limit.
+    try:
+        parent_metadata = path.parent.lstat()
+    except FileNotFoundError:
+        if not create:
+            raise
+        raise _unsafe_path_error("parent directory") from None
+    except OSError as exc:
+        raise _unsafe_path_error("parent directory") from exc
+    if _path_is_link_or_junction(path.parent, parent_metadata) or not stat.S_ISDIR(
+        parent_metadata.st_mode
+    ):
+        raise _unsafe_path_error("parent directory")
+    return None
+
+
+def _entry_metadata(path: Path, parent_descriptor: int | None) -> os.stat_result | None:
+    try:
+        if parent_descriptor is not None:
+            return os.stat(path.name, dir_fd=parent_descriptor, follow_symlinks=False)
+        return path.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise _unsafe_path_error("path") from exc
+
+
+def artifact_path_is_safe(
+    path: Path,
+    *,
+    allow_missing: bool = True,
+    anchor: Path | None = None,
+) -> bool:
+    """Return whether a leaf is missing or a single-link regular file without following it."""
+    path = Path(path)
+    parent_descriptor: int | None = None
+    try:
+        parent_descriptor = _open_parent_directory(path, create=False, anchor=anchor)
+        metadata = _entry_metadata(path, parent_descriptor)
+        if metadata is None:
+            return allow_missing
+        _validate_regular_metadata(metadata, kind="path")
+        return True
+    except OSError:
+        return False
+    finally:
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+
+
+def artifact_path_exists(
+    path: Path,
+    *,
+    allow_directory: bool = False,
+    anchor: Path | None = None,
+) -> bool:
+    """Check for a safe existing node without following its leaf or anchored parents."""
+    path = Path(path)
+    parent_descriptor: int | None = None
+    try:
+        parent_descriptor = _open_parent_directory(path, create=False, anchor=anchor)
+        metadata = _entry_metadata(path, parent_descriptor)
+        if metadata is None or _path_is_link_or_junction(path, metadata):
+            return False
+        if stat.S_ISDIR(metadata.st_mode):
+            return allow_directory
+        _validate_regular_metadata(metadata, kind="path")
+        return True
+    except OSError:
+        return False
+    finally:
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+
+
+def ensure_artifact_paths_safe(
+    paths: Sequence[Path],
+    *,
+    anchor: Path | None = None,
+) -> None:
+    """Fail before work when automatic artifact leaves are unsafe."""
+    for path_value in paths:
+        path = Path(path_value)
+        parent_descriptor: int | None = None
+        try:
+            parent_descriptor = _open_parent_directory(path, create=False, anchor=anchor)
+            metadata = _entry_metadata(path, parent_descriptor)
+            if metadata is None:
+                continue
+            if stat.S_ISDIR(metadata.st_mode):
+                raise IsADirectoryError(errno.EISDIR, os.strerror(errno.EISDIR), path.name)
+            _validate_regular_metadata(metadata, kind="path")
+        finally:
+            if parent_descriptor is not None:
+                os.close(parent_descriptor)
+
+
+def ensure_artifact_directory(path: Path, *, anchor: Path | None = None) -> Path:
+    """Create or validate an automatic directory without following any anchored component."""
+    path = _lexical_absolute(path)
+    descriptor = _open_parent_directory(
+        path / ".artifact-directory-probe", create=True, anchor=anchor
+    )
+    if descriptor is not None:
+        os.close(descriptor)
+    return path
+
+
+def ensure_project_runtime_paths_safe(
+    project_dir: Path,
+    *,
+    anchor: Path | None = None,
+) -> Path | None:
+    """Validate all fixed automatic project leaves before provider or process startup."""
+    project_dir = _lexical_absolute(project_dir)
+    project_anchor = _lexical_absolute(anchor or project_dir.parent)
+    probe = project_dir / ".runtime-path-probe"
+    parent_descriptor = _open_parent_directory(
+        probe,
+        create=False,
+        anchor=project_anchor,
+    )
+    runs_metadata: os.stat_result | None = None
+    existing_runtime_directories: set[str] = set()
+    try:
+        for name in PROJECT_RUNTIME_FILE_NAMES:
+            artifact_path = project_dir / name
+            metadata = _entry_metadata(artifact_path, parent_descriptor)
+            if metadata is not None:
+                # Preserve the historical handling of stale directories: callers may
+                # treat them as an already-present stop marker or an unreadable cache.
+                # Links, hard-linked files, and blocking/special nodes still fail closed.
+                if _path_is_link_or_junction(artifact_path, metadata):
+                    raise _unsafe_path_error("project artifact")
+                if stat.S_ISREG(metadata.st_mode):
+                    _validate_regular_metadata(metadata, kind="project artifact")
+                elif not stat.S_ISDIR(metadata.st_mode):
+                    raise _unsafe_path_error("project artifact")
+        for name in PROJECT_RUNTIME_DIRECTORY_NAMES:
+            artifact_directory = project_dir / name
+            metadata = _entry_metadata(artifact_directory, parent_descriptor)
+            if metadata is not None and (
+                _path_is_link_or_junction(artifact_directory, metadata)
+                or not stat.S_ISDIR(metadata.st_mode)
+            ):
+                raise _unsafe_path_error("project artifact directory")
+            if metadata is not None:
+                existing_runtime_directories.add(name)
+        runs_metadata = _entry_metadata(project_dir / "runs", parent_descriptor)
+    finally:
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+
+    _register_artifact_boundary(project_dir, project_anchor)
+    nested_paths = [
+        project_dir / relative_path
+        for relative_path in PROJECT_RUNTIME_NESTED_FILE_PATHS
+        if relative_path.parts[0] in existing_runtime_directories
+    ]
+    for nested_path in nested_paths:
+        nested_parent_descriptor: int | None = None
+        try:
+            nested_parent_descriptor = _open_parent_directory(nested_path, create=False)
+            nested_metadata = _entry_metadata(nested_path, nested_parent_descriptor)
+            if nested_metadata is None:
+                continue
+            if _path_is_link_or_junction(nested_path, nested_metadata):
+                raise _unsafe_path_error("project artifact")
+            if stat.S_ISREG(nested_metadata.st_mode):
+                _validate_regular_metadata(nested_metadata, kind="project artifact")
+            elif not stat.S_ISDIR(nested_metadata.st_mode):
+                raise _unsafe_path_error("project artifact")
+        finally:
+            if nested_parent_descriptor is not None:
+                os.close(nested_parent_descriptor)
+    if runs_metadata is None:
+        return None
+    runs_path = project_dir / "runs"
+    if _path_is_link_or_junction(runs_path, runs_metadata):
+        try:
+            runs_root = runs_path.resolve(strict=True)
+        except (OSError, RuntimeError) as exc:
+            raise _unsafe_path_error("runs directory") from exc
+        if not runs_root.is_dir():
+            raise _unsafe_path_error("runs directory")
+        try:
+            runs_relative = runs_root.relative_to(project_dir.resolve(strict=True))
+        except (OSError, RuntimeError, ValueError):
+            pass
+        else:
+            lexical_runs_root = project_dir / runs_relative
+            _register_artifact_boundary(lexical_runs_root, project_anchor)
+            return lexical_runs_root
+        _register_artifact_boundary(runs_root, runs_root)
+        return runs_root
+    elif not stat.S_ISDIR(runs_metadata.st_mode):
+        raise _unsafe_path_error("runs directory")
+    return runs_path
+
+
+def list_artifact_directories(path: Path) -> list[tuple[float, str, Path]]:
+    """List real direct child directories without following directory entries."""
+    path = _lexical_absolute(path)
+    selected_anchor = _registered_artifact_anchor(path / ".directory-list-probe") or path
+    descriptor = _open_directory_from_anchor(path, anchor=selected_anchor, create=False)
+    if descriptor is not None:
+        try:
+            entries: list[tuple[float, str, Path]] = []
+            for name in os.listdir(descriptor):
+                try:
+                    metadata = os.stat(name, dir_fd=descriptor, follow_symlinks=False)
+                except OSError:
+                    continue
+                if stat.S_ISDIR(metadata.st_mode):
+                    entries.append((metadata.st_mtime, name, path / name))
+            return entries
+        finally:
+            os.close(descriptor)
+
+    entries = []
+    for child in path.iterdir():
+        metadata = child.lstat()
+        if stat.S_ISDIR(metadata.st_mode) and not _path_is_link_or_junction(child, metadata):
+            entries.append((metadata.st_mtime, child.name, child))
+    return entries
+
+
+def list_artifact_entry_names(path: Path, *, missing_ok: bool = False) -> list[str]:
+    """List direct entry names through the registered no-follow directory walk."""
+    path = _lexical_absolute(path)
+    selected_anchor = _registered_artifact_anchor(path / ".directory-list-probe") or path
+    try:
+        descriptor = _open_directory_from_anchor(path, anchor=selected_anchor, create=False)
+    except FileNotFoundError:
+        if missing_ok:
+            return []
+        raise
+    if descriptor is not None:
+        try:
+            return sorted(os.listdir(descriptor))
+        finally:
+            os.close(descriptor)
+    return sorted(child.name for child in path.iterdir())
+
+
+def list_artifact_regular_files(
+    path: Path,
+    *,
+    allowed_top_level_directories: set[str] | None = None,
+) -> list[Path]:
+    """Recursively list safe regular files without following directory entries."""
+    path = _lexical_absolute(path)
+    selected_anchor = _registered_artifact_anchor(path / ".file-list-probe") or path
+    descriptor = _open_directory_from_anchor(path, anchor=selected_anchor, create=False)
+    if descriptor is not None:
+        files: list[Path] = []
+
+        def walk(directory_descriptor: int, lexical_directory: Path) -> None:
+            try:
+                names = sorted(os.listdir(directory_descriptor))
+            except OSError as exc:
+                raise _unsafe_path_error("directory traversal") from exc
+            for name in names:
+                try:
+                    metadata = os.stat(
+                        name,
+                        dir_fd=directory_descriptor,
+                        follow_symlinks=False,
+                    )
+                except OSError:
+                    continue
+                child = lexical_directory / name
+                if stat.S_ISDIR(metadata.st_mode):
+                    if (
+                        lexical_directory == path
+                        and allowed_top_level_directories is not None
+                        and name not in allowed_top_level_directories
+                    ):
+                        continue
+                    child_descriptor = -1
+                    try:
+                        child_descriptor = os.open(
+                            name,
+                            _directory_open_flags(),
+                            dir_fd=directory_descriptor,
+                        )
+                        opened_metadata = os.fstat(child_descriptor)
+                        if (metadata.st_dev, metadata.st_ino) != (
+                            opened_metadata.st_dev,
+                            opened_metadata.st_ino,
+                        ):
+                            continue
+                        walk(child_descriptor, child)
+                    except OSError:
+                        continue
+                    finally:
+                        if child_descriptor >= 0:
+                            os.close(child_descriptor)
+                    continue
+                try:
+                    _validate_regular_metadata(metadata, kind="listed artifact")
+                except OSError:
+                    continue
+                files.append(child)
+
+        try:
+            walk(descriptor, path)
+            return sorted(files, key=lambda item: item.as_posix())
+        finally:
+            os.close(descriptor)
+
+    # Windows fallback: every observed component is checked statically. Active hostile
+    # replacement remains subject to the documented Windows path-race limitation.
+    files = []
+
+    def walk_path(directory: Path) -> None:
+        try:
+            children = sorted(directory.iterdir(), key=lambda child: child.name)
+        except OSError as exc:
+            raise _unsafe_path_error("directory traversal") from exc
+        for child in children:
+            try:
+                metadata = child.lstat()
+            except OSError:
+                continue
+            if _path_is_link_or_junction(child, metadata):
+                continue
+            if stat.S_ISDIR(metadata.st_mode):
+                if (
+                    directory == path
+                    and allowed_top_level_directories is not None
+                    and child.name not in allowed_top_level_directories
+                ):
+                    continue
+                walk_path(child)
+                continue
+            try:
+                _validate_regular_metadata(metadata, kind="listed artifact")
+            except OSError:
+                continue
+            files.append(child)
+
+    walk_path(path)
+    return sorted(files, key=lambda item: item.as_posix())
+
+
+def _atomic_write_text(path: Path, content: str, *, anchor: Path | None = None) -> None:
+    """Durably replace a text file without truncating the previous version on failure."""
+    path = Path(path)
+    parent_descriptor: int | None = None
+    temp_path: Path | None = None
+    temp_name = f".{path.name}.{uuid.uuid4().hex}.tmp"
+    try:
+        parent_descriptor = _open_parent_directory(path, create=True, anchor=anchor)
+        existing_metadata = _entry_metadata(path, parent_descriptor)
+        if existing_metadata is not None:
+            _validate_regular_metadata(existing_metadata, kind="write target")
+
+        if parent_descriptor is not None:
+            flags = (
+                os.O_WRONLY
+                | os.O_CREAT
+                | os.O_EXCL
+                | getattr(os, "O_NOFOLLOW", 0)
+                | getattr(os, "O_CLOEXEC", 0)
+            )
+            descriptor = os.open(temp_name, flags, 0o600, dir_fd=parent_descriptor)
+            try:
+                with os.fdopen(descriptor, "w", encoding="utf-8") as temp_file:
+                    descriptor = -1
+                    temp_file.write(content)
+                    temp_file.flush()
+                    os.fsync(temp_file.fileno())
+            finally:
+                if descriptor >= 0:
+                    os.close(descriptor)
+            os.replace(
+                temp_name,
+                path.name,
+                src_dir_fd=parent_descriptor,
+                dst_dir_fd=parent_descriptor,
+            )
+        else:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=path.parent,
+                prefix=f".{path.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as temp_file:
+                temp_path = Path(temp_file.name)
+                temp_file.write(content)
+                temp_file.flush()
+                os.fsync(temp_file.fileno())
+            os.replace(temp_path, path)
     except BaseException:
-        if temp_path is not None:
+        if parent_descriptor is not None:
+            try:
+                os.unlink(temp_name, dir_fd=parent_descriptor)
+            except OSError:
+                pass
+        elif temp_path is not None:
             try:
                 temp_path.unlink(missing_ok=True)
             except OSError:
                 pass
         raise
+    finally:
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
 
 
-def read_text(path: Path) -> str:
-    if not path.exists():
-        return ""
-    return path.read_text(encoding="utf-8").strip()
-
-
-def write_text(path: Path, content: str) -> None:
-    _atomic_write_text(path, content.strip() + "\n")
-
-
-def read_file_text(path: Path) -> str:
-    """Read a text file exactly as stored, returning an empty string if missing."""
-    if not path.exists():
-        return ""
+def read_regular_text(
+    path: Path,
+    *,
+    missing_ok: bool = False,
+    anchor: Path | None = None,
+) -> str:
+    """Read one regular, single-link UTF-8 leaf through an anchored parent descriptor."""
+    path = Path(path)
+    parent_descriptor: int | None = None
+    descriptor = -1
     try:
-        return path.read_text(encoding="utf-8")
-    except OSError:
+        parent_descriptor = _open_parent_directory(path, create=False, anchor=anchor)
+        metadata = _entry_metadata(path, parent_descriptor)
+        if metadata is None:
+            if missing_ok:
+                return ""
+            raise FileNotFoundError(path.name)
+        _validate_regular_metadata(metadata, kind="read target")
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_BINARY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        if parent_descriptor is not None:
+            descriptor = os.open(path.name, flags, dir_fd=parent_descriptor)
+        else:
+            descriptor = os.open(path, flags)
+        opened_metadata = os.fstat(descriptor)
+        _validate_regular_metadata(opened_metadata, kind="read target")
+        if (metadata.st_dev, metadata.st_ino) != (
+            opened_metadata.st_dev,
+            opened_metadata.st_ino,
+        ):
+            raise _unsafe_path_error("changed read target")
+        with os.fdopen(descriptor, "r", encoding="utf-8") as file:
+            descriptor = -1
+            return file.read()
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+
+
+def read_text(path: Path, *, anchor: Path | None = None) -> str:
+    return read_regular_text(path, missing_ok=True, anchor=anchor).strip()
+
+
+def write_text(path: Path, content: str, *, anchor: Path | None = None) -> None:
+    _atomic_write_text(path, content.strip() + "\n", anchor=anchor)
+
+
+def read_file_text(path: Path, *, anchor: Path | None = None) -> str:
+    """Read a text file exactly as stored, returning an empty string if missing."""
+    try:
+        return read_regular_text(path, missing_ok=True, anchor=anchor)
+    except (OSError, UnicodeError):
         return ""
 
 
@@ -92,32 +770,111 @@ def display_path(path: Path | str | None, root: Path | None = None, default: str
     return f"<repo>/{resolved_path.name}"
 
 
-def write_file_text(path: Path, content: str) -> None:
+def write_file_text(path: Path, content: str, *, anchor: Path | None = None) -> None:
     """Write text exactly as provided, creating parent directories as needed."""
-    _atomic_write_text(path, content)
+    _atomic_write_text(path, content, anchor=anchor)
 
 
-def tail_file_lines(path: Path, max_lines: int = 200) -> str:
-    if not path.exists():
-        return ""
+def tail_file_lines(path: Path, max_lines: int = 200, *, anchor: Path | None = None) -> str:
     try:
-        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    except OSError:
+        lines = read_regular_text(path, missing_ok=True, anchor=anchor).splitlines()
+    except (OSError, UnicodeError):
         return ""
     return "\n".join(lines[-max_lines:])
 
 
-def make_run_root(project_dir: Path) -> Path:
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    run_root = project_dir / "runs" / timestamp
-    run_root.mkdir(parents=True, exist_ok=True)
-    return run_root
+def make_run_root(project_dir: Path, *, anchor: Path | None = None) -> Path:
+    project_dir = _lexical_absolute(project_dir)
+    project_anchor = _lexical_absolute(anchor or project_dir.parent)
+    existing_runs_root = ensure_project_runtime_paths_safe(project_dir, anchor=project_anchor)
+    runs_path = project_dir / "runs"
+    if existing_runs_root is None:
+        _make_directory_child(
+            project_dir,
+            "runs",
+            allow_existing=False,
+            anchor=project_anchor,
+        )
+        runs_root = runs_path
+        runs_anchor = project_anchor
+    else:
+        runs_root = existing_runs_root
+        if runs_root != runs_path:
+            runs_anchor = runs_root
+        else:
+            runs_anchor = project_anchor
+
+    for _ in range(100):
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        try:
+            return _make_directory_child(
+                runs_root,
+                timestamp,
+                allow_existing=False,
+                anchor=runs_anchor,
+            )
+        except FileExistsError:
+            continue
+    raise OSError("unable to allocate a unique run directory")
 
 
-def make_round_dir(run_root: Path, round_index: int) -> Path:
-    round_dir = run_root / f"round_{round_index:02d}"
-    round_dir.mkdir(parents=True, exist_ok=True)
-    return round_dir
+def _make_directory_child(
+    parent: Path,
+    name: str,
+    *,
+    allow_existing: bool,
+    anchor: Path | None = None,
+) -> Path:
+    parent = _lexical_absolute(parent)
+    child = parent / name
+    parent_descriptor = _open_parent_directory(child, create=False, anchor=anchor)
+    if parent_descriptor is not None:
+        try:
+            try:
+                os.mkdir(name, dir_fd=parent_descriptor)
+            except FileExistsError:
+                if not allow_existing:
+                    raise
+            metadata = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+            if not stat.S_ISDIR(metadata.st_mode):
+                raise _unsafe_path_error("directory")
+        finally:
+            os.close(parent_descriptor)
+        return child
+
+    try:
+        metadata = child.lstat()
+    except FileNotFoundError:
+        child.mkdir()
+    else:
+        if not allow_existing:
+            raise FileExistsError(child.name)
+        if _path_is_link_or_junction(child, metadata) or not stat.S_ISDIR(metadata.st_mode):
+            raise _unsafe_path_error("directory")
+    return child
+
+
+def make_round_dir(
+    run_root: Path,
+    round_index: int,
+    *,
+    allow_existing: bool = False,
+    anchor: Path | None = None,
+) -> Path:
+    run_root = _lexical_absolute(run_root)
+    selected_anchor = anchor or _registered_artifact_anchor(run_root / ".round-probe")
+    if selected_anchor is None:
+        descriptor = _open_directory_from_anchor(run_root, anchor=run_root, create=False)
+        if descriptor is not None:
+            os.close(descriptor)
+        _register_artifact_boundary(run_root, run_root)
+        selected_anchor = run_root
+    return _make_directory_child(
+        run_root,
+        f"round_{round_index:02d}",
+        allow_existing=allow_existing,
+        anchor=selected_anchor,
+    )
 
 
 def save_round_outputs(
@@ -127,11 +884,12 @@ def save_round_outputs(
     review: str,
     revised: str,
     judge: str,
+    anchor: Path | None = None,
 ) -> None:
-    write_text(round_dir / "01_draft.md", draft)
-    write_text(round_dir / "02_review.md", review)
-    write_text(round_dir / "03_revised.md", revised)
-    write_text(round_dir / "04_judge.md", judge)
+    write_text(round_dir / "01_draft.md", draft, anchor=anchor)
+    write_text(round_dir / "02_review.md", review, anchor=anchor)
+    write_text(round_dir / "03_revised.md", revised, anchor=anchor)
+    write_text(round_dir / "04_judge.md", judge, anchor=anchor)
 
 
 def parse_score(judge_text: str) -> Optional[float]:
@@ -297,8 +1055,9 @@ def update_project_memory(
     memory_path: Path,
     round_index: int,
     summary: Dict[str, str],
+    anchor: Path | None = None,
 ) -> None:
-    existing = read_text(memory_path)
+    existing = read_text(memory_path, anchor=anchor)
     if AUTO_MEMORY_HEADER in existing:
         manual_part = existing.split(AUTO_MEMORY_HEADER, 1)[0].rstrip()
     else:
@@ -335,16 +1094,21 @@ def update_project_memory(
     if _word_count(combined) > MAX_MEMORY_WORDS:
         combined = _tail_words(combined, MAX_MEMORY_WORDS)
     combined = combined.strip() + "\n"
-    _atomic_write_text(memory_path, combined)
+    _atomic_write_text(memory_path, combined, anchor=anchor)
 
 
-def write_score_history(path: Path, history: List[Dict[str, Any]]) -> None:
-    _atomic_write_text(path, json.dumps(history, indent=2))
+def write_score_history(
+    path: Path,
+    history: List[Dict[str, Any]],
+    *,
+    anchor: Path | None = None,
+) -> None:
+    _atomic_write_text(path, json.dumps(history, indent=2), anchor=anchor)
 
 
-def get_memory_for_prompt(memory_path: Path) -> str:
+def get_memory_for_prompt(memory_path: Path, *, anchor: Path | None = None) -> str:
     """Read memory.md and return only the latest words for prompt usage."""
-    content = read_text(memory_path)
+    content = read_text(memory_path, anchor=anchor)
     if not content:
         return ""
     return _tail_words(content, MAX_PROMPT_MEMORY_WORDS)
@@ -359,6 +1123,7 @@ def update_research_state(
     review_output: str,
     judge_output: str,
     topic_keywords: Optional[Sequence[str]] = None,
+    anchor: Path | None = None,
 ) -> Dict[str, Any]:
     revised_lines = _collect_meaningful_lines(revised_output)
     review_lines = _collect_meaningful_lines(review_output)
@@ -407,31 +1172,166 @@ def update_research_state(
         "current_best_score": round(best_score, 2),
     }
 
-    _atomic_write_text(state_path, json.dumps(state, indent=2))
+    _atomic_write_text(state_path, json.dumps(state, indent=2), anchor=anchor)
     return state
 
 
-def read_json_file(path: Path) -> Dict[str, Any]:
-    if not path.exists():
-        return {}
+def read_json_file(path: Path, *, anchor: Path | None = None) -> Dict[str, Any]:
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, RecursionError):
+        content = read_regular_text(path, missing_ok=True, anchor=anchor)
+        if not content:
+            return {}
+        data = json.loads(content)
+    except (OSError, UnicodeError, ValueError, RecursionError):
         return {}
     if isinstance(data, dict):
         return data
     return {}
 
 
-def write_json_file(path: Path, data: Dict[str, Any]) -> None:
-    _atomic_write_text(path, json.dumps(data, indent=2))
+def write_json_file(
+    path: Path,
+    data: Dict[str, Any],
+    *,
+    anchor: Path | None = None,
+) -> None:
+    _atomic_write_text(path, json.dumps(data, indent=2), anchor=anchor)
 
 
-def append_log_line(log_path: Path, message: str) -> None:
+def open_append_text_file(path: Path, *, anchor: Path | None = None) -> TextIO:
+    """Open a regular append sink without following anchored components or its leaf."""
+    path = Path(path)
+    parent_descriptor: int | None = None
+    descriptor = -1
     try:
-        log_path.parent.mkdir(parents=True, exist_ok=True)
+        parent_descriptor = _open_parent_directory(path, create=True, anchor=anchor)
+        metadata = _entry_metadata(path, parent_descriptor)
+        if metadata is not None:
+            if stat.S_ISDIR(metadata.st_mode):
+                raise IsADirectoryError(errno.EISDIR, os.strerror(errno.EISDIR), path.name)
+            _validate_regular_metadata(metadata, kind="append target")
+        flags = (
+            os.O_WRONLY
+            | os.O_APPEND
+            | os.O_CREAT
+            | getattr(os, "O_BINARY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        open_target: str | Path = path.name if parent_descriptor is not None else path
+        open_kwargs = {"dir_fd": parent_descriptor} if parent_descriptor is not None else {}
+        if metadata is None:
+            try:
+                descriptor = os.open(open_target, flags | os.O_EXCL, 0o600, **open_kwargs)
+            except FileExistsError:
+                metadata = _entry_metadata(path, parent_descriptor)
+                if metadata is None:
+                    raise _unsafe_path_error("changed append target") from None
+                _validate_regular_metadata(metadata, kind="append target")
+                descriptor = os.open(open_target, flags & ~os.O_CREAT, **open_kwargs)
+        else:
+            descriptor = os.open(open_target, flags & ~os.O_CREAT, **open_kwargs)
+        opened_metadata = os.fstat(descriptor)
+        _validate_regular_metadata(opened_metadata, kind="append target")
+        if metadata is not None and (metadata.st_dev, metadata.st_ino) != (
+            opened_metadata.st_dev,
+            opened_metadata.st_ino,
+        ):
+            raise _unsafe_path_error("changed append target")
+        file = os.fdopen(descriptor, "a", encoding="utf-8")
+        descriptor = -1
+        return file
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+
+
+def append_file_text(path: Path, content: str, *, anchor: Path | None = None) -> None:
+    with open_append_text_file(path, anchor=anchor) as file:
+        file.write(content)
+
+
+def unlink_artifact_file(
+    path: Path,
+    *,
+    missing_ok: bool = True,
+    anchor: Path | None = None,
+) -> None:
+    """Unlink one regular automatic artifact through its anchored parent descriptor."""
+    path = Path(path)
+    parent_descriptor: int | None = None
+    try:
+        parent_descriptor = _open_parent_directory(path, create=False, anchor=anchor)
+        metadata = _entry_metadata(path, parent_descriptor)
+        if metadata is None:
+            if missing_ok:
+                return
+            raise FileNotFoundError(path.name)
+        _validate_regular_metadata(metadata, kind="unlink target")
+        if parent_descriptor is not None:
+            os.unlink(path.name, dir_fd=parent_descriptor)
+        else:
+            path.unlink()
+    finally:
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+
+
+def open_binary_update_file(path: Path, *, anchor: Path | None = None) -> BinaryIO:
+    """Open or create one regular binary coordination leaf without following links."""
+    path = Path(path)
+    parent_descriptor: int | None = None
+    descriptor = -1
+    try:
+        parent_descriptor = _open_parent_directory(path, create=True, anchor=anchor)
+        metadata = _entry_metadata(path, parent_descriptor)
+        if metadata is not None:
+            _validate_regular_metadata(metadata, kind="coordination target")
+        flags = (
+            os.O_RDWR
+            | os.O_CREAT
+            | getattr(os, "O_BINARY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        open_target: str | Path = path.name if parent_descriptor is not None else path
+        open_kwargs = {"dir_fd": parent_descriptor} if parent_descriptor is not None else {}
+        if metadata is None:
+            try:
+                descriptor = os.open(open_target, flags | os.O_EXCL, 0o600, **open_kwargs)
+            except FileExistsError:
+                metadata = _entry_metadata(path, parent_descriptor)
+                if metadata is None:
+                    raise _unsafe_path_error("changed coordination target") from None
+                _validate_regular_metadata(metadata, kind="coordination target")
+                descriptor = os.open(open_target, flags & ~os.O_CREAT, **open_kwargs)
+        else:
+            descriptor = os.open(open_target, flags & ~os.O_CREAT, **open_kwargs)
+        opened_metadata = os.fstat(descriptor)
+        _validate_regular_metadata(opened_metadata, kind="coordination target")
+        if metadata is not None and (metadata.st_dev, metadata.st_ino) != (
+            opened_metadata.st_dev,
+            opened_metadata.st_ino,
+        ):
+            raise _unsafe_path_error("changed coordination target")
+        file = os.fdopen(descriptor, "r+b")
+        descriptor = -1
+        return file
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+
+
+def append_log_line(log_path: Path, message: str, *, anchor: Path | None = None) -> None:
+    try:
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with log_path.open("a", encoding="utf-8") as f:
+        with open_append_text_file(log_path, anchor=anchor) as f:
             f.write(f"{ts} | {message}\n")
     except OSError:
         return
@@ -447,6 +1347,7 @@ def write_interrupted_report(
     resume_command: str,
     stop_time: str,
     repo_root: Path | None = None,
+    anchor: Path | None = None,
 ) -> None:
     content = (
         "# Interrupted Report\n\n"
@@ -457,4 +1358,4 @@ def write_interrupted_report(
         f"- safe resume command: `{resume_command}`\n"
         f"- stop time: {stop_time}\n"
     )
-    write_text(report_path, content)
+    write_text(report_path, content, anchor=anchor)

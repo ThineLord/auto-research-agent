@@ -125,6 +125,29 @@
   and historical conclusions remain unchanged. Reports describe the account as redacted rather than
   pretending a placeholder was the original evidence.
 
+## 2026-07-11 - Walk automatic artifact paths from a registered trust anchor
+
+- Decision: reject linked project/task inputs, linked or hard-linked fixed artifact leaves,
+  blocking special files, and linked automatic output directories. On POSIX, register each project
+  process-wide against its real `projects/` directory, rebase nested run boundaries to that anchor,
+  and give only external run storage its own resolved physical root; walk every component from the
+  selected anchor with descriptor-relative no-follow opens before leaf reads/appends/replacements/
+  unlinks, child-directory creation, or automatic source traversal.
+- Reason: path-based existence checks followed by reads, appends, or replacement followed static
+  links and allowed a parent rename/link swap to redirect automatic I/O outside the project.
+- Compatibility: preserve a configured `project/runs` storage link by resolving it once to a real
+  storage directory; preserve stale real-directory tolerance and explicit analyze/compare/export
+  paths. Fixed automatic hard links are rejected because writes would mutate every name for the
+  inode. Survey source helpers now return lexical `abspath` spelling rather than canonicalizing
+  through mutable project components; persisted content, ordering, and displayed repo-relative paths
+  remain unchanged.
+- Threat boundary: ancestors above a registered anchor remain trusted local infrastructure. Static
+  links and hard links are rejected, but a malicious same-UID actor replacing a real-directory entry
+  with another real directory, racing a hard link onto an already-open inode, or targeting a new
+  temporary inode is outside the guarantee. Windows receives component-level static rejection but
+  cannot claim equivalent active-swap resistance with the standard path-based fallback; unsupported
+  POSIX automatic boundaries fail closed.
+
 ## 2026-07-11 - Bind benchmark stop reason to fixed target-run metadata
 
 - Decision: resolve report stop reason from the selected run's fixed `run_summary.json`,

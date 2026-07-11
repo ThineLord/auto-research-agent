@@ -9,6 +9,7 @@ from unittest.mock import patch
 from rich.console import Console
 
 import src.cli as cli_module
+import src.project_input as project_input_module
 from src.agents import ResearchAgents
 from src.config import AppConfig
 from src.project_input import ProjectInputError, load_project_input
@@ -129,6 +130,84 @@ class ProjectInputTests(unittest.TestCase):
             self.assertIn("Task file must be valid UTF-8 text", str(raised.exception))
             self.assertIn("projects/private/task.md", str(raised.exception))
             self.assertNotIn(str(root.resolve()), str(raised.exception))
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_rejects_symlinked_project_and_task_without_reading_external_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            projects = root / "projects"
+            projects.mkdir()
+
+            outside_project = root / "outside-project"
+            outside_project.mkdir()
+            (outside_project / "task.md").write_text(
+                "# PRIVATE_PROJECT_SENTINEL\n",
+                encoding="utf-8",
+            )
+            (projects / "linked-project").symlink_to(
+                outside_project,
+                target_is_directory=True,
+            )
+            with self.assertRaisesRegex(ProjectInputError, "unsafe project path") as project_error:
+                load_project_input(
+                    root=root,
+                    project_name="linked-project",
+                    explicit_project=True,
+                )
+            self.assertNotIn("PRIVATE_PROJECT_SENTINEL", str(project_error.exception))
+            self.assertNotIn(str(root.resolve()), str(project_error.exception))
+
+            direct_project = projects / "direct-project"
+            direct_project.mkdir()
+            external_task = root / "external-task.md"
+            external_task.write_text("# PRIVATE_TASK_SENTINEL\n", encoding="utf-8")
+            (direct_project / "task.md").symlink_to(external_task)
+            with self.assertRaisesRegex(ProjectInputError, "unsafe task path") as task_error:
+                load_project_input(
+                    root=root,
+                    project_name="direct-project",
+                    explicit_project=True,
+                )
+            self.assertNotIn("PRIVATE_TASK_SENTINEL", str(task_error.exception))
+            self.assertNotIn(str(root.resolve()), str(task_error.exception))
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_rejects_projects_ancestor_swap_before_task_read(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            projects = root / "projects"
+            project = projects / "selected"
+            outside_projects = root / "outside-projects"
+            outside_project = outside_projects / "selected"
+            project.mkdir(parents=True)
+            outside_project.mkdir(parents=True)
+            (project / "task.md").write_text("# SAFE_TASK\n", encoding="utf-8")
+            (outside_project / "task.md").write_text(
+                "# PRIVATE_EXTERNAL_TASK\n",
+                encoding="utf-8",
+            )
+            original_read = project_input_module.read_regular_text
+
+            def swap_then_read(path: Path, **kwargs: object) -> str:
+                projects.rename(root / "original-projects")
+                projects.symlink_to(outside_projects, target_is_directory=True)
+                return original_read(path, **kwargs)
+
+            with (
+                patch.object(
+                    project_input_module,
+                    "read_regular_text",
+                    side_effect=swap_then_read,
+                ),
+                self.assertRaisesRegex(ProjectInputError, "unsafe task path") as raised,
+            ):
+                load_project_input(
+                    root=root,
+                    project_name="selected",
+                    explicit_project=True,
+                )
+
+            self.assertNotIn("PRIVATE_EXTERNAL_TASK", str(raised.exception))
 
     def test_cli_project_input_error_masks_repo_root_path(self) -> None:
         args = SimpleNamespace(

@@ -13,6 +13,39 @@ from src.run_analytics import analyze_run, write_run_analysis
 
 
 class RunAnalyticsTests(unittest.TestCase):
+    def test_safe_analysis_treats_invalid_utf8_metrics_as_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "run"
+            run_root.mkdir()
+            (run_root / "round_metrics.json").write_bytes(b"\xff\xfe")
+
+            analysis = analyze_run(run_root, safe_artifacts=True)
+
+            self.assertEqual(analysis["score"]["trend"], "unknown")
+            self.assertEqual(analysis["rounds"]["round_count"], 0)
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_explicit_analysis_output_parent_symlink_remains_authorized(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_root = root / "run"
+            run_root.mkdir()
+            (run_root / "run_summary.json").write_text(
+                json.dumps({"run_id": "run", "best_score": 80}),
+                encoding="utf-8",
+            )
+            outside_output = root / "outside-output"
+            outside_output.mkdir()
+            linked_output = root / "linked-output"
+            linked_output.symlink_to(outside_output, target_is_directory=True)
+
+            analysis = write_run_analysis(run_root, linked_output / "analysis.json")
+
+            self.assertEqual(
+                json.loads((outside_output / "analysis.json").read_text(encoding="utf-8")),
+                analysis,
+            )
+
     def test_analyze_run_groups_score_robustness_cost_and_interpretability(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             run_root = Path(tmp) / "runs" / "run-a"

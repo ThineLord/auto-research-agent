@@ -7,10 +7,13 @@ structured survey report plus machine-readable metadata.
 
 from __future__ import annotations
 
+import os
 import re
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 from datetime import datetime
+from fnmatch import fnmatchcase
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 from urllib.parse import urlparse
@@ -19,7 +22,17 @@ from rich.console import Console
 
 from .config import LiteratureSurveyConfig
 from .project_input import ProjectInput
-from .storage import display_path, write_json_file, write_text
+from .storage import (
+    artifact_path_is_safe,
+    display_path,
+    ensure_artifact_directory,
+    ensure_artifact_paths_safe,
+    ensure_project_runtime_paths_safe,
+    list_artifact_regular_files,
+    read_file_text,
+    write_json_file,
+    write_text,
+)
 
 COMMON_WORDS = {
     "about",
@@ -392,7 +405,9 @@ def _extract_issue_lines(text: str, markers: Sequence[str], *, limit: int = 4) -
 
 
 def _source_kind(path: Path, project_dir: Path) -> str:
-    rel = path.resolve().relative_to(project_dir.resolve()).as_posix()
+    lexical_path = Path(os.path.abspath(path))
+    lexical_project = Path(os.path.abspath(project_dir))
+    rel = lexical_path.relative_to(lexical_project).as_posix()
     if rel == "task.md":
         return "task"
     if rel == "memory.md":
@@ -404,40 +419,81 @@ def _source_kind(path: Path, project_dir: Path) -> str:
     return "project_markdown"
 
 
+def _matches_source_glob(path: Path, pattern: str) -> bool:
+    """Match a project-relative path with pathlib-style ``**`` segment semantics."""
+    path_parts = path.parts
+    pattern_parts = Path(pattern).parts
+
+    @lru_cache(maxsize=None)
+    def matches(path_index: int, pattern_index: int) -> bool:
+        if pattern_index == len(pattern_parts):
+            return path_index == len(path_parts)
+        pattern_part = pattern_parts[pattern_index]
+        if pattern_part == "**":
+            return matches(path_index, pattern_index + 1) or (
+                path_index < len(path_parts) and matches(path_index + 1, pattern_index)
+            )
+        return (
+            path_index < len(path_parts)
+            and fnmatchcase(path_parts[path_index], pattern_part)
+            and matches(path_index + 1, pattern_index + 1)
+        )
+
+    return matches(0, 0)
+
+
 def collect_source_files(project_dir: Path, config: LiteratureSurveyConfig) -> list[Path]:
     """Collect survey source files from a project without leaving the project root."""
 
-    candidates: dict[Path, None] = {}
-    if config.include_task:
-        candidates[project_dir / "task.md"] = None
-    if config.include_memory:
-        candidates[project_dir / "memory.md"] = None
-    if config.include_project_markdown:
-        for path in project_dir.glob("*.md"):
-            candidates[path] = None
-    if config.include_run_outputs:
-        for path in project_dir.glob("runs/**/*.md"):
-            candidates[path] = None
-
-    for glob_pattern in config.source_globs:
-        for path in project_dir.glob(glob_pattern):
-            candidates[path] = None
-
+    ensure_project_runtime_paths_safe(project_dir)
+    lexical_project = Path(os.path.abspath(project_dir))
+    allowed_directories: set[str] | None = {"runs"} if config.include_run_outputs else set()
+    for pattern in config.source_globs:
+        parts = Path(pattern).parts
+        if len(parts) <= 1:
+            continue
+        first = parts[0]
+        if first == "**" or any(character in first for character in "*?["):
+            allowed_directories = None
+            break
+        if allowed_directories is not None:
+            allowed_directories.add(first)
+    output_parts = Path(config.output_dir).parts if config.output_dir else ()
     source_files: list[Path] = []
-    project_resolved = project_dir.resolve()
-    for path in sorted(candidates, key=lambda item: item.as_posix()):
+    for path in list_artifact_regular_files(
+        lexical_project,
+        allowed_top_level_directories=allowed_directories,
+    ):
         try:
-            resolved = path.resolve()
-            resolved.relative_to(project_resolved)
+            lexical_path = Path(os.path.abspath(path))
+            relative_path = lexical_path.relative_to(lexical_project)
         except ValueError:
             continue
-        if not resolved.exists() or not resolved.is_file():
+        if output_parts and relative_path.parts[: len(output_parts)] == output_parts:
             continue
-        if config.output_dir and config.output_dir in resolved.relative_to(project_resolved).parts:
+        if lexical_path.suffix.lower() not in {".md", ".txt"}:
             continue
-        if resolved.suffix.lower() not in {".md", ".txt"}:
+        include = (
+            (config.include_task and relative_path == Path("task.md"))
+            or (config.include_memory and relative_path == Path("memory.md"))
+            or (
+                config.include_project_markdown
+                and len(relative_path.parts) == 1
+                and lexical_path.suffix.lower() == ".md"
+            )
+            or (
+                config.include_run_outputs
+                and relative_path.parts[0] == "runs"
+                and lexical_path.suffix.lower() == ".md"
+            )
+            or any(
+                _matches_source_glob(relative_path, glob_pattern)
+                for glob_pattern in config.source_globs
+            )
+        )
+        if not include or not artifact_path_is_safe(lexical_path, allow_missing=False):
             continue
-        source_files.append(resolved)
+        source_files.append(lexical_path)
         if len(source_files) >= config.max_source_files:
             break
     return source_files
@@ -665,7 +721,9 @@ def _paper_from_block(
 
 
 def parse_papers_from_file(path: Path, project_dir: Path) -> list[PaperMetadata]:
-    text = path.read_text(encoding="utf-8", errors="replace")
+    text = read_file_text(path)
+    if not text:
+        return []
     source_kind = _source_kind(path, project_dir)
     blocks: list[dict[str, object]] = []
     blocks.extend(_parse_yaml_like_frontmatter(text))
@@ -1074,6 +1132,7 @@ def run_literature_survey_mode(
     )
 
     project_dir = project_input.project_dir
+    ensure_project_runtime_paths_safe(project_dir)
     repo_root = _survey_repo_root(project_dir)
     artifact_project_metadata = _project_metadata_for_artifact(project_input, repo_root)
     generated_at = datetime.now().isoformat()
@@ -1081,10 +1140,24 @@ def run_literature_survey_mode(
     report_path = output_path or (output_dir / "survey_report.md")
     if not report_path.is_absolute():
         report_path = project_dir / report_path
-    report_path.parent.mkdir(parents=True, exist_ok=True)
+    automatic_output = output_path is None
+    if automatic_output:
+        ensure_artifact_directory(report_path.parent)
+    else:
+        report_path = report_path.resolve(strict=False)
+        report_path.parent.mkdir(parents=True, exist_ok=True)
     metadata_path = report_path.with_name("paper_metadata.json")
     related_work_path = report_path.with_name("related_work.md")
     manifest_path = report_path.with_name("survey_manifest.json")
+    if automatic_output:
+        ensure_artifact_paths_safe(
+            (report_path, metadata_path, related_work_path, manifest_path),
+        )
+    else:
+        report_path = report_path.resolve(strict=False)
+        metadata_path = metadata_path.resolve(strict=False)
+        related_work_path = related_work_path.resolve(strict=False)
+        manifest_path = manifest_path.resolve(strict=False)
 
     papers, source_files = collect_papers(project_dir, config)
     metadata_quality = _metadata_quality_summary(papers)

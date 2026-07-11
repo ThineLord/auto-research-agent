@@ -107,6 +107,47 @@ Core modules:
 Generated project artifacts live under `projects/<project_name>/` and are ignored by git when they
 are runtime outputs.
 
+### Automatic artifact filesystem boundary
+
+Normal CLI, runner, session, diagnostic, survey, provider-event, runtime-lock, and UI workflows
+treat repository code/configuration and the local workspace/storage ancestors as trusted, but do
+not trust the automatic artifact nodes inside a selected project or run. A selected `projects/`
+directory, project directory, or `task.md` may not be a symbolic link. Fixed project artifact
+leaves must be missing or single-link regular files; symbolic links, hard-linked files, FIFOs,
+sockets, and devices fail before provider or background-process startup. Historical stale real
+directories at a file-shaped artifact name remain tolerated where existing callers already handle
+them. Automatic output directories must be real directories.
+
+`project/runs` is the one intentional link exception. An existing configured storage link is
+resolved once to a real directory, and new or resumed runs use canonical direct children of that
+resolved location. Per-run directories discovered by the UI must themselves be real directory
+entries, and their fixed metadata leaves must pass the same non-following checks. Explicit
+`--analyze-run`, `--compare-runs`, and explicit export paths are user-authorized inputs and are not
+silently re-scoped to the selected project.
+
+On POSIX systems, each selected project is registered process-wide against its real `projects/`
+directory, so background threads and UI reruns share the same boundary. Nested run roots inherit
+that project anchor; only a configured run store outside the project receives its own resolved
+physical storage anchor. Storage helpers open the trusted anchor with `O_DIRECTORY|O_NOFOLLOW`,
+walk every untrusted component to the immediate parent with descriptor-relative no-follow opens,
+then perform leaf `stat`, read,
+append, coordination-file creation, directory creation, unlink, temporary-file creation, and
+replacement relative to the final descriptor. Opened leaves are regular single-link files whose
+device/inode identity is rechecked; nonblocking opens prevent FIFOs from hanging a read or append.
+Atomic replacement remains same-directory and fsyncs the temporary file before replacement.
+Unknown POSIX platforms without the required descriptor primitives fail closed for registered
+automatic boundaries. Survey source discovery uses the same descriptor-rooted traversal, prunes
+unconfigured top-level trees, and intentionally retains lexical path spelling for subsequent safe
+reads instead of canonicalizing a candidate through mutable project components.
+
+This is not a hostile multi-user filesystem sandbox. Ancestors above the registered anchor are
+trusted local infrastructure. A malicious same-UID actor that replaces an untrusted real-directory
+entry with a different real directory, races a new hard link onto an already opened file, or targets
+an unpredictable temporary inode is outside the guarantee; static links, hard links, and special
+nodes are still rejected. Windows performs component-level static link/junction and node checks,
+but standard path-based fallback cannot promise resistance to active replacement between validation
+and I/O.
+
 ## Configuration And Topic Context
 
 `config.yaml` is validated before CLI or UI workflows start. Unknown keys and invalid values fail
@@ -213,8 +254,9 @@ When a checkpoint selects a run, these UI consumers validate and canonicalize it
 derive those fixed filenames, and validate each leaf before reading it. Checkpoint `run_config` /
 `run_summary` values and summary `round_metrics_path` remain provenance only; they cannot redirect
 UI reads. Unsafe roots, non-regular files, and escaping run/round links produce partial or
-unavailable views without exposing their target paths. This boundary does not define the broader
-project-level artifact symlink policy. Project-level `score_history.json` is used only by the
+unavailable views without exposing their target paths. The automatic project-level boundary above
+also applies to project score history, inputs, logs, and UI process metadata. Project-level
+`score_history.json` is used only by the
 no-`run_root` legacy layout; a selected canonical run uses its own `round_metrics.json` instead.
 The `Run analytics dashboard` uses existing `run_summary.json`, `round_metrics.json`, and
 `score_history.json` only. It displays compact score, rubric, similarity/evolution, timeout/error,

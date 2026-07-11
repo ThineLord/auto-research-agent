@@ -17,7 +17,20 @@ from typing import Any, BinaryIO, Dict, Optional, Sequence, Tuple
 from rich.console import Console
 
 from .constants import RUN_LOCK_FILENAME
-from .storage import append_log_line, read_json_file, write_json_file
+from .storage import (
+    append_log_line,
+    artifact_boundary_is_registered,
+    artifact_path_exists,
+    artifact_path_is_safe,
+    ensure_artifact_directory,
+    ensure_artifact_paths_safe,
+    ensure_project_runtime_paths_safe,
+    open_append_text_file,
+    open_binary_update_file,
+    read_json_file,
+    unlink_artifact_file,
+    write_json_file,
+)
 
 RUN_PROCESS_META_FILENAME = "ui_run_process.json"
 MODEL_JOB_PROCESS_META_FILENAME = "ui_model_job_process.json"
@@ -67,7 +80,15 @@ def log_run(console: Console, log_path: Path, mode: str, message: str) -> None:
 
 
 def stop_requested(stop_signal_path: Path) -> bool:
-    return stop_signal_path.exists()
+    if not artifact_boundary_is_registered(stop_signal_path):
+        try:
+            ensure_project_runtime_paths_safe(
+                stop_signal_path.parent,
+                anchor=stop_signal_path.parent.parent,
+            )
+        except OSError:
+            return False
+    return artifact_path_exists(stop_signal_path, allow_directory=True)
 
 
 def is_pid_running(pid: int) -> bool:
@@ -138,6 +159,13 @@ def model_job_meta_path(project_dir: Path) -> Path:
 
 
 def get_active_process_meta(meta_path: Path) -> Dict[str, Any]:
+    try:
+        ensure_project_runtime_paths_safe(
+            meta_path.parent,
+            anchor=meta_path.parent.parent,
+        )
+    except OSError:
+        return {}
     meta = read_json_file(meta_path)
     try:
         pid = int(meta.get("pid", 0)) if meta else 0
@@ -145,8 +173,10 @@ def get_active_process_meta(meta_path: Path) -> Dict[str, Any]:
         pid = 0
     if pid and is_pid_running(pid):
         return meta
+    if not artifact_path_is_safe(meta_path, allow_missing=False):
+        return {}
     try:
-        meta_path.unlink(missing_ok=True)
+        unlink_artifact_file(meta_path)
     except OSError:
         pass
     return {}
@@ -170,9 +200,15 @@ def start_background_process(
     extra: Optional[Dict[str, Any]] = None,
     env_overrides: Optional[Dict[str, str]] = None,
 ) -> BackgroundProcessResult:
+    process: subprocess.Popen[str] | None = None
     try:
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        log_file = log_path.open("a", encoding="utf-8")
+        log_parent = Path(os.path.abspath(log_path.parent))
+        meta_parent = Path(os.path.abspath(meta_path.parent))
+        if log_parent != meta_parent:
+            raise OSError("background log and metadata must share one project directory")
+        ensure_project_runtime_paths_safe(log_parent, anchor=log_parent.parent)
+        ensure_artifact_paths_safe((log_path, meta_path))
+        log_file = open_append_text_file(log_path)
         try:
             env = os.environ.copy()
             if env_overrides:
@@ -198,6 +234,18 @@ def start_background_process(
         write_json_file(meta_path, meta)
         return BackgroundProcessResult(pid=process.pid)
     except Exception as exc:  # noqa: BLE001
+        if process is not None:
+            try:
+                process.terminate()
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                try:
+                    process.kill()
+                    process.wait(timeout=5)
+                except (OSError, subprocess.SubprocessError):
+                    pass
+            except (OSError, subprocess.SubprocessError):
+                pass
         return BackgroundProcessResult(
             pid=None,
             error=f"Failed to start {kind} process: {_safe_start_error(exc)}",
@@ -330,27 +378,7 @@ def _try_lock_guard(guard_file: BinaryIO) -> bool:
 
 
 def _open_guard_file(guard_path: Path) -> BinaryIO:
-    try:
-        existing_stat = guard_path.lstat()
-    except FileNotFoundError:
-        existing_stat = None
-    if existing_stat is not None and not stat.S_ISREG(existing_stat.st_mode):
-        raise OSError("run lock guard must be a regular file")
-
-    flags = os.O_RDWR | os.O_CREAT
-    if hasattr(os, "O_CLOEXEC"):
-        flags |= os.O_CLOEXEC
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    descriptor = os.open(guard_path, flags, 0o600)
-    try:
-        opened_stat = os.fstat(descriptor)
-        if not stat.S_ISREG(opened_stat.st_mode):
-            raise OSError("run lock guard must be a regular file")
-        return os.fdopen(descriptor, "r+b")
-    except BaseException:
-        os.close(descriptor)
-        raise
+    return open_binary_update_file(guard_path)
 
 
 def _guard_identity(guard_file: BinaryIO) -> tuple[int, int]:
@@ -401,8 +429,46 @@ def acquire_run_lock(
     lock_path = project_dir / RUN_LOCK_FILENAME
     guard_path = project_dir / RUN_LOCK_GUARD_FILENAME
     guard_file: BinaryIO | None = None
+
+    stale_lock_error = (
+        f"Stale run lock could not be cleared: {RUN_LOCK_FILENAME} is not removable. "
+        "Move it aside manually and retry."
+    )
     try:
-        project_dir.mkdir(parents=True, exist_ok=True)
+        ensure_artifact_directory(project_dir, anchor=project_dir.parent)
+    except OSError as exc:
+        return None, f"Project runtime artifacts could not be validated: {exc.__class__.__name__}."
+
+    try:
+        ensure_artifact_paths_safe((lock_path,), anchor=project_dir.parent)
+    except OSError:
+        return None, stale_lock_error
+
+    try:
+        ensure_artifact_paths_safe((guard_path,), anchor=project_dir.parent)
+    except OSError as exc:
+        return None, f"Run lock guard could not be acquired: {exc.__class__.__name__}."
+
+    try:
+        ensure_project_runtime_paths_safe(project_dir, anchor=project_dir.parent)
+    except OSError as exc:
+        # Recheck the two lock leaves so an active replacement retains the most
+        # actionable historical diagnosis instead of being mislabeled as a guard error.
+        if not artifact_path_is_safe(
+            lock_path,
+            allow_missing=True,
+            anchor=project_dir.parent,
+        ):
+            return None, stale_lock_error
+        if not artifact_path_is_safe(
+            guard_path,
+            allow_missing=True,
+            anchor=project_dir.parent,
+        ):
+            return None, f"Run lock guard could not be acquired: {exc.__class__.__name__}."
+        return None, f"Project runtime artifacts could not be validated: {exc.__class__.__name__}."
+
+    try:
         guard_file = _open_guard_file(guard_path)
         guard_acquired = _try_lock_guard(guard_file)
     except OSError as exc:
@@ -422,11 +488,7 @@ def acquire_run_lock(
     lock_data, regular_or_missing = _lock_metadata(lock_path)
     if not regular_or_missing:
         _close_guard(guard_file)
-        return (
-            None,
-            f"Stale run lock could not be cleared: {RUN_LOCK_FILENAME} is not removable. "
-            "Move it aside manually and retry.",
-        )
+        return None, stale_lock_error
 
     existing_pid = _parse_lock_pid(lock_data.get("pid")) if lock_data else 0
     same_guard = _metadata_guard_matches(lock_data, guard_device, guard_inode)
@@ -493,7 +555,7 @@ def release_run_lock(lock_handle: Optional[RunLockHandle | Path]) -> None:
                 lock_handle.guard_inode,
             )
         ):
-            lock_handle.path.unlink(missing_ok=True)
+            unlink_artifact_file(lock_handle.path)
     except OSError:
         pass
     finally:

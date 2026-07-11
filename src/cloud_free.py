@@ -14,7 +14,12 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from .judge_output import JUDGE_OUTPUT_SCHEMA
-from .storage import parse_score, write_json_file
+from .storage import (
+    ensure_project_runtime_paths_safe,
+    parse_score,
+    read_file_text,
+    write_json_file,
+)
 
 FREE_RUNNER_AUTO = "auto_long_run"
 FREE_RUNNER_QUALITY = "quality_free"
@@ -815,6 +820,7 @@ def _serialize_profiles(profiles: Sequence[CloudModelProfile]) -> list[dict[str,
 
 
 def save_discovery_artifact(project_dir: Path, models: Sequence[CloudModelInfo]) -> Path:
+    ensure_project_runtime_paths_safe(project_dir)
     path = project_dir / "artifacts" / DISCOVERY_ARTIFACT_NAME
     write_json_file(
         path,
@@ -827,6 +833,7 @@ def save_discovery_artifact(project_dir: Path, models: Sequence[CloudModelInfo])
 
 
 def save_profile_artifact(project_dir: Path, profiles: Sequence[CloudModelProfile]) -> Path:
+    ensure_project_runtime_paths_safe(project_dir)
     path = project_dir / "artifacts" / PROFILE_ARTIFACT_NAME
     write_json_file(
         path,
@@ -903,10 +910,12 @@ def _validated_cached_record(
 
 def load_profile_artifact(project_dir: Path) -> list[CloudModelProfile]:
     path = project_dir / "artifacts" / PROFILE_ARTIFACT_NAME
-    if not path.exists():
-        return []
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        ensure_project_runtime_paths_safe(project_dir)
+        content = read_file_text(path)
+        if not content:
+            return []
+        payload = json.loads(content)
     except (OSError, ValueError, RecursionError):
         return []
     profiles = payload.get("profiles", []) if isinstance(payload, Mapping) else []
@@ -944,10 +953,12 @@ def load_profile_artifact(project_dir: Path) -> list[CloudModelProfile]:
 
 def load_discovery_artifact(project_dir: Path) -> list[CloudModelInfo]:
     path = project_dir / "artifacts" / DISCOVERY_ARTIFACT_NAME
-    if not path.exists():
-        return []
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        ensure_project_runtime_paths_safe(project_dir)
+        content = read_file_text(path)
+        if not content:
+            return []
+        payload = json.loads(content)
     except (OSError, ValueError, RecursionError):
         return []
     models = payload.get("models", []) if isinstance(payload, Mapping) else []

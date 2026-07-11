@@ -71,7 +71,12 @@ from .run_compare import compare_runs
 from .runner import ResumeHistoryError, run_iterative_rounds
 from .runtime import RUN_LOCK_GUARD_FILENAME, acquire_run_lock, release_run_lock
 from .session import run_session_mode
-from .storage import write_json_file
+from .storage import (
+    artifact_path_is_safe,
+    ensure_artifact_directory,
+    ensure_project_runtime_paths_safe,
+    write_json_file,
+)
 
 _EXIT_OPERATION_ERROR = 1
 _EXIT_STARTUP_ERROR = 2
@@ -335,6 +340,30 @@ def _print_run_lock_recovery_hint(console: Console, root: Path, project_dir: Pat
     )
 
 
+def _unsafe_lock_path_message(project_dir: Path) -> str | None:
+    """Preserve actionable lock diagnostics when project-wide preflight fails first."""
+    try:
+        ensure_artifact_directory(project_dir, anchor=project_dir.parent)
+    except OSError:
+        return None
+    if not artifact_path_is_safe(
+        project_dir / RUN_LOCK_FILENAME,
+        allow_missing=True,
+        anchor=project_dir.parent,
+    ):
+        return (
+            f"Stale run lock could not be cleared: {RUN_LOCK_FILENAME} is not removable. "
+            "Move it aside manually and retry."
+        )
+    if not artifact_path_is_safe(
+        project_dir / RUN_LOCK_GUARD_FILENAME,
+        allow_missing=True,
+        anchor=project_dir.parent,
+    ):
+        return "Run lock guard could not be acquired: unsafe or unavailable guard path."
+    return None
+
+
 def _privacy_safe_comparison(comparison: dict[str, Any], root: Path) -> dict[str, Any]:
     safe_comparison = dict(comparison)
     safe_runs: list[dict[str, Any]] = []
@@ -373,7 +402,8 @@ def _run_compare_cli(args: argparse.Namespace, console: Console, root: Path) -> 
     output_arg = getattr(args, "compare_output", None)
     if output_arg:
         output_path = _resolve_repo_relative_path(root, output_arg)
-        write_json_file(output_path, comparison)
+        authorized_output_path = output_path.parent.resolve(strict=False) / output_path.name
+        write_json_file(authorized_output_path, comparison)
         console.print(
             f"[green]Saved run comparison:[/green] {_display_repo_path(root, output_path)}"
         )
@@ -387,7 +417,8 @@ def _run_analyze_cli(args: argparse.Namespace, console: Console, root: Path) -> 
     output_arg = getattr(args, "analyze_output", None)
     if output_arg:
         output_path = _resolve_repo_relative_path(root, output_arg)
-        write_json_file(output_path, analysis)
+        authorized_output_path = output_path.parent.resolve(strict=False) / output_path.name
+        write_json_file(authorized_output_path, analysis)
         console.print(f"[green]Saved run analysis:[/green] {_display_repo_path(root, output_path)}")
     console.print_json(data=analysis)
     return analysis
@@ -537,6 +568,19 @@ def main() -> None:
         f"title={project_input.project_title} | "
         f"task={_display_repo_path(root, project_input.task_path)}"
     )
+    try:
+        ensure_project_runtime_paths_safe(project_dir)
+    except OSError:
+        lock_message = _unsafe_lock_path_message(project_dir)
+        if lock_message:
+            console.print(f"[red]{lock_message}[/red]")
+            _print_run_lock_recovery_hint(console, root, project_dir)
+        else:
+            console.print(
+                "[red]Project artifact error: an automatic project path is unsafe or "
+                "unavailable.[/red]"
+            )
+        raise SystemExit(_EXIT_STARTUP_ERROR) from None
 
     if getattr(args, "survey", False):
         survey_output = getattr(args, "survey_output", None)
@@ -560,6 +604,12 @@ def main() -> None:
                 config=config.literature_survey,
                 output_path=survey_output_path,
             )
+        except OSError:
+            console.print(
+                "[red]Survey artifact error: an automatic output path is unsafe or "
+                "unavailable.[/red]"
+            )
+            raise SystemExit(_EXIT_OPERATION_ERROR) from None
         finally:
             release_run_lock(run_lock_path)
         return

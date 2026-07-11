@@ -77,6 +77,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         "save_input": "Save Input",
         "input_saved": "task.md and memory.md saved.",
+        "input_save_failed": (
+            "Input save did not complete; inspect the project files before retrying because a "
+            "partial update may have occurred."
+        ),
+        "unsafe_project_paths": "This project's runtime artifacts are unsafe or unavailable.",
         "run_controls": "C. Run controls",
         "drafting_mode": "Drafting mode",
         "drafting_mode_best_guided": "Best guided (current default)",
@@ -419,6 +424,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "memory_optional_help": "memory.md 是可选文件，并且会被 Git 忽略。点击保存后才会创建本地记忆文件。",
         "save_input": "保存输入",
         "input_saved": "task.md 和 memory.md 已保存。",
+        "input_save_failed": "输入保存未完成；重试前请检查项目文件，可能发生了部分更新。",
+        "unsafe_project_paths": "此项目的运行时 artifact 路径不安全或当前不可用。",
         "run_controls": "C. 运行控制",
         "drafting_mode": "起草模式",
         "drafting_mode_best_guided": "Best guided（当前默认）",
