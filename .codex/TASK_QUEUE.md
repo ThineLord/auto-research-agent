@@ -343,20 +343,22 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Commit required: yes.
 - Dependencies: ARA-034 strict checkpoint eligibility first.
 
-## ARA-040 - Keep cloud profile fallback artifacts in one provenance cohort
+## ARA-040 - Reconcile cached cloud discovery/profile membership
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P2
 - Risk: medium
 - Description: a discovery failure can save a new fallback profile while retaining stale discovery
   data, causing the next process to recommend a model deliberately excluded by the current fallback.
 - Related files: `src/cloud_free.py`, cloud artifact schemas/loaders, cloud-free CLI tests
-- Acceptance criteria: fallback discovery/profile artifacts share verifiable generation provenance
-  or stale discovery is invalidated safely; a later process cannot reintroduce the ignored model.
-- Validation command: two-process stale-cache reproduction and compatibility controls followed by
-  `make check`.
+- Acceptance criteria: stale discovery is ignored safely when its candidate membership differs from
+  a non-empty profile; a later process cannot reintroduce the ignored model. This task does not claim
+  generation provenance for artifacts whose membership happens to match.
+- Validation command: two-process stale-cache and exact/no-profile/partial/unsafe/duplicate/legacy/
+  current-policy controls, cloud-free/CLI/UI/recovery tests (`120 passed, 56 subtests passed`), then
+  `make check` (`329 passed, 215 subtests passed`).
 - Commit required: yes.
-- Dependencies: complete ARA-038 error-boundary work first.
+- Dependencies: ARA-038 error-boundary work; ARA-042 separately owns UI session cache identity.
 
 ## ARA-041 - Make resume startup metadata recoverable across multi-file failure
 
@@ -373,6 +375,40 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Commit required: yes.
 - Dependencies: explicit approval for a greater-than-30-minute, cross-file transaction design; do
   not fold into ARA-034 or other local validation fixes.
+
+## ARA-042 - Scope and refresh UI cloud-free session caches
+
+- Status: `TODO`
+- Priority: P2
+- Risk: medium
+- Description: Streamlit stores discovered models and profile results under global session keys, so
+  switching projects or updating artifacts through an external CLI can retain stale in-memory data,
+  including when model ID membership is unchanged.
+- Related files: `ui/app.py`, cloud-free UI state helpers, UI/backend tests
+- Acceptance criteria: cached cloud-free state is bound to the selected canonical project and
+  invalidated when the underlying discovery/profile artifacts change; project switches and external
+  same-ID metadata updates cannot reuse the prior session's recommendation inputs.
+- Validation command: two-project switch and external-refresh UI state regressions, cloud-free/UI
+  tests, then `make check`.
+- Commit required: yes.
+- Dependencies: complete ARA-040 membership reconciliation first; no provider call.
+
+## ARA-043 - Respect blocking profiles when every cached candidate failed
+
+- Status: `TODO`
+- Priority: P2
+- Risk: medium
+- Description: `recommend_free_cloud_model` falls back to a safe seed after every candidate was
+  excluded by quota, reachability, billing-safety, or token-context profile results, potentially
+  selecting a model the same profile says is unusable.
+- Related files: `src/cloud_free.py`, CLI/UI recommendation behavior, cloud-free tests
+- Acceptance criteria: when every candidate has a blocking profile, automatic recommendation is
+  unavailable rather than selecting one of those candidates; genuinely unprofiled safe candidates
+  retain the documented fallback behavior.
+- Validation command: all-blocked/partially-profiled/exact-cohort recommendation matrix,
+  cloud-free/CLI/UI tests, then `make check`.
+- Commit required: yes.
+- Dependencies: ARA-040 cached membership guard; no provider call.
 
 ## ARA-011 - Prevent failed rounds from replacing a trusted best output
 

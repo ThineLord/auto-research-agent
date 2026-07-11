@@ -370,3 +370,18 @@
   change the next prompt while new metadata claimed a resumed session.
 - Scope: no context schema, prompt composition, provider, scoring, history reconciliation, round
   output, valid-context whitespace behavior, or historical artifact interpretation changes.
+
+## 2026-07-12 - Reconcile cached cloud artifacts by candidate membership
+
+- Decision: for automatic CLI/UI recommendation, reclassify cached discovery under current policy
+  and trust its metadata only when a non-empty profile has exactly the same unique, canonical safe
+  model IDs. On mismatch, ignore discovery and intersect current configured candidates with safe
+  profile IDs.
+- Compatibility: an absent or empty profile retains the existing discovery-only behavior; a complete
+  exact cohort retains discovery metadata and recommendation scoring. Explicit discovery and profile
+  commands continue using their same-process in-memory candidate pool.
+- Reason: a discovery-error profile save did not replace an older discovery file, so a later process
+  could score a deliberately unprofiled stale model as an attractive safe/high-TPM candidate.
+- Boundary: this is membership reconciliation, not proof that equal-ID artifacts share a generation.
+  No schema, timestamp, artifact file, migration, deletion, provider, or preset changes are made;
+  project/external-refresh UI session identity remains queued separately as ARA-042.

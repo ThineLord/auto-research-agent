@@ -354,6 +354,59 @@ def build_candidate_pool(
     return sorted(candidates, key=lambda item: item.model_id.casefold())
 
 
+def build_cached_candidate_pool(
+    *,
+    discovered_models: Sequence[CloudModelInfo] = (),
+    configured_models: Sequence[str] = (),
+    profiles: Sequence[CloudModelProfile] = (),
+    config: CloudFreeConfig | None = None,
+) -> list[CloudModelInfo]:
+    """Reconcile independently loaded discovery and profile artifacts fail-closed."""
+    config = config or CloudFreeConfig()
+    current_discovery = [
+        classify_model(
+            model_id=model.model_id,
+            display_name=model.display_name,
+            supported_generation_methods=model.supported_generation_methods,
+            input_token_limit=model.input_token_limit,
+            output_token_limit=model.output_token_limit,
+            description=model.description,
+            source=model.source,
+            available=model.available,
+            allowed_patterns=config.allowed_model_patterns,
+            blocked_patterns=config.blocked_model_patterns,
+        )
+        for model in discovered_models
+    ]
+    candidates = build_candidate_pool(
+        discovered_models=current_discovery,
+        configured_models=configured_models,
+        config=config,
+    )
+    if not profiles:
+        return candidates
+
+    profiled_id_list = [
+        profile.model_id.strip()
+        for profile in profiles
+        if profile.safe_text_generation and profile.model_id.strip()
+    ]
+    profiled_ids = set(profiled_id_list)
+    candidate_ids = {candidate.model_id for candidate in candidates}
+    profile_membership_is_exact = (
+        len(profiled_id_list) == len(profiles) == len(profiled_ids)
+        and candidate_ids == profiled_ids
+    )
+    if profile_membership_is_exact:
+        return candidates
+
+    configured_candidates = build_candidate_pool(
+        configured_models=configured_models,
+        config=config,
+    )
+    return [candidate for candidate in configured_candidates if candidate.model_id in profiled_ids]
+
+
 def _safe_error_message(exc: BaseException) -> str:
     text = str(exc) or exc.__class__.__name__
     text = re.sub(r"AIza[0-9A-Za-z_\-]{20,}", "[redacted-api-key]", text)

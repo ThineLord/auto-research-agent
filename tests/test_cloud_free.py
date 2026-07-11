@@ -17,6 +17,7 @@ from src.cloud_free import (
     CloudFreeScheduler,
     CloudModelProfile,
     apply_cloud_prompt_budget,
+    build_cached_candidate_pool,
     build_candidate_pool,
     choose_fallback_model,
     classify_gemini_error,
@@ -28,6 +29,7 @@ from src.cloud_free import (
     model_info_from_sdk_model,
     profile_free_cloud_models,
     recommend_free_cloud_model,
+    save_discovery_artifact,
     save_profile_artifact,
 )
 from src.config import (
@@ -357,6 +359,135 @@ class CloudFreePolicyTests(unittest.TestCase):
         self.assertEqual(quality.model_id, "gemini-3.5-flash")
         self.assertIsNotNone(volume)
         self.assertEqual(volume.model_id, "gemma-3-high-tpm")
+
+    def test_cached_candidate_pool_excludes_stale_discovery_outside_profile_cohort(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            stale_model = classify_model(
+                model_id="gemma-3-high-tpm",
+                source="discovered",
+            )
+            fallback_profiles = [
+                CloudModelProfile(
+                    model_id=model_id,
+                    daily_quota_exhausted=True,
+                )
+                for model_id in ("gemini-3.5-flash", "gemini-2.5-flash-lite")
+            ]
+            save_discovery_artifact(project_dir, [stale_model])
+            save_profile_artifact(project_dir, fallback_profiles)
+
+            discovered = load_discovery_artifact(project_dir)
+            profiles = load_profile_artifact(project_dir)
+            stale_candidates = build_candidate_pool(discovered_models=discovered)
+            stale_recommendation = recommend_free_cloud_model(
+                candidates=stale_candidates,
+                profiles=profiles,
+            )
+            self.assertIsNotNone(stale_recommendation)
+            self.assertEqual(stale_recommendation.model_id, "gemma-3-high-tpm")
+
+            reconciled = build_cached_candidate_pool(
+                discovered_models=discovered,
+                profiles=profiles,
+            )
+            recommendation = recommend_free_cloud_model(
+                candidates=reconciled,
+                profiles=profiles,
+            )
+            self.assertEqual(
+                [candidate.model_id for candidate in reconciled],
+                ["gemini-2.5-flash-lite", "gemini-3.5-flash"],
+            )
+            self.assertIsNotNone(recommendation)
+            self.assertNotEqual(recommendation.model_id, "gemma-3-high-tpm")
+
+            exact_profiles = [
+                CloudModelProfile(model_id=candidate.model_id) for candidate in stale_candidates
+            ]
+            self.assertEqual(
+                build_cached_candidate_pool(
+                    discovered_models=discovered,
+                    profiles=exact_profiles,
+                ),
+                stale_candidates,
+            )
+            self.assertEqual(
+                build_cached_candidate_pool(discovered_models=discovered),
+                stale_candidates,
+            )
+            self.assertEqual(
+                [
+                    candidate.model_id
+                    for candidate in build_cached_candidate_pool(
+                        discovered_models=discovered,
+                        profiles=[CloudModelProfile(model_id="gemini-3.5-flash")],
+                    )
+                ],
+                ["gemini-3.5-flash"],
+            )
+            self.assertEqual(
+                build_cached_candidate_pool(
+                    discovered_models=discovered,
+                    profiles=[
+                        CloudModelProfile(
+                            model_id="gemini-3.5-flash",
+                            safe_text_generation=False,
+                        )
+                    ],
+                ),
+                [],
+            )
+            duplicate_profiles = [
+                CloudModelProfile(model_id="gemini-3.5-flash"),
+                CloudModelProfile(model_id="gemini-3.5-flash"),
+            ]
+            duplicate_candidates = build_cached_candidate_pool(
+                discovered_models=discovered,
+                profiles=duplicate_profiles,
+            )
+            self.assertEqual(
+                [candidate.model_id for candidate in duplicate_candidates],
+                ["gemini-3.5-flash"],
+            )
+            self.assertEqual(duplicate_candidates[0].source, "configured")
+            legacy_prefixed_profiles = [
+                CloudModelProfile(
+                    model_id=f"models/{model_id}",
+                    daily_quota_exhausted=True,
+                )
+                for model_id in ("gemini-3.5-flash", "gemini-2.5-flash-lite")
+            ]
+            legacy_candidates = build_cached_candidate_pool(
+                discovered_models=discovered,
+                profiles=legacy_prefixed_profiles,
+            )
+            self.assertEqual(legacy_candidates, [])
+            self.assertIsNone(
+                recommend_free_cloud_model(
+                    candidates=legacy_candidates,
+                    profiles=legacy_prefixed_profiles,
+                )
+            )
+            blocked_model = classify_model(model_id="gemini-3.5-pro")
+            exact_with_blocked = build_cached_candidate_pool(
+                discovered_models=[*discovered, blocked_model],
+                profiles=exact_profiles,
+            )
+            self.assertEqual(exact_with_blocked, stale_candidates)
+            self.assertNotIn(
+                "gemini-3.5-pro",
+                {candidate.model_id for candidate in exact_with_blocked},
+            )
+            currently_blocked = build_cached_candidate_pool(
+                discovered_models=discovered,
+                profiles=exact_profiles,
+                config=CloudFreeConfig(blocked_model_patterns=(r"gemma",)),
+            )
+            self.assertNotIn(
+                "gemma-3-high-tpm",
+                {candidate.model_id for candidate in currently_blocked},
+            )
 
     def test_profile_artifact_does_not_store_api_keys(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

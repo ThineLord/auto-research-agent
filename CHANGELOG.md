@@ -40,6 +40,10 @@
 
 ### Fixed
 
+* Cached cloud-free recommendation now distrusts discovery metadata when its current safe candidate
+  membership differs from a non-empty profile artifact. CLI and UI ignore stale discovery in that
+  case, retain only currently allowed configured/profiled candidates, and re-evaluate cached model
+  safety under current policy without deleting or migrating existing artifacts.
 * Resume now reads all four previous-round draft/review/revised/Judge context files before changing
   startup metadata. Existing unreadable or invalid-UTF-8 context blocks without agent invocation or
   artifact writes and reports only the fixed artifact name; genuinely missing legacy context remains

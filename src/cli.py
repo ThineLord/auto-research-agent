@@ -20,6 +20,7 @@ from .benchmarking import (
 from .cloud_free import (
     FREE_RUNNER_MANUAL,
     FREE_RUNNER_PRESETS,
+    build_cached_candidate_pool,
     build_candidate_pool,
     discover_free_cloud_models,
     filter_safe_text_models,
@@ -812,9 +813,10 @@ def main() -> None:
     ):
         discovered = load_discovery_artifact(project_dir)
         profiles = load_profile_artifact(project_dir)
-        candidates = build_candidate_pool(
+        candidates = build_cached_candidate_pool(
             discovered_models=discovered,
             configured_models=gemini_config.models,
+            profiles=profiles,
             config=cloud_free_config,
         )
         recommendation = recommend_free_cloud_model(

@@ -18,6 +18,7 @@ from src.cloud_free import (
     FREE_RUNNER_PRESETS,
     FREE_RUNNER_QUALITY,
     FREE_RUNNER_VOLUME,
+    build_cached_candidate_pool,
     build_candidate_pool,
     discover_free_cloud_models,
     filter_safe_text_models,
@@ -1961,9 +1962,10 @@ def main() -> None:
                 profile_results = profiles
                 st.success(t("cloud_free_profile_saved", count=len(profiles)))
 
-        cloud_candidates = build_candidate_pool(
+        cloud_candidates = build_cached_candidate_pool(
             discovered_models=discovered_models,
             configured_models=cloud_models,
+            profiles=profile_results,
             config=app_config.cloud_free,
         )
         cloud_free_recommendation = recommend_free_cloud_model(

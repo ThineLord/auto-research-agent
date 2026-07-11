@@ -4,20 +4,19 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: retain the completed, locally validated ARA-039 fail-before-write resume-context
-  boundary, publish that work, and continue with isolated ARA-040 cloud provenance handling.
+- Current goal: retain the completed, locally validated ARA-040 cached-membership guard, publish
+  that work, and continue with isolated ARA-043 all-blocked recommendation handling.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `25ae39bcd90ba2a2152025f46739dabf3391e8cb` (the exact HEAD
+- State recorded against commit: `9191a357d24dd6caa4fed04038de99c7ffa2ae60` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `25ae39bcd90ba2a2152025f46739dabf3391e8cb` (exact local,
+- Last externally verified fallback: `9191a357d24dd6caa4fed04038de99c7ffa2ae60` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-039 is `DONE` with focused, related, full-gate, and
-  independent review results passing locally; publication is pending. ARA-038 remains the exact
-  external fallback at `25ae39b`, verified by push/PR runs `29165142777`/`29165143905` on Python
-  3.10/3.13.
+- Active task at this snapshot: none. ARA-040 is `DONE` with related, full-gate, and two independent
+  reviews passing locally; publication is pending. ARA-039 remains the exact external fallback at
+  `9191a35`, verified by push/PR runs `29165593346`/`29165594723` on Python 3.10/3.13.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -506,16 +505,38 @@ Updated: 2026-07-12 (Asia/Shanghai)
   and path-safe exception/console behavior. Valid complete context and missing legacy compatibility
   controls pass; two independent reviews returned GO.
 
+## ARA-040 Cached Cloud Membership Guard
+
+- Reproduced a later process selecting stale `gemma-3-high-tpm` after discovery failed and saved a
+  new default-seed-only profile beside the old discovery artifact.
+- Added one CLI/UI cached-candidate helper that reclassifies discovery under current policy, trusts
+  discovery only for exact unique canonical profile membership, and otherwise ignores discovery in
+  favor of current configured/profiled membership. Empty profile compatibility remains unchanged.
+- Covered exact, absent, partial, unsafe, duplicate, legacy-prefixed, blocked, and current-policy
+  cases plus a real two-process disk round trip. No artifact schema, file, deletion, or migration
+  changed. Two independent reviews returned GO.
+
 ## Remaining Steps
 
 - Resolve the semantic current HEAD publication, exact remote equality, and CI state live before
-  starting ARA-040, then record the new externally verified fallback.
-- Continue with ARA-040, the highest-priority unblocked P2, unless new evidence changes ordering.
+  starting ARA-043, then record the new externally verified fallback.
+- Continue with ARA-043 before the broader UI-cache ARA-042; do not cross owner/configuration
+  approval gates.
 - Keep ARA-018, ARA-029, and ARA-030 behind their recorded owner/configuration/long-task approval
   gates; do not fold release or CI-configuration policy into the analysis/compare fixes.
 
 ## Test Status
 
+- ARA-040 two-process and exact/no-profile/partial/unsafe/duplicate/legacy/current-policy controls
+  plus cloud-free/CLI/UI/recovery regression passed `120 passed, 56 subtests passed`.
+- ARA-040 local `make check` passed Ruff format/lint, imports, repository-safety self-test,
+  worktree/staged scans, and pytest (`329 passed, 215 subtests passed`; 100 tracked files and zero
+  findings). Two independent final reviews returned GO after checking CLI/UI integration, explicit
+  profile-flow compatibility, current policy, real disk round trip, and no schema/file mutation. No
+  provider call was made.
+- ARA-039 remote verification: exact local/upstream/`ls-remote` equality at `9191a35`, ahead/behind
+  `0/0`; push run `29165593346` and pull-request run `29165594723` passed Python 3.10/3.13. Draft
+  PR 13 is open, mergeable, and updated.
 - ARA-039 focused four-context invalid-UTF8/read-failure and missing-parent compatibility regression
   passed `4 passed, 8 subtests passed`; related round-loop/CLI regression passed `80 passed, 107
   subtests passed`.
@@ -856,6 +877,12 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- The ARA-040 pre-fix two-process probe loaded a new seed-only fallback profile beside stale
+  discovery and recommended `gemma-3-high-tpm`; this was the confirmed silent selection failure.
+- Independent ARA-040 review found that normalizing legacy `models/...` profile IDs could falsely
+  match membership while downstream lookup did not normalize, and that cached safe flags could
+  bypass current block policy. Strict canonical membership plus current-policy reclassification
+  closed both before the final related/full gates.
 - The initial ARA-039 invalid-UTF8 and injected-read controls both failed as expected because no
   `ResumeHistoryError` was raised; resume wrote startup artifacts and invoked an agent with empty
   previous Judge context.

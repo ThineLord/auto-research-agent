@@ -315,21 +315,24 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-039 - Unreadable prior-round context is silently discarded on resume
 
-- Status: fixed and locally validated; publication pending
+- Status: fixed, pushed, and CI-verified
 - Severity: P2 reproducibility
 - Impact: invalid UTF-8 in existing prior-round Judge context becomes an empty prompt context after
   startup metadata has already changed.
-- Current action: ARA-039 preloads all four previous-round contexts before startup writes; genuinely
-  missing legacy paths remain empty, while existing I/O/UTF-8 failures raise a fixed basename-only
-  error without cause chaining. Focused, related, full-gate, and independent reviews passed.
+- Current action: ARA-039 completed at `9191a35`; exact push/PR runs
+  `29165593346`/`29165594723` passed Python 3.10/3.13. Fail-before-write ordering, legacy missing
+  compatibility, and path-safe failure handling are verified.
 
 ## KI-040 - Cloud fallback profile can retain stale discovery provenance
 
-- Status: confirmed; queued as ARA-040
+- Status: fixed and locally validated; publication pending
 - Severity: P2 selection consistency
 - Impact: a new fallback profile can coexist with stale discovery data and cause a later process to
   reselect a model deliberately excluded in the current process.
-- Current action: bind discovery/profile artifacts to one verifiable cohort after ARA-038.
+- Current action: ARA-040 applies a non-destructive membership guard in CLI and UI recommendation
+  paths. Exact unique membership retains discovery metadata; mismatched/noncanonical membership
+  ignores discovery and intersects current safe configured candidates with profile IDs. Cached model
+  safety is recalculated under current policy; no generation-provenance claim or schema change is made.
 
 ## KI-041 - Resume startup metadata can split across generations
 
@@ -339,3 +342,23 @@ Updated: 2026-07-12 (Asia/Shanghai)
   a new running resume session although no agent ran and other state remains old.
 - Current action: require explicit approval for a cross-file recoverable transaction design and
   per-write fault-injection matrix.
+
+## KI-042 - UI cloud-free session cache is not project or artifact scoped
+
+- Status: confirmed; queued as ARA-042
+- Severity: P2 selection consistency
+- Impact: switching projects or refreshing cloud artifacts outside Streamlit can leave global
+  in-memory discovery/profile values active; equal model IDs can hide stale metadata from ARA-040's
+  membership guard.
+- Current action: bind session cache identity to the canonical selected project plus artifact change
+  state without changing artifact schemas.
+
+## KI-043 - All blocked profiles can still produce a fallback recommendation
+
+- Status: confirmed; queued as ARA-043
+- Severity: P2 provider reliability
+- Impact: after quota/unreachable/billing-safety/token-context profiles exclude every candidate, the
+  fallback branch can select one of the same blocked safe seeds and trigger a predictably failing
+  provider attempt.
+- Current action: distinguish “no scored profile but unprofiled candidate exists” from “every
+  candidate has a blocking profile” without changing manual selection or provider retry policy.

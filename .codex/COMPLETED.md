@@ -581,3 +581,25 @@ Validation and implementation outcomes will be appended only after they are actu
 - Focused tests passed `4 passed, 8 subtests passed`; related round-loop/CLI tests passed `80 passed,
   107 subtests passed`; local `make check` passed `328 passed, 215 subtests passed` with 100 tracked
   files and zero findings. Two independent final reviews returned GO; no provider call was made.
+- Committed as `9191a35`, pushed with exact local/upstream/`ls-remote` equality, updated draft PR
+  13, and confirmed push run `29165593346` plus pull-request run `29165594723` passed every Python
+  3.10/3.13 job.
+
+## 2026-07-12 - Cached cloud discovery/profile membership reconciliation
+
+- Reproduced a true two-process disk round trip: stale discovery retained `gemma-3-high-tpm`, a new
+  discovery-error fallback profile covered only the default seeds, and the next process recommended
+  the stale unprofiled Gemma.
+- Added a non-destructive cached-candidate guard shared by CLI and UI recommendation. Empty/missing
+  profiles preserve discovery-only compatibility; exact unique profile/candidate membership retains
+  discovery metadata; every mismatch ignores discovery and keeps only current configured candidates
+  also represented by safe profile IDs.
+- Reclassified cached discovery records under the current allow/block policy before membership
+  comparison, so artifact-era or forged safe flags cannot override current configuration. Duplicate,
+  unsafe, partial, and noncanonical `models/...` profile IDs all take the conservative mismatch path.
+- Kept explicit discovery/profile commands on their in-memory candidate pool and made no artifact
+  schema, file, deletion, migration, provider, selection preset, or historical artifact change.
+- Focused/two-process and compatibility controls plus cloud-free/CLI/UI/recovery tests passed `120
+  passed, 56 subtests passed`; local `make check` passed `329 passed, 215 subtests passed` with 100
+  tracked files and zero findings. Two independent final reviews returned GO; no provider call was
+  made.
