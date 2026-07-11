@@ -179,7 +179,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-014 - Source benchmark stop reason from the target run
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P2
 - Risk: medium
 - Description: benchmark reporting can read the project's latest checkpoint instead of the target historical run, mislabeling stop reason.

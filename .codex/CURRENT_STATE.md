@@ -7,19 +7,18 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Current goal: make historical benchmark reports source stop reason from their selected target run
   and reject unrelated project checkpoints (`ARA-014`).
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `588e32c6c2692e421fe5439361bbb6595584642f`
-- Last known stable commit: `588e32c6c2692e421fe5439361bbb6595584642f` (locally validated
-  ARA-014 implementation; recovery checkpoint, push, PR update, and remote CI remain)
-- Active task: ARA-014 is `IN_PROGRESS`; implementation commit `588e32c` passed focused/full tests
-  and blocker-free independent review. Recovery checkpoint, push, PR update, and CI remain.
-  ARA-016 is done; ARA-004 remains separately blocked.
-- Uncommitted changes: yes; recovery metadata only.
+- Current HEAD at state snapshot: `c893e63f21a1f103ec7085e788206e3b2a4bc61f`
+- Last known stable commit: `c893e63f21a1f103ec7085e788206e3b2a4bc61f` (exact local,
+  remote-tracking, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs passed)
+- Active task: ARA-014 is `DONE`; final verified-state closeout metadata is being prepared. The next
+  unblocked P2 will be selected after this clean checkpoint. ARA-004 remains separately blocked.
+- Uncommitted changes: yes; verified-state closeout metadata only.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
 - `.codex/TASK_QUEUE.md`
-- `.codex/DECISIONS.md`
+- `.codex/COMPLETED.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
@@ -240,11 +239,17 @@ Updated: 2026-07-11 (Asia/Shanghai)
   regular-file reads and a dynamic official `STOP_*` allowlist. Final review reported green.
 - Committed the scoped implementation, tests, changelog, and developer guidance as `588e32c` with
   no ignored artifacts, experiment values, providers, prompts, metrics, or unrelated files.
+- Committed recovery state as `c893e63`, pushed both commits, and verified exact local,
+  remote-tracking, and GitHub branch SHA equality.
+- Updated draft PR 13 with ARA-014 scope, validation, safety/compatibility boundaries, and commits;
+  it remains open, draft, and mergeable.
+- Verified push run `29140847860` and pull-request run `29140848882`: Python 3.10 and 3.13 all
+  passed, including repository-safety and test steps in each of the four jobs.
 
 ## Remaining Steps
 
-- Update and commit recovery metadata, then push both commits.
-- Verify exact remote SHA, update PR 13, and verify Python 3.10/3.13 push/PR CI.
+- Commit and push this final verified-state closeout, verify exact SHA and CI, then select the next
+  highest-value unblocked P2 from the synchronized queue.
 
 ## Test Status
 
@@ -258,6 +263,8 @@ Updated: 2026-07-11 (Asia/Shanghai)
   symlink fixture remained `11 passed, 20 subtests passed`.
 - Current worktree and staged-index repository-safety scans passed with 91 tracked files and zero
   findings; `git diff --check` passed. Real provider tests were not needed or run.
+- GitHub Actions at `c893e63`: Python 3.10/3.13 passed for both push and pull-request events; safety
+  and test steps passed in all four jobs.
 - ARA-016 focused regression: Ruff lint passed and `tests/test_repo_safety.py` passed (`11 passed`).
 - Scanner controls: self-test, tracked worktree, and full staged-index scans passed with 91 tracked
   files, including the scanner and test; no tracked binary/NUL file or gitlink is currently present.
@@ -449,7 +456,7 @@ Updated: 2026-07-11 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git add -- .codex/CURRENT_STATE.md .codex/TASK_QUEUE.md .codex/DECISIONS.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
+git add -- .codex/CURRENT_STATE.md .codex/TASK_QUEUE.md .codex/COMPLETED.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
 ```
 
 ## Interruption Recovery

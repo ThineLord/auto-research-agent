@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T13:09:19+08:00",
+  "recorded_at": "2026-07-11T13:13:51+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "588e32c6c2692e421fe5439361bbb6595584642f",
-  "last_known_stable_commit": "588e32c6c2692e421fe5439361bbb6595584642f",
-  "status": "ara014_implementation_committed_pending_remote_verification",
+  "head_commit": "c893e63f21a1f103ec7085e788206e3b2a4bc61f",
+  "last_known_stable_commit": "c893e63f21a1f103ec7085e788206e3b2a4bc61f",
+  "status": "ara014_remote_verified_closeout_pending",
   "commands": [
     {
       "command": ".venv/bin/python -m pytest -q tests/test_benchmark_report.py",
@@ -78,6 +78,41 @@
       "summary": {
         "implementation_commit": "588e32c6c2692e421fe5439361bbb6595584642f"
       }
+    },
+    {
+      "command": "exact local, remote-tracking, and git ls-remote SHA comparison",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "c893e63f21a1f103ec7085e788206e3b2a4bc61f"
+      }
+    },
+    {
+      "command": "GitHub Actions push and pull-request run/job verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "push_run_id": 29140847860,
+        "pull_request_run_id": 29140848882,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "repository_safety_steps": "passed_in_all_four_jobs",
+        "test_steps": "passed_in_all_four_jobs"
+      }
+    },
+    {
+      "command": "GitHub connector draft PR 13 update and readback",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "draft": true,
+        "open": true,
+        "mergeable": true,
+        "head_commit": "c893e63f21a1f103ec7085e788206e3b2a4bc61f",
+        "body_contains_ara014": true
+      }
     }
   ],
   "failures": [
@@ -102,10 +137,6 @@
   ],
   "not_run": [
     {
-      "check": "GitHub Python 3.10/3.13 push and pull-request matrix",
-      "reason": "The implementation and recovery checkpoint have not been pushed yet."
-    },
-    {
       "check": "real provider smoke",
       "reason": "Benchmark report metadata selection and rendering are provider-free read-only behavior."
     }
@@ -117,6 +148,8 @@
     "Only official STOP_* constants are reportable; unknown, multiline, private-path, Markdown, and credential-shaped values render as unknown.",
     "All 10 current stop constants remained reportable in the focused compatibility matrix.",
     "Ignored runtime artifacts were not opened or modified, and no provider, prompt, metric, score, experiment, or canonical research artifact changed.",
-    "Active non-cooperating parent/path replacement remains the separately tracked ARA-022 boundary."
+    "Active non-cooperating parent/path replacement remains the separately tracked ARA-022 boundary.",
+    "Implementation 588e32c and recovery checkpoint c893e63 were pushed; exact SHA equality and all four Python 3.10/3.13 jobs were verified.",
+    "Draft PR 13 was updated through the GitHub connector and remains open, draft, and mergeable; no merge was attempted."
   ]
 }

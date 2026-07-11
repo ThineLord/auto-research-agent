@@ -214,3 +214,23 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed implementation as `2b6523c` and recovery state as `975559d`, pushed both, verified exact
   local/tracking/GitHub SHA equality, updated draft PR 13, and confirmed all four Python 3.10/3.13
   push and pull-request jobs passed, including the new safety step.
+
+## 2026-07-11 - Historical benchmark stop-reason attribution
+
+- Reproduced a historical target run whose own summary said `USER_STOP_REQUESTED` being mislabeled
+  `MAX_ROUNDS` from a newer project checkpoint; the initial regression failed exactly once.
+- Resolved stop reason from target-run summary, config, then legacy manifest, and accepted project
+  checkpoint only when normalized root and any supplied run ID positively match the target.
+- Rejected malformed/nonobject and conflicting checkpoint identity data rather than borrowing it;
+  covered absolute, repository/project/runs-relative, path-only, and legacy ID-only forms.
+- Made fixed metadata leaves reject symlinks, directories, and FIFOs, with descriptor identity checks
+  before reads. Unknown, injected, private, or credential-shaped values render as `unknown`.
+- Restricted reportable reasons to official `STOP_*` constants and verified all 10 current constants
+  remain compatible.
+- Multiple independent audits reproduced and then verified fixes for the attribution bug, external
+  metadata reads, Markdown/private-text injection, and credential-shaped output; final review was green.
+- Focused tests passed with `11 passed, 20 subtests passed`; final `make check` passed with `224
+  passed, 154 subtests passed`; both safety scans reported 91 tracked files and zero findings.
+- Committed implementation as `588e32c` and recovery state as `c893e63`, pushed both, verified exact
+  local/tracking/GitHub SHA equality, updated draft PR 13, and confirmed all four Python 3.10/3.13
+  push and pull-request jobs passed, including safety and test steps.
