@@ -295,3 +295,21 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed implementation as `b961070` and recovery state as `a3bef4d`, pushed both, verified exact
   local/tracking/GitHub SHA equality, and confirmed all four Python 3.10/3.13 push and pull-request
   jobs passed, including safety and test steps.
+
+## 2026-07-11 - Current analytics and comparison documentation alignment
+
+- Cross-checked the current quickstart roadmap against CLI comparison, single-run analytics, UI
+  dashboard/comparison, structured timing/token metrics, resume metadata, and drafting-mode code and
+  tests without opening ignored experiment artifacts.
+- Reclassified completed comparison, analytics, Streamlit width, resume-preview, timing, estimated-
+  token, and drafting-mode work as implemented instead of future priorities.
+- Preserved explicit limitations around research-quality judgment, true provider cost, uncertainty,
+  causal inference, lineage, novelty/diff, and advanced cross-run analysis.
+- Kept README, CHANGELOG, and dated historical audit/gap reports unchanged so historical evidence
+  remains intact.
+- Independent final review found and then verified corrections for rubric-field attribution,
+  lifecycle-action wording, exact drafting-mode names, and `final_session_report.md`; final result GO.
+- Targeted stale-wording search and `git diff --check` passed; final `make check` passed with `236
+  passed, 164 subtests passed`, and both safety scans reported 91 files with zero findings.
+- Committed the documentation implementation as `15d9935`; remote push and CI verification remain
+  pending at this recovery checkpoint.

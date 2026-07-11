@@ -266,7 +266,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-005 - Align stale future-priority documentation with implemented features
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P3
 - Risk: low
 - Description: remove or revise statements that still describe implemented comparison, analytics, or dashboard work as future work.

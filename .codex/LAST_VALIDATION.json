@@ -1,11 +1,55 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T14:16:31+08:00",
+  "recorded_at": "2026-07-11T14:27:07+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "a3bef4dcb0fdea377514b22cdc32a59468a686a7",
-  "last_known_stable_commit": "a3bef4dcb0fdea377514b22cdc32a59468a686a7",
-  "status": "ara024_remote_verified_closeout_pending",
+  "head_commit": "15d99351ebef8fc7cccb38acd4205f8cc7e23917",
+  "last_known_stable_commit": "0112e108292847ddde864150331db4c3b05a9aed",
+  "status": "ara005_local_verified_checkpoint_pending",
   "commands": [
+    {
+      "command": "targeted current-document stale-wording search plus git diff --check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "remaining_known_stale_phrases": 0,
+        "historical_reports_modified": false
+      }
+    },
+    {
+      "command": "make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 54,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "pytest_tests_passed": 236,
+        "pytest_subtests_passed": 164,
+        "pytest_duration_seconds": 2.69
+      }
+    },
+    {
+      "command": "independent current-document evidence and corrected-diff review",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "blocking_findings_remaining": 0,
+        "historical_context_preserved": true,
+        "research_claim_boundaries_preserved": true
+      }
+    },
+    {
+      "command": "git commit -m docs: align implemented analytics roadmap",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "implementation_commit": "15d99351ebef8fc7cccb38acd4205f8cc7e23917",
+        "files_changed": 1
+      }
+    },
     {
       "command": ".venv/bin/python -m pytest -q tests/test_run_config.py tests/test_round_loop.py",
       "exit_code": 0,
@@ -97,6 +141,14 @@
   ],
   "failures": [
     {
+      "command": "initial independent final documentation review",
+      "result": "corrected_before_commit",
+      "summary": {
+        "documentation_accuracy_findings": 3,
+        "cause": "rubric field attribution, lifecycle capability wording, and session report filename required correction"
+      }
+    },
+    {
       "command": "initial zero-round resume-session regressions",
       "result": "expected_pre_fix_failure",
       "summary": {
@@ -108,14 +160,17 @@
   "not_run": [
     {
       "check": "real provider smoke",
-      "reason": "Run-config lifecycle bookkeeping and temporary-directory tests are provider-free; no request behavior changed."
+      "reason": "Documentation-only alignment changed no provider or runtime behavior."
     },
     {
       "check": "native Python 3.10",
-      "reason": "Local runtime is Python 3.13.14; Python 3.10 remains covered by GitHub Actions after push."
+      "reason": "Local runtime is Python 3.13.14; Python 3.10 will be covered by GitHub Actions after push."
     }
   ],
   "notes": [
+    "Current quickstart wording now distinguishes implemented basic analytics/comparison from advanced research evaluation gaps.",
+    "README, CHANGELOG, and dated historical audit/gap reports were intentionally unchanged.",
+    "Implementation 15d9935 is locally committed; recovery checkpoint, push, CI, and PR refresh are pending.",
     "A resume-existing lifecycle appends a session even when its next round is 1.",
     "A genuinely new round-1 run keeps an empty resume_sessions list.",
     "The existing start_round greater than 1 compatibility branch remains intact.",

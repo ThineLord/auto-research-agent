@@ -40,20 +40,19 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-`ARA-024` implementation `b961070` and recovery checkpoint `a3bef4d` are pushed and remotely
-verified. All Python 3.10/3.13 push and pull-request jobs passed. Only final verified-state closeout
-may remain. Compare HEAD/upstream and current state before repeating work. The last successful local
-full validation command was:
+`ARA-005` implementation `15d9935` is locally committed and fully validated; its recovery metadata
+may still be uncommitted, and remote push/CI verification is pending. Compare HEAD/upstream and the
+worktree before repeating work. The last successful local full validation command was:
 
 ```bash
 make check
 ```
 
-The expected result is Ruff/import/safety success and `236 passed, 164 subtests passed`. Related
-run-config/round-loop validation should report `47 passed, 59 subtests passed`; both safety modes
-should scan 91 tracked files with zero findings. If closeout metadata is uncommitted, stage only the
-six named `.codex` files and create the closeout commit. If ahead, push normally and verify exact
-remote SHA plus CI, then update draft PR 13. Do not restart ARA-024.
+The expected result is Ruff/import/safety success and `236 passed, 164 subtests passed`; both safety
+modes should scan 91 tracked files with zero findings. The independent corrected-diff review is GO.
+If recovery metadata is uncommitted, stage only the five named `.codex` files and create the ARA-005
+checkpoint commit. If ahead, push normally and verify exact remote SHA plus Python 3.10/3.13 push
+and pull-request CI, then update draft PR 13. Do not restart ARA-005.
 
 `ARA-004` remains separately blocked. Do not repeat its unsafe local build harness or delete/rewrite
 ignored `projects/example` state; read `KI-005`, `KI-013`, and `KI-023` before any packaging work.
@@ -69,5 +68,5 @@ Active non-cooperating filesystem replacement remains ARA-022 and was not widene
 ## Suggested immediate command
 
 ```bash
-git status --short --branch && git diff --check
+git status --short --branch && git diff --check && git log --oneline -n 5
 ```

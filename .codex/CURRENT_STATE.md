@@ -4,30 +4,24 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: record resume-session provenance when an existing zero-round checkpoint resumes at
-  round 1, without classifying a genuinely new run as resumed (`ARA-024`).
+- Current goal: align stale future-priority documentation with the already implemented comparison,
+  analytics, and dashboard features without overstating research readiness (`ARA-005`).
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `a3bef4dcb0fdea377514b22cdc32a59468a686a7`
-- Last known stable commit: `a3bef4dcb0fdea377514b22cdc32a59468a686a7` (exact local,
+- Current HEAD at state snapshot: `15d99351ebef8fc7cccb38acd4205f8cc7e23917`
+- Last known stable commit: `0112e108292847ddde864150331db4c3b05a9aed` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task: ARA-024 is `DONE`; final verified-state closeout metadata is being prepared. The next
-  task will be selected from the synchronized queue after this checkpoint; ARA-004 remains blocked.
-- Uncommitted changes: yes; verified-state closeout metadata only.
+- Active task: ARA-005 is `DONE`; locally verified recovery metadata is being prepared before push.
+  ARA-004 remains blocked.
+- Uncommitted changes: yes; ARA-005 recovery metadata only.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
 - `.codex/COMPLETED.md`
-- `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
 - `.codex/TASK_QUEUE.md`
-- `CHANGELOG.md`
-- `docs/DEVELOPER_GUIDE.md`
-- `src/run_config.py`
-- `tests/test_round_loop.py`
-- `tests/test_run_config.py`
 
 ## Completed Steps
 
@@ -332,14 +326,41 @@ Updated: 2026-07-11 (Asia/Shanghai)
   remote-tracking, `ls-remote`, and GitHub branch SHA equality.
 - Verified push run `29142505314` and pull-request run `29142506476`: Python 3.10 and 3.13 all
   passed, including formatting, lint, import, repository-safety, and test steps in all four jobs.
+- Verified ARA-024 final closeout `0112e108292847ddde864150331db4c3b05a9aed`: local,
+  remote-tracking, and GitHub branch SHAs match; push run `29142573684` and pull-request run
+  `29142574570` passed on Python 3.10 and 3.13, and draft PR 13 is updated.
+- Started ARA-005 and independently cross-checked `docs/quickstart_zh.md` against the comparison,
+  analytics, UI, and test implementations. README, CHANGELOG, and dated historical audit/gap
+  reports remain unchanged.
+- Reclassified completed CLI comparison, UI comparison, agent timing, estimated-token, Streamlit
+  width, resume-preview, and drafting-mode work as implemented while retaining explicit boundaries
+  around research quality, true cost, causal claims, and advanced cross-run analysis.
+- A targeted stale-wording search returned no remaining ARA-005 phrases, and `git diff --check`
+  passed.
+- Independent final review first identified three fact-precision blockers: comparison rubric fields,
+  already-implemented resume lifecycle distinctions, and the session report filename. All were
+  corrected, the named drafting modes were made explicit, and the final re-review reported GO.
+- Final `make check` after all wording corrections passed with Ruff, imports, both safety scans,
+  and pytest (`236 passed, 164 subtests passed`).
+- Staged only `docs/quickstart_zh.md`, verified its cached diff and staged safety scan, and committed
+  implementation `15d99351ebef8fc7cccb38acd4205f8cc7e23917`
+  (`docs: align implemented analytics roadmap`).
 
 ## Remaining Steps
 
-- Commit and push this final verified-state closeout, verify exact SHA and CI, update draft PR 13,
-  then select the next bounded task.
+- Commit this ARA-005 recovery checkpoint, push the implementation and checkpoint, verify exact
+  remote SHA and Python 3.10/3.13 push/PR CI, update draft PR 13, then record the verified closeout.
 
 ## Test Status
 
+- ARA-005 targeted stale-wording search: passed; no known-completed comparison, analytics,
+  dashboard, drafting-mode, timing, or estimated-token item remains described as future work in the
+  current-state quickstart roadmap.
+- ARA-005 `git diff --check`: passed. Final `make check`: Ruff format passed (54 files), Ruff lint
+  passed, imports passed, both safety scans passed, and pytest passed (`236 passed, 164 subtests
+  passed in 2.69s`).
+- ARA-005 independent read-only evidence audit and final corrected-diff review: GO; README,
+  CHANGELOG, and dated historical reports remain unchanged.
 - ARA-024 pre-fix regression: `2 failed`; direct and real zero-round resume both omitted the session.
 - ARA-024 related regression: `47 passed, 59 subtests passed`.
 - Final ARA-024 `make check`: Ruff format passed (54 files), Ruff lint passed, imports passed, both
@@ -592,7 +613,7 @@ Updated: 2026-07-11 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git add -- .codex/CURRENT_STATE.md .codex/COMPLETED.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md .codex/TASK_QUEUE.md
+git add -- .codex/CURRENT_STATE.md .codex/COMPLETED.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md .codex/TASK_QUEUE.md
 ```
 
 ## Interruption Recovery
