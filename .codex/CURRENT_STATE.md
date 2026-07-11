@@ -4,34 +4,27 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: preserve the verified ARA-004 clean-install packaging fix and hand the repository
-  off from a pushed, CI-green, self-resolving recovery checkpoint.
+- Current goal: define and enforce the ARA-022 project-level runtime artifact symlink boundary
+  without breaking supported local workflows or configured `runs/` storage links.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `0aee55e1a48dab3d56f0475f789c2134c548ddc5` (the exact HEAD
+- State recorded against commit: `094446f3dfa8ee876dd0d7505ad0087988eef32d` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `0aee55e1a48dab3d56f0475f789c2134c548ddc5` (exact local,
+- Last externally verified fallback: `094446f3dfa8ee876dd0d7505ad0087988eef32d` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-004 is `DONE`; implementation commit `0aee55e` is pushed,
-  exact remote equality is verified, and push run `29148635379` plus PR run `29148637631` passed on
-  Python 3.10 and 3.13. ARA-022 is the next queued candidate but is a high-risk, greater-than-30-
-  minute filesystem-policy task and requires its own assessment/approval under `AGENTS.md`.
+- Active task at this snapshot: ARA-022 is `IN_PROGRESS`. The owner approved its high-risk,
+  greater-than-30-minute filesystem-policy work on 2026-07-11. The clean baseline passes;
+  threat-model audit and temporary-fixture reproduction are in progress. No runtime code has
+  changed yet.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
-## Files Changed By The Current ARA-004 Work Unit
+## Files Changed By The ARA-022 Start Snapshot
 
-- `pyproject.toml`
-- `src/_bundled/` (six explicit public resource copies)
-- `src/package_resources.py`
-- `src/cli.py`, `src/run_config.py`, `src/runner.py`, `src/diagnostic.py`, `src/resume.py`,
-  `src/session.py`
-- `tests/test_package_resources.py`, `tests/test_run_config.py`
-- `README.md`, `CHANGELOG.md`, `docs/DEVELOPER_GUIDE.md`
 - `.codex/CURRENT_STATE.md`, `.codex/LAST_VALIDATION.json`, `.codex/RESUME_INSTRUCTIONS.md`,
-  `.codex/TASK_QUEUE.md`, `.codex/KNOWN_ISSUES.md`, `.codex/DECISIONS.md`, `.codex/COMPLETED.md`
+  `.codex/TASK_QUEUE.md`, `.codex/KNOWN_ISSUES.md`
 
 ## Completed Steps
 
@@ -410,17 +403,23 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## Remaining Steps
 
-- No ARA-004 implementation or validation step remains.
-- On recovery, resolve semantic `HEAD`, worktree, upstream, `ls-remote`, and GitHub checks live. If
-  newer state-only evidence is unavailable, use verified implementation commit `0aee55e` as the
-  conservative fallback; do not create a recursive closeout merely to embed a commit's own SHA.
-- Do not publish the temporary sdist. ARA-026 owns deterministic/identity-neutral archive metadata,
-  and ARA-018 still blocks any public package release until the owner chooses a license policy.
-- Before starting ARA-022, provide its required high-risk, greater-than-30-minute assessment and
-  wait for approval. No lower-priority unblocked implementation task remains in the current queue.
+- Use the recorded clean provider-free baseline to distinguish existing behavior from new failures.
+- Inventory project-level fixed inputs/outputs, append logs, provider events, run roots, and all
+  atomic replacement call sites without opening ignored repository runtime artifacts.
+- Define the trusted-local-filesystem boundary, including the existing configured resolved `runs/`
+  storage-link compatibility contract and the active parent-swap limitation.
+- Reproduce confirmed static-link and active-swap violations in temporary fixtures, add failing
+  tests, and implement the smallest consistent no-follow/rejection policy.
+- Run focused storage/project-input/runtime/resume/UI regressions, `make check`, independent
+  adversarial review, staged safety checks, then commit, push, verify CI, and update draft PR 13.
 
 ## Test Status
 
+- ARA-022 start baseline: `make check` passed with Ruff, imports, both safety modes, and pytest
+  (`246 passed, 172 subtests passed in 3.72s`; 99 tracked files, zero findings).
+- ARA-022 focused reproduction: pending at this start snapshot.
+- ARA-004 recovery checkpoint `094446f`: push run `29148953536` and pull-request run `29148955113`
+  passed on Python 3.10 and 3.13; local/upstream/`ls-remote` equality is `0/0`.
 - ARA-004 pre-fix regression: two installed-layout subtests failed with status 2 and missing
   `config.example.yaml`, covering neutral and unrelated-Git CWDs.
 - ARA-004 final package-resource suite: `9 passed, 8 subtests passed`; final combined package/
@@ -732,8 +731,8 @@ Updated: 2026-07-11 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git status --short --branch && git rev-parse --verify HEAD && git log --oneline -n 5
-cat .codex/CURRENT_STATE.md && cat .codex/TASK_QUEUE.md
+make check
+rg -n "write_text|write_bytes|open\(|atomic_write|append|best_output|memory|provider_events|run.log|runs" src tests
 ```
 
 ## Interruption Recovery
@@ -756,6 +755,7 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - A pip build review created one cache entry under the user's pip cache containing a pre-fix wheel.
   It is not tracked and was not deleted because cleanup was not authorized; never treat it as a
   release artifact.
-- ARA-022 changes the filesystem trust/write policy and is high risk. Follow `AGENTS.md`: provide a
-  dedicated greater-than-30-minute assessment and wait for approval before implementation.
+- ARA-022 changes the filesystem trust/write policy and is high risk. Owner approval was received;
+  preserve configured `runs/` storage-link compatibility and fail closed on unsupported no-follow
+  primitives rather than silently widening the trust boundary.
 - Do not stage with `git add -A`; stage only reviewed paths.

@@ -178,7 +178,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-022 - Define project-level symlink boundaries for runtime artifacts
 
-- Status: `TODO`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: high
 - Description: project-level inputs/outputs such as `runs/`, `best_output.md`, `memory.md`, logs, and provider events can still follow filesystem symlinks in normal or resume workflows; closing an active rename/symlink race requires a broader storage policy than checkpoint validation.
@@ -186,7 +186,9 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Acceptance criteria: define the trusted-local-filesystem threat model and either reject unsafe project artifact links consistently or use descriptor-based no-follow writes without breaking canonical local workflows.
 - Validation command: adversarial filesystem tests plus `make check`.
 - Commit required: yes if behavior changes.
-- Dependencies: owner input only if external artifact storage is intended; otherwise higher-priority P1 work.
+- Dependencies: owner approved the high-risk, greater-than-30-minute implementation on 2026-07-11;
+  preserve the existing configured resolved `runs/` storage-link contract unless reproducible
+  evidence requires a separately documented migration.
 
 ## ARA-023 - Define interrupt-to-process-status propagation
 

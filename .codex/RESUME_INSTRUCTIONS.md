@@ -46,10 +46,10 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-No implementation task is active. ARA-004 is `DONE` at implementation commit `0aee55e`; exact
-local/upstream/`ls-remote` equality and Python 3.10/3.13 push/PR CI are verified. Resolve semantic
-`HEAD` and current remote evidence live; if a later state-only commit lacks remote evidence, use
-`0aee55e1a48dab3d56f0475f789c2134c548ddc5` as the conservative stable fallback.
+ARA-022 is owner-approved and `IN_PROGRESS`. Resume from the exact checkpoint in
+`CURRENT_STATE.md`; do not assume baseline, reproduction, or implementation completed unless
+`LAST_VALIDATION.json` records it. If newer state-only evidence is unavailable, use
+`094446f3dfa8ee876dd0d7505ad0087988eef32d` as the conservative stable fallback.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
 it imported the editable checkout and advanced ignored `projects/example` state after a missing
@@ -78,10 +78,11 @@ ignored `projects/example` state or the recorded pip-cache residue, and do not p
 sdist. Versions, license, dependency policy, UI/scripts distribution, and active filesystem swaps
 remain separate tasks.
 
-ARA-022 is the next unblocked queue candidate, but it is a high-risk, greater-than-30-minute
-filesystem trust/write-policy change. Under `AGENTS.md`, provide a dedicated assessment with major
-subtasks/checkpoints and wait for approval before implementation. ARA-018 remains owner-blocked;
-ARA-019, ARA-026, ARA-006, and ARA-007 remain deferred under their recorded dependencies.
+ARA-022 may inspect and modify only tracked code/docs plus temporary fixtures. Never probe the
+repository's ignored project runtime to discover links. Preserve configured resolved `runs/`
+storage links, distinguish static leaf links from active parent replacement, and record any
+platform capability gap explicitly. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006, and
+ARA-007 remain deferred under their recorded dependencies.
 
 ## 5. Safety boundaries
 
@@ -96,5 +97,5 @@ ARA-019, ARA-026, ARA-006, and ARA-007 remain deferred under their recorded depe
 git status --short --branch && git diff --check && git log --oneline -n 5
 git rev-parse --verify HEAD
 .venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
-cat .codex/TASK_QUEUE.md
+make check
 ```

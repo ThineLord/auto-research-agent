@@ -160,10 +160,11 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## KI-021 - Static resume checks do not close active filesystem swap races
 
-- Status: confirmed residual under an active local-filesystem attacker
+- Status: confirmed residual; owner-approved ARA-022 work is in progress
 - Severity: P2 under the project's local single-user threat model
 - Impact: renaming a validated run directory and replacing its path with a symlink between checks and stage persistence can redirect later writes; project-level artifact symlinks also remain broader than checkpoint scope.
-- Current action: task `ARA-022`; document the trust boundary before considering descriptor-based no-follow I/O or a repository-wide symlink policy.
+- Current action: task `ARA-022`; reproduce only in temporary fixtures, preserve configured
+  `runs/` storage links, and implement the smallest consistent no-follow/rejection policy.
 
 ## KI-022 - Manual interrupts can still produce process status 0
 

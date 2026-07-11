@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T18:11:00+08:00",
+  "recorded_at": "2026-07-11T18:59:47+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "0aee55e1a48dab3d56f0475f789c2134c548ddc5",
-  "last_known_stable_commit": "0aee55e1a48dab3d56f0475f789c2134c548ddc5",
+  "head_commit": "094446f3dfa8ee876dd0d7505ad0087988eef32d",
+  "last_known_stable_commit": "094446f3dfa8ee876dd0d7505ad0087988eef32d",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "0aee55e1a48dab3d56f0475f789c2134c548ddc5",
+  "state_recorded_against_commit": "094446f3dfa8ee876dd0d7505ad0087988eef32d",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-11T18:00:48+08:00",
-    "commit": "0aee55e1a48dab3d56f0475f789c2134c548ddc5",
+    "verified_at": "2026-07-11T18:12:32+08:00",
+    "commit": "094446f3dfa8ee876dd0d7505ad0087988eef32d",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29148635379,
+        "run_id": 29148953536,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "0aee55e1a48dab3d56f0475f789c2134c548ddc5",
+        "head_sha": "094446f3dfa8ee876dd0d7505ad0087988eef32d",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29148637631,
+        "run_id": 29148955113,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "0aee55e1a48dab3d56f0475f789c2134c548ddc5",
+        "head_sha": "094446f3dfa8ee876dd0d7505ad0087988eef32d",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,42 @@
       }
     }
   },
-  "status": "ara004_complete_pushed_remote_equal_and_ci_verified",
+  "status": "ara022_baseline_passed_audit_in_progress",
   "commands": [
+    {
+      "command": "make check at ARA-022 start",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 56,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 99,
+        "findings": 0,
+        "pytest_tests_passed": 246,
+        "pytest_subtests_passed": 172,
+        "pytest_duration_seconds": 3.72
+      }
+    },
+    {
+      "command": "ARA-004 recovery checkpoint remote and GitHub Actions verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "094446f3dfa8ee876dd0d7505ad0087988eef32d",
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29148953536,
+        "pull_request_run_id": 29148955113,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed"
+      }
+    },
     {
       "command": ".venv/bin/python -m pytest -q tests/test_package_resources.py (pre-fix)",
       "exit_code": 1,
@@ -500,6 +534,9 @@
     }
   ],
   "notes": [
+    "Owner approved the high-risk, 45-90 minute ARA-022 filesystem-policy implementation on 2026-07-11.",
+    "ARA-022 must use tracked code and temporary fixtures only; ignored repository runtime remains untouched.",
+    "Configured resolved runs storage links remain a compatibility requirement unless separately documented evidence requires migration.",
     "Owner approved the 45-90 minute ARA-004 package-resource and writable-workspace implementation on 2026-07-11.",
     "KI-023 remained untouched; all ARA-004 build/install/mock validation used temporary isolated workspaces and excluded source-tree imports.",
     "ARA-025 uses an additive schema-v1 semantic HEAD reference and never requires a recursive state-only closeout.",
