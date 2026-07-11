@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T18:59:47+08:00",
+  "recorded_at": "2026-07-11T20:45:26+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "094446f3dfa8ee876dd0d7505ad0087988eef32d",
-  "last_known_stable_commit": "094446f3dfa8ee876dd0d7505ad0087988eef32d",
+  "head_commit": "93026caef879a3b1ec1c935b362e85c77d4e7567",
+  "last_known_stable_commit": "93026caef879a3b1ec1c935b362e85c77d4e7567",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "094446f3dfa8ee876dd0d7505ad0087988eef32d",
+  "state_recorded_against_commit": "93026caef879a3b1ec1c935b362e85c77d4e7567",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-11T18:12:32+08:00",
-    "commit": "094446f3dfa8ee876dd0d7505ad0087988eef32d",
+    "verified_at": "2026-07-11T20:42:38+08:00",
+    "commit": "93026caef879a3b1ec1c935b362e85c77d4e7567",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29148953536,
+        "run_id": 29153023802,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "094446f3dfa8ee876dd0d7505ad0087988eef32d",
+        "head_sha": "93026caef879a3b1ec1c935b362e85c77d4e7567",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29148955113,
+        "run_id": 29153024964,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "094446f3dfa8ee876dd0d7505ad0087988eef32d",
+        "head_sha": "93026caef879a3b1ec1c935b362e85c77d4e7567",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,111 @@
       }
     }
   },
-  "status": "ara022_baseline_passed_audit_in_progress",
+  "status": "ara022_complete_remote_equal_ci_verified",
   "commands": [
+    {
+      "command": "make check after ARA-022 recovery-state closeout updates",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 56,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 99,
+        "findings": 0,
+        "pytest_tests_passed": 294,
+        "pytest_subtests_passed": 176,
+        "pytest_duration_seconds": 9.52
+      }
+    },
+    {
+      "command": "GitHub Actions verification for ARA-022 portability checkpoint",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "93026caef879a3b1ec1c935b362e85c77d4e7567",
+        "push_run_id": 29153023802,
+        "pull_request_run_id": 29153024964,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "format_lint_import_safety_tests": "passed_in_all_four_jobs"
+      }
+    },
+    {
+      "command": "ARA-022 implementation and Python 3.10 portability commits plus push verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "implementation_commit": "544b26a613a615e16fca9ddfe3c305f789bfc573",
+        "portability_fix_commit": "93026caef879a3b1ec1c935b362e85c77d4e7567",
+        "remote_branch": "codex/sol-autonomous-hardening",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "ahead": 0,
+        "behind": 0,
+        "draft_pr": 13,
+        "replacement_push_run_id": 29153023802,
+        "replacement_pull_request_run_id": 29153024964,
+        "replacement_ci_status": "passed"
+      }
+    },
+    {
+      "command": "make check after Python 3.10 portability correction",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 56,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 99,
+        "findings": 0,
+        "pytest_tests_passed": 294,
+        "pytest_subtests_passed": 176,
+        "pytest_duration_seconds": 9.4
+      }
+    },
+    {
+      "command": "make check after ARA-022 implementation and independent review",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 56,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 99,
+        "findings": 0,
+        "pytest_tests_passed": 294,
+        "pytest_subtests_passed": 176,
+        "pytest_duration_seconds": 9.44,
+        "git_diff_check": "passed"
+      }
+    },
+    {
+      "command": "independent frozen-diff ARA-022 validation",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 294,
+        "pytest_subtests_passed": 176,
+        "pytest_duration_seconds": 9.43,
+        "ruff_lint": "passed",
+        "ruff_format": "passed",
+        "git_diff_check": "passed",
+        "implementation_review": "GO",
+        "documentation_boundary_review": "GO"
+      }
+    },
     {
       "command": "make check at ARA-022 start",
       "exit_code": 0,
@@ -463,6 +566,49 @@
   ],
   "failures": [
     {
+      "command": "GitHub Actions runs 29152939334 and 29152940413 at implementation 544b26a",
+      "result": "corrected_and_replacement_ci_started",
+      "summary": {
+        "python_3_10_push": "failed",
+        "python_3_10_pull_request": "failed",
+        "python_3_13_push": "passed",
+        "python_3_13_pull_request": "passed",
+        "cause": "the reparse classifier test constructed pathlib.Path after mocking os.name to nt, so Linux Python 3.10 attempted to instantiate unsupported WindowsPath",
+        "production_code_failure": false,
+        "fix_commit": "93026caef879a3b1ec1c935b362e85c77d4e7567",
+        "replacement_push_run_id": 29153023802,
+        "replacement_pull_request_run_id": 29153024964
+      }
+    },
+    {
+      "command": "intermediate full pytest after initial run-lock preflight",
+      "result": "corrected_before_commit",
+      "summary": {
+        "pytest_failed": 2,
+        "pytest_passed": 278,
+        "pytest_subtests_passed": 170,
+        "cause": "project-wide preflight temporarily bypassed the historical stale-lock diagnostic branch"
+      }
+    },
+    {
+      "command": "intermediate round-loop collection",
+      "result": "corrected_before_commit",
+      "summary": {
+        "cause": "a new resume regression test was inserted before the preceding test body ended, causing IndentationError",
+        "tests_run": 0
+      }
+    },
+    {
+      "command": "intermediate survey lexical-path compatibility suite",
+      "result": "corrected_before_commit",
+      "summary": {
+        "pytest_failed": 1,
+        "pytest_passed": 282,
+        "pytest_subtests_passed": 172,
+        "cause": "the old macOS canonical path assertion did not reflect intentional lexical abspath retention"
+      }
+    },
+    {
       "command": ".venv/bin/python -m pytest -q tests/test_package_resources.py (pre-fix)",
       "result": "expected_pre_fix_failure",
       "summary": {
@@ -521,6 +667,10 @@
   ],
   "not_run": [
     {
+      "check": "native Windows ARA-022 integration",
+      "reason": "No native Windows runner was available; reparse-point classification and component-level static behavior are unit-tested/reviewed, while active replacement is explicitly outside the Windows guarantee."
+    },
+    {
       "check": "real provider smoke",
       "reason": "ARA-004 is a provider-free package-resource and mock-workflow change; isolated mock, source, wheel, and sdist controls exercise the affected behavior without credentials or cost."
     },
@@ -534,6 +684,12 @@
     }
   ],
   "notes": [
+    "Initial ARA-022 CI exposed a Python 3.10-only test construction bug; production behavior, Python 3.13 CI, and all local gates were green. The correction is committed/pushed as 93026ca and replacement CI passed.",
+    "ARA-022 implementation, tests, and threat-model documentation are complete, pushed, remote-equal, reflected in draft PR 13, and Python 3.10/3.13 CI-verified.",
+    "The automatic boundary registry is process-wide so worker threads and UI reruns share it; nested run roots inherit or rebase to the project anchor.",
+    "Configured external runs storage, stale real-directory tolerance, explicit analyze/compare aliases, and explicit export parents remain supported.",
+    "Survey source helpers intentionally retain lexical abspath spelling so canonicalization cannot bypass a registered boundary; persisted artifact content and repo-relative display remain unchanged.",
+    "Same-UID real-directory entry replacement, post-open or new-temp hard-link races, trusted ancestors above the anchor, and Windows active replacement are explicitly outside the guarantee.",
     "Owner approved the high-risk, 45-90 minute ARA-022 filesystem-policy implementation on 2026-07-11.",
     "ARA-022 must use tracked code and temporary fixtures only; ignored repository runtime remains untouched.",
     "Configured resolved runs storage links remain a compatibility requirement unless separately documented evidence requires migration.",

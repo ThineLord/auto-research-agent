@@ -361,3 +361,32 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed implementation as `0aee55e`, pushed it, verified exact local/upstream/`ls-remote`
   equality with ahead/behind `0/0`, and confirmed push run `29148635379` plus pull-request run
   `29148637631` passed every Python 3.10/3.13 job. Draft PR 13 remains the maintenance PR.
+
+## 2026-07-11 - Automatic artifact filesystem boundary
+
+- Reproduced static leaf links, ancestor/nested symlink swaps, UI validation/read replacement,
+  fresh-context metadata/log/stop-signal access, survey traversal escape, and cross-thread boundary
+  loss only in temporary fixtures; ignored repository runtime remained untouched.
+- Added a process-wide project boundary registry. Nested run roots inherit or rebase to the project
+  anchor, while configured run storage outside the project receives its own physical anchor.
+- Routed automatic POSIX reads, appends, atomic replacement, unlink, coordination files, directory
+  creation, and pruned/stable survey traversal through descriptor-relative no-follow operations;
+  rejected static symbolic links, hard-linked files, linked directories, and special nodes.
+- Established self-contained boundaries for CLI, resume, survey/cloud, run locks, background
+  processes, cooperative stop handling, and Streamlit live fragments without changing providers,
+  prompts, scoring, experiment artifacts, conclusions, or schemas.
+- Preserved configured external `runs/` storage, stale real-directory tolerance, explicit
+  analyze/compare aliases, explicit export parents, and actionable lock/guard recovery diagnostics.
+  Survey source paths intentionally retain lexical `abspath` spelling for safe reads.
+- Documented the exact residual threat boundary: trusted ancestors, malicious same-UID replacement
+  with another real directory, post-open/new-temp hard-link races, and Windows active replacement
+  are not claimed as protected. Native Windows integration was not available.
+- Final local `make check` passed with Ruff, imports, both repository-safety modes, and pytest (`294
+  passed, 176 subtests passed`; 99 tracked files, zero findings). Independent implementation,
+  adversarial, state-consistency, and documentation reviews reported GO.
+- Initial Python 3.10 CI exposed only a test construction bug caused by creating `Path` while
+  `os.name` was mocked to `nt`; Python 3.13 passed. Moved construction before the mock, reran the
+  full gate, and committed the correction separately.
+- Committed implementation as `544b26a` and the Python-3.10 portability fix as `93026ca`, pushed
+  both, verified exact local/upstream/`ls-remote` equality, updated draft PR 13, and confirmed push
+  run `29153023802` plus pull-request run `29153024964` passed every Python 3.10/3.13 job.

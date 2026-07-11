@@ -160,11 +160,17 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## KI-021 - Static resume checks do not close active filesystem swap races
 
-- Status: confirmed residual; owner-approved ARA-022 work is in progress
+- Status: fixed within the documented ARA-022 boundary; validated, committed, pushed, and
+  CI-verified
 - Severity: P2 under the project's local single-user threat model
-- Impact: renaming a validated run directory and replacing its path with a symlink between checks and stage persistence can redirect later writes; project-level artifact symlinks also remain broader than checkpoint scope.
-- Current action: task `ARA-022`; reproduce only in temporary fixtures, preserve configured
-  `runs/` storage links, and implement the smallest consistent no-follow/rejection policy.
+- Impact: registered POSIX automatic I/O and traversal now reject static links/hard links/special
+  nodes plus ancestor/nested symlink replacements; fresh CLI/UI/background/resume/survey/stop entry
+  points establish that boundary before automatic access.
+- Current action: task `ARA-022` completed at implementation `544b26a` plus portability fix
+  `93026ca`; push/PR runs `29153023802`/`29153024964` passed Python 3.10/3.13. Preserve the explicit
+  residual boundary: trusted ancestors above the anchor, malicious same-UID replacement with a
+  different real directory, post-open/new-temp hard-link races, and Windows active replacement are
+  not claimed as protected.
 
 ## KI-022 - Manual interrupts can still produce process status 0
 

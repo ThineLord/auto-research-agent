@@ -46,10 +46,11 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-ARA-022 is owner-approved and `IN_PROGRESS`. Resume from the exact checkpoint in
-`CURRENT_STATE.md`; do not assume baseline, reproduction, or implementation completed unless
-`LAST_VALIDATION.json` records it. If newer state-only evidence is unavailable, use
-`094446f3dfa8ee876dd0d7505ad0087988eef32d` as the conservative stable fallback.
+ARA-022 is `DONE`. Implementation `544b26a` and Python-3.10 test portability fix `93026ca` are
+pushed, remote-equal, reflected in draft PR 13, and verified by push/PR runs
+`29153023802`/`29153024964` on Python 3.10/3.13. Resume from the exact checkpoint in
+`CURRENT_STATE.md`; use `93026caef879a3b1ec1c935b362e85c77d4e7567` as the conservative exact
+externally verified fallback if the semantic current `HEAD` has not yet been checked.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
 it imported the editable checkout and advanced ignored `projects/example` state after a missing
@@ -66,9 +67,9 @@ The last successful local full validation command was:
 make check
 ```
 
-The current full expected result is Ruff/import/safety success and `246 passed, 172 subtests
-passed`; the final focused ARA-004 package/run-config/CLI/mock layer passes `35 passed, 20 subtests
-passed`. Both safety modes should scan only tracked/staged files with zero findings.
+The current full expected result is Ruff/import/safety success and `294 passed, 176 subtests
+passed`; the ARA-022 focused storage/runtime/resume/survey/UI/CLI layer passes `181 passed, 104
+subtests passed`. Both safety modes should scan only tracked/staged files with zero findings.
 Resolve `HEAD`, compare it with upstream and `ls-remote`, and inspect current PR checks before
 starting another task. If the current HEAD lacks successful remote evidence, use
 `last_external_verification.commit` as the conservative stable fallback. Do not restart ARA-005.
@@ -78,11 +79,16 @@ ignored `projects/example` state or the recorded pip-cache residue, and do not p
 sdist. Versions, license, dependency policy, UI/scripts distribution, and active filesystem swaps
 remain separate tasks.
 
-ARA-022 may inspect and modify only tracked code/docs plus temporary fixtures. Never probe the
-repository's ignored project runtime to discover links. Preserve configured resolved `runs/`
-storage links, distinguish static leaf links from active parent replacement, and record any
-platform capability gap explicitly. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006, and
-ARA-007 remain deferred under their recorded dependencies.
+ARA-022 used only tracked code/docs plus temporary fixtures; repository ignored runtime remains out
+of scope. Preserve configured resolved `runs/` storage links. The implementation protects
+registered link-based replacement but explicitly does
+not claim same-UID real-directory replacement, post-open/new-temp hard-link races, trusted-anchor
+ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
+and ARA-007 remain deferred under their recorded dependencies.
+
+There is no unblocked implementation task in the queue. ARA-018 requires an explicit owner
+license/distribution decision; do not start ARA-019, ARA-026, ARA-006, or ARA-007 until their
+recorded policy/publication dependencies are satisfied.
 
 ## 5. Safety boundaries
 
@@ -94,8 +100,7 @@ ARA-007 remain deferred under their recorded dependencies.
 ## Suggested immediate command
 
 ```bash
-git status --short --branch && git diff --check && git log --oneline -n 5
+git status --short --branch
 git rev-parse --verify HEAD
 .venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
-make check
 ```

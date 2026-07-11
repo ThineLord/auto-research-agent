@@ -4,27 +4,27 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: define and enforce the ARA-022 project-level runtime artifact symlink boundary
-  without breaking supported local workflows or configured `runs/` storage links.
+- Current goal: preserve the completed ARA-022 automatic-artifact boundary and wait for an explicit
+  owner policy decision before release-policy work; no unblocked implementation task remains.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `094446f3dfa8ee876dd0d7505ad0087988eef32d` (the exact HEAD
+- State recorded against commit: `93026caef879a3b1ec1c935b362e85c77d4e7567` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `094446f3dfa8ee876dd0d7505ad0087988eef32d` (exact local,
+- Last externally verified fallback: `93026caef879a3b1ec1c935b362e85c77d4e7567` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: ARA-022 is `IN_PROGRESS`. The owner approved its high-risk,
-  greater-than-30-minute filesystem-policy work on 2026-07-11. The clean baseline passes;
-  threat-model audit and temporary-fixture reproduction are in progress. No runtime code has
-  changed yet.
+- Active task at this snapshot: none. ARA-022 is `DONE`: implementation `544b26a` and Python-3.10
+  portability fix `93026ca` are pushed and remote-equal; replacement push/PR runs
+  `29153023802`/`29153024964` passed Python 3.10 and 3.13. Remaining queue items are owner-blocked or
+  deferred release-policy work.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
-## Files Changed By The ARA-022 Start Snapshot
+## Files Changed By The Active ARA-022 Worktree
 
-- `.codex/CURRENT_STATE.md`, `.codex/LAST_VALIDATION.json`, `.codex/RESUME_INSTRUCTIONS.md`,
-  `.codex/TASK_QUEUE.md`, `.codex/KNOWN_ISSUES.md`
+- Only recovery-state records remain uncommitted. Resolve the exact live list with
+  `git status --short`; implementation, tests, public docs, and decisions are committed.
 
 ## Completed Steps
 
@@ -401,23 +401,55 @@ Updated: 2026-07-11 (Asia/Shanghai)
   is explicitly not publication-ready because its tar headers expose the local builder owner/group
   and generated metadata timestamps are not reproducible. Follow-up ARA-026 records that boundary.
 
+## ARA-022 Implementation Checkpoint
+
+- Reproduced static leaf links, nested/ancestor link swaps, UI validation/read swaps, fresh-context
+  metadata/log/stop-signal paths, and cross-thread boundary loss only in temporary fixtures.
+- Added a process-wide trusted-boundary registry. Nested run roots inherit/rebase to the project
+  anchor; only configured storage outside the project receives a separate physical anchor.
+- Added POSIX component-by-component no-follow descriptor operations for automatic reads, appends,
+  atomic replacement, unlink, coordination files, directory creation, and pruned recursive survey
+  source traversal. Static hard links and special nodes fail closed.
+- Preserved configured external `runs/` storage, stale real-directory tolerance, explicit
+  analyze/compare aliases, and explicit export-parent behavior. Survey source helpers intentionally
+  retain lexical `abspath` spelling so safe reads cannot be redirected by canonicalization.
+- Hardened CLI, resume, survey/cloud, run lock, background-process, cooperative stop, and Streamlit
+  direct-entry boundaries; preserved actionable lock/guard recovery classification.
+- Independent implementation and state-consistency reviews report GO. The documented exclusions are
+  same-UID replacement with another real directory, post-open/new-temp hard-link races, trusted
+  ancestors above the anchor, and Windows active replacement.
+- Committed the implementation as `544b26a` and pushed it with exact local/upstream/`ls-remote`
+  equality. Python 3.13 CI passed, while both Python 3.10 runs exposed a test-only portability bug:
+  the test constructed `Path` after mocking `os.name="nt"` on Linux.
+- Moved `Path` construction before the mock, reran `make check` (`294 passed, 176 subtests passed`),
+  committed the portable regression as `93026ca`, pushed, and verified exact remote equality.
+
 ## Remaining Steps
 
-- Use the recorded clean provider-free baseline to distinguish existing behavior from new failures.
-- Inventory project-level fixed inputs/outputs, append logs, provider events, run roots, and all
-  atomic replacement call sites without opening ignored repository runtime artifacts.
-- Define the trusted-local-filesystem boundary, including the existing configured resolved `runs/`
-  storage-link compatibility contract and the active parent-swap limitation.
-- Reproduce confirmed static-link and active-swap violations in temporary fixtures, add failing
-  tests, and implement the smallest consistent no-follow/rejection policy.
-- Run focused storage/project-input/runtime/resume/UI regressions, `make check`, independent
-  adversarial review, staged safety checks, then commit, push, verify CI, and update draft PR 13.
+- Create and push the state-only ARA-022 closeout commit, then verify local/upstream/`ls-remote`
+  equality and its push/PR CI without reopening implementation work.
+- Stop at the queue policy gate. ARA-018 needs the owner's legal/distribution decision; ARA-019,
+  ARA-026, ARA-006, and ARA-007 remain deferred under recorded dependencies.
 
 ## Test Status
 
 - ARA-022 start baseline: `make check` passed with Ruff, imports, both safety modes, and pytest
   (`246 passed, 172 subtests passed in 3.72s`; 99 tracked files, zero findings).
-- ARA-022 focused reproduction: pending at this start snapshot.
+- ARA-022 focused final layer passed (`181 passed, 104 subtests passed`); independent full pytest
+  passed (`294 passed, 176 subtests passed in 9.43s`).
+- Final local `make check` passed with Ruff format/lint, imports, repository-safety self-test,
+  worktree/staged safety scans of 99 tracked files with zero findings, and pytest (`294 passed, 176
+  subtests passed in 9.44s`). `git diff --check` also passed.
+- Corrected before the final gate: early project preflight temporarily changed stale lock/FIFO
+  diagnostics (`2 failed, 278 passed, 170 subtests`); a misplaced test caused round-loop collection
+  `IndentationError`; canonical survey path spelling caused one compatibility assertion failure
+  (`1 failed, 282 passed, 172 subtests`). None remains in the final result.
+- Initial implementation CI runs `29152939334` (push) and `29152940413` (PR) failed only on Python
+  3.10: `Path("automatic-directory")` was constructed while `os.name` was mocked to `nt`, causing
+  Linux Python 3.10 to instantiate unsupported `WindowsPath`. Python 3.13 passed both runs. The
+  test-only fix is `93026ca`; local full validation remained green and replacement CI passed.
+- Replacement runs `29153023802` (push) and `29153024964` (PR) passed all Python 3.10/3.13 format,
+  lint, import, repository-safety, and test jobs at `93026ca`.
 - ARA-004 recovery checkpoint `094446f`: push run `29148953536` and pull-request run `29148955113`
   passed on Python 3.10 and 3.13; local/upstream/`ls-remote` equality is `0/0`.
 - ARA-004 pre-fix regression: two installed-layout subtests failed with status 2 and missing
@@ -731,8 +763,9 @@ Updated: 2026-07-11 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-make check
-rg -n "write_text|write_bytes|open\(|atomic_write|append|best_output|memory|provider_events|run.log|runs" src tests
+git status --short --branch
+.venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
+.venv/bin/python scripts/check_repo_safety.py --staged
 ```
 
 ## Interruption Recovery
@@ -745,11 +778,12 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.
 - Do not change prompts, scoring semantics, provider behavior, benchmark results, or artifact interpretation as part of a maintenance-only fix.
-- Do not widen the completed `ARA-021` checkpoint into project-level output/log symlink or active
-  filesystem-swap policy; those remain `ARA-022`.
+- ARA-022 blocks static link/hard-link/special-node escapes and link-based active replacement within
+  its registered boundary. It is not a hostile same-UID sandbox: real-directory entry replacement,
+  post-open/new-temp hard-link races, trusted-anchor ancestors, and Windows active replacement are
+  explicitly outside the guarantee.
 - Keep ARA-023 scoped to manual-interrupt propagation, cooperative stop status, and the associated
   lock lifecycle; the separately completed ARA-004 packaging behavior must not be folded into it.
-- Active non-cooperating filesystem replacement remains `ARA-022`.
 - Do not publish ARA-004's temporary sdist: its tar metadata contains the local builder owner/group
   and generated timestamps are not reproducible. ARA-026 owns that release-hardening work.
 - A pip build review created one cache entry under the user's pip cache containing a pre-fix wheel.
