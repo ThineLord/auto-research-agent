@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-12T01:43:47+08:00",
+  "recorded_at": "2026-07-12T02:00:55+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "78b76dcea0e8e2b67e25c192944ddc693ed41565",
-  "last_known_stable_commit": "78b76dcea0e8e2b67e25c192944ddc693ed41565",
+  "head_commit": "21fea1102b63f3ce457f0ee455c62c849607eab9",
+  "last_known_stable_commit": "21fea1102b63f3ce457f0ee455c62c849607eab9",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "78b76dcea0e8e2b67e25c192944ddc693ed41565",
+  "state_recorded_against_commit": "21fea1102b63f3ce457f0ee455c62c849607eab9",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-12T01:23:45+08:00",
-    "commit": "78b76dcea0e8e2b67e25c192944ddc693ed41565",
+    "verified_at": "2026-07-12T01:47:24+08:00",
+    "commit": "21fea1102b63f3ce457f0ee455c62c849607eab9",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29161456466,
+        "run_id": 29162165065,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "78b76dcea0e8e2b67e25c192944ddc693ed41565",
+        "head_sha": "21fea1102b63f3ce457f0ee455c62c849607eab9",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29161457321,
+        "run_id": 29162166082,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "78b76dcea0e8e2b67e25c192944ddc693ed41565",
+        "head_sha": "21fea1102b63f3ce457f0ee455c62c849607eab9",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,111 @@
       }
     }
   },
-  "status": "ara032_validated_locally_pending_publish",
+  "status": "ara033_validated_locally_pending_publish",
   "commands": [
+    {
+      "command": "make check after explicit ARA-033 staging and final metadata synchronization",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 57,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 100,
+        "findings": 0,
+        "pytest_tests_passed": 311,
+        "pytest_subtests_passed": 188,
+        "pytest_duration_seconds": 9.48
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_cli_exit_codes.py tests/test_run_analytics.py tests/test_run_compare.py tests/test_storage.py",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 72,
+        "pytest_subtests_passed": 22,
+        "failed_write_status_1": "passed",
+        "traceback_and_path_redaction": "passed",
+        "successful_exports": "passed",
+        "explicit_parent_symlinks": "passed"
+      }
+    },
+    {
+      "command": "focused ARA-033 unavailable-parent and unresolved-home subprocess regressions",
+      "exit_code": 0,
+      "result": "passed_after_expected_pre_fix_failures",
+      "summary": {
+        "pytest_tests_passed": 2,
+        "pytest_deselected": 23,
+        "pytest_subtests_passed": 4,
+        "analysis_exit_code": 1,
+        "comparison_exit_code": 1,
+        "traceback_disclosed": false,
+        "absolute_path_disclosed": false,
+        "blocker_bytes_preserved": true
+      }
+    },
+    {
+      "command": "two independent ARA-033 CLI contract and compatibility reviews",
+      "exit_code": 0,
+      "result": "passed_after_output_expansion_correction",
+      "summary": {
+        "blocking_findings_remaining": 0,
+        "operation_error_status": 1,
+        "output_argument_expansion": "covered",
+        "output_parent_resolution": "covered",
+        "json_write": "covered",
+        "successful_symlink_exports": "passed",
+        "reviewers": 2
+      }
+    },
+    {
+      "command": "provider-free analysis/comparison output failure reproduction (pre-fix)",
+      "exit_code": 1,
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "analysis_return_code": 1,
+        "comparison_return_code": 1,
+        "traceback_disclosed": true,
+        "temporary_absolute_path_disclosed": true,
+        "repository_absolute_path_disclosed": true,
+        "output_created": false,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "unresolved output home subprocess regression before expanding the normalized boundary",
+      "exit_code": 1,
+      "result": "expected_intermediate_failure",
+      "summary": {
+        "pytest_subtests_failed": 2,
+        "cause": "Path.expanduser RuntimeError occurred before the output-path try block",
+        "traceback_disclosed": true
+      }
+    },
+    {
+      "command": "ARA-032 publication, remote equality, CI, and draft PR verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "21fea1102b63f3ce457f0ee455c62c849607eab9",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29162165065,
+        "pull_request_run_id": 29162166082,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "draft_pr_13_updated": true
+      }
+    },
     {
       "command": "make check after explicit ARA-032 staging and final metadata synchronization",
       "exit_code": 0,
@@ -873,6 +976,15 @@
   ],
   "failures": [
     {
+      "command": "provider-free ARA-033 output failure subprocesses (pre-fix)",
+      "result": "corrected_before_commit",
+      "summary": {
+        "cause": "explicit analysis/comparison output resolution and writes lacked a CLI error boundary",
+        "impact": "operation status was correct but traceback and absolute paths were disclosed",
+        "provider_calls": 0
+      }
+    },
+    {
       "command": "provider-free non-finite analysis/comparison reproduction (pre-fix)",
       "result": "expected_pre_fix_failure",
       "summary": {
@@ -1057,7 +1169,9 @@
     }
   ],
   "notes": [
-    "ARA-032 is locally complete and limited to overall-score conversion, selection, ranking, trend, average, delta, and score-derived JSON output; arbitrary non-score legacy metadata remains outside scope.",
+    "ARA-033 is locally complete and limited to privacy-safe CLI normalization of explicit analysis/comparison output argument expansion, parent resolution, and JSON-write failures; successful exports and lower-level helpers remain compatible.",
+    "No unblocked TODO remains after ARA-033; ARA-029, ARA-030, and ARA-018 retain their explicit configuration, long-task, and owner-decision gates.",
+    "ARA-032 is complete at remote-equal commit 21fea11 with successful push and pull-request CI runs 29162165065 and 29162166082 on Python 3.10 and 3.13.",
     "ARA-032 preserves the historical finite-total average operation and uses scaled math.fsum only when the original total overflows, preventing both extreme non-finite output and ordinary 0.01 result drift.",
     "ARA-031 is complete at remote-equal commit 78b76dc with successful push and pull-request CI runs 29161456466 and 29161457321 on Python 3.10 and 3.13.",
     "An existing empty JSON object remains accepted because ARA-031 validates preservability and object shape, not a new field-level schema; any schema migration is a separate compatibility task.",

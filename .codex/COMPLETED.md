@@ -442,3 +442,18 @@ Validation and implementation outcomes will be appended only after they are actu
   passed` with 100 tracked files and zero safety findings.
 - Two independent adversarial reviews returned GO after finding and driving fixes for the missing
   negative-score rank, derived overflow, maximum-float average, and ordinary 0.01 rounding drift.
+
+## 2026-07-12 - Privacy-safe analysis and comparison output failures
+
+- Reproduced both module entrypoints returning status 1 with a full traceback and temporary/repo
+  absolute paths when an explicit output parent was an ordinary file. Unresolved `~user` output
+  paths produced the same leak through path expansion.
+- Kept the documented operation-failure status 1 and added fixed analysis/comparison output error
+  messages without exception text, traceback, or path content.
+- Scoped catches to explicit output argument expansion, parent resolution, and JSON writing; lower
+  analysis/comparison helpers, storage exceptions, console rendering, successful output, and
+  explicit output-parent symlink authorization remain unchanged.
+- Focused subprocess tests passed `2 passed, 4 subtests passed`; related
+  CLI/analysis/comparison/storage tests passed `72 passed, 22 subtests passed`; local `make check`
+  passed `311 passed, 188 subtests passed` with 100 tracked files and zero safety findings.
+- Two independent final reviews returned GO after running failure, success, and symlink matrices.

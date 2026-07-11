@@ -244,12 +244,21 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-032 - Non-finite artifact scores contaminate analysis and comparison
 
-- Status: fixed and locally validated in ARA-032; publish/CI state must be resolved live
+- Status: fixed, pushed, and CI-verified
 - Severity: P1 data/report correctness
 - Impact: malformed or legacy `NaN`/`Infinity` scores can win ranking, create a false flat trend,
   and escape as non-standard JSON. Finite extremes can also overflow derived averages/deltas, while
   a numeric missing-score sentinel can outrank valid negative scores.
-- Current action: finite conversion, score-presence ranking, overflow-safe derived fields, and
-  strict-JSON/compatibility regressions are complete. Related tests and `make check` are green, and
-  two independent adversarial reviews returned GO; resolve semantic `HEAD`, remote equality, and
-  CI live after publication.
+- Current action: task ARA-032 completed at `21fea11`; exact push/PR runs
+  `29162165065`/`29162166082` passed Python 3.10/3.13. Finite conversion, score-presence ranking,
+  overflow-safe derived fields, and strict-JSON/compatibility regressions are complete.
+
+## KI-033 - Provider-free export failures leak traceback and local paths
+
+- Status: fixed and locally validated in ARA-033; publish/CI state must be resolved live
+- Severity: P2 privacy/CLI reliability
+- Impact: an unavailable analysis/comparison output parent or unresolved home shortcut returns the
+  correct status 1 but exposes a Python traceback with temporary and repository absolute paths.
+- Current action: explicit output resolution/write failures now use fixed path-free diagnostics and
+  status 1. Failure, success, symlink, related, full, and two independent reviews are green; resolve
+  semantic `HEAD`, remote equality, and CI live after publication.

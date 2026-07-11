@@ -40,6 +40,9 @@
 
 ### Fixed
 
+* Analysis and comparison exports now report unavailable or unresolvable explicit output paths as
+  privacy-safe operation failures (status 1) instead of emitting tracebacks and local paths;
+  successful output and explicitly selected parent symlinks remain supported.
 * Analysis and comparison now ignore boolean, non-finite, and unrepresentably large overall scores;
   missing scores cannot outrank valid negative scores, overflowed deltas serialize as `null`, and
   finite-extreme averages remain strict JSON without changing ordinary historical rounding.

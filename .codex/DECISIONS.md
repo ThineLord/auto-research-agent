@@ -268,3 +268,14 @@
 - Compatibility: finite legacy numeric strings, ordinary rounded averages, run ordering among
   scored records, prompts, providers, experiment artifacts, and historical reports are unchanged.
   Arbitrary non-score metadata sanitation remains outside ARA-032.
+
+## 2026-07-12 - Normalize explicit provider-free export failures as operation errors
+
+- Decision: analysis/comparison output argument expansion, parent resolution, and JSON writes map
+  `OSError`/path-resolution `RuntimeError` to a fixed privacy-safe diagnostic and exit status 1.
+- Reason: these commands have already entered their requested provider-free operation, so the
+  documented operation-failure status applies; exposing raw exceptions leaked local paths without
+  adding actionable recovery information.
+- Boundary: do not catch analysis/comparison computation or terminal-rendering failures, and do not
+  suppress errors in the storage layer. Successful exports and explicitly authorized output-parent
+  symlinks retain their existing behavior.

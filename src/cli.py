@@ -401,9 +401,15 @@ def _run_compare_cli(args: argparse.Namespace, console: Console, root: Path) -> 
     comparison = _privacy_safe_comparison(compare_runs(run_roots), root)
     output_arg = getattr(args, "compare_output", None)
     if output_arg:
-        output_path = _resolve_repo_relative_path(root, output_arg)
-        authorized_output_path = output_path.parent.resolve(strict=False) / output_path.name
-        write_json_file(authorized_output_path, comparison)
+        try:
+            output_path = _resolve_repo_relative_path(root, output_arg)
+            authorized_output_path = output_path.parent.resolve(strict=False) / output_path.name
+            write_json_file(authorized_output_path, comparison)
+        except (OSError, RuntimeError):
+            console.print(
+                "[red]Run comparison output error: output path is unsafe or unavailable.[/red]"
+            )
+            raise SystemExit(_EXIT_OPERATION_ERROR) from None
         console.print(
             f"[green]Saved run comparison:[/green] {_display_repo_path(root, output_path)}"
         )
@@ -416,9 +422,15 @@ def _run_analyze_cli(args: argparse.Namespace, console: Console, root: Path) -> 
     analysis = _privacy_safe_run_analysis(analyze_run(run_root), root)
     output_arg = getattr(args, "analyze_output", None)
     if output_arg:
-        output_path = _resolve_repo_relative_path(root, output_arg)
-        authorized_output_path = output_path.parent.resolve(strict=False) / output_path.name
-        write_json_file(authorized_output_path, analysis)
+        try:
+            output_path = _resolve_repo_relative_path(root, output_arg)
+            authorized_output_path = output_path.parent.resolve(strict=False) / output_path.name
+            write_json_file(authorized_output_path, analysis)
+        except (OSError, RuntimeError):
+            console.print(
+                "[red]Run analysis output error: output path is unsafe or unavailable.[/red]"
+            )
+            raise SystemExit(_EXIT_OPERATION_ERROR) from None
         console.print(f"[green]Saved run analysis:[/green] {_display_repo_path(root, output_path)}")
     console.print_json(data=analysis)
     return analysis

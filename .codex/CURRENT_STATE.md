@@ -4,18 +4,18 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: preserve the locally validated ARA-032 finite-score checkpoint and continue with
-  the next unblocked task, ARA-033, only after live Git recovery checks.
+- Current goal: preserve the locally validated ARA-033 CLI output-error checkpoint; no unblocked
+  implementation task remains without owner/configuration/long-task approval.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `78b76dcea0e8e2b67e25c192944ddc693ed41565` (the exact HEAD
+- State recorded against commit: `21fea1102b63f3ce457f0ee455c62c849607eab9` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `78b76dcea0e8e2b67e25c192944ddc693ed41565` (exact local,
+- Last externally verified fallback: `21fea1102b63f3ce457f0ee455c62c849607eab9` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-032 is `DONE` after provider-free focused, related, full,
-  and independent adversarial validation; ARA-033 is the next unblocked `TODO` task.
+- Active task at this snapshot: none. ARA-033 is `DONE` after provider-free subprocess, related,
+  full, and independent contract validation. All remaining tasks are `DEFERRED` or `BLOCKED`.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -451,15 +451,40 @@ Updated: 2026-07-12 (Asia/Shanghai)
   regressions. Two independent adversarial reviews returned GO after the extreme-average fallback
   and finite-total compatibility path were added.
 
+## ARA-033 Privacy-Safe Output Failure Boundary
+
+- Reproduced analysis and comparison output parents implemented as ordinary files: both module
+  commands returned 1 but emitted full tracebacks containing temporary and repository absolute
+  paths. An unresolved `~user` output path exposed the same boundary through `RuntimeError`.
+- Limited normalization to the explicit output argument branch: user expansion, parent resolution,
+  and JSON writing catch `OSError`/`RuntimeError`, print a fixed path-free message, and raise the
+  existing operation-error status 1 without exception chaining.
+- Left analysis/comparison computation, storage propagation, final console rendering, successful
+  JSON output, and explicitly authorized output-parent symlinks unchanged.
+- Added real module subprocess regressions for both modes and both failure classes. Two independent
+  reviews returned GO after checking exit semantics, failed writes, success paths, and symlink
+  compatibility.
+
 ## Remaining Steps
 
-- ARA-033 is next: reproduce the privacy-unsafe analysis/comparison output-write traceback and
-  define the smallest CLI-boundary normalization without changing successful exports.
+- There is no unblocked implementation task. ARA-029 requires explicit CI-configuration approval;
+  ARA-030 requires a separate greater-than-30-minute approval; ARA-018 requires an owner license
+  decision, and its dependent release tasks remain deferred.
 - Keep ARA-018, ARA-029, and ARA-030 behind their recorded owner/configuration/long-task approval
   gates; do not fold release or CI-configuration policy into the analysis/compare fixes.
 
 ## Test Status
 
+- ARA-033 focused failure boundary passed `2 passed, 23 deselected, 4 subtests passed`; related
+  CLI/analysis/comparison/storage regression passed `72 passed, 22 subtests passed`.
+- ARA-033 full provider-free gate passed Ruff format/lint, imports, repository-safety self-test,
+  worktree/staged safety scans, and pytest after explicit staging (`311 passed, 188 subtests passed
+  in 9.48s`; 100 tracked files and zero findings).
+- Two independent ARA-033 reviews returned GO. They verified status 1, no traceback/path disclosure,
+  unchanged blocker bytes, successful provider-free output, and explicit parent-symlink support.
+- ARA-032 remote verification: exact local/upstream/`ls-remote` equality at `21fea11`, ahead/behind
+  `0/0`; push run `29162165065` and pull-request run `29162166082` passed Python 3.10/3.13. Draft PR
+  13 is open, mergeable, and updated.
 - ARA-032 final provider-free gate: Ruff format/lint, imports, repository-safety self-test,
   worktree/staged safety scans, and pytest passed after explicit staging (`309 passed, 184 subtests
   passed in 8.96s`; 100 tracked files and zero findings).
@@ -725,6 +750,10 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- ARA-033 pre-fix provider-free subprocesses for analysis and comparison each returned 1 but emitted
+  a traceback containing both temporary and repository absolute paths. The first regression failed
+  two subtests as expected; an additional unresolved-`~user` regression also failed two subtests
+  until output argument expansion moved inside the normalized boundary.
 - ARA-032's initial strict-JSON tests failed twice as expected because score-derived output still
   contained `NaN`; a later huge-integer extension exposed uncaught `OverflowError` before the
   conversion boundary was widened.
@@ -864,6 +893,9 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - Do not change prompts, scoring semantics, provider behavior, benchmark results, or artifact interpretation as part of a maintenance-only fix.
 - ARA-032 normalizes overall score selection, ranking, trend, average, delta, and their exported
   fields. It does not claim to sanitize arbitrary non-score metadata embedded in legacy artifacts.
+- ARA-033 catches only explicit output argument expansion, parent resolution, and JSON-write
+  failures. Analysis/comparison computation and terminal rendering errors remain visible runtime
+  failures rather than being mislabeled as output-path problems.
 - ARA-022 blocks static link/hard-link/special-node escapes and link-based active replacement within
   its registered boundary. It is not a hostile same-UID sandbox: real-directory entry replacement,
   post-open/new-temp hard-link races, trusted-anchor ancestors, and Windows active replacement are

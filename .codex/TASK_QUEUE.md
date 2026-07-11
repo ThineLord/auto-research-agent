@@ -227,7 +227,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-033 - Normalize analysis and comparison output write failures at the CLI boundary
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P2
 - Risk: low
 - Description: provider-free analysis/comparison output failures currently expose a traceback and
@@ -235,7 +235,8 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Related files: `src/cli.py`, CLI exit-code and analysis/comparison tests
 - Acceptance criteria: unavailable output parents return the documented operational status without
   traceback or local path disclosure; successful output behavior remains unchanged.
-- Validation command: subprocess CLI regressions followed by `make check`.
+- Validation command: focused subprocess CLI regressions, related CLI/analysis/comparison/storage
+  tests, and `make check` (`311 passed, 188 subtests passed`).
 - Commit required: yes.
 - Dependencies: complete ARA-032 so shared analysis/compare tests remain isolated by root cause.
 

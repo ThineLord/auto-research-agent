@@ -522,6 +522,99 @@ cli.main()
             analysis_result.stdout + analysis_result.stderr,
         )
 
+    def test_analysis_and_comparison_output_errors_are_privacy_safe(self) -> None:
+        for mode in ("analysis", "comparison"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                blocker = root / "private-output-parent"
+                blocker.write_text("PRIVATE_OUTPUT_SENTINEL\n", encoding="utf-8")
+                if mode == "analysis":
+                    run_root = root / "run"
+                    run_root.mkdir()
+                    mode_args = [
+                        "--analyze-run",
+                        str(run_root),
+                        "--analyze-output",
+                        str(blocker / "analysis.json"),
+                    ]
+                    expected_message = "Run analysis output error"
+                else:
+                    run_a = root / "run-a"
+                    run_b = root / "run-b"
+                    run_a.mkdir()
+                    run_b.mkdir()
+                    mode_args = [
+                        "--compare-runs",
+                        str(run_a),
+                        str(run_b),
+                        "--compare-output",
+                        str(blocker / "comparison.json"),
+                    ]
+                    expected_message = "Run comparison output error"
+
+                result = subprocess.run(
+                    [sys.executable, "-m", "src.main", *mode_args],
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                combined = result.stdout + result.stderr
+
+                self.assertEqual(result.returncode, 1, combined)
+                self.assertNotIn("Traceback", result.stderr)
+                self.assertNotIn(str(root), combined)
+                self.assertNotIn(str(ROOT), combined)
+                self.assertIn(expected_message, result.stdout)
+                self.assertEqual(
+                    blocker.read_text(encoding="utf-8"),
+                    "PRIVATE_OUTPUT_SENTINEL\n",
+                )
+
+    def test_unresolvable_output_home_is_privacy_safe(self) -> None:
+        for mode in ("analysis", "comparison"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                unknown_home = f"~ara033_missing_user_{root.name}"
+                if mode == "analysis":
+                    run_root = root / "run"
+                    run_root.mkdir()
+                    mode_args = [
+                        "--analyze-run",
+                        str(run_root),
+                        "--analyze-output",
+                        f"{unknown_home}/analysis.json",
+                    ]
+                    expected_message = "Run analysis output error"
+                else:
+                    run_a = root / "run-a"
+                    run_b = root / "run-b"
+                    run_a.mkdir()
+                    run_b.mkdir()
+                    mode_args = [
+                        "--compare-runs",
+                        str(run_a),
+                        str(run_b),
+                        "--compare-output",
+                        f"{unknown_home}/comparison.json",
+                    ]
+                    expected_message = "Run comparison output error"
+
+                result = subprocess.run(
+                    [sys.executable, "-m", "src.main", *mode_args],
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                combined = result.stdout + result.stderr
+
+                self.assertEqual(result.returncode, 1, combined)
+                self.assertNotIn("Traceback", combined)
+                self.assertNotIn(str(ROOT), combined)
+                self.assertNotIn(unknown_home, combined)
+                self.assertIn(expected_message, result.stdout)
+
     def test_module_entrypoint_invalid_project_exits_two(self) -> None:
         result = subprocess.run(
             [sys.executable, "-m", "src.main", "--mock", "--project", "../outside"],
