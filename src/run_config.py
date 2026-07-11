@@ -96,7 +96,8 @@ def build_initial_run_config(
     resume_sessions = list(existing.get("resume_sessions", []))
     start_round = int((runtime_config or {}).get("start_round", 1))
     drafting_mode = str((runtime_config or {}).get("drafting_mode", ""))
-    if start_round > 1:
+    resumes_existing_run = (resume_metadata or {}).get("lifecycle_action") == "resume_existing_run"
+    if start_round > 1 or resumes_existing_run:
         resume_sessions.append(
             {
                 "started_at": current_session_started_at,

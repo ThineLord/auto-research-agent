@@ -6,10 +6,43 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.run_config import collect_prompt_file_hashes, read_run_config
+from src.run_config import build_initial_run_config, collect_prompt_file_hashes, read_run_config
 
 
 class RunConfigTests(unittest.TestCase):
+    def test_round_one_resume_session_depends_on_lifecycle_not_round_number(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "runs" / "selected"
+            run_root.mkdir(parents=True)
+            common = {
+                "run_id": "selected",
+                "run_root": run_root,
+                "model_name": "fake-model",
+                "runtime_config": {"start_round": 1},
+                "started_at": "2026-07-11T00:00:00+00:00",
+            }
+
+            new_run = build_initial_run_config(
+                **common,
+                mode="normal",
+                resume_metadata={"lifecycle_action": "start_new_run"},
+            )
+            resumed_run = build_initial_run_config(
+                **common,
+                mode="resume",
+                existing_run_config={
+                    "started_at": "2026-07-10T00:00:00+00:00",
+                    "resume_sessions": [],
+                },
+                resume_metadata={"lifecycle_action": "resume_existing_run"},
+            )
+
+        self.assertEqual(new_run["resume_sessions"], [])
+        self.assertEqual(
+            resumed_run["resume_sessions"],
+            [{"started_at": "2026-07-11T00:00:00+00:00", "start_round": 1}],
+        )
+
     def test_collect_prompt_file_hashes_records_markdown_prompt_hashes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             prompt_dir = Path(tmp) / "prompts"

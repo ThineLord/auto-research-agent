@@ -24,6 +24,8 @@
 
 ### Fixed
 
+* Resuming an existing zero-round checkpoint now appends a round-1 entry to run-config
+  `resume_sessions`; a genuinely new round-1 run still has no resume-session entry.
 * Resuming a legacy run now preserves its original manifest provenance and unknown extension fields
   while merging current resume metadata. Existing manifests that cannot be preserved fail before
   writes, and an explicit checkpoint run ID must match the canonical run-directory identity;

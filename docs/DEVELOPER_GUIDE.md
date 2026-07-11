@@ -186,6 +186,8 @@ schema-additive and must not reinterpret or rescale the Judge's top-level score.
   next-round directory status/safety action. Resumed runs also record retained-history status and
   source fields. Existing histories remain opaque append-only records; unsafe arrays fail closed
   before run config, manifest, checkpoint, round, or summary writes.
+- `resume_sessions` uses lifecycle metadata as well as the round number, so resuming a zero-round
+  checkpoint records a round-1 session while a genuinely new round-1 run keeps an empty list.
 - Resume treats the canonical run-directory basename as the run identity. A present checkpoint
   `run_id` must match it; a missing ID is derived from it. Existing legacy manifests are parsed
   before the first write, retain creation-time and unknown fields, and merge current resume metadata.

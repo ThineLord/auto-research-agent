@@ -1385,6 +1385,9 @@ class RoundLoopTests(unittest.TestCase):
                 self.assertEqual(manifest["run_id"], "sparse-run")
                 self.assertEqual(manifest["run_root"], str(run_root.resolve()))
                 self.assertFalse((project_dir / "STOP_REQUESTED").exists())
+                run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+                self.assertEqual(len(run_config["resume_sessions"]), session_index)
+                self.assertEqual(run_config["resume_sessions"][-1]["start_round"], 1)
 
     def test_resume_rejects_run_roots_outside_the_selected_project(self) -> None:
         unsafe_kinds = (
