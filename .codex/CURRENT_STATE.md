@@ -4,26 +4,25 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: make committed recovery state resolve its containing HEAD without permanently
-  claiming that the previous closeout remains pending (`ARA-025`).
+- Current goal: make clean wheel and source-distribution installs retain the provider-free resources
+  needed by documented mock workflows without writing runtime state into `site-packages` (`ARA-004`).
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `3fa33a7663b4206c33417247cca78c5f74b06915` (the exact HEAD
+- State recorded against commit: `08994bee99f69399f88a24bb1d0f1e2d21d4c1b0` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `3fa33a7663b4206c33417247cca78c5f74b06915` (exact local,
+- Last externally verified fallback: `08994bee99f69399f88a24bb1d0f1e2d21d4c1b0` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-025 is `DONE`; select the next queue item only after live
-  Git and CI verification. ARA-004 remains blocked.
+- Active task at this snapshot: ARA-004 is `IN_PROGRESS`; owner approval was received for the
+  45–90 minute resource/workspace implementation. KI-023 remains untouched, so build/install/mock
+  validation is restricted to temporary isolated workspaces.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
-## Files Changed By The ARA-025 Snapshot
+## Files Changed By The ARA-004 Start Snapshot
 
-- `.codex/COMPLETED.md`
 - `.codex/CURRENT_STATE.md`
-- `.codex/DECISIONS.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/RESUME_INSTRUCTIONS.md`
@@ -366,15 +365,33 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Updated recovery instructions and decisions so state snapshots never request another recursive
   closeout merely to embed their own SHA. ARA-025 consistency assertions and final `make check`
   passed; independent review's four synchronization blockers were corrected.
+- Received explicit owner approval for ARA-004, reverified clean branch/upstream equality, GitHub
+  authentication, the absence of active Git operations, and successful Python 3.10/3.13 CI at
+  `08994be`.
+- Restored the verified ARA-004 audit instead of repeating the unsafe harness: wheel and sdist omit
+  config/prompts/example assets, installed mock exits 2 before provider work, and neutral temporary
+  workspaces remain empty.
+- Preserved KI-023 exactly as-is. Approval covers the packaging/resource implementation, not
+  cleanup or reconstruction of ignored `projects/example` state.
 
 ## Remaining Steps
 
-- Do not create another state-only closeout. Resolve the containing `HEAD` live; if it is ahead,
-  push normally, verify exact upstream/`ls-remote` equality and current Python 3.10/3.13 PR/push CI,
-  update draft PR 13, then select the next bounded task.
+- Revalidate the exact resource consumers and clean-artifact inventory without touching ignored
+  project state; add a failing isolated regression for the installed mock contract.
+- Implement the minimal package-resource and writable-workspace split while preserving source and
+  editable behavior, provider semantics, prompt bytes, versions, licenses, UI/scripts scope, and
+  all historical artifacts.
+- Run targeted tests, `make check`, source/editable controls, and clean wheel/sdist console/module
+  help/mock smokes; independently re-audit the artifact contents and write boundaries.
+- Commit and push only verified scoped files, verify exact remote SHA and Python 3.10/3.13 CI, and
+  update draft PR 13. Do not create recursive state-only closeouts.
 
 ## Test Status
 
+- ARA-004 pre-implementation evidence: clean wheel/sdist help controls passed and all four installed
+  mock controls exited 2 with missing `config.example.yaml`; no provider calls or neutral-workspace
+  artifacts. This evidence is being revalidated through safe temporary fixtures before changes.
+- Current ARA-004 implementation validation: pending.
 - ARA-025 JSON parsing and semantic consistency assertions: passed; fixed argv resolves current
   `HEAD`, all legacy/fallback fields remain 40-hex, verified commit exists and is an ancestor, and
   recorded CI events/workflow/head/jobs match live GitHub evidence.
@@ -470,8 +487,9 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - ARA-004 safe isolated build inventory: wheel/sdist built successfully; four console/module help
   controls passed, and four mock controls failed at missing bundled config with status 2. Neutral
   workspaces remained empty.
-- ARA-004 implementation tests were not started because the verified fix exceeds 30 minutes and
-  needs an explicit checkpoint approval.
+- ARA-004 implementation tests were initially withheld because the verified fix exceeded 30
+  minutes; owner approval was later received, and current progress is recorded at the top of this
+  file.
 - ARA-004 audit checkpoint `89e95bf`: all four Python 3.10/3.13 push/pull-request CI jobs passed.
 - ARA-004 verified-state closeout `3d77729`: all four Python 3.10/3.13 push/pull-request CI jobs
   passed; its Node.js 20 action deprecation annotation remains deferred under ARA-019.
@@ -644,9 +662,7 @@ Updated: 2026-07-11 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git status --short --branch
-git rev-parse --verify HEAD
-.venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
+rg -n "repo_root|config.example|prompts|projects" src tests pyproject.toml
 ```
 
 ## Interruption Recovery

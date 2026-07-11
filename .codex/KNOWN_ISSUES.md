@@ -36,13 +36,12 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-005 - Non-editable package assets are not yet verified
 
-- Status: verified incomplete in both wheel and sdist
+- Status: verified incomplete in both wheel and sdist; approved implementation in progress
 - Severity: P2
 - Evidence: the project declares only the `src` package while runtime workflows also reference repository assets and UI/scripts.
 - Impact: wheel-installed behavior may differ from editable or cloned-checkout behavior.
-- Current action: task `ARA-004`; audit checkpoint `89e95bf` is remotely verified. Safe
-  implementation requires separating installed read-only resources from a writable workspace and
-  is awaiting the recorded long-task checkpoint approval.
+- Current action: task `ARA-004`; implement the approved separation between installed read-only
+  resources and a writable workspace, using only temporary isolated validation workspaces.
 
 ## KI-006 - Legacy ignored logs can predate path masking
 
@@ -97,12 +96,12 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-013 - Wheel-installed mock workflow cannot find repository assets
 
-- Status: reproduced in isolated wheel and sdist installs; implementation blocked before changes
+- Status: reproduced in isolated wheel and sdist installs; approved implementation in progress
 - Severity: P1 for packaged distribution
 - Impact: console help works, but mock startup cannot locate `config.example.yaml`; a source checkout works.
-- Current action: task `ARA-004`; audit checkpoint `89e95bf` is remotely verified. Do not advertise
-  wheel readiness or use package-root data files that would make installed workflows write into
-  `site-packages`.
+- Current action: task `ARA-004`; bundle only required public read-only assets and keep installed
+  writable output outside `site-packages`. Do not advertise wheel readiness until clean-install
+  validation passes.
 
 ## KI-014 - Tracked reports contain a personal absolute-path fragment
 

@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T14:48:52+08:00",
+  "recorded_at": "2026-07-11T17:05:30+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "3fa33a7663b4206c33417247cca78c5f74b06915",
-  "last_known_stable_commit": "3fa33a7663b4206c33417247cca78c5f74b06915",
+  "head_commit": "08994bee99f69399f88a24bb1d0f1e2d21d4c1b0",
+  "last_known_stable_commit": "08994bee99f69399f88a24bb1d0f1e2d21d4c1b0",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "3fa33a7663b4206c33417247cca78c5f74b06915",
+  "state_recorded_against_commit": "08994bee99f69399f88a24bb1d0f1e2d21d4c1b0",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-11T14:31:35+08:00",
-    "commit": "3fa33a7663b4206c33417247cca78c5f74b06915",
+    "verified_at": "2026-07-11T14:53:00+08:00",
+    "commit": "08994bee99f69399f88a24bb1d0f1e2d21d4c1b0",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29142941351,
+        "run_id": 29143531240,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "3fa33a7663b4206c33417247cca78c5f74b06915",
+        "head_sha": "08994bee99f69399f88a24bb1d0f1e2d21d4c1b0",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29142943132,
+        "run_id": 29143532623,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "3fa33a7663b4206c33417247cca78c5f74b06915",
+        "head_sha": "08994bee99f69399f88a24bb1d0f1e2d21d4c1b0",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,7 +54,7 @@
       }
     }
   },
-  "status": "ara025_complete_ready_for_next_task",
+  "status": "ara004_approved_evidence_revalidation_in_progress",
   "commands": [
     {
       "command": "ARA-025 recovery-state semantic consistency assertions",
@@ -290,6 +290,8 @@
     }
   ],
   "notes": [
+    "Owner approved the 45-90 minute ARA-004 package-resource and writable-workspace implementation on 2026-07-11.",
+    "KI-023 remains untouched; all ARA-004 build/install/mock validation must use temporary isolated workspaces and exclude source-tree imports.",
     "ARA-025 uses an additive schema-v1 semantic HEAD reference and never requires a recursive state-only closeout.",
     "Current worktree, branch, upstream, remote, and CI state must be resolved live; 3fa33a7 remains the exact conservative externally verified fallback.",
     "Current quickstart wording now distinguishes implemented basic analytics/comparison from advanced research evaluation gaps.",

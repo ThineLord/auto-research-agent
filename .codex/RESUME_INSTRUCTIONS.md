@@ -46,10 +46,15 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-`ARA-005` implementation `15d9935`, recovery checkpoint `6b59091`, and verified closeout `3fa33a7`
-are pushed and reflected in draft PR 13. The closeout's push run `29142941351` and pull-request run
-`29142943132` passed on Python 3.10 and 3.13. Do not recreate another state-only closeout merely to
-embed its own SHA; resolve the current commit from Git and verify remote/CI evidence live.
+ARA-004 is approved and `IN_PROGRESS`. Resume from the highest completed checkpoint recorded in
+`CURRENT_STATE.md`; do not repeat the original local harness. It imported the editable checkout and
+advanced ignored `projects/example` state after a missing build backend. Owner approval covers the
+packaging/resource fix but does not authorize cleanup or reuse of that ignored state.
+
+All ARA-004 build/install/module/console/mock validation must use temporary isolated workspaces with
+source-tree imports excluded. Never seed or run against the repository's actual `projects/example`.
+Keep installed read-only assets separate from writable project output and fail rather than writing
+runtime state into `site-packages`.
 
 The last successful local full validation command was:
 
@@ -57,14 +62,15 @@ The last successful local full validation command was:
 make check
 ```
 
-The expected result is Ruff/import/safety success and `236 passed, 164 subtests passed`; both safety
-modes should scan 91 tracked files with zero findings. The ARA-005 corrected-diff review is GO.
+The pre-implementation expected result is Ruff/import/safety success and `236 passed, 164 subtests
+passed`; both safety modes should scan 91 tracked files with zero findings.
 Resolve `HEAD`, compare it with upstream and `ls-remote`, and inspect current PR checks before
 starting another task. If the current HEAD lacks successful remote evidence, use
 `last_external_verification.commit` as the conservative stable fallback. Do not restart ARA-005.
 
-`ARA-004` remains separately blocked. Do not repeat its unsafe local build harness or delete/rewrite
-ignored `projects/example` state; read `KI-005`, `KI-013`, and `KI-023` before any packaging work.
+Read `KI-005`, `KI-013`, and `KI-023` before continuing ARA-004. Do not delete/rewrite ignored
+`projects/example` state, and do not widen packaging scope into versions, licenses, dependency
+policy, UI/scripts distribution, or ARA-022 filesystem-swap behavior.
 Active non-cooperating filesystem replacement remains ARA-022 and was not widened into ARA-020.
 
 ## 5. Safety boundaries
