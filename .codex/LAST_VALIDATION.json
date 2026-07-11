@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T12:41:42+08:00",
+  "recorded_at": "2026-07-11T12:45:14+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "2b6523cda3d7a7943644692e276b6fdc7270573c",
-  "last_known_stable_commit": "2b6523cda3d7a7943644692e276b6fdc7270573c",
-  "status": "ara016_implementation_committed_pending_remote_verification",
+  "head_commit": "975559d1e6832c75ba1d909cc5bebe8f13335f05",
+  "last_known_stable_commit": "975559d1e6832c75ba1d909cc5bebe8f13335f05",
+  "status": "ara016_remote_verified_closeout_pending",
   "commands": [
     {
       "command": ".venv/bin/python -m pytest -q tests/test_repo_safety.py",
@@ -72,6 +72,40 @@
       "summary": {
         "implementation_commit": "2b6523cda3d7a7943644692e276b6fdc7270573c"
       }
+    },
+    {
+      "command": "exact local, remote-tracking, and git ls-remote SHA comparison",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "975559d1e6832c75ba1d909cc5bebe8f13335f05"
+      }
+    },
+    {
+      "command": "GitHub Actions push and pull-request run/job verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "push_run_id": 29140074284,
+        "pull_request_run_id": 29140075306,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "repository_safety_steps": "passed_in_all_four_jobs"
+      }
+    },
+    {
+      "command": "GitHub connector draft PR 13 update and readback",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "draft": true,
+        "open": true,
+        "mergeable": true,
+        "head_commit": "975559d1e6832c75ba1d909cc5bebe8f13335f05",
+        "body_contains_ara016": true
+      }
     }
   ],
   "failures": [
@@ -94,10 +128,6 @@
   ],
   "not_run": [
     {
-      "check": "native Python 3.10 execution and GitHub Actions matrix",
-      "reason": "Python 3.10 is unavailable locally; the remote push and CI matrix are pending."
-    },
-    {
       "check": "real provider smoke",
       "reason": "The change is provider-free repository validation and report redaction only."
     }
@@ -107,6 +137,8 @@
     "Worktree reads use descriptor-relative no-follow traversal; platforms without the required primitives fail closed while staged-index scanning remains available.",
     "The four report edits explicitly state that the account name is redacted and preserve the historical conclusions.",
     "Ignored projects/example state from KI-023 was not opened, changed, staged, or cleaned.",
-    "ARA-004 remains blocked and no package, provider, prompt, metric, experiment, dependency, or canonical artifact behavior changed."
+    "ARA-004 remains blocked and no package, provider, prompt, metric, experiment, dependency, or canonical artifact behavior changed.",
+    "Implementation 2b6523c and recovery checkpoint 975559d were pushed; exact SHA equality and all four Python 3.10/3.13 jobs were verified.",
+    "Draft PR 13 was updated through the GitHub connector and remains open, draft, and mergeable; no merge was attempted."
   ]
 }

@@ -203,7 +203,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-016 - Remove tracked personal paths and add a repository safety gate
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P1
 - Risk: low
 - Description: tracked reports contain a real local username in example scan text; sanitize it and prevent new tracked personal paths or obvious secrets.

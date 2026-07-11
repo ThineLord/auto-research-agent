@@ -7,19 +7,18 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Current goal: remove confirmed tracked personal-path fragments and add a deterministic tracked-file
   privacy/safety gate without changing historical findings (`ARA-016`).
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `2b6523cda3d7a7943644692e276b6fdc7270573c`
-- Last known stable commit: `2b6523cda3d7a7943644692e276b6fdc7270573c` (locally validated
-  implementation commit; recovery checkpoint, remote push, and GitHub CI are pending)
-- Active task: ARA-016 is `IN_PROGRESS`; implementation commit `2b6523c` is locally validated after
-  focused/full tests and blocker-free independent review. Recovery checkpoint, push, PR update, and
-  remote CI verification remain. ARA-004 is separately blocked.
-- Uncommitted changes: yes; recovery metadata only.
+- Current HEAD at state snapshot: `975559d1e6832c75ba1d909cc5bebe8f13335f05`
+- Last known stable commit: `975559d1e6832c75ba1d909cc5bebe8f13335f05` (exact local,
+  remote-tracking, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs passed)
+- Active task: ARA-016 is `DONE`; final verified-state closeout metadata is being prepared. The next
+  highest-value unblocked reproduced defect is ARA-014. ARA-004 remains separately blocked.
+- Uncommitted changes: yes; verified-state closeout metadata only.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
 - `.codex/TASK_QUEUE.md`
-- `.codex/DECISIONS.md`
+- `.codex/COMPLETED.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
@@ -217,11 +216,17 @@ Updated: 2026-07-11 (Asia/Shanghai)
   fail-closed behavior, staged-index path, tests, and local/CI/documentation wiring with no blocker.
 - Committed the reviewed implementation, tests, report redaction, Make/CI wiring, changelog, and
   public documentation as `2b6523c` with no unrelated or ignored artifacts.
+- Committed recovery state as `975559d`, pushed both commits, and verified exact local,
+  remote-tracking, and GitHub branch SHA equality.
+- Updated draft PR 13 with the ARA-016 scope, validation, compatibility boundary, commits, and
+  pending-status evidence while preserving its open draft state.
+- Verified push run `29140074284` and pull-request run `29140075306`: Python 3.10 and 3.13 all
+  passed, including the new repository-safety step in each of the four jobs.
 
 ## Remaining Steps
 
-- Update and commit recovery metadata, push both commits, verify exact remote SHA, update draft PR 13,
-  and verify all Python 3.10/3.13 push and pull-request jobs.
+- Commit and push this final verified-state closeout, verify exact remote SHA and its CI, then start
+  ARA-014 from the clean synchronized branch.
 
 ## Test Status
 
@@ -234,6 +239,8 @@ Updated: 2026-07-11 (Asia/Shanghai)
   the current local environment is Python 3.13.14.
 - Python 3.10 AST parsing passed for the scanner and its test module. Final independent review reran
   the 11 focused tests plus self/worktree/staged scans and reported no release blocker.
+- GitHub Actions at `975559d`: Python 3.10/3.13 passed for both push and pull-request events; the
+  repository-safety step passed in all four jobs.
 - Real provider smoke was not run because this task only changes repository validation and report
   wording; it makes no provider, prompt, metric, experiment, or runtime behavior change.
 - Final ARA-015 focused regression: `46 passed, 44 subtests passed`; focused Ruff lint and
@@ -405,7 +412,7 @@ Updated: 2026-07-11 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git add -- .codex/CURRENT_STATE.md .codex/TASK_QUEUE.md .codex/DECISIONS.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
+git add -- .codex/CURRENT_STATE.md .codex/TASK_QUEUE.md .codex/COMPLETED.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
 ```
 
 ## Interruption Recovery

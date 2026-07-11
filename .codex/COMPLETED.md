@@ -192,3 +192,25 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed implementation, tests, changelog, and developer documentation as `8845adf` and recovery
   state as `a513e4d`; pushed both and verified exact local/remote SHA equality.
 - Updated draft PR 13 and confirmed Python 3.10/3.13 passed for both push and pull-request triggers.
+
+## 2026-07-11 - Tracked repository privacy and secret gate
+
+- Confirmed the only baseline privacy findings were four real local-account fragments in two
+  tracked historical reports; no ignored artifact was opened and no provider/private-key finding
+  was present.
+- Reworded those records with explicit account-redaction language while preserving their historical
+  conclusions and avoiding a false claim that a placeholder was the original scan input.
+- Added a stdlib-only byte scanner for the tracked worktree and complete stage-0 index, with
+  privacy-safe category/location output, high-confidence path/key rules, and self-test controls.
+- Covered partial staging, untracked content, invalid UTF-8/NUL bytes, missing files, static links,
+  parent-directory links, unsupported traversal capability, operational errors, and safe examples.
+- Independent reviews reproduced an outside read through a linked parent and a swap race in the
+  initial compatibility fallback; descriptor-relative no-follow traversal and unsupported-platform
+  fail-closed behavior corrected both. Final quality review reported no release blocker.
+- Added `make repo-safety`, wired both scan modes and the self-test into `make check` and CI, and
+  documented its tracked-only and ignored-artifact boundary.
+- Focused validation passed with `11 passed`; final `make check` passed with `217 passed, 134
+  subtests passed`; worktree/index scans reported 91 tracked files and zero findings.
+- Committed implementation as `2b6523c` and recovery state as `975559d`, pushed both, verified exact
+  local/tracking/GitHub SHA equality, updated draft PR 13, and confirmed all four Python 3.10/3.13
+  push and pull-request jobs passed, including the new safety step.
