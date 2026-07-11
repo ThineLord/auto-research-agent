@@ -4,23 +4,30 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: align stale future-priority documentation with the already implemented comparison,
-  analytics, and dashboard features without overstating research readiness (`ARA-005`).
+- Current goal: make committed recovery state resolve its containing HEAD without permanently
+  claiming that the previous closeout remains pending (`ARA-025`).
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `6b590918b6ad7fc0e0ce4a83e4d011b7b479f0c8`
-- Last known stable commit: `6b590918b6ad7fc0e0ce4a83e4d011b7b479f0c8` (exact local,
+- Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
+  `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
+- State recorded against commit: `3fa33a7663b4206c33417247cca78c5f74b06915` (the exact HEAD
+  observed immediately before this additive state snapshot).
+- Last externally verified fallback: `3fa33a7663b4206c33417247cca78c5f74b06915` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task: ARA-005 is `DONE`; final remotely verified closeout metadata is being prepared.
-  ARA-004 remains blocked.
-- Uncommitted changes: yes; ARA-005 verified-state closeout metadata only.
+- Active task at this snapshot: none. ARA-025 is `DONE`; select the next queue item only after live
+  Git and CI verification. ARA-004 remains blocked.
+- Uncommitted changes: not persisted as a static claim. Resolve live with
+  `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
-## Modified Files
+## Files Changed By The ARA-025 Snapshot
 
-- `.codex/CURRENT_STATE.md`
 - `.codex/COMPLETED.md`
+- `.codex/CURRENT_STATE.md`
+- `.codex/DECISIONS.md`
 - `.codex/LAST_VALIDATION.json`
+- `.codex/KNOWN_ISSUES.md`
 - `.codex/RESUME_INSTRUCTIONS.md`
+- `.codex/TASK_QUEUE.md`
 
 ## Completed Steps
 
@@ -349,14 +356,32 @@ Updated: 2026-07-11 (Asia/Shanghai)
   equality with ahead/behind `0/0` and a clean worktree.
 - Verified push run `29142879222` and pull-request run `29142880135`: Python 3.10 and 3.13 passed
   every formatting, lint, import, repository-safety, and test step in all four jobs.
+- Confirmed four prior closeout commits permanently embedded their parent checkpoint and stale
+  pending/dirty authoring state because a tracked file cannot contain its own final commit SHA.
+- Confirmed no tracked runtime code, scripts, or tests consume the recovery JSON fields; unknown
+  external readers remain protected through unchanged schema-v1 legacy 40-hex fields.
+- Added authoritative semantic `current_head.ref`, fixed no-shell resolution argv, live worktree
+  source, exact snapshot-base SHA, and exact external verification evidence for ARA-005 closeout
+  `3fa33a7` including event/workflow/head/job conclusions.
+- Updated recovery instructions and decisions so state snapshots never request another recursive
+  closeout merely to embed their own SHA. ARA-025 consistency assertions and final `make check`
+  passed; independent review's four synchronization blockers were corrected.
 
 ## Remaining Steps
 
-- Commit and push this final verified-state closeout, verify exact SHA and Python 3.10/3.13 CI,
+- Do not create another state-only closeout. Resolve the containing `HEAD` live; if it is ahead,
+  push normally, verify exact upstream/`ls-remote` equality and current Python 3.10/3.13 PR/push CI,
   update draft PR 13, then select the next bounded task.
 
 ## Test Status
 
+- ARA-025 JSON parsing and semantic consistency assertions: passed; fixed argv resolves current
+  `HEAD`, all legacy/fallback fields remain 40-hex, verified commit exists and is an ancestor, and
+  recorded CI events/workflow/head/jobs match live GitHub evidence.
+- ARA-025 final `make check`: Ruff format passed (54 files), Ruff lint passed, imports passed, both
+  safety scans passed, and pytest passed (`236 passed, 164 subtests passed in 2.70s`).
+- ARA-025 independent review: core design GO; its four final state-synchronization blockers were
+  corrected and require one final readback before commit.
 - ARA-005 targeted stale-wording search: passed; no known-completed comparison, analytics,
   dashboard, drafting-mode, timing, or estimated-token item remains described as future work in the
   current-state quickstart roadmap.
@@ -619,7 +644,9 @@ Updated: 2026-07-11 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git add -- .codex/CURRENT_STATE.md .codex/COMPLETED.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
+git status --short --branch
+git rev-parse --verify HEAD
+.venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
 ```
 
 ## Interruption Recovery

@@ -192,3 +192,13 @@ Updated: 2026-07-10 (Asia/Shanghai)
   current-session time but does not append `resume_sessions` because the next round is still 1.
 - Current action: task `ARA-024` completed at implementation `b961070` and remotely verified
   checkpoint `a3bef4d`; all Python 3.10/3.13 push and PR jobs passed.
+
+## KI-025 - Committed recovery snapshots permanently lag their containing closeout
+
+- Status: fixed in the self-resolving recovery snapshot; verify current Git/CI state live
+- Severity: P2 recovery accuracy
+- Impact: each state-only closeout embeds its parent SHA and pending/dirty authoring state, so a
+  later recovery can mistake an already pushed and CI-verified closeout for unfinished work.
+- Current action: task `ARA-025` completed; legacy exact SHA fields remain compatible while the
+  authoritative semantic HEAD reference, live worktree source, and exact external-verification
+  evidence prevent recursive closeout instructions.

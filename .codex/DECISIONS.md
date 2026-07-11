@@ -167,3 +167,18 @@
   absent legacy fields from a resume session fabricated provenance that never existed.
 - Compatibility: configured `runs/` storage links and leaf aliases remain usable with canonical ID;
   current session mode/model/time stay in run config, and consumer fallback remains unchanged.
+
+## 2026-07-11 - Resolve committed recovery HEAD semantically
+
+- Decision: make `current_head.ref: HEAD` plus the fixed argv
+  `git rev-parse --verify HEAD` authoritative for the commit containing a tracked recovery snapshot.
+  Keep the schema-v1 `head_commit` and `last_known_stable_commit` fields as deprecated exact SHA
+  fallbacks, and add explicit field semantics plus the most recent external verification evidence.
+- Reason: a commit cannot embed its own final SHA because changing the tracked file changes that SHA.
+  State-only closeout commits therefore permanently claimed their parent HEAD, pending work, and a
+  dirty worktree even after they were pushed and CI-verified.
+- Recovery boundary: committed metadata does not claim future live worktree, upstream, or CI state.
+  Recovery must resolve Git state live and fall back to the last exact externally verified commit
+  when current remote evidence is absent.
+- Compatibility: no runtime code consumes these files; additive schema-v1 fields preserve unknown
+  external readers that still require the legacy 40-hex values.

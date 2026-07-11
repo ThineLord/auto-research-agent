@@ -116,6 +116,24 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Commit required: yes.
 - Dependencies: `ARA-020`.
 
+## ARA-025 - Make committed recovery state self-resolving
+
+- Status: `DONE`
+- Priority: P2
+- Risk: low
+- Description: state-only closeout commits cannot embed their own final SHA, so the committed
+  snapshot permanently reports the parent HEAD, pending closeout, and uncommitted files even after
+  the closeout itself is pushed and CI-verified.
+- Related files: `.codex/CURRENT_STATE.md`, `.codex/LAST_VALIDATION.json`,
+  `.codex/RESUME_INSTRUCTIONS.md`, `.codex/DECISIONS.md`, `.codex/KNOWN_ISSUES.md`
+- Acceptance criteria: committed recovery metadata resolves current HEAD from Git without claiming
+  stale worktree state, retains an exact externally verified fallback commit, and instructs recovery
+  to verify remote/CI state live; existing history remains readable.
+- Validation command: JSON parsing, recovery-state consistency assertions, `git diff --check`, and
+  `make check`.
+- Commit required: yes.
+- Dependencies: ARA-005 verified closeout `3fa33a7`.
+
 ## ARA-011 - Prevent failed rounds from replacing a trusted best output
 
 - Status: `DONE`

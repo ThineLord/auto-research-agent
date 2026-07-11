@@ -1,11 +1,99 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T14:29:36+08:00",
+  "recorded_at": "2026-07-11T14:48:52+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "6b590918b6ad7fc0e0ce4a83e4d011b7b479f0c8",
-  "last_known_stable_commit": "6b590918b6ad7fc0e0ce4a83e4d011b7b479f0c8",
-  "status": "ara005_remote_verified_closeout_pending",
+  "head_commit": "3fa33a7663b4206c33417247cca78c5f74b06915",
+  "last_known_stable_commit": "3fa33a7663b4206c33417247cca78c5f74b06915",
+  "current_head": {
+    "ref": "HEAD",
+    "resolution_argv": [
+      "git",
+      "rev-parse",
+      "--verify",
+      "HEAD"
+    ],
+    "authoritative": true
+  },
+  "state_recorded_against_commit": "3fa33a7663b4206c33417247cca78c5f74b06915",
+  "working_tree_source": "live_git_status",
+  "legacy_field_semantics": {
+    "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
+    "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
+  },
+  "last_external_verification": {
+    "verified_at": "2026-07-11T14:31:35+08:00",
+    "commit": "3fa33a7663b4206c33417247cca78c5f74b06915",
+    "remote_branch": "codex/sol-autonomous-hardening",
+    "remote_equal": true,
+    "local_equals_upstream": true,
+    "local_equals_ls_remote": true,
+    "ahead": 0,
+    "behind": 0,
+    "ci": {
+      "push": {
+        "run_id": 29142941351,
+        "event": "push",
+        "workflow": "CI",
+        "head_sha": "3fa33a7663b4206c33417247cca78c5f74b06915",
+        "conclusion": "success",
+        "jobs": {
+          "Python 3.10": "success",
+          "Python 3.13": "success"
+        }
+      },
+      "pull_request": {
+        "run_id": 29142943132,
+        "event": "pull_request",
+        "workflow": "CI",
+        "head_sha": "3fa33a7663b4206c33417247cca78c5f74b06915",
+        "conclusion": "success",
+        "jobs": {
+          "Python 3.10": "success",
+          "Python 3.13": "success"
+        }
+      }
+    }
+  },
+  "status": "ara025_complete_ready_for_next_task",
   "commands": [
+    {
+      "command": "ARA-025 recovery-state semantic consistency assertions",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "schema_version": 1,
+        "legacy_sha_fields_preserved": true,
+        "current_head_fixed_argv": true,
+        "verified_commit_exists_and_is_ancestor": true,
+        "working_tree_source": "live_git_status"
+      }
+    },
+    {
+      "command": "make check after ARA-025 metadata changes",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 54,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "pytest_tests_passed": 236,
+        "pytest_subtests_passed": 164,
+        "pytest_duration_seconds": 2.7
+      }
+    },
+    {
+      "command": "independent ARA-025 schema and recovery review",
+      "exit_code": 0,
+      "result": "passed_after_corrections",
+      "summary": {
+        "additive_schema_design": "passed",
+        "blocking_state_sync_findings_corrected": 4,
+        "blocking_findings_remaining": 0
+      }
+    },
     {
       "command": "targeted current-document stale-wording search plus git diff --check",
       "exit_code": 0,
@@ -202,13 +290,15 @@
     }
   ],
   "notes": [
+    "ARA-025 uses an additive schema-v1 semantic HEAD reference and never requires a recursive state-only closeout.",
+    "Current worktree, branch, upstream, remote, and CI state must be resolved live; 3fa33a7 remains the exact conservative externally verified fallback.",
     "Current quickstart wording now distinguishes implemented basic analytics/comparison from advanced research evaluation gaps.",
     "README, CHANGELOG, and dated historical audit/gap reports were intentionally unchanged.",
-    "Implementation 15d9935 and recovery checkpoint 6b59091 are pushed and remotely verified; only final closeout and PR refresh are pending.",
+    "ARA-005 implementation 15d9935, recovery checkpoint 6b59091, and closeout 3fa33a7 are pushed, remotely verified, and reflected in draft PR 13.",
     "A resume-existing lifecycle appends a session even when its next round is 1.",
     "A genuinely new round-1 run keeps an empty resume_sessions list.",
     "The existing start_round greater than 1 compatibility branch remains intact.",
     "No manifest, provider, prompt, score, metric, round execution, or artifact schema behavior changed.",
-    "Implementation b961070 and recovery checkpoint a3bef4d are pushed and remotely verified; only final closeout and PR refresh are pending."
+    "ARA-024 implementation b961070, recovery checkpoint a3bef4d, and closeout 0112e10 are pushed, remotely verified, and reflected in draft PR 13."
   ]
 }

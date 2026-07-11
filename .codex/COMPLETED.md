@@ -314,3 +314,21 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed implementation as `15d9935` and recovery state as `6b59091`, pushed both, verified exact
   local/tracking/GitHub SHA equality, and confirmed all four Python 3.10/3.13 push and pull-request
   jobs passed, including safety and test steps.
+
+## 2026-07-11 - Self-resolving committed recovery state
+
+- Reproduced the structural mismatch across four closeout commits: each tracked state file embedded
+  its parent SHA and permanently claimed pending/dirty work after the containing closeout was already
+  pushed and CI-verified.
+- Confirmed no repository runtime code consumes these fields, then preserved unknown external
+  consumers by keeping schema version 1 and the legacy exact 40-hex fields.
+- Added authoritative `current_head.ref: HEAD`, fixed no-shell resolution argv, live worktree-state
+  sourcing, exact snapshot-base semantics, and a conservative exact verified fallback.
+- Recorded ARA-005 closeout `3fa33a7` external evidence with remote equality plus push/PR event,
+  workflow, `head_sha`, conclusion, and Python 3.10/3.13 job results.
+- Removed recursive closeout, static dirty-worktree, and stale pending instructions from the current
+  recovery path while retaining all historical evidence.
+- JSON/ancestry/state consistency assertions, live CI evidence checks, `git diff --check`, and final
+  `make check` passed (`236 passed, 164 subtests passed`; 91 tracked files, zero safety findings).
+- Independent design review approved the additive model and identified four final synchronization
+  blockers; all were corrected before the semantic snapshot commit.
