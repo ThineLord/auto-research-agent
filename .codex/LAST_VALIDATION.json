@@ -1,29 +1,19 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T14:06:41+08:00",
+  "recorded_at": "2026-07-11T14:12:36+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "c1e8c57bc762d17ee9c26297160bd453b80fa294",
-  "last_known_stable_commit": "c1e8c57bc762d17ee9c26297160bd453b80fa294",
-  "status": "ara020_remote_verified_closeout_pending",
+  "head_commit": "b961070a848c2cf67269b8c081c32641fd6990b5",
+  "last_known_stable_commit": "b961070a848c2cf67269b8c081c32641fd6990b5",
+  "status": "ara024_implementation_committed_checkpoint_pending",
   "commands": [
     {
-      "command": ".venv/bin/python -m pytest -q tests/test_round_loop.py -k ARA-020 focused selectors",
+      "command": ".venv/bin/python -m pytest -q tests/test_run_config.py tests/test_round_loop.py",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "pytest_tests_passed": 4,
-        "pytest_subtests_passed": 10,
-        "pytest_duration_seconds": 0.13
-      }
-    },
-    {
-      "command": ".venv/bin/python -m pytest -q tests/test_round_loop.py tests/test_run_config.py tests/test_run_compare.py tests/test_run_analytics.py tests/test_benchmark_report.py tests/test_ui_helpers.py",
-      "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "pytest_tests_passed": 119,
-        "pytest_subtests_passed": 100,
-        "pytest_duration_seconds": 0.79
+        "pytest_tests_passed": 47,
+        "pytest_subtests_passed": 59,
+        "pytest_duration_seconds": 0.45
       }
     },
     {
@@ -37,128 +27,56 @@
         "repo_safety_self_test": "passed",
         "repo_safety_worktree": "passed",
         "repo_safety_staged": "passed",
-        "pytest_tests_passed": 235,
+        "pytest_tests_passed": 236,
         "pytest_subtests_passed": 164,
-        "pytest_duration_seconds": 2.68
+        "pytest_duration_seconds": 2.69
       }
     },
     {
-      "command": "independent code and adversarial compatibility reviews",
+      "command": "independent lifecycle/session regression review",
       "exit_code": 0,
-      "result": "passed_after_correction",
+      "result": "passed",
       "summary": {
-        "reviewers": 2,
         "blocking_findings_remaining": 0,
-        "sparse_manifest_provenance_finding_closed": true,
-        "repeated_resume_probe": "passed",
-        "consumer_fallback_probe": "passed"
+        "new_round_one_control": "passed",
+        "repeated_zero_round_resume": "passed",
+        "higher_round_compatibility": "passed"
       }
     },
     {
-      "command": "repository safety worktree and staged scans",
+      "command": "git commit -m fix: record zero-round resume sessions",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "implementation_commit": "b961070a848c2cf67269b8c081c32641fd6990b5",
+        "files_changed": 5
+      }
+    },
+    {
+      "command": "repository safety worktree and staged scans plus git diff check",
       "exit_code": 0,
       "result": "passed",
       "summary": {
         "tracked_files_scanned": 91,
         "findings": 0,
-        "binary_or_nul_files": 0,
-        "gitlinks_skipped": 0,
         "ignored_files_enumerated": false
       }
-    },
-    {
-      "command": "git commit -m fix: preserve run manifest provenance on resume",
-      "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "implementation_commit": "3b98c61d7cd7531266144d1d46d3c5aad29220c4",
-        "files_changed": 9
-      }
-    },
-    {
-      "command": "git commit -m chore: checkpoint ARA-020 manifest provenance",
-      "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "recovery_checkpoint": "c1e8c57bc762d17ee9c26297160bd453b80fa294",
-        "files_changed": 6
-      }
-    },
-    {
-      "command": "push plus exact local, remote-tracking, ls-remote, and GitHub PR head comparison",
-      "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "verified_commit": "c1e8c57bc762d17ee9c26297160bd453b80fa294"
-      }
-    },
-    {
-      "command": "GitHub Actions push and pull-request run/job verification",
-      "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "push_run_id": 29142234694,
-        "pull_request_run_id": 29142235674,
-        "python_3_10_push": "passed",
-        "python_3_13_push": "passed",
-        "python_3_10_pull_request": "passed",
-        "python_3_13_pull_request": "passed",
-        "repository_safety_steps": "passed_in_all_four_jobs",
-        "test_steps": "passed_in_all_four_jobs"
-      }
-    },
-    {
-      "command": "GitHub connector draft PR 13 update and readback",
-      "exit_code": 0,
-      "result": "passed",
-      "summary": {
-        "draft": true,
-        "open": true,
-        "mergeable": true,
-        "head_commit": "c1e8c57bc762d17ee9c26297160bd453b80fa294",
-        "body_contains_ara020": true
-      }
-    },
-    {
-      "command": "git diff --check",
-      "exit_code": 0,
-      "result": "passed"
     }
   ],
   "failures": [
     {
-      "command": "initial ARA-020 provenance and identity regression",
+      "command": "initial zero-round resume-session regressions",
       "result": "expected_pre_fix_failure",
       "summary": {
-        "pytest_failed_or_subfailed": 8,
-        "pytest_passed": 2,
-        "pytest_deselected": 39,
-        "causes": [
-          "resume replaced original manifest provenance and unknown fields",
-          "explicit direct and leaf-alias checkpoint IDs could disagree with canonical root",
-          "unpreservable manifests were overwritten instead of failing before writes"
-        ]
-      }
-    },
-    {
-      "command": "first post-fix provenance path assertion",
-      "result": "test_assertion_corrected",
-      "summary": {
-        "cause": "macOS canonicalized /var to /private/var; behavior was correct"
-      }
-    },
-    {
-      "command": "first independent implementation review",
-      "result": "finding_reproduced_then_fixed",
-      "summary": {
-        "cause": "valid sparse manifests inherited current resume session fields as false creation provenance"
+        "pytest_failed": 2,
+        "cause": "start_round equal to 1 suppressed resume_sessions for an existing run"
       }
     }
   ],
   "not_run": [
     {
       "check": "real provider smoke",
-      "reason": "Resume metadata preservation, identity validation, and temporary-directory regressions are provider-free; no request behavior changed."
+      "reason": "Run-config lifecycle bookkeeping and temporary-directory tests are provider-free; no request behavior changed."
     },
     {
       "check": "native Python 3.10",
@@ -166,13 +84,10 @@
     }
   ],
   "notes": [
-    "Canonical run_root.name is the single resume identity; explicit checkpoint and manifest IDs must match it.",
-    "Existing raw manifests are parsed before the first write, preserve creation and unknown fields, and merge current resume metadata additively.",
-    "Malformed, invalid UTF-8, nonobject, overly nested, identity-conflicting, or unmergeable manifests fail before artifact writes.",
-    "Existing sparse manifests stay sparse across repeated resume; current session fields remain in run_config.",
-    "Configured runs storage symlinks, canonical-ID leaf aliases, missing checkpoint IDs, and legacy consumers remain compatible.",
-    "Ignored repository artifacts were not opened or modified, and no provider, prompt, score, metric, experiment result, or artifact schema changed.",
-    "Implementation 3b98c61 and recovery checkpoint c1e8c57 are pushed and remotely verified; only the final state closeout is pending.",
-    "Draft PR 13 is open, draft, and mergeable; no merge was attempted."
+    "A resume-existing lifecycle appends a session even when its next round is 1.",
+    "A genuinely new round-1 run keeps an empty resume_sessions list.",
+    "The existing start_round greater than 1 compatibility branch remains intact.",
+    "No manifest, provider, prompt, score, metric, round execution, or artifact schema behavior changed.",
+    "Implementation b961070 is committed; recovery checkpoint, push, PR update, and CI verification are pending."
   ]
 }

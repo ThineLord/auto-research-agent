@@ -4,25 +4,28 @@ Updated: 2026-07-11 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: preserve original legacy run-manifest provenance and identity across resume while
-  retaining unknown compatibility fields (`ARA-020`).
+- Current goal: record resume-session provenance when an existing zero-round checkpoint resumes at
+  round 1, without classifying a genuinely new run as resumed (`ARA-024`).
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `c1e8c57bc762d17ee9c26297160bd453b80fa294`
-- Last known stable commit: `c1e8c57bc762d17ee9c26297160bd453b80fa294` (exact local,
-  remote-tracking, `ls-remote`, and GitHub PR head equality plus all Python 3.10/3.13 push/PR jobs
-  passed)
-- Active task: ARA-020 is `DONE`; final verified-state closeout metadata is being prepared. ARA-024
-  is the next bounded provenance task after this checkpoint; ARA-004 remains blocked.
-- Uncommitted changes: yes; verified-state closeout metadata only.
+- Current HEAD at state snapshot: `b961070a848c2cf67269b8c081c32641fd6990b5`
+- Last known stable commit: `b961070a848c2cf67269b8c081c32641fd6990b5` (locally validated
+  implementation; remote push and Python 3.10/3.13 CI verification pending)
+- Active task: ARA-024 is `IN_PROGRESS`; implementation `b961070` is committed after tests, docs,
+  independent review, and full gate passed. Recovery checkpoint, push, PR update, and CI remain.
+- Uncommitted changes: yes; ARA-024 recovery metadata only.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
-- `.codex/COMPLETED.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
 - `.codex/TASK_QUEUE.md`
+- `CHANGELOG.md`
+- `docs/DEVELOPER_GUIDE.md`
+- `src/run_config.py`
+- `tests/test_round_loop.py`
+- `tests/test_run_config.py`
 
 ## Completed Steps
 
@@ -307,14 +310,36 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Verified push run `29142234694` and pull-request run `29142235674`: Python 3.10 and 3.13 all
   passed, including formatting, lint, import, repository-safety, and test steps in all four jobs.
 - Updated and read back draft PR 13 with ARA-020 scope/evidence; it remains open, draft, and mergeable.
+- Committed and pushed final ARA-020 verified-state closeout `4d77a8c`, verified exact SHA equality,
+  and confirmed all four Python 3.10/3.13 closeout jobs passed. Draft PR 13 was updated and remains
+  open, draft, and mergeable.
+- Reproduced direct builder and real repeated zero-round resumes leaving `resume_sessions` empty,
+  while the new round-1 control correctly remained empty.
+- Added direct lifecycle and two-consecutive-resume regressions before changing implementation; both
+  failed exactly on the missing round-1 session entry.
+- Changed session append to use `start_round > 1` or explicit `resume_existing_run` lifecycle,
+  preserving old higher-round compatibility and new-run round-1 behavior.
+- Related run-config/round-loop tests passed (`47 passed, 59 subtests passed`); final `make check`
+  passed with Ruff, imports, both safety scans, and pytest (`236 passed, 164 subtests passed`).
+- Independent focused review reported GO across new round 1, zero-round repeated resume, and
+  start-round-greater-than-1 compatibility; no provider or ignored artifact was used.
+- Staged only the five reviewed code/test/public-doc paths, passed staged diff/safety checks, and
+  committed implementation `b961070a848c2cf67269b8c081c32641fd6990b5`
+  (`fix: record zero-round resume sessions`).
 
 ## Remaining Steps
 
-- Commit and push this final verified-state closeout, verify exact SHA and CI, then start bounded
-  task ARA-024 from the synchronized queue.
+- Commit this recovery metadata as a separate checkpoint.
+- Push, verify exact SHA, update draft PR 13, and verify Python 3.10/3.13 push/PR jobs.
 
 ## Test Status
 
+- ARA-024 pre-fix regression: `2 failed`; direct and real zero-round resume both omitted the session.
+- ARA-024 related regression: `47 passed, 59 subtests passed`.
+- Final ARA-024 `make check`: Ruff format passed (54 files), Ruff lint passed, imports passed, both
+  safety scans passed, and pytest passed (`236 passed, 164 subtests passed in 2.69s`).
+- Independent review: GO; new run round 1 remains empty, each zero-round resume adds exactly one,
+  and existing start-round-greater-than-1 behavior passes. No provider-backed test was needed.
 - ARA-020 pre-fix regression: `8 failed, 2 passed, 39 deselected`; manifest provenance was replaced,
   explicit direct/alias IDs were accepted, and five unpreservable manifest cases were overwritten.
 - ARA-020 focused regression after the final sparse correction: `4 passed, 10 subtests passed`.
@@ -325,6 +350,8 @@ Updated: 2026-07-11 (Asia/Shanghai)
   session contamination. Provider calls and ignored project artifacts were not used.
 - GitHub Actions at `c1e8c57`: Python 3.10/3.13 passed for both push and pull-request events;
   formatting, lint, imports, repository safety, and tests passed in all four jobs.
+- Final ARA-020 closeout `4d77a8c`: exact remote SHA verified and Python 3.10/3.13 passed for push
+  run `29142308598` and pull-request run `29142309509`, including all safety/test steps.
 - ARA-023 pre-fix interrupt regression: `3 failed, 1 passed, 50 deselected`; both CLI boundaries
   returned normally and runner did not re-propagate after safe artifact finalization.
 - ARA-023 final related regression: `63 passed, 61 subtests passed in 1.49s` across CLI exit,
@@ -551,11 +578,13 @@ Updated: 2026-07-11 (Asia/Shanghai)
   `/private/var`; the assertion now compares the canonical run-config path and all behavior passed.
 - Independent ARA-020 review found valid sparse manifests would inherit current resume fields and
   preserve them falsely; the three-way provenance source policy and repeated-resume regression fixed it.
+- Initial ARA-024 direct and runner-level regressions both failed because `start_round == 1` was the
+  only session-append gate; these were expected pre-fix failures.
 
 ## Next Command
 
 ```bash
-git add -- .codex/CURRENT_STATE.md .codex/COMPLETED.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md .codex/TASK_QUEUE.md
+git add -- .codex/CURRENT_STATE.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md .codex/TASK_QUEUE.md
 ```
 
 ## Interruption Recovery

@@ -40,21 +40,19 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-`ARA-020` implementation `3b98c61` and recovery checkpoint `c1e8c57` are pushed and remotely
-verified. All Python 3.10/3.13 push and pull-request jobs passed. Only the final verified-state
-closeout may remain depending on the interruption point. Compare HEAD/upstream and current state
-before repeating work. The last successful local full validation command was:
+`ARA-024` implementation `b961070` is locally committed and validated; its recovery checkpoint,
+push, PR update, and CI verification may remain. Compare HEAD/upstream and current state before
+repeating work. The last successful local full validation command was:
 
 ```bash
 make check
 ```
 
-The expected result is Ruff/import/safety success and `235 passed, 164 subtests passed`. Focused
-ARA-020 validation should report `4 passed, 10 subtests passed`; the resume/config/consumer/UI suite
-should report `119 passed, 100 subtests passed`; both safety modes should scan 91 tracked files with
-zero findings. If verified closeout metadata is uncommitted, stage only the six named `.codex` files
-and create the closeout. If ahead, push normally and verify exact remote SHA plus CI. Once clean and
-synchronized, continue with bounded ARA-024; do not restart ARA-020.
+The expected result is Ruff/import/safety success and `236 passed, 164 subtests passed`. Related
+run-config/round-loop validation should report `47 passed, 59 subtests passed`; both safety modes
+should scan 91 tracked files with zero findings. If only recovery metadata is uncommitted, stage the
+five named `.codex` files and create a checkpoint commit. If ahead, push normally, verify exact
+remote SHA plus CI, and update draft PR 13. Do not restart ARA-024 or duplicate `b961070`.
 
 `ARA-004` remains separately blocked. Do not repeat its unsafe local build harness or delete/rewrite
 ignored `projects/example` state; read `KI-005`, `KI-013`, and `KI-023` before any packaging work.

@@ -186,9 +186,8 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-024 - Zero-round resume omits a run-config resume session entry
 
-- Status: confirmed by code-path audit; deferred from ARA-020
+- Status: fixed and locally validated at implementation `b961070`; push/CI verification pending
 - Severity: P3 provenance completeness
 - Impact: resuming a checkpoint with `last_completed_round=0` records resume lifecycle metadata and
   current-session time but does not append `resume_sessions` because the next round is still 1.
-- Current action: task `ARA-024`; distinguish new-run round 1 from resume-existing-run round 1 and
-  add a session entry without changing round execution or legacy manifest semantics.
+- Current action: task `ARA-024`; commit recovery state, push implementation `b961070`, and verify CI.
