@@ -356,3 +356,17 @@
   pricing policy, provider calls, model metadata, and existing artifacts remain unchanged.
 - Scope: the possibility of retaining stale discovery beside a new fallback profile is a separate
   provenance-cohort problem queued as ARA-040, not silently changed under ARA-038.
+
+## 2026-07-12 - Preload prior-round resume context before startup writes
+
+- Decision: after canonical path and artifact checks, read the previous round's fixed draft, review,
+  revised, and Judge files exactly once before building or writing new startup metadata. Reuse those
+  in-memory values in the round loop.
+- Missing compatibility: a missing leaf or entirely missing legacy previous-round directory remains
+  an empty context. Existing content that cannot be opened or decoded as UTF-8 raises a basename-only
+  `ResumeHistoryError` with exception chaining suppressed.
+- Reason: the tolerant storage helper erased the distinction between missing and unreadable data and
+  was called only after run config/log/manifest writes, so corrupted research context could silently
+  change the next prompt while new metadata claimed a resumed session.
+- Scope: no context schema, prompt composition, provider, scoring, history reconciliation, round
+  output, valid-context whitespace behavior, or historical artifact interpretation changes.

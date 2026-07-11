@@ -40,6 +40,10 @@
 
 ### Fixed
 
+* Resume now reads all four previous-round draft/review/revised/Judge context files before changing
+  startup metadata. Existing unreadable or invalid-UTF-8 context blocks without agent invocation or
+  artifact writes and reports only the fixed artifact name; genuinely missing legacy context remains
+  compatible as empty input.
 * Cloud-free model discovery now contains SDK lazy-pager iteration and model-conversion failures in
   its existing safe error result, so explicit discovery exits 1 while profile mode can retain its
   configured-seed fallback. Automatic discovery/profile artifact write failures now use a fixed,

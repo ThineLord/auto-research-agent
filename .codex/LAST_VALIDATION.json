@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-12T03:17:49+08:00",
+  "recorded_at": "2026-07-12T03:35:27+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "cd2114325d748241abe156da8864d492246613a6",
-  "last_known_stable_commit": "cd2114325d748241abe156da8864d492246613a6",
+  "head_commit": "25ae39bcd90ba2a2152025f46739dabf3391e8cb",
+  "last_known_stable_commit": "25ae39bcd90ba2a2152025f46739dabf3391e8cb",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "cd2114325d748241abe156da8864d492246613a6",
+  "state_recorded_against_commit": "25ae39bcd90ba2a2152025f46739dabf3391e8cb",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-12T03:06:16+08:00",
-    "commit": "cd2114325d748241abe156da8864d492246613a6",
+    "verified_at": "2026-07-12T03:24:54+08:00",
+    "commit": "25ae39bcd90ba2a2152025f46739dabf3391e8cb",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29164609427,
+        "run_id": 29165142777,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "cd2114325d748241abe156da8864d492246613a6",
+        "head_sha": "25ae39bcd90ba2a2152025f46739dabf3391e8cb",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29164610776,
+        "run_id": 29165143905,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "cd2114325d748241abe156da8864d492246613a6",
+        "head_sha": "25ae39bcd90ba2a2152025f46739dabf3391e8cb",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,100 @@
       }
     }
   },
-  "status": "ara038_done_local_validation_passed_publication_pending",
+  "status": "ara039_done_local_validation_passed_publication_pending",
   "commands": [
+    {
+      "command": "ARA-039 pre-fix invalid-UTF8 and injected prior-Judge read controls",
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "pytest_subtests_failed": 2,
+        "resume_history_error_missing": true,
+        "startup_artifacts_written": true,
+        "agent_invoked": true,
+        "previous_judge_silently_empty": true
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q focused ARA-039 four-context error matrix and compatibility controls",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 4,
+        "pytest_subtests_passed": 8,
+        "context_files_covered": 4,
+        "failure_classes_covered": [
+          "invalid_utf8",
+          "injected_os_error"
+        ],
+        "missing_parent_compatibility": "passed",
+        "byte_preservation": "passed",
+        "new_round_directory_absent": true,
+        "agent_not_invoked": true,
+        "exception_cause_suppressed": true,
+        "path_privacy": "passed"
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_round_loop.py tests/test_cli_exit_codes.py",
+      "exit_code": 0,
+      "result": "passed_after_missing_parent_compatibility_correction",
+      "summary": {
+        "pytest_tests_passed": 80,
+        "pytest_subtests_passed": 107,
+        "interim_test_failures": 2,
+        "interim_subtest_failures": 14,
+        "interim_cause": "a missing previous-round directory was initially classified as unreadable"
+      }
+    },
+    {
+      "command": "make check after ARA-039 implementation and recovery-state synchronization",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 57,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 100,
+        "findings": 0,
+        "pytest_tests_passed": 328,
+        "pytest_subtests_passed": 215,
+        "pytest_duration_seconds": 11.63
+      }
+    },
+    {
+      "command": "two independent ARA-039 final reviews",
+      "result": "passed",
+      "summary": {
+        "boundary_review": "GO",
+        "final_diff_review": "GO",
+        "fail_before_write_order": "passed",
+        "missing_legacy_compatibility": "passed",
+        "path_and_cause_privacy": "passed",
+        "provider_called": false
+      }
+    },
+    {
+      "command": "ARA-038 publication, remote equality, CI, and draft PR verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "25ae39bcd90ba2a2152025f46739dabf3391e8cb",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29165142777,
+        "pull_request_run_id": 29165143905,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "draft_pr_13_updated": true
+      }
+    },
     {
       "command": "ARA-038 pre-fix fake lazy-pager and automatic artifact-write fault matrix",
       "result": "expected_pre_fix_failure",
@@ -1659,6 +1751,10 @@
   ],
   "not_run": [
     {
+      "check": "real provider smoke for ARA-039",
+      "reason": "Prior-round context loading and fail-before-write ordering are deterministic local resume boundaries; fake agents plus temporary invalid-UTF8 and read-error fixtures cover the affected behavior without credentials or cost."
+    },
+    {
       "check": "real provider smoke for ARA-038",
       "reason": "Discovery iteration and artifact-write boundaries are deterministic and covered with fake SDK pagers plus temporary write failures; no credential, cost, or external service is required."
     },
@@ -1696,7 +1792,9 @@
     }
   ],
   "notes": [
-    "ARA-038 is complete and locally validated with no active task; publication remains pending and ARA-039 is the next unblocked P2.",
+    "ARA-039 is complete and locally validated with no active task; publication remains pending and ARA-040 is the next unblocked P2.",
+    "ARA-039 preloads the four fixed previous-round context files before startup writes, treats only genuinely missing paths as empty, and suppresses path-bearing exception causes for existing unreadable content.",
+    "ARA-038 is complete at remote-equal commit 25ae39b with successful push and pull-request CI runs 29165142777 and 29165143905 on Python 3.10 and 3.13.",
     "ARA-038 preserves explicit discovery status 1, profile discovery-error seed fallback status 0, legacy non-iterable models wrappers, and fixed path-free status 1 for all four automatic artifact-write failure stages.",
     "ARA-040 separately owns cross-process discovery/profile provenance cohorts; ARA-038 does not silently invalidate or migrate existing artifacts.",
     "ARA-037 is complete at remote-equal commit cd21143 with successful push and pull-request CI runs 29164609427 and 29164610776 on Python 3.10 and 3.13.",

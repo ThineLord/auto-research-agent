@@ -328,7 +328,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-039 - Fail before writes on unreadable prior-round resume context
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P2
 - Risk: medium
 - Description: invalid UTF-8 in an existing prior-round Judge artifact is silently converted to an
@@ -337,8 +337,9 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Acceptance criteria: an existing but unreadable prior-round context artifact blocks resume before
   automatic writes or agent invocation; genuinely missing legacy context follows an explicit
   compatibility policy.
-- Validation command: byte-preservation invalid-UTF8/read-failure matrix, resume/round-loop tests,
-  then `make check`.
+- Validation command: byte-preservation four-context invalid-UTF8/read-failure matrix (`4 passed, 8
+  subtests passed`), resume/round-loop/CLI tests (`80 passed, 107 subtests passed`), then `make
+  check` (`328 passed, 215 subtests passed`).
 - Commit required: yes.
 - Dependencies: ARA-034 strict checkpoint eligibility first.
 

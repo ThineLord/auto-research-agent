@@ -561,3 +561,23 @@ Validation and implementation outcomes will be appended only after they are actu
 - Focused tests passed `3 passed, 6 subtests passed`; related cloud-free/CLI tests passed `50 passed,
   34 subtests passed`; local `make check` passed `326 passed, 207 subtests passed` with 100 tracked
   files and zero findings. Two independent final reviews returned GO; no provider call was made.
+- Committed as `25ae39b`, pushed with exact local/upstream/`ls-remote` equality, updated draft PR
+  13, and confirmed push run `29165142777` plus pull-request run `29165143905` passed every Python
+  3.10/3.13 job.
+
+## 2026-07-12 - Fail-before-write prior-round resume context handling
+
+- Reproduced invalid UTF-8 and injected read failures in the previous round's Judge context being
+  silently converted to empty text after new run config, log, and manifest content had been written;
+  resume then invoked the draft agent instead of failing safely.
+- Replaced the tolerant context reader with a resume-specific boundary: genuinely missing leaves or
+  an entirely missing legacy round directory remain empty, while other I/O and Unicode failures
+  become a basename-only `ResumeHistoryError` with suppressed exception chaining.
+- Preloaded draft, review, revised, and Judge context once after path checks and before any startup
+  artifact write or agent invocation; the later round loop reuses those in-memory values.
+- Added a four-file by two-error matrix proving every existing file remains byte-identical, no new
+  round directory or automatic file is created, agents are not called, and exception/console output
+  contains no temporary path. A missing-parent legacy control proves compatibility.
+- Focused tests passed `4 passed, 8 subtests passed`; related round-loop/CLI tests passed `80 passed,
+  107 subtests passed`; local `make check` passed `328 passed, 215 subtests passed` with 100 tracked
+  files and zero findings. Two independent final reviews returned GO; no provider call was made.

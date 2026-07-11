@@ -4,19 +4,20 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: retain the completed, locally validated ARA-038 cloud-free error boundaries,
-  publish that checkpoint, and continue with isolated ARA-039 resume-context handling.
+- Current goal: retain the completed, locally validated ARA-039 fail-before-write resume-context
+  boundary, publish that work, and continue with isolated ARA-040 cloud provenance handling.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `cd2114325d748241abe156da8864d492246613a6` (the exact HEAD
+- State recorded against commit: `25ae39bcd90ba2a2152025f46739dabf3391e8cb` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `cd2114325d748241abe156da8864d492246613a6` (exact local,
+- Last externally verified fallback: `25ae39bcd90ba2a2152025f46739dabf3391e8cb` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-038 is `DONE` with focused, related, full-gate, and two
-  independent reviews passing locally; publication is pending. ARA-037 remains the exact external
-  fallback at `cd21143`, verified by push/PR runs `29164609427`/`29164610776` on Python 3.10/3.13.
+- Active task at this snapshot: none. ARA-039 is `DONE` with focused, related, full-gate, and
+  independent review results passing locally; publication is pending. ARA-038 remains the exact
+  external fallback at `25ae39b`, verified by push/PR runs `29165142777`/`29165143905` on Python
+  3.10/3.13.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -494,16 +495,38 @@ Updated: 2026-07-12 (Asia/Shanghai)
 - Provider-free focused, related, full-gate, and two independent adversarial reviews passed. The
   separate discovery/profile provenance-cohort risk remains queued as ARA-040.
 
+## ARA-039 Prior-Round Resume Context Boundary
+
+- Reproduced invalid UTF-8 and injected read errors in an existing previous Judge artifact becoming
+  silent empty context only after startup metadata writes; the draft agent was still invoked.
+- Replaced tolerant reads with one pre-write read of each fixed draft/review/revised/Judge artifact.
+  Missing leaves or an entirely missing legacy round directory remain empty, while other I/O/Unicode
+  failures raise a basename-only error with exception chaining suppressed.
+- A four-file by two-error matrix proves byte preservation, no new round directory, no agent access,
+  and path-safe exception/console behavior. Valid complete context and missing legacy compatibility
+  controls pass; two independent reviews returned GO.
+
 ## Remaining Steps
 
 - Resolve the semantic current HEAD publication, exact remote equality, and CI state live before
-  starting ARA-039, then record the new externally verified fallback.
-- Continue with ARA-039, the highest-priority unblocked P2, unless new evidence changes ordering.
+  starting ARA-040, then record the new externally verified fallback.
+- Continue with ARA-040, the highest-priority unblocked P2, unless new evidence changes ordering.
 - Keep ARA-018, ARA-029, and ARA-030 behind their recorded owner/configuration/long-task approval
   gates; do not fold release or CI-configuration policy into the analysis/compare fixes.
 
 ## Test Status
 
+- ARA-039 focused four-context invalid-UTF8/read-failure and missing-parent compatibility regression
+  passed `4 passed, 8 subtests passed`; related round-loop/CLI regression passed `80 passed, 107
+  subtests passed`.
+- ARA-039 local `make check` passed Ruff format/lint, imports, repository-safety self-test,
+  worktree/staged scans, and pytest (`328 passed, 215 subtests passed`; 100 tracked files and zero
+  findings). Two independent final reviews returned GO after checking fail-before-write ordering,
+  byte/directory preservation, no agent calls, missing legacy compatibility, and path/cause privacy.
+  No provider call was made.
+- ARA-038 remote verification: exact local/upstream/`ls-remote` equality at `25ae39b`, ahead/behind
+  `0/0`; push run `29165142777` and pull-request run `29165143905` passed Python 3.10/3.13. Draft
+  PR 13 is open, mergeable, and updated.
 - ARA-038 focused lazy-iteration/artifact-write/profile-fallback regression passed `3 passed, 6
   subtests passed`; related cloud-free/CLI regression passed `50 passed, 34 subtests passed`.
 - ARA-038 local `make check` passed Ruff format/lint, imports, repository-safety self-test,
@@ -833,6 +856,13 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- The initial ARA-039 invalid-UTF8 and injected-read controls both failed as expected because no
+  `ResumeHistoryError` was raised; resume wrote startup artifacts and invoked an agent with empty
+  previous Judge context.
+- The first related ARA-039 regression found that a missing previous-round directory was incorrectly
+  classified as unreadable, causing 2 test failures and 14 subtest failures. `FileNotFoundError` now
+  retains the legacy empty-context path, while other I/O/Unicode failures remain fail-closed; the
+  final related and full suites pass.
 - The initial ARA-038 fake lazy pager raised after its first item and escaped with a traceback; four
   injected artifact-write `OSError` stages also escaped with paths. These were the expected pre-fix
   failures. Independent review then found an iterator-time `TypeError` could be mistaken for a

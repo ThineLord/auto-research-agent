@@ -305,23 +305,23 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-038 - Cloud-free lazy iteration and artifact writes escape error boundaries
 
-- Status: fixed and locally validated; publication pending
+- Status: fixed, pushed, and CI-verified
 - Severity: P2 CLI/privacy
 - Impact: lazy SDK iteration and discovery/profile artifact writes can leak tracebacks/paths, and
   lazy failure prevents the documented profile seed fallback.
-- Current action: ARA-038 now contains lazy iteration/model-conversion failures as a safe public
-  discovery result and maps all four automatic discovery/profile artifact-write stages to fixed
-  path-free status 1. Explicit discovery remains status 1 and profile discovery fallback remains
-  status 0; focused, related, full-gate, and two independent reviews passed without a provider call.
+- Current action: ARA-038 completed at `25ae39b`; exact push/PR runs
+  `29165142777`/`29165143905` passed Python 3.10/3.13. Lazy discovery and all four artifact-write
+  stages retain their documented status and privacy contracts.
 
 ## KI-039 - Unreadable prior-round context is silently discarded on resume
 
-- Status: confirmed; queued as ARA-039
+- Status: fixed and locally validated; publication pending
 - Severity: P2 reproducibility
 - Impact: invalid UTF-8 in existing prior-round Judge context becomes an empty prompt context after
   startup metadata has already changed.
-- Current action: define missing-file compatibility and fail before writes on existing unreadable
-  context.
+- Current action: ARA-039 preloads all four previous-round contexts before startup writes; genuinely
+  missing legacy paths remain empty, while existing I/O/UTF-8 failures raise a fixed basename-only
+  error without cause chaining. Focused, related, full-gate, and independent reviews passed.
 
 ## KI-040 - Cloud fallback profile can retain stale discovery provenance
 

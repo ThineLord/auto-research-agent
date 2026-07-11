@@ -61,6 +61,7 @@ if find_spec("yaml") is None:
 import src.cli as cli_module
 import src.main as main_module
 import src.resume as resume_module
+import src.runner as runner_module
 from src.cli import parse_args
 from src.cloud_free import CloudFreeDailyQuotaExhausted
 from src.config import AppConfig
@@ -2492,6 +2493,133 @@ class RoundLoopTests(unittest.TestCase):
                 (run_root / "round_03" / "03_revised.md").read_text(encoding="utf-8"),
                 "revised three\n",
             )
+
+    def test_resume_rejects_unreadable_previous_context_before_writes(self) -> None:
+        for filename in ("01_draft.md", "02_review.md", "03_revised.md", "04_judge.md"):
+            for case in ("invalid_utf8", "read_error"):
+                with (
+                    self.subTest(filename=filename, case=case),
+                    tempfile.TemporaryDirectory() as tmp,
+                ):
+                    project_dir = Path(tmp) / "project"
+                    run_root = project_dir / "runs" / "resume-run"
+                    previous_round_dir = run_root / "round_01"
+                    previous_round_dir.mkdir(parents=True)
+                    memory_path = project_dir / "memory.md"
+                    memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                    context_path = previous_round_dir / filename
+                    context_path.write_bytes(
+                        b"\xff\xfe" if case == "invalid_utf8" else b"Prior round context.\n"
+                    )
+                    artifact_contents = {
+                        run_root / "run_config.json": b'{"run_id": "resume-run"}',
+                        run_root / "run_manifest.json": b'{"run_id": "resume-run"}',
+                        project_dir / "checkpoint.json": json.dumps(
+                            {
+                                "run_id": "resume-run",
+                                "run_root": str(run_root),
+                                "last_completed_round": 1,
+                                "best_score": -1,
+                                "can_resume": True,
+                            }
+                        ).encode(),
+                    }
+                    for path, content in artifact_contents.items():
+                        path.write_bytes(content)
+                    before = {
+                        path.relative_to(project_dir): path.read_bytes()
+                        for path in project_dir.rglob("*")
+                        if path.is_file()
+                    }
+                    agents = RecordingAgents()
+                    console = Console(record=True)
+                    original_read = runner_module.read_regular_text
+
+                    def read_with_injected_error(path: Path, **kwargs: object) -> str:
+                        if Path(path).name == filename:
+                            raise OSError(f"private prior context path: {path}")
+                        return original_read(path, **kwargs)
+
+                    read_patch = (
+                        patch.object(
+                            runner_module,
+                            "read_regular_text",
+                            side_effect=read_with_injected_error,
+                        )
+                        if case == "read_error"
+                        else patch.object(runner_module, "read_regular_text", wraps=original_read)
+                    )
+                    with read_patch, self.assertRaises(ResumeHistoryError) as caught:
+                        run_resume_mode(
+                            console=console,
+                            agents=agents,
+                            task_text="Design a privacy-aware memory adapter.",
+                            project_dir=project_dir,
+                            memory_path=memory_path,
+                            model_name="fake-model",
+                            max_rounds=2,
+                            stop_if_no_improvement_rounds=10,
+                            global_max_runtime_seconds=60,
+                            per_agent_timeout_seconds=300,
+                        )
+
+                    after = {
+                        path.relative_to(project_dir): path.read_bytes()
+                        for path in project_dir.rglob("*")
+                        if path.is_file()
+                    }
+                    self.assertEqual(agents.draft_rounds, [])
+                    self.assertEqual(after, before)
+                    self.assertFalse((run_root / "round_02").exists())
+                    self.assertIn(filename, str(caught.exception))
+                    self.assertNotIn(str(Path(tmp)), str(caught.exception))
+                    self.assertIsNone(caught.exception.__cause__)
+                    if hasattr(console, "export_text"):
+                        output = " ".join(console.export_text().split())
+                        self.assertIn("Cannot resume safely", output)
+                        self.assertIn(filename, output)
+                        self.assertNotIn(str(Path(tmp)), output)
+
+    def test_resume_allows_genuinely_missing_legacy_previous_context(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            (project_dir / "checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 1,
+                        "best_score": -1,
+                        "can_resume": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            agents = DraftContextAgents()
+
+            resume_started = run_resume_mode(
+                console=Console(),
+                agents=agents,
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                model_name="fake-model",
+                max_rounds=2,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+            )
+
+            self.assertTrue(resume_started)
+            self.assertEqual(len(agents.draft_contexts), 1)
+            self.assertEqual(agents.draft_contexts[0]["previous_judge"], "")
+            self.assertEqual(agents.draft_contexts[0]["previous_review"], "")
+            self.assertEqual(agents.draft_contexts[0]["previous_draft"], "")
+            self.assertEqual(agents.draft_contexts[0]["previous_revised"], "")
 
     def test_resume_uses_project_score_history_for_legacy_run_without_metrics(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

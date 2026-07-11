@@ -67,7 +67,6 @@ from .storage import (
     make_round_dir,
     make_run_root,
     parse_score,
-    read_file_text,
     read_json_file,
     read_regular_text,
     read_text,
@@ -181,7 +180,12 @@ def _read_resume_history(path: Path, *, start_round: int) -> List[Dict[str, Any]
 
 
 def _read_resume_round_text(path: Path) -> str:
-    return read_file_text(path).strip()
+    try:
+        return read_regular_text(path, missing_ok=True).strip()
+    except FileNotFoundError:
+        return ""
+    except (OSError, UnicodeError):
+        raise ResumeHistoryError(f"{path.name} is unreadable or invalid UTF-8") from None
 
 
 def _read_resume_manifest(path: Path, *, canonical_run_id: str) -> Optional[Dict[str, Any]]:
@@ -758,6 +762,10 @@ def run_iterative_rounds(
     research_state_path = project_dir / "research_state.json"
     started_at_iso = datetime.now().astimezone().isoformat()
     resumes_existing_run = mode == "resume" or start_round > 1 or run_root_override is not None
+    last_draft_output = ""
+    last_review_output = ""
+    last_revised_output = ""
+    last_judge_output = ""
     if resumes_existing_run:
         resume_artifact_paths = (
             run_config_path,
@@ -798,6 +806,12 @@ def run_iterative_rounds(
                 paths=previous_outputs,
             ):
                 raise ResumeHistoryError(RESUME_PATH_MESSAGES[UNSAFE_ARTIFACT_PATH])
+            (
+                last_draft_output,
+                last_review_output,
+                last_revised_output,
+                last_judge_output,
+            ) = tuple(_read_resume_round_text(path) for path in previous_outputs)
 
         for pending_round in range(start_round, max_rounds + 1):
             _validate_pending_resume_round_dir(run_root, pending_round)
@@ -1007,19 +1021,6 @@ def run_iterative_rounds(
         ),
     )
     previous_round = start_round - 1 if resumes_existing_run else 0
-    previous_round_dir = run_root / f"round_{previous_round:02d}" if previous_round else None
-    last_draft_output = (
-        _read_resume_round_text(previous_round_dir / "01_draft.md") if previous_round_dir else ""
-    )
-    last_review_output = (
-        _read_resume_round_text(previous_round_dir / "02_review.md") if previous_round_dir else ""
-    )
-    last_revised_output = (
-        _read_resume_round_text(previous_round_dir / "03_revised.md") if previous_round_dir else ""
-    )
-    last_judge_output = (
-        _read_resume_round_text(previous_round_dir / "04_judge.md") if previous_round_dir else ""
-    )
     previous_judge = last_judge_output
     judge_history: List[str] = [last_judge_output] if last_judge_output else []
     previous_round_metric = _history_entry_for_round(round_metrics, previous_round)
