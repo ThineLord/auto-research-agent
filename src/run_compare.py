@@ -202,6 +202,11 @@ def load_run_summary(run_root: Path, *, safe_artifacts: bool = False) -> dict[st
         rubric_averages = rubric_totals.get("rubric_averages", {})
     if not isinstance(rubric_averages, dict):
         rubric_averages = {}
+    rubric_averages = {
+        str(key): numeric
+        for key, value in rubric_averages.items()
+        if (numeric := _as_float(value)) is not None
+    }
     rubric_round_count = _as_int(summary.get("rubric_round_count"))
     if rubric_round_count is None:
         rubric_round_count = _as_int(rubric_totals.get("rounds_with_rubric"))

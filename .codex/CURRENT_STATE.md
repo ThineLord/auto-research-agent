@@ -4,20 +4,20 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: retain the completed, locally validated ARA-034 literal-boolean resume boundary and
-  continue next with the isolated ARA-035 finite legacy-metric task after live recovery checks.
+- Current goal: retain the completed, locally validated ARA-035 strict legacy-metric boundary and
+  continue next with the isolated ARA-036 Judge numeric coercion task after live recovery checks.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `f44687eb03fbc971adc762d12437aefc58f576a8` (the exact HEAD
+- State recorded against commit: `bdbd9d548823dab95d25114a3f6e43e4393c4396` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `f44687eb03fbc971adc762d12437aefc58f576a8` (exact local,
+- Last externally verified fallback: `bdbd9d548823dab95d25114a3f6e43e4393c4396` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-034 is `DONE` with focused, related, full-gate, and two
-  independent review results passing locally. ARA-035 is the next unblocked P1 task. The exact
-  external fallback remains ARA-033 commit `f44687e`; resolve the semantic current `HEAD`, remote,
-  and CI state live.
+- Active task at this snapshot: none. ARA-035 is `DONE` with focused, related, broad regression,
+  full-gate, and two independent final review results passing locally. ARA-036 is the next
+  unblocked P1 task. The exact external fallback remains ARA-034 commit `bdbd9d5`; resolve the
+  semantic current `HEAD`, remote, and CI state live.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -481,15 +481,27 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Remaining Steps
 
-- Start ARA-035 with a provider-free strict-JSON reproduction for legacy non-score metrics; keep its
-  aggregation semantics isolated from the completed ARA-034 recovery boundary and ARA-036 Judge
-  parsing boundary.
-- Continue with ARA-036 after ARA-035 unless a newly confirmed higher-priority risk supersedes it.
+- Start ARA-036 with focused Judge parser and invalid-round reproductions for unrepresentable
+  structured numeric fields; keep parser semantics isolated from the completed legacy metric
+  aggregation boundary.
+- Continue with the highest-priority queued P2 after ARA-036 unless newly confirmed evidence changes
+  the ordering.
 - Keep ARA-018, ARA-029, and ARA-030 behind their recorded owner/configuration/long-task approval
   gates; do not fold release or CI-configuration policy into the analysis/compare fixes.
 
 ## Test Status
 
+- ARA-035 focused strict-JSON metric/API/CLI regression passed `59 passed, 20 subtests passed`;
+  broader runner/diagnostic/UI regression passed `172 passed, 116 subtests passed`.
+- ARA-035 local `make check` passed Ruff format/lint, imports, repository-safety self-test,
+  worktree/staged scans, and pytest (`321 passed, 201 subtests passed`; 100 tracked files and zero
+  findings).
+- Two independent ARA-035 final reviews returned GO after checking numeric/string NaN/Infinity,
+  `10**400`, cross-agent/cross-round overflow, non-object agent leaves, raw legacy summary rubric,
+  strict API/writer/CLI output, and ordinary-value compatibility. No provider call was made.
+- ARA-034 remote verification: exact local/upstream/`ls-remote` equality at `bdbd9d5`, ahead/behind
+  `0/0`; push run `29163467415` and pull-request run `29163468552` passed Python 3.10/3.13. Draft
+  PR 13 is open, mergeable, and updated.
 - ARA-034 focused preview/end-to-end/CLI regressions passed `3 passed, 11 subtests passed`; the
   pre-fix run had failed for truthy strings/integer, huge/non-finite scores, agent access, writes,
   and CLI status exactly as expected.

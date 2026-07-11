@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -34,6 +35,10 @@ class _InterruptOnTruth:
 
 
 class CliExitCodeTests(unittest.TestCase):
+    @staticmethod
+    def _reject_json_constant(value: str) -> None:
+        raise ValueError(f"non-standard JSON constant: {value}")
+
     def test_project_preflight_os_errors_exit_two_before_runtime_setup(self) -> None:
         for error in (PermissionError("denied"), FileNotFoundError("missing")):
             with self.subTest(error=error.__class__.__name__), tempfile.TemporaryDirectory() as tmp:
@@ -521,6 +526,76 @@ cli.main()
             0,
             analysis_result.stdout + analysis_result.stderr,
         )
+
+    def test_provider_free_metric_overflow_outputs_remain_strict_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_a = root / "run-a"
+            run_b = root / "run-b"
+            run_a.mkdir()
+            run_b.mkdir()
+            (run_a / "round_metrics.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "round": 1,
+                            "agent_timings_seconds": {"draft": 1e308, "review": 1e308},
+                            "estimated_total_tokens": float("inf"),
+                            "evolution_metrics": {"score_delta_vs_previous": 1e308},
+                            "judge_rubric": {"evaluation_design_quality": -1e308},
+                        },
+                        {
+                            "round": 2,
+                            "agent_timings_seconds": {"draft": 10**400},
+                            "evolution_metrics": {"score_delta_vs_previous": 1e308},
+                            "judge_rubric": {"evaluation_design_quality": 1e308},
+                        },
+                        {"round": 3, "agent_io_metrics": {"draft": []}},
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            cases = (
+                (
+                    "analysis",
+                    [
+                        "--analyze-run",
+                        str(run_a),
+                        "--analyze-output",
+                        str(root / "analysis.json"),
+                    ],
+                    root / "analysis.json",
+                ),
+                (
+                    "comparison",
+                    [
+                        "--compare-runs",
+                        str(run_a),
+                        str(run_b),
+                        "--compare-output",
+                        str(root / "comparison.json"),
+                    ],
+                    root / "comparison.json",
+                ),
+            )
+            for mode, mode_args, output_path in cases:
+                with self.subTest(mode=mode):
+                    result = subprocess.run(
+                        [sys.executable, "-m", "src.main", *mode_args],
+                        cwd=ROOT,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    payload = json.loads(
+                        output_path.read_text(encoding="utf-8"),
+                        parse_constant=self._reject_json_constant,
+                    )
+
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertNotIn("Traceback", result.stderr)
+                    self.assertIsInstance(payload, dict)
 
     def test_analysis_and_comparison_output_errors_are_privacy_safe(self) -> None:
         for mode in ("analysis", "comparison"):

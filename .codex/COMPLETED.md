@@ -478,3 +478,29 @@ Validation and implementation outcomes will be appended only after they are actu
   tracked files and zero safety findings).
 - Two independent final reviews returned GO after checking literal-type semantics, valid-checkpoint
   compatibility, finite-score behavior, artifact preservation, CLI exit status, and lock release.
+- Committed as `bdbd9d5`, pushed with exact local/upstream/`ls-remote` equality, updated draft PR
+  13, and confirmed push run `29163467415` plus pull-request run `29163468552` passed every Python
+  3.10/3.13 job.
+
+## 2026-07-12 - Finite legacy metric aggregation and strict JSON
+
+- Reproduced provider-free analysis/comparison status-0 output containing Infinity for timing,
+  evolution, and rubric derived values; `10**400` timing/rubric/evolution and numeric NaN/Infinity
+  token counters instead raised conversion exceptions with traceback.
+- Made required additive float values use the existing zero default when malformed/non-finite and
+  optional values become unavailable. Float/int conversion now catches unrepresentable inputs.
+- Propagated unrepresentable elapsed totals as `None` across the within-round cross-agent,
+  cross-round overall, and per-agent cross-round accumulation layers.
+- Preserved ordinary sum/round behavior and used a scaled finite average only when ordinary
+  evolution/rubric summation overflowed; unrepresentable score/rubric deltas become `None`.
+- Filtered invalid raw `run_summary.json` rubric averages while retaining finite numeric strings and
+  unknown finite keys. Evolution numeric strings remain ignored, token floats retain truncation,
+  exact huge integers remain exact, and no positivity/range clamp was introduced.
+- Added strict direct/API/writer/real-CLI matrices for numeric/string NaN/Infinity, `10**400`,
+  cross-agent/cross-round overflow, malformed agent leaves, raw summary fallback, and compatibility
+  controls. Analysis and comparison both return status 0 without traceback and write strict JSON.
+- Related tests passed `59 passed, 20 subtests passed`; broad affected regression passed `172
+  passed, 116 subtests passed`; local `make check` passed `321 passed, 201 subtests passed` with 100
+  tracked files and zero findings.
+- One independent review found a non-Mapping agent leaf traceback; it received direct/CLI coverage
+  and a minimal empty-mapping fallback. Both final independent reviews returned GO.

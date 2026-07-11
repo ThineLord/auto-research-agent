@@ -40,6 +40,11 @@
 
 ### Fixed
 
+* Provider-free analysis and comparison now tolerate malformed, non-finite, and unrepresentably
+  large legacy timing, token, evolution, rubric, and per-agent metric values without traceback or
+  non-standard JSON. Unrepresentable elapsed totals and deltas become unavailable, representable
+  extreme averages remain finite, raw legacy rubric averages are normalized, and ordinary finite
+  aggregation plus historical token/evolution compatibility remains unchanged.
 * Resume now treats only the JSON boolean `true` as an eligible checkpoint flag; strings, numbers,
   and container values fail closed before the runner or any agent stage can write artifacts. Huge,
   boolean, NaN, and infinite preview scores use the existing safe default instead of crashing or

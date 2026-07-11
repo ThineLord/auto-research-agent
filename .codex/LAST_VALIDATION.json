@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-12T02:22:53+08:00",
+  "recorded_at": "2026-07-12T02:43:14+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "f44687eb03fbc971adc762d12437aefc58f576a8",
-  "last_known_stable_commit": "f44687eb03fbc971adc762d12437aefc58f576a8",
+  "head_commit": "bdbd9d548823dab95d25114a3f6e43e4393c4396",
+  "last_known_stable_commit": "bdbd9d548823dab95d25114a3f6e43e4393c4396",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "f44687eb03fbc971adc762d12437aefc58f576a8",
+  "state_recorded_against_commit": "bdbd9d548823dab95d25114a3f6e43e4393c4396",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-12T02:15:41+08:00",
-    "commit": "f44687eb03fbc971adc762d12437aefc58f576a8",
+    "verified_at": "2026-07-12T02:29:34+08:00",
+    "commit": "bdbd9d548823dab95d25114a3f6e43e4393c4396",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29162704235,
+        "run_id": 29163467415,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "f44687eb03fbc971adc762d12437aefc58f576a8",
+        "head_sha": "bdbd9d548823dab95d25114a3f6e43e4393c4396",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29162705572,
+        "run_id": 29163468552,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "f44687eb03fbc971adc762d12437aefc58f576a8",
+        "head_sha": "bdbd9d548823dab95d25114a3f6e43e4393c4396",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,85 @@
       }
     }
   },
-  "status": "ara034_done_local_validation_passed_remote_verification_live",
+  "status": "ara035_done_local_validation_passed_remote_verification_live",
   "commands": [
+    {
+      "command": "make check after ARA-035 implementation before final recovery-state synchronization",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 57,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 100,
+        "findings": 0,
+        "pytest_tests_passed": 321,
+        "pytest_subtests_passed": 201,
+        "pytest_duration_seconds": 10.19
+      }
+    },
+    {
+      "command": "two independent ARA-035 metrics and analysis/CLI reviews",
+      "exit_code": 0,
+      "result": "passed_after_non_mapping_leaf_correction",
+      "summary": {
+        "reviewers": 2,
+        "initial_blocking_findings": 1,
+        "blocking_findings_remaining": 0,
+        "strict_json_api_writer_cli": "passed",
+        "ordinary_value_compatibility": "passed",
+        "three_elapsed_aggregation_levels": "passed",
+        "malformed_agent_leaf": "corrected_and_re_reviewed"
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_metrics.py tests/test_run_analytics.py tests/test_run_compare.py tests/test_cli_exit_codes.py tests/test_round_loop.py tests/test_diagnostic.py tests/test_ui_helpers.py",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 172,
+        "pytest_subtests_passed": 116,
+        "runner_compatibility": "passed",
+        "diagnostic_compatibility": "passed",
+        "ui_compatibility": "passed"
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_metrics.py tests/test_run_analytics.py tests/test_run_compare.py tests/test_cli_exit_codes.py",
+      "exit_code": 0,
+      "result": "passed_after_expected_pre_fix_failures",
+      "summary": {
+        "pytest_tests_passed": 59,
+        "pytest_subtests_passed": 20,
+        "analysis_cli_exit_code": 0,
+        "comparison_cli_exit_code": 0,
+        "strict_json": "passed",
+        "traceback_disclosed": false,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-034 publication, remote equality, CI, and draft PR verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "bdbd9d548823dab95d25114a3f6e43e4393c4396",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29163467415,
+        "pull_request_run_id": 29163468552,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "draft_pr_13_updated": true
+      }
+    },
     {
       "command": "make check after ARA-034 implementation and recovery-state synchronization",
       "exit_code": 0,
@@ -1092,6 +1169,47 @@
   ],
   "failures": [
     {
+      "command": "first independent ARA-035 implementation review",
+      "result": "corrected_and_re_reviewed",
+      "summary": {
+        "cause": "summarize_agent_io_metrics assumed every per-agent legacy leaf was a mapping",
+        "impact": "a list leaf caused AttributeError traceback in provider-free analysis",
+        "fix": "non-Mapping leaves use the existing empty-record defaults with direct and CLI coverage",
+        "blocking_findings_remaining": 0
+      }
+    },
+    {
+      "command": "focused ARA-035 regressions before implementation",
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "pytest_failed": 3,
+        "cause": "legacy metric coercion accepted non-finite values, raised on unrepresentable conversions, and allowed finite additions to overflow",
+        "impact": "provider-free analysis/comparison either wrote non-standard JSON under status 0 or exited with traceback",
+        "provider_calls": 0,
+        "corrected_before_commit": true
+      }
+    },
+    {
+      "command": "first ARA-035 recovery-state consistency run",
+      "result": "corrected_and_rerun",
+      "summary": {
+        "pytest_failed": 1,
+        "pytest_passed": 5,
+        "pytest_subtests_passed": 1,
+        "cause": "the active-task finalization bullet also named two boundary tasks, violating the single-active-task classifier",
+        "runtime_or_implementation_failure": false
+      }
+    },
+    {
+      "command": "first ARA-035 state search",
+      "result": "corrected_and_rerun",
+      "summary": {
+        "cause": "a backticked DONE token inside a double-quoted zsh pattern was interpreted as command substitution",
+        "file_or_git_impact": "none",
+        "replacement": "subsequent searches use literal single-quoted patterns"
+      }
+    },
+    {
       "command": "first post-fix stale-state wording scan",
       "result": "corrected_and_rerun",
       "summary": {
@@ -1290,6 +1408,10 @@
   ],
   "not_run": [
     {
+      "check": "real provider smoke for ARA-035",
+      "reason": "Analysis and comparison consume existing local artifacts without provider calls; direct, API, writer, and real module subprocess matrices cover the affected metric boundary without credentials or cost."
+    },
+    {
       "check": "real provider smoke for ARA-034",
       "reason": "Resume eligibility is decided from local checkpoint metadata before any runner or agent stage; provider-free direct and real module subprocess tests cover the affected boundary without credentials or cost."
     },
@@ -1311,7 +1433,9 @@
     }
   ],
   "notes": [
-    "ARA-034 is complete and locally validated in semantic current HEAD; current publication and CI state must be resolved live, while f44687e remains the exact conservative externally verified fallback.",
+    "ARA-035 is complete and locally validated in semantic current HEAD; current publication and CI state must be resolved live, while bdbd9d5 remains the exact conservative externally verified fallback.",
+    "ARA-035 remains isolated to provider-free legacy non-score metric coercion and aggregation; ARA-036 separately owns Judge parser overflow and is the next unblocked P1 task.",
+    "ARA-034 is complete at remote-equal commit bdbd9d5 with successful push and pull-request CI runs 29163467415 and 29163468552 on Python 3.10 and 3.13.",
     "ARA-034 is limited to literal-boolean checkpoint eligibility and finite preview best_score normalization before any resume runner/agent-stage/write; history/context validation remains separately queued as ARA-039 and split startup metadata as ARA-041.",
     "ARA-033 is complete at remote-equal commit f44687e with successful push and pull-request CI runs 29162704235 and 29162705572 on Python 3.10 and 3.13.",
     "ARA-032 is complete at remote-equal commit 21fea11 with successful push and pull-request CI runs 29162165065 and 29162166082 on Python 3.10 and 3.13.",

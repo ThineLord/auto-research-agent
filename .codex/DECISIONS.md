@@ -296,3 +296,22 @@
   execution, providers, prompts, score semantics, experiment artifacts, and historical conclusions
   remain unchanged. Client/agent container construction order is a separate existing CLI behavior;
   no provider call or agent stage occurs for an ineligible checkpoint.
+
+## 2026-07-12 - Keep legacy metric aggregation finite without changing ordinary arithmetic
+
+- Decision: coerce required additive legacy floats to the established zero default when malformed,
+  non-finite, or unrepresentable; optional floats become unavailable. An elapsed sum that cannot be
+  represented becomes `None` at each cross-agent, cross-round, and per-agent accumulation level.
+- Derived arithmetic: preserve the existing `sum(values) / count` and rounding path whenever the
+  total is finite. Only an overflowed evolution/rubric total uses max-absolute scaling with
+  `math.fsum`; an unrepresentable delta becomes `None`.
+- Legacy boundary: normalize raw summary rubric averages through the same finite conversion and
+  treat non-Mapping agent metric leaves as empty records. Preserve timing numeric strings, token
+  float truncation and arbitrary-precision integers, finite rubric numeric strings/unknown keys,
+  and the existing rule that evolution numeric strings are ignored. Do not add positivity or
+  similarity-range clamps under this task.
+- Reason: tolerant conversions and ordinary float addition allowed malformed artifacts to crash
+  provider-free commands or emit NaN/Infinity under status 0, while changing the ordinary arithmetic
+  path would silently alter historical report values.
+- Scope: analysis/comparison API, JSON writer, and CLI paths are covered without changing global JSON
+  serialization, providers, prompts, scoring, generated artifacts, experiments, or research claims.

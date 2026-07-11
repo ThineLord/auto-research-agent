@@ -265,23 +265,24 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-034 - Non-boolean resume eligibility is treated as true
 
-- Status: fixed and locally validated in the semantic current `HEAD`; resolve publication/CI live
+- Status: fixed, pushed, and CI-verified
 - Severity: P1 recovery integrity
 - Impact: values such as `"false"`, `"true"`, or `1` can start agents and overwrite an explicitly
   ineligible checkpoint; huge/non-finite preview scores can crash or propagate invalid state.
-- Current action: ARA-034 now requires identity with boolean `true`, converts only finite
-  representable preview scores, and has direct plus CLI fail-before-write/agent regression
-  coverage. The full local gate and two independent reviews passed; verify the semantic current
-  `HEAD` against the remote and CI after recovery.
+- Current action: ARA-034 completed at `bdbd9d5`; exact push/PR runs
+  `29163467415`/`29163468552` passed Python 3.10/3.13. Literal-true eligibility, finite preview
+  conversion, and direct/CLI fail-before-write coverage are complete.
 
 ## KI-035 - Legacy non-score metrics can overflow or emit non-standard JSON
 
-- Status: confirmed; queued as ARA-035
+- Status: fixed and locally validated in the semantic current `HEAD`; resolve publication/CI live
 - Severity: P1 report/data correctness
 - Impact: malformed or extreme timings, evolution metrics, rubric values, and counters can emit
   `NaN`/`Infinity` under status 0 or raise provider-free `OverflowError` tracebacks.
-- Current action: add finite-aware coercion, overflow-safe aggregation, and strict-JSON controls
-  without changing ordinary metric results.
+- Current action: ARA-035 now filters malformed/non-finite values, marks unrepresentable elapsed
+  totals/deltas unavailable, preserves representable extreme averages, normalizes raw legacy rubric
+  averages, and has real analysis/comparison CLI strict-JSON coverage. Full local validation and two
+  final reviews passed; verify semantic current `HEAD` remotely after recovery.
 
 ## KI-036 - Unrepresentable Judge numbers raise during parsing
 

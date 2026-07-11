@@ -260,7 +260,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-035 - Keep legacy metric aggregates finite and strict JSON
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P1
 - Risk: medium
 - Description: non-score legacy timings, evolution values, rubric values, and token counters can
@@ -270,8 +270,10 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Acceptance criteria: malformed/non-finite legacy metric values are skipped or use documented
   unavailable defaults; finite ordinary aggregates retain their historical results; derived
   overflow never emits non-standard JSON or traceback.
-- Validation command: strict-JSON numeric-boundary matrix, CLI analysis/compare subprocess tests,
-  related metrics tests, then `make check`.
+- Validation command: strict-JSON numeric-boundary matrix, real CLI analysis/compare subprocess
+  tests, related metrics/analysis/compare/CLI tests (`59 passed, 20 subtests passed`), broader
+  runner/diagnostic/UI regression (`172 passed, 116 subtests passed`), then `make check` (`321
+  passed, 201 subtests passed`).
 - Commit required: yes.
 - Dependencies: complete ARA-034 without combining recovery and metric semantics.
 

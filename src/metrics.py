@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping, Sequence
 from difflib import SequenceMatcher
 from typing import Any
@@ -38,42 +39,71 @@ def _text_char_count(parts: Sequence[Any] | str | None) -> int:
 def _as_float(value: Any) -> float:
     if isinstance(value, bool):
         return 0.0
-    if isinstance(value, (int, float)):
-        return float(value)
     try:
-        return float(str(value))
-    except (TypeError, ValueError):
+        numeric = float(value) if isinstance(value, (int, float)) else float(str(value))
+    except (TypeError, ValueError, OverflowError):
         return 0.0
+    return numeric if math.isfinite(numeric) else 0.0
 
 
 def _as_int(value: Any) -> int:
     if isinstance(value, bool):
         return 0
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float):
-        return int(value)
     try:
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float):
+            return int(value) if math.isfinite(value) else 0
         return int(str(value))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return 0
 
 
 def _optional_float(value: Any) -> float | None:
     if isinstance(value, bool):
         return None
-    if isinstance(value, (int, float)):
-        return float(value)
     try:
-        return float(str(value))
-    except (TypeError, ValueError):
+        numeric = float(value) if isinstance(value, (int, float)) else float(str(value))
+    except (TypeError, ValueError, OverflowError):
         return None
+    return numeric if math.isfinite(numeric) else None
+
+
+def _finite_add(left: float | None, right: float | None) -> float | None:
+    if left is None or right is None:
+        return None
+    result = left + right
+    return result if math.isfinite(result) else None
+
+
+def _finite_difference(left: float, right: float) -> float | None:
+    result = left - right
+    return result if math.isfinite(result) else None
+
+
+def _finite_sum(values: Sequence[float]) -> float | None:
+    total: float | None = 0.0
+    for value in values:
+        total = _finite_add(total, value)
+    return total
 
 
 def _average(values: Sequence[float]) -> float | None:
     if not values:
         return None
-    return round(sum(values) / len(values), 3)
+    total = sum(values)
+    if math.isfinite(total):
+        average = total / len(values)
+    else:
+        scale = max(abs(value) for value in values)
+        if scale == 0.0:
+            return 0.0
+        try:
+            normalized_average = math.fsum(value / scale for value in values) / len(values)
+            average = normalized_average * scale
+        except (OverflowError, ValueError):
+            return None
+    return round(average, 3) if math.isfinite(average) else None
 
 
 def _normalize_similarity_text(text: str) -> str:
@@ -119,8 +149,11 @@ def build_round_evolution_metrics(
     judge_chars = len(current_judge)
     previous_revised_chars = len(previous_revised)
     score_delta = None
-    if current_score is not None and previous_score is not None:
-        score_delta = round(current_score - previous_score, 2)
+    current_score_value = _optional_float(current_score)
+    previous_score_value = _optional_float(previous_score)
+    if current_score_value is not None and previous_score_value is not None:
+        finite_delta = _finite_difference(current_score_value, previous_score_value)
+        score_delta = round(finite_delta, 2) if finite_delta is not None else None
     revised_delta_chars = None
     if previous_revised.strip():
         revised_delta_chars = revised_chars - previous_revised_chars
@@ -174,16 +207,15 @@ def summarize_judge_rubric_metrics(
             values_by_key.setdefault(key, []).append(value)
 
     rubric_keys = sorted(values_by_key)
-    averages = {
-        key: round(sum(values) / len(values), 3) for key, values in values_by_key.items() if values
-    }
+    averages = {key: _average(values) for key, values in values_by_key.items() if values}
     latest = {key: values[-1] for key, values in values_by_key.items() if values}
     best = {key: max(values) for key, values in values_by_key.items() if values}
-    delta_first_to_latest = {
-        key: round(values[-1] - values[0], 3)
-        for key, values in values_by_key.items()
-        if len(values) >= 2
-    }
+    delta_first_to_latest = {}
+    for key, values in values_by_key.items():
+        if len(values) < 2:
+            continue
+        delta = _finite_difference(values[-1], values[0])
+        delta_first_to_latest[key] = round(delta, 3) if delta is not None else None
     return {
         "rounds_with_rubric": rounds_with_rubric,
         "rubric_keys": rubric_keys,
@@ -239,6 +271,7 @@ def summarize_agent_io_metrics(agent_io_metrics: Mapping[str, Mapping[str, Any]]
     agent_metric_totals: dict[str, dict[str, Any]] = {}
     for agent in AGENT_STAGES:
         metric = agent_io_metrics.get(agent, {})
+        metric = metric if isinstance(metric, Mapping) else {}
         agent_total = {
             "called_count": 1 if metric.get("called") else 0,
             "error_count": 1 if metric.get("had_error") else 0,
@@ -250,13 +283,17 @@ def summarize_agent_io_metrics(agent_io_metrics: Mapping[str, Mapping[str, Any]]
             "estimated_total_tokens": _as_int(metric.get("estimated_total_tokens")),
         }
         agent_metric_totals[agent] = agent_total
-        totals["total_agent_elapsed_seconds"] += agent_total["elapsed_seconds"]
+        totals["total_agent_elapsed_seconds"] = _finite_add(
+            totals["total_agent_elapsed_seconds"],
+            agent_total["elapsed_seconds"],
+        )
         totals["total_estimated_input_chars"] += agent_total["estimated_input_chars"]
         totals["total_output_chars"] += agent_total["output_chars"]
         totals["total_estimated_input_tokens"] += agent_total["estimated_input_tokens"]
         totals["total_estimated_output_tokens"] += agent_total["estimated_output_tokens"]
         totals["total_estimated_tokens"] += agent_total["estimated_total_tokens"]
-    totals["total_agent_elapsed_seconds"] = round(totals["total_agent_elapsed_seconds"], 3)
+    if totals["total_agent_elapsed_seconds"] is not None:
+        totals["total_agent_elapsed_seconds"] = round(totals["total_agent_elapsed_seconds"], 3)
     totals["agent_metric_totals"] = agent_metric_totals
     return totals
 
@@ -330,7 +367,9 @@ def summarize_round_metrics(round_metrics: Sequence[Mapping[str, Any]]) -> dict[
             if timings:
                 aggregate["rounds_with_agent_timings"] += 1
             round_totals = {
-                "total_agent_elapsed_seconds": sum(_as_float(value) for value in timings.values()),
+                "total_agent_elapsed_seconds": _finite_sum(
+                    [_as_float(value) for value in timings.values()]
+                ),
                 "total_estimated_input_chars": _as_int(entry.get("estimated_input_chars")),
                 "total_output_chars": _as_int(entry.get("output_chars")),
                 "total_estimated_input_tokens": _as_int(entry.get("estimated_input_tokens")),
@@ -341,8 +380,9 @@ def summarize_round_metrics(round_metrics: Sequence[Mapping[str, Any]]) -> dict[
             if round_totals["total_estimated_tokens"] > 0:
                 aggregate["rounds_with_token_estimates"] += 1
 
-        aggregate["total_agent_elapsed_seconds"] += _as_float(
-            round_totals.get("total_agent_elapsed_seconds")
+        aggregate["total_agent_elapsed_seconds"] = _finite_add(
+            aggregate["total_agent_elapsed_seconds"],
+            _optional_float(round_totals.get("total_agent_elapsed_seconds")),
         )
         aggregate["total_estimated_input_chars"] += _as_int(
             round_totals.get("total_estimated_input_chars")
@@ -366,7 +406,10 @@ def summarize_round_metrics(round_metrics: Sequence[Mapping[str, Any]]) -> dict[
             target = aggregate["agent_metric_totals"][agent]
             target["called_count"] += _as_int(source.get("called_count"))
             target["error_count"] += _as_int(source.get("error_count"))
-            target["elapsed_seconds"] += _as_float(source.get("elapsed_seconds"))
+            target["elapsed_seconds"] = _finite_add(
+                target["elapsed_seconds"],
+                _as_float(source.get("elapsed_seconds")),
+            )
             target["estimated_input_chars"] += _as_int(source.get("estimated_input_chars"))
             target["output_chars"] += _as_int(source.get("output_chars"))
             target["estimated_input_tokens"] += _as_int(source.get("estimated_input_tokens"))
@@ -381,23 +424,49 @@ def summarize_round_metrics(round_metrics: Sequence[Mapping[str, Any]]) -> dict[
             revised_previous = evolution_metrics.get("revised_similarity_to_previous")
             judge_previous = evolution_metrics.get("judge_similarity_to_previous")
             score_delta = evolution_metrics.get("score_delta_vs_previous")
-            if isinstance(draft_to_revised, (int, float)):
-                draft_to_revised_similarities.append(float(draft_to_revised))
-                if draft_to_revised >= LOW_SIMILARITY_CHANGE_THRESHOLD:
+            draft_to_revised_value = (
+                _optional_float(draft_to_revised)
+                if isinstance(draft_to_revised, (int, float))
+                and not isinstance(draft_to_revised, bool)
+                else None
+            )
+            revised_previous_value = (
+                _optional_float(revised_previous)
+                if isinstance(revised_previous, (int, float))
+                and not isinstance(revised_previous, bool)
+                else None
+            )
+            judge_previous_value = (
+                _optional_float(judge_previous)
+                if isinstance(judge_previous, (int, float)) and not isinstance(judge_previous, bool)
+                else None
+            )
+            score_delta_value = (
+                _optional_float(score_delta)
+                if isinstance(score_delta, (int, float)) and not isinstance(score_delta, bool)
+                else None
+            )
+            if draft_to_revised_value is not None:
+                draft_to_revised_similarities.append(draft_to_revised_value)
+                if draft_to_revised_value >= LOW_SIMILARITY_CHANGE_THRESHOLD:
                     low_revision_change_rounds.append(round_number)
-            if isinstance(revised_previous, (int, float)):
-                revised_previous_similarities.append(float(revised_previous))
+            if revised_previous_value is not None:
+                revised_previous_similarities.append(revised_previous_value)
                 aggregate["evolution_metric_totals"]["rounds_with_previous_round_similarity"] += 1
-                if revised_previous >= LOW_SIMILARITY_CHANGE_THRESHOLD:
+                if revised_previous_value >= LOW_SIMILARITY_CHANGE_THRESHOLD:
                     low_previous_revised_change_rounds.append(round_number)
-            if isinstance(judge_previous, (int, float)):
-                judge_previous_similarities.append(float(judge_previous))
-            if isinstance(score_delta, (int, float)):
-                score_deltas.append(float(score_delta))
+            if judge_previous_value is not None:
+                judge_previous_similarities.append(judge_previous_value)
+            if score_delta_value is not None:
+                score_deltas.append(score_delta_value)
 
-    aggregate["total_agent_elapsed_seconds"] = round(aggregate["total_agent_elapsed_seconds"], 3)
+    if aggregate["total_agent_elapsed_seconds"] is not None:
+        aggregate["total_agent_elapsed_seconds"] = round(
+            aggregate["total_agent_elapsed_seconds"], 3
+        )
     for agent_totals in aggregate["agent_metric_totals"].values():
-        agent_totals["elapsed_seconds"] = round(agent_totals["elapsed_seconds"], 3)
+        if agent_totals["elapsed_seconds"] is not None:
+            agent_totals["elapsed_seconds"] = round(agent_totals["elapsed_seconds"], 3)
     evolution_totals = aggregate["evolution_metric_totals"]
     evolution_totals["avg_draft_to_revised_similarity"] = _average(draft_to_revised_similarities)
     evolution_totals["avg_revised_similarity_to_previous"] = _average(revised_previous_similarities)

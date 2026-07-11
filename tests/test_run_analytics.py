@@ -216,6 +216,85 @@ class RunAnalyticsTests(unittest.TestCase):
         self.assertEqual(analysis["score"]["trend"], "improved")
         self.assertEqual(strict_payload, analysis)
 
+    def test_legacy_metric_overflow_does_not_break_strict_analysis_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "runs" / "legacy-metric-overflow"
+            run_root.mkdir(parents=True)
+            (run_root / "round_metrics.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "round": 1,
+                            "agent_timings_seconds": {"draft": 1e308, "review": 1e308},
+                            "estimated_total_tokens": float("inf"),
+                            "evolution_metrics": {
+                                "draft_to_revised_similarity": 1e308,
+                            },
+                            "judge_rubric": {"evaluation_design_quality": -1e308},
+                        },
+                        {
+                            "round": 2,
+                            "agent_timings_seconds": {"draft": 10**400},
+                            "evolution_metrics": {
+                                "draft_to_revised_similarity": 1e308,
+                            },
+                            "judge_rubric": {"evaluation_design_quality": 1e308},
+                        },
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            output_path = Path(tmp) / "analysis.json"
+
+            analysis = write_run_analysis(run_root, output_path)
+            strict_payload = json.loads(
+                output_path.read_text(encoding="utf-8"),
+                parse_constant=self._reject_json_constant,
+            )
+
+        self.assertIsNone(analysis["cost_ready"]["total_agent_elapsed_seconds"])
+        self.assertIsNone(analysis["cost_ready"]["total_estimated_tokens"])
+        self.assertEqual(
+            analysis["interpretability"]["avg_draft_to_revised_similarity"],
+            1e308,
+        )
+        self.assertEqual(analysis["rubric"]["rubric_avg_evaluation"], 0.0)
+        self.assertEqual(strict_payload, analysis)
+
+    def test_legacy_summary_rubric_averages_are_finite_normalized(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "runs" / "legacy-summary-rubric"
+            run_root.mkdir(parents=True)
+            (run_root / "run_summary.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "legacy-summary-rubric",
+                        "rubric_subscore_averages": {
+                            "evaluation_design_quality": float("nan"),
+                            "tomorrow_actionability": "12.5",
+                            "huge_legacy_value": 10**400,
+                            "infinite_legacy_value": "Infinity",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            output_path = Path(tmp) / "analysis.json"
+
+            analysis = write_run_analysis(run_root, output_path)
+            strict_payload = json.loads(
+                output_path.read_text(encoding="utf-8"),
+                parse_constant=self._reject_json_constant,
+            )
+
+        self.assertEqual(
+            analysis["rubric"]["rubric_subscore_averages"],
+            {"tomorrow_actionability": 12.5},
+        )
+        self.assertIsNone(analysis["rubric"]["rubric_avg_evaluation"])
+        self.assertEqual(analysis["rubric"]["rubric_avg_actionability"], 12.5)
+        self.assertEqual(strict_payload, analysis)
+
     def test_cli_analyze_wrapper_masks_paths_and_writes_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
