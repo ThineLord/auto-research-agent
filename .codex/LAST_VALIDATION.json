@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-11T14:12:36+08:00",
+  "recorded_at": "2026-07-11T14:16:31+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "b961070a848c2cf67269b8c081c32641fd6990b5",
-  "last_known_stable_commit": "b961070a848c2cf67269b8c081c32641fd6990b5",
-  "status": "ara024_implementation_committed_checkpoint_pending",
+  "head_commit": "a3bef4dcb0fdea377514b22cdc32a59468a686a7",
+  "last_known_stable_commit": "a3bef4dcb0fdea377514b22cdc32a59468a686a7",
+  "status": "ara024_remote_verified_closeout_pending",
   "commands": [
     {
       "command": ".venv/bin/python -m pytest -q tests/test_run_config.py tests/test_round_loop.py",
@@ -53,6 +53,38 @@
       }
     },
     {
+      "command": "git commit -m chore: checkpoint ARA-024 resume sessions",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "recovery_checkpoint": "a3bef4dcb0fdea377514b22cdc32a59468a686a7",
+        "files_changed": 5
+      }
+    },
+    {
+      "command": "push plus exact local, remote-tracking, and ls-remote comparison",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "a3bef4dcb0fdea377514b22cdc32a59468a686a7"
+      }
+    },
+    {
+      "command": "GitHub Actions push and pull-request run/job verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "push_run_id": 29142505314,
+        "pull_request_run_id": 29142506476,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "repository_safety_steps": "passed_in_all_four_jobs",
+        "test_steps": "passed_in_all_four_jobs"
+      }
+    },
+    {
       "command": "repository safety worktree and staged scans plus git diff check",
       "exit_code": 0,
       "result": "passed",
@@ -88,6 +120,6 @@
     "A genuinely new round-1 run keeps an empty resume_sessions list.",
     "The existing start_round greater than 1 compatibility branch remains intact.",
     "No manifest, provider, prompt, score, metric, round execution, or artifact schema behavior changed.",
-    "Implementation b961070 is committed; recovery checkpoint, push, PR update, and CI verification are pending."
+    "Implementation b961070 and recovery checkpoint a3bef4d are pushed and remotely verified; only final closeout and PR refresh are pending."
   ]
 }

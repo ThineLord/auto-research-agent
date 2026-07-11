@@ -103,7 +103,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-024 - Record zero-round resume sessions in run config
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P3
 - Risk: low
 - Description: `build_initial_run_config` appends `resume_sessions` only when `start_round > 1`, so

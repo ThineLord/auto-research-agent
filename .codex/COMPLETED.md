@@ -279,3 +279,19 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed implementation as `3b98c61` and recovery state as `c1e8c57`, pushed both, verified exact
   local/tracking/GitHub SHA equality, updated draft PR 13, and confirmed all four Python 3.10/3.13
   push and pull-request jobs passed, including safety and test steps.
+
+## 2026-07-11 - Zero-round resume-session provenance
+
+- Reproduced an existing zero-round checkpoint resuming at round 1 without a `resume_sessions`
+  entry, while a genuinely new round-1 run correctly kept an empty list.
+- Made session append depend on either existing higher-round compatibility or explicit
+  `resume_existing_run` lifecycle metadata, without changing round execution or eligibility.
+- Added direct builder and two-consecutive real resume coverage; each resume invocation appends
+  exactly one round-1 session, while new-run and start-round-greater-than-1 controls remain correct.
+- Related tests passed with `47 passed, 59 subtests passed`; final `make check` passed with
+  `236 passed, 164 subtests passed`; both safety scans reported 91 files and zero findings.
+- Independent focused review reported GO. No manifest, provider, prompt, score, metric, experiment,
+  ignored artifact, or artifact schema behavior changed.
+- Committed implementation as `b961070` and recovery state as `a3bef4d`, pushed both, verified exact
+  local/tracking/GitHub SHA equality, and confirmed all four Python 3.10/3.13 push and pull-request
+  jobs passed, including safety and test steps.

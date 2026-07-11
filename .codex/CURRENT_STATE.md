@@ -7,16 +7,18 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Current goal: record resume-session provenance when an existing zero-round checkpoint resumes at
   round 1, without classifying a genuinely new run as resumed (`ARA-024`).
 - Current branch: `codex/sol-autonomous-hardening`
-- Current HEAD at state snapshot: `b961070a848c2cf67269b8c081c32641fd6990b5`
-- Last known stable commit: `b961070a848c2cf67269b8c081c32641fd6990b5` (locally validated
-  implementation; remote push and Python 3.10/3.13 CI verification pending)
-- Active task: ARA-024 is `IN_PROGRESS`; implementation `b961070` is committed after tests, docs,
-  independent review, and full gate passed. Recovery checkpoint, push, PR update, and CI remain.
-- Uncommitted changes: yes; ARA-024 recovery metadata only.
+- Current HEAD at state snapshot: `a3bef4dcb0fdea377514b22cdc32a59468a686a7`
+- Last known stable commit: `a3bef4dcb0fdea377514b22cdc32a59468a686a7` (exact local,
+  remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
+  passed)
+- Active task: ARA-024 is `DONE`; final verified-state closeout metadata is being prepared. The next
+  task will be selected from the synchronized queue after this checkpoint; ARA-004 remains blocked.
+- Uncommitted changes: yes; verified-state closeout metadata only.
 
 ## Modified Files
 
 - `.codex/CURRENT_STATE.md`
+- `.codex/COMPLETED.md`
 - `.codex/KNOWN_ISSUES.md`
 - `.codex/LAST_VALIDATION.json`
 - `.codex/RESUME_INSTRUCTIONS.md`
@@ -326,11 +328,15 @@ Updated: 2026-07-11 (Asia/Shanghai)
 - Staged only the five reviewed code/test/public-doc paths, passed staged diff/safety checks, and
   committed implementation `b961070a848c2cf67269b8c081c32641fd6990b5`
   (`fix: record zero-round resume sessions`).
+- Committed recovery checkpoint `a3bef4d`, pushed both commits, and verified exact local,
+  remote-tracking, `ls-remote`, and GitHub branch SHA equality.
+- Verified push run `29142505314` and pull-request run `29142506476`: Python 3.10 and 3.13 all
+  passed, including formatting, lint, import, repository-safety, and test steps in all four jobs.
 
 ## Remaining Steps
 
-- Commit this recovery metadata as a separate checkpoint.
-- Push, verify exact SHA, update draft PR 13, and verify Python 3.10/3.13 push/PR jobs.
+- Commit and push this final verified-state closeout, verify exact SHA and CI, update draft PR 13,
+  then select the next bounded task.
 
 ## Test Status
 
@@ -340,6 +346,8 @@ Updated: 2026-07-11 (Asia/Shanghai)
   safety scans passed, and pytest passed (`236 passed, 164 subtests passed in 2.69s`).
 - Independent review: GO; new run round 1 remains empty, each zero-round resume adds exactly one,
   and existing start-round-greater-than-1 behavior passes. No provider-backed test was needed.
+- GitHub Actions at `a3bef4d`: Python 3.10/3.13 passed for both push and pull-request events;
+  formatting, lint, imports, repository safety, and tests passed in all four jobs.
 - ARA-020 pre-fix regression: `8 failed, 2 passed, 39 deselected`; manifest provenance was replaced,
   explicit direct/alias IDs were accepted, and five unpreservable manifest cases were overwritten.
 - ARA-020 focused regression after the final sparse correction: `4 passed, 10 subtests passed`.
@@ -584,7 +592,7 @@ Updated: 2026-07-11 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git add -- .codex/CURRENT_STATE.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md .codex/TASK_QUEUE.md
+git add -- .codex/CURRENT_STATE.md .codex/COMPLETED.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md .codex/TASK_QUEUE.md
 ```
 
 ## Interruption Recovery

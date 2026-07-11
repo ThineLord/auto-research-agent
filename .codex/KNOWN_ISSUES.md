@@ -186,8 +186,9 @@ Updated: 2026-07-10 (Asia/Shanghai)
 
 ## KI-024 - Zero-round resume omits a run-config resume session entry
 
-- Status: fixed and locally validated at implementation `b961070`; push/CI verification pending
+- Status: fixed, pushed, and CI-verified
 - Severity: P3 provenance completeness
 - Impact: resuming a checkpoint with `last_completed_round=0` records resume lifecycle metadata and
   current-session time but does not append `resume_sessions` because the next round is still 1.
-- Current action: task `ARA-024`; commit recovery state, push implementation `b961070`, and verify CI.
+- Current action: task `ARA-024` completed at implementation `b961070` and remotely verified
+  checkpoint `a3bef4d`; all Python 3.10/3.13 push and PR jobs passed.
