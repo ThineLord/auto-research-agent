@@ -162,6 +162,10 @@ Progress comes from:
   seconds, total agent elapsed seconds, aggregate estimated tokens, and paths to metrics/config
   artifacts.
 
+Offline benchmark reports resolve a recognized `STOP_*` reason from the selected run's summary,
+config, then legacy manifest. They use the mutable project checkpoint only when its run path and any
+supplied run ID match that target; unsafe/unknown values or unrelated state render as `unknown`.
+
 Token fields are deliberately named `estimated_*_tokens` and use
 `visible_context_chars_div_4_ceil`. They are cost-ready accounting foundations, not provider billing
 truth, and the project does not hardcode vendor prices.

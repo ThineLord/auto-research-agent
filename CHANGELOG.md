@@ -24,6 +24,10 @@
 
 ### Fixed
 
+* Historical benchmark reports now take recognized stop reasons from the selected run's summary,
+  config, or legacy manifest. The mutable project checkpoint is used only when its run path/ID
+  proves it belongs to that target; unknown/private text renders safely instead of relabeling or
+  leaking through an older report.
 * Gemini now passes the configured `model.timeout_seconds` to the Google Gen AI client's HTTP
   transport in milliseconds for every supported API-key source. Transport timeouts are reported as
   a privacy-safe `timeout` provider error without adding retries or changing generation settings.
