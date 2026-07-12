@@ -378,7 +378,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-042 - Scope and refresh UI cloud-free session caches
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P2
 - Risk: medium
 - Description: Streamlit stores discovered models and profile results under global session keys, so

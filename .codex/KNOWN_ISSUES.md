@@ -344,17 +344,19 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-042 - UI cloud-free session cache is not project or artifact scoped
 
-- Status: confirmed; queued as ARA-042
+- Status: fixed and locally validated; publication pending
 - Severity: P2 selection consistency
 - Impact: switching projects or refreshing cloud artifacts outside Streamlit can leave global
   in-memory discovery/profile values active; equal model IDs can hide stale metadata from ARA-040's
   membership guard.
-- Current action: bind session cache identity to the canonical selected project plus artifact change
-  state without changing artifact schemas.
+- Resolution: cache identity combines canonical project path/device/inode with safe SHA-256 content
+  states for both artifacts. Cache misses recheck the joint identity, retry once, and fail empty if
+  unstable; legacy, unreadable, unsafe, project-switch, and same-ID refresh cases cannot reuse stale
+  values.
 
 ## KI-043 - All blocked profiles can still produce a fallback recommendation
 
-- Status: fixed and locally validated; publication pending
+- Status: fixed, pushed, and CI-verified
 - Severity: P2 provider reliability
 - Impact: after quota/unreachable/billing-safety/token-context profiles exclude every candidate, the
   fallback branch can select one of the same blocked safe seeds and trigger a predictably failing

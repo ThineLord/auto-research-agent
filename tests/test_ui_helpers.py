@@ -82,6 +82,328 @@ class SharedUiBackendHelperTests(unittest.TestCase):
 
             self.assertEqual(ui_app.load_score_history_rows(score_history_path), [])
 
+    def test_cloud_free_session_cache_reloads_when_selected_project_changes(self) -> None:
+        import ui.app as ui_app
+        from src.cloud_free import (
+            CloudModelProfile,
+            classify_model,
+            save_discovery_artifact,
+            save_profile_artifact,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            projects = Path(tmp) / "projects"
+            project_a = projects / "project-a"
+            project_b = projects / "project-b"
+            project_a.mkdir(parents=True)
+            project_b.mkdir()
+            for project, label, latency in (
+                (project_a, "Project A metadata", 1.0),
+                (project_b, "Project B metadata", 2.0),
+            ):
+                save_discovery_artifact(
+                    project,
+                    [classify_model(model_id="gemini-3.5-flash", display_name=label)],
+                )
+                save_profile_artifact(
+                    project,
+                    [
+                        CloudModelProfile(
+                            model_id="gemini-3.5-flash",
+                            reachable=True,
+                            latency_seconds=latency,
+                        )
+                    ],
+                )
+
+            session_state: dict[str, object] = {
+                "cloud_free_discovered_models": [
+                    classify_model(
+                        model_id="gemini-3.5-flash",
+                        display_name="legacy global cache",
+                    )
+                ],
+                "cloud_free_profile_results": [
+                    CloudModelProfile(model_id="gemini-3.5-flash", latency_seconds=99.0)
+                ],
+            }
+            models_a, profiles_a = ui_app.load_scoped_cloud_free_cache(
+                project_a,
+                session_state,
+            )
+            identity_a = session_state["cloud_free_cache_identity"]
+            models_b, profiles_b = ui_app.load_scoped_cloud_free_cache(
+                project_b,
+                session_state,
+            )
+            identity_b = session_state["cloud_free_cache_identity"]
+            models_a_again, profiles_a_again = ui_app.load_scoped_cloud_free_cache(
+                project_a,
+                session_state,
+            )
+
+        self.assertEqual(models_a[0].display_name, "Project A metadata")
+        self.assertEqual(profiles_a[0].latency_seconds, 1.0)
+        self.assertEqual(models_b[0].display_name, "Project B metadata")
+        self.assertEqual(profiles_b[0].latency_seconds, 2.0)
+        self.assertNotEqual(identity_a, identity_b)
+        self.assertEqual(models_a_again[0].display_name, "Project A metadata")
+        self.assertEqual(profiles_a_again[0].latency_seconds, 1.0)
+
+    def test_cloud_free_session_cache_reloads_external_same_id_metadata_updates(self) -> None:
+        import ui.app as ui_app
+        from src.cloud_free import (
+            CloudModelProfile,
+            classify_model,
+            recommend_free_cloud_model,
+            save_discovery_artifact,
+            save_profile_artifact,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "projects" / "selected"
+            project.mkdir(parents=True)
+            save_discovery_artifact(
+                project,
+                [
+                    classify_model(
+                        model_id="gemini-3.5-flash",
+                        display_name="old metadata",
+                    )
+                ],
+            )
+            save_profile_artifact(
+                project,
+                [
+                    CloudModelProfile(
+                        model_id="gemini-3.5-flash",
+                        daily_quota_exhausted=True,
+                        latency_seconds=1.0,
+                    )
+                ],
+            )
+            session_state: dict[str, object] = {}
+            old_models, old_profiles = ui_app.load_scoped_cloud_free_cache(
+                project,
+                session_state,
+            )
+
+            with (
+                patch.object(ui_app, "load_discovery_artifact") as load_discovery,
+                patch.object(ui_app, "load_profile_artifact") as load_profile,
+            ):
+                cached_models, cached_profiles = ui_app.load_scoped_cloud_free_cache(
+                    project,
+                    session_state,
+                )
+            load_discovery.assert_not_called()
+            load_profile.assert_not_called()
+
+            self.assertIsNone(
+                recommend_free_cloud_model(
+                    candidates=old_models,
+                    profiles=old_profiles,
+                )
+            )
+            discovery_path = project / "artifacts" / "cloud_free_models.json"
+            original_discovery = discovery_path.read_text(encoding="utf-8")
+            updated_discovery = original_discovery.replace("old metadata", "new metadata")
+            self.assertEqual(len(updated_discovery), len(original_discovery))
+            discovery_before = discovery_path.stat()
+            discovery_path.write_text(updated_discovery, encoding="utf-8")
+            os.utime(
+                discovery_path,
+                ns=(discovery_before.st_atime_ns, discovery_before.st_mtime_ns),
+            )
+            discovery_after = discovery_path.stat()
+            self.assertEqual(
+                (
+                    discovery_after.st_ino,
+                    discovery_after.st_size,
+                    discovery_after.st_mtime_ns,
+                ),
+                (
+                    discovery_before.st_ino,
+                    discovery_before.st_size,
+                    discovery_before.st_mtime_ns,
+                ),
+            )
+            refreshed_models, unchanged_profiles = ui_app.load_scoped_cloud_free_cache(
+                project,
+                session_state,
+            )
+            save_profile_artifact(
+                project,
+                [
+                    CloudModelProfile(
+                        model_id="gemini-3.5-flash",
+                        reachable=True,
+                        latency_seconds=9.0,
+                    )
+                ],
+            )
+            unchanged_models, refreshed_profiles = ui_app.load_scoped_cloud_free_cache(
+                project,
+                session_state,
+            )
+
+        self.assertIs(cached_models, old_models)
+        self.assertIs(cached_profiles, old_profiles)
+        self.assertEqual(refreshed_models[0].model_id, old_models[0].model_id)
+        self.assertEqual(refreshed_models[0].display_name, "new metadata")
+        self.assertEqual(unchanged_profiles[0].latency_seconds, 1.0)
+        self.assertEqual(unchanged_models[0].display_name, "new metadata")
+        self.assertEqual(refreshed_profiles[0].model_id, old_profiles[0].model_id)
+        self.assertEqual(refreshed_profiles[0].latency_seconds, 9.0)
+        self.assertIsNotNone(
+            recommend_free_cloud_model(
+                candidates=unchanged_models,
+                profiles=refreshed_profiles,
+            )
+        )
+
+    def test_cloud_free_session_cache_retries_unstable_snapshots_then_fails_empty(self) -> None:
+        import ui.app as ui_app
+
+        project = Path("unused-project")
+        stable_session: dict[str, object] = {
+            "cloud_free_cache_identity": ("old",),
+            "cloud_free_discovered_models": ["old-model"],
+            "cloud_free_profile_results": ["old-profile"],
+        }
+        with (
+            patch.object(
+                ui_app,
+                "cloud_free_cache_identity",
+                side_effect=[("generation-a",), ("generation-b",), ("generation-b",)],
+            ),
+            patch.object(
+                ui_app,
+                "load_discovery_artifact",
+                side_effect=[["first-model"], ["stable-model"]],
+            ) as load_discovery,
+            patch.object(
+                ui_app,
+                "load_profile_artifact",
+                side_effect=[["first-profile"], ["stable-profile"]],
+            ) as load_profile,
+        ):
+            stable_models, stable_profiles = ui_app.load_scoped_cloud_free_cache(
+                project,
+                stable_session,
+            )
+
+        self.assertEqual(stable_models, ["stable-model"])
+        self.assertEqual(stable_profiles, ["stable-profile"])
+        self.assertEqual(stable_session["cloud_free_cache_identity"], ("generation-b",))
+        self.assertEqual(load_discovery.call_count, 2)
+        self.assertEqual(load_profile.call_count, 2)
+
+        unstable_session: dict[str, object] = {
+            "cloud_free_cache_identity": ("old",),
+            "cloud_free_discovered_models": ["old-model"],
+            "cloud_free_profile_results": ["old-profile"],
+        }
+        with (
+            patch.object(
+                ui_app,
+                "cloud_free_cache_identity",
+                side_effect=[("generation-a",), ("generation-b",), ("generation-c",)],
+            ),
+            patch.object(
+                ui_app,
+                "load_discovery_artifact",
+                side_effect=[["first-model"], ["second-model"]],
+            ),
+            patch.object(
+                ui_app,
+                "load_profile_artifact",
+                side_effect=[["first-profile"], ["second-profile"]],
+            ),
+        ):
+            unstable_models, unstable_profiles = ui_app.load_scoped_cloud_free_cache(
+                project,
+                unstable_session,
+            )
+
+        self.assertEqual(unstable_models, [])
+        self.assertEqual(unstable_profiles, [])
+        self.assertNotIn("cloud_free_cache_identity", unstable_session)
+        self.assertNotIn("cloud_free_discovered_models", unstable_session)
+        self.assertNotIn("cloud_free_profile_results", unstable_session)
+
+    def test_cloud_free_session_cache_recovers_from_unreadable_artifacts(self) -> None:
+        import ui.app as ui_app
+        from src.cloud_free import (
+            CloudModelProfile,
+            classify_model,
+            save_discovery_artifact,
+            save_profile_artifact,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "projects" / "selected"
+            artifacts = project / "artifacts"
+            artifacts.mkdir(parents=True)
+            (artifacts / "cloud_free_models.json").write_bytes(b"\xff\xfe")
+            (artifacts / "cloud_free_profile.json").write_text("{invalid", encoding="utf-8")
+            session_state: dict[str, object] = {
+                "cloud_free_discovered_models": ["stale-model"],
+                "cloud_free_profile_results": ["stale-profile"],
+            }
+
+            invalid_models, invalid_profiles = ui_app.load_scoped_cloud_free_cache(
+                project,
+                session_state,
+            )
+            save_discovery_artifact(
+                project,
+                [classify_model(model_id="gemini-3.5-flash")],
+            )
+            save_profile_artifact(
+                project,
+                [CloudModelProfile(model_id="gemini-3.5-flash", reachable=True)],
+            )
+            valid_models, valid_profiles = ui_app.load_scoped_cloud_free_cache(
+                project,
+                session_state,
+            )
+
+        self.assertEqual(invalid_models, [])
+        self.assertEqual(invalid_profiles, [])
+        self.assertEqual(valid_models[0].model_id, "gemini-3.5-flash")
+        self.assertEqual(valid_profiles[0].model_id, "gemini-3.5-flash")
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_cloud_free_session_cache_clears_stale_values_for_unsafe_artifact(self) -> None:
+        import ui.app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project = root / "projects" / "selected"
+            artifacts = project / "artifacts"
+            artifacts.mkdir(parents=True)
+            external = root / "external-models.json"
+            external.write_text('{"models": [{"private": true}]}\n', encoding="utf-8")
+            (artifacts / "cloud_free_models.json").symlink_to(external)
+            session_state: dict[str, object] = {
+                "cloud_free_cache_identity": ("safe-old-project",),
+                "cloud_free_discovered_models": ["stale-model"],
+                "cloud_free_profile_results": ["stale-profile"],
+            }
+
+            models, profiles = ui_app.load_scoped_cloud_free_cache(project, session_state)
+
+            self.assertEqual(
+                external.read_text(encoding="utf-8"), '{"models": [{"private": true}]}\n'
+            )
+
+        self.assertEqual(models, [])
+        self.assertEqual(profiles, [])
+        self.assertNotIn("cloud_free_cache_identity", session_state)
+        self.assertNotIn("cloud_free_discovered_models", session_state)
+        self.assertNotIn("cloud_free_profile_results", session_state)
+
     def test_get_active_process_meta_returns_live_process_and_removes_stale_meta(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             meta_path = Path(tmp) / "ui_run_process.json"

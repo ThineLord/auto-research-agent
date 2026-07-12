@@ -414,3 +414,22 @@
   convention; immutable action pinning remains separately owned by ARA-019.
 - Scope: no dependency, packaging, wheel-smoke, publication, release, provider, artifact, experiment,
   or application runtime policy changes are included.
+
+## 2026-07-12 - Content-scope UI cloud session state
+
+- Decision: bind discovery and profile session lists to one identity containing the validated
+  canonical project path, project device/inode, and SHA-256 content state of both fixed artifacts.
+  Use distinct missing, unreadable, and unsafe/error sentinels; never store artifact content in the
+  identity.
+- Consistency boundary: clear legacy/old state before a miss, load both lists, re-fingerprint the
+  joint identity, retry once on change, and fail empty without caching if it changes again. Commit
+  the two lists before the identity; UI-owned saves invalidate identity before updating one list.
+- Reason: global list keys survive project changes, while ID-membership reconciliation cannot see
+  external metadata changes when model IDs stay equal. Content state also prevents inode/size/mtime
+  preservation from hiding an update.
+- Compatibility: valid stable artifacts retain session reuse; malformed or missing artifacts still
+  yield empty lists and recover when replaced. No artifact schema/file, provider call, configuration,
+  model-selection rule, experiment result, ignored runtime, or historical interpretation changes.
+- Residual boundary: a mutation after the final fingerprint can affect at most one render. Atomic
+  cross-file discovery/profile generations require a transaction or provenance schema and remain
+  outside this no-schema UI cache fix.

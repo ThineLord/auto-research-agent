@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import stat
 import sys
+from collections.abc import MutableMapping
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -13,11 +15,13 @@ import streamlit as st
 
 from src.benchmarking import BENCHMARK_PRESETS
 from src.cloud_free import (
+    DISCOVERY_ARTIFACT_NAME,
     FREE_RUNNER_AUTO,
     FREE_RUNNER_MANUAL,
     FREE_RUNNER_PRESETS,
     FREE_RUNNER_QUALITY,
     FREE_RUNNER_VOLUME,
+    PROFILE_ARTIFACT_NAME,
     build_cached_candidate_pool,
     build_candidate_pool,
     discover_free_cloud_models,
@@ -71,6 +75,7 @@ from src.storage import (
     list_artifact_directories,
     read_file_text,
     read_json_file,
+    read_regular_text,
     tail_file_lines,
     write_file_text,
 )
@@ -112,6 +117,9 @@ DRAFTING_MODE_LABEL_KEYS = {
     "fresh_from_task_with_review": "drafting_mode_fresh_with_review",
     "continue_from_previous_draft": "drafting_mode_continue_from_previous",
 }
+CLOUD_FREE_CACHE_IDENTITY_KEY = "cloud_free_cache_identity"
+CLOUD_FREE_DISCOVERY_SESSION_KEY = "cloud_free_discovered_models"
+CLOUD_FREE_PROFILE_SESSION_KEY = "cloud_free_profile_results"
 
 
 def relative_repo_path(path: Path) -> str:
@@ -365,6 +373,77 @@ def refresh_ollama_model_cache(*, base_url: str, timeout_seconds: int = 5) -> No
     models, error = query_ollama_models(timeout_seconds=timeout_seconds, base_url=base_url)
     st.session_state["ollama_models"] = models
     st.session_state["ollama_models_error"] = error or ""
+
+
+def _cloud_free_artifact_content_identity(
+    project_dir: Path,
+    artifact_name: str,
+) -> tuple[str, str]:
+    artifact_path = project_dir / "artifacts" / artifact_name
+    try:
+        content = read_regular_text(artifact_path, missing_ok=False)
+    except FileNotFoundError:
+        return ("missing", "")
+    except UnicodeError:
+        return ("unreadable", "")
+    except OSError:
+        return ("unsafe_or_unreadable", "")
+    return ("sha256", hashlib.sha256(content.encode("utf-8")).hexdigest())
+
+
+def cloud_free_cache_identity(project_dir: Path) -> tuple[object, ...]:
+    project_dir = Path(project_dir)
+    ensure_project_runtime_paths_safe(project_dir, anchor=project_dir.parent)
+    canonical_project = project_dir.resolve(strict=True)
+    project_metadata = project_dir.lstat()
+    return (
+        canonical_project.as_posix(),
+        project_metadata.st_dev,
+        project_metadata.st_ino,
+        _cloud_free_artifact_content_identity(project_dir, DISCOVERY_ARTIFACT_NAME),
+        _cloud_free_artifact_content_identity(project_dir, PROFILE_ARTIFACT_NAME),
+    )
+
+
+def _clear_cloud_free_session_cache(session_state: MutableMapping[str, Any]) -> None:
+    session_state.pop(CLOUD_FREE_CACHE_IDENTITY_KEY, None)
+    session_state.pop(CLOUD_FREE_DISCOVERY_SESSION_KEY, None)
+    session_state.pop(CLOUD_FREE_PROFILE_SESSION_KEY, None)
+
+
+def load_scoped_cloud_free_cache(
+    project_dir: Path,
+    session_state: MutableMapping[str, Any],
+) -> tuple[list[Any], list[Any]]:
+    try:
+        identity = cloud_free_cache_identity(project_dir)
+    except (OSError, RuntimeError):
+        _clear_cloud_free_session_cache(session_state)
+        return [], []
+    discovered_models = session_state.get(CLOUD_FREE_DISCOVERY_SESSION_KEY)
+    profile_results = session_state.get(CLOUD_FREE_PROFILE_SESSION_KEY)
+    if (
+        session_state.get(CLOUD_FREE_CACHE_IDENTITY_KEY) != identity
+        or not isinstance(discovered_models, list)
+        or not isinstance(profile_results, list)
+    ):
+        _clear_cloud_free_session_cache(session_state)
+        try:
+            for _attempt in range(2):
+                discovered_models = load_discovery_artifact(project_dir)
+                profile_results = load_profile_artifact(project_dir)
+                observed_identity = cloud_free_cache_identity(project_dir)
+                if observed_identity == identity:
+                    session_state[CLOUD_FREE_DISCOVERY_SESSION_KEY] = discovered_models
+                    session_state[CLOUD_FREE_PROFILE_SESSION_KEY] = profile_results
+                    session_state[CLOUD_FREE_CACHE_IDENTITY_KEY] = identity
+                    return discovered_models, profile_results
+                identity = observed_identity
+        except (OSError, RuntimeError):
+            pass
+        _clear_cloud_free_session_cache(session_state)
+        return [], []
+    return discovered_models, profile_results
 
 
 def localized_stage(stage: Any) -> str:
@@ -1917,12 +1996,10 @@ def main() -> None:
             key="free_runner_preset",
         )
 
-        discovered_models = st.session_state.get("cloud_free_discovered_models")
-        if not isinstance(discovered_models, list):
-            discovered_models = load_discovery_artifact(proj_path)
-        profile_results = st.session_state.get("cloud_free_profile_results")
-        if not isinstance(profile_results, list):
-            profile_results = load_profile_artifact(proj_path)
+        discovered_models, profile_results = load_scoped_cloud_free_cache(
+            proj_path,
+            st.session_state,
+        )
 
         discover_col, profile_col, recommendation_col = st.columns([1, 1, 3])
         with discover_col:
@@ -1937,7 +2014,8 @@ def main() -> None:
                     st.error(t("cloud_free_discovery_failed", error=error))
                 else:
                     save_discovery_artifact(proj_path, discovered)
-                    st.session_state["cloud_free_discovered_models"] = discovered
+                    st.session_state.pop(CLOUD_FREE_CACHE_IDENTITY_KEY, None)
+                    st.session_state[CLOUD_FREE_DISCOVERY_SESSION_KEY] = discovered
                     discovered_models = discovered
                     st.success(t("cloud_free_discovery_saved", count=len(discovered)))
         with profile_col:
@@ -1958,7 +2036,8 @@ def main() -> None:
                         api_key=gemini_api_key_password or app_config.model.gemini.api_key,
                     )
                 save_profile_artifact(proj_path, profiles)
-                st.session_state["cloud_free_profile_results"] = profiles
+                st.session_state.pop(CLOUD_FREE_CACHE_IDENTITY_KEY, None)
+                st.session_state[CLOUD_FREE_PROFILE_SESSION_KEY] = profiles
                 profile_results = profiles
                 st.success(t("cloud_free_profile_saved", count=len(profiles)))
 

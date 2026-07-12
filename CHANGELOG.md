@@ -42,6 +42,10 @@
 
 ### Fixed
 
+* Streamlit cloud-free discovery/profile session values are now scoped to the validated canonical
+  project and safe content state of both artifacts. Project switches, legacy global session values,
+  and external same-model-ID metadata updates reload together; unstable or unsafe snapshots fail
+  empty instead of reusing stale recommendation inputs.
 * Automatic cloud-free recommendation and runtime fallback now return no selection when every safe
   candidate has a profile blocked by reachability, quota, billing/safety, token-context, or unsafe-
   text results. Mixed unprofiled and healthy candidates remain eligible, Quality uses the same guard,

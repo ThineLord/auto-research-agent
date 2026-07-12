@@ -46,13 +46,14 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-There is no active task. ARA-029 is `DONE` with focused, full-gate, and two independent reviews
-passing locally; publish it and verify all four Python 3.10/3.13 push/PR jobs before starting
-ARA-042. Keep dependency, release, wheel-smoke, and publication policy out of scope. ARA-043 is
-`DONE` at `685a36c`, remote-equal, reflected in draft PR 13, and verified by push/PR runs
-`29166629408`/`29166630511` on Python 3.10/3.13. Resume from the semantic checkpoint in
+There is no active task. ARA-042 is `DONE` with focused, full-gate, and two independent reviews
+passing locally; publish it and verify all four Python 3.10/3.13 event jobs before reassessing the
+queue. Do not change artifact schemas or call a provider. ARA-029 is `DONE` at `6f03ec8`,
+remote-equal, reflected in draft PR 13, and verified by push/PR runs
+`29180344621`/`29180345488` on Python 3.10/3.13 with zero annotations. Resume from the semantic
+checkpoint in
 `CURRENT_STATE.md`; use
-`685a36c7d7a9826c6f20d095935a9536aabedca5` as the conservative exact externally verified fallback
+`6f03ec8e7c2005543d8b8dbaf20fc6d6cceaa94d` as the conservative exact externally verified fallback
 if the semantic current `HEAD` has not yet been checked.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
@@ -70,9 +71,9 @@ The last successful local full validation command was:
 make check
 ```
 
-The current full expected result is Ruff/import/safety success and `334 passed, 227 subtests
-passed`; the combined ARA-029 CI/recovery contract passes `10 passed, 1 subtest passed`, and the
-ARA-022 focused storage/runtime/resume/survey/UI/CLI layer passes `181 passed, 104 subtests passed`.
+The current full expected result is Ruff/import/safety success and `339 passed, 227 subtests
+passed`; the ARA-042 related UI/cloud-free/recovery layer passes `97 passed, 44 subtests passed`, and
+the combined ARA-029 CI/recovery contract passes `10 passed, 1 subtest passed`.
 Both safety modes should scan only tracked/staged files with zero findings.
 Resolve `HEAD`, compare it with upstream and `ls-remote`, and inspect current PR checks before
 starting another task. If the current HEAD lacks successful remote evidence, use
@@ -90,10 +91,10 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-No task is currently `IN_PROGRESS`; ARA-042 is the next unblocked P2 after ARA-029 publication
-verification. ARA-018 requires an explicit owner license/distribution decision; ARA-030 and ARA-041
-require separate greater-than-30-minute approval. Do not start ARA-019, ARA-026, ARA-006, or
-ARA-007 until their recorded dependencies are satisfied.
+There is no unblocked implementation task after ARA-042 publication verification. ARA-018 requires
+an explicit owner license/distribution decision; ARA-030 and ARA-041 require separate
+greater-than-30-minute approval. Do not start ARA-019, ARA-026, ARA-006, or ARA-007 until their
+recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
 

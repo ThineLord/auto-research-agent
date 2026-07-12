@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-12T12:51:45+08:00",
+  "recorded_at": "2026-07-12T13:11:46+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "685a36c7d7a9826c6f20d095935a9536aabedca5",
-  "last_known_stable_commit": "685a36c7d7a9826c6f20d095935a9536aabedca5",
+  "head_commit": "6f03ec8e7c2005543d8b8dbaf20fc6d6cceaa94d",
+  "last_known_stable_commit": "6f03ec8e7c2005543d8b8dbaf20fc6d6cceaa94d",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "685a36c7d7a9826c6f20d095935a9536aabedca5",
+  "state_recorded_against_commit": "6f03ec8e7c2005543d8b8dbaf20fc6d6cceaa94d",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-12T04:14:04+08:00",
-    "commit": "685a36c7d7a9826c6f20d095935a9536aabedca5",
+    "verified_at": "2026-07-12T12:53:32+08:00",
+    "commit": "6f03ec8e7c2005543d8b8dbaf20fc6d6cceaa94d",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29166629408,
+        "run_id": 29180344621,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "685a36c7d7a9826c6f20d095935a9536aabedca5",
+        "head_sha": "6f03ec8e7c2005543d8b8dbaf20fc6d6cceaa94d",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29166630511,
+        "run_id": 29180345488,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "685a36c7d7a9826c6f20d095935a9536aabedca5",
+        "head_sha": "6f03ec8e7c2005543d8b8dbaf20fc6d6cceaa94d",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,91 @@
       }
     }
   },
-  "status": "ara029_done_local_validation_passed_publication_pending",
+  "status": "ara042_done_local_validation_passed_publication_pending",
   "commands": [
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_ui_helpers.py -k cloud_free_session_cache before ARA-042 fix",
+      "exit_code": 1,
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "pytest_tests_failed": 2,
+        "two_project_stale_cache": true,
+        "external_same_id_stale_cache": true,
+        "provider_called": false
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_ui_helpers.py -k cloud_free_session_cache",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 5,
+        "project_switch": "passed",
+        "same_inode_size_mtime_content_refresh": "passed",
+        "blocked_to_healthy_recommendation": "passed",
+        "retry_then_fail_empty": "passed",
+        "unreadable_recovery": "passed",
+        "unsafe_symlink_clearing": "passed"
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_ui_helpers.py tests/test_cloud_free.py tests/test_recovery_state.py",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 97,
+        "pytest_subtests_passed": 44,
+        "provider_called": false
+      }
+    },
+    {
+      "command": "make check after ARA-042 final explicit staging",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 58,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 101,
+        "findings": 0,
+        "pytest_tests_passed": 339,
+        "pytest_subtests_passed": 227,
+        "pytest_duration_seconds": 12.22
+      }
+    },
+    {
+      "command": "two independent ARA-042 identity and regression reviews",
+      "result": "passed",
+      "summary": {
+        "identity_review": "GO",
+        "test_review": "GO",
+        "blocking_findings": 0,
+        "provider_called": false
+      }
+    },
+    {
+      "command": "ARA-029 publication, remote equality, CI, annotation, and draft PR verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "6f03ec8e7c2005543d8b8dbaf20fc6d6cceaa94d",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29180344621,
+        "pull_request_run_id": 29180345488,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "job_annotations": 0,
+        "draft_pr_13_updated": true
+      }
+    },
     {
       "command": "initial ARA-029 completion recovery-state consistency check",
       "result": "corrected_before_commit",
@@ -2008,6 +2091,10 @@
   ],
   "not_run": [
     {
+      "check": "real provider smoke for ARA-042",
+      "reason": "UI cache identity, content refresh, and fail-empty behavior are deterministic local session/artifact boundaries; real project-switch, same-ID rewrite, malformed, race, and symlink fixtures cover them without credentials or cost."
+    },
+    {
       "check": "actionlint for ARA-029",
       "reason": "actionlint was not installed; no dependency was added for this narrow workflow change. PyYAML contract parsing, local gates, and the real GitHub push/PR jobs provide the configured validation layers."
     },
@@ -2061,7 +2148,8 @@
     }
   ],
   "notes": [
-    "ARA-029 is DONE and locally validated for least-privilege CI permissions, bounded runtime, and Node 24 action majors; publication and four-job GitHub verification remain pending, then ARA-042 is next.",
+    "ARA-042 is DONE and locally validated for canonical-project and safe artifact-content scoped UI cloud-free session state; publication and four-job GitHub verification remain pending.",
+    "ARA-029 is complete at remote-equal commit 6f03ec8 with successful push and pull-request CI runs 29180344621 and 29180345488 on Python 3.10 and 3.13 and zero job annotations.",
     "ARA-043 is complete at remote-equal commit 685a36c with successful push and pull-request CI runs 29166629408 and 29166630511 on Python 3.10 and 3.13.",
     "ARA-043 uses one blocking predicate for Quality, normal scoring, and runtime fallback; all-blocked returns no selection while mixed unprofiled and healthy candidates remain eligible.",
     "ARA-040 is complete at remote-equal commit ba4b2c1 with successful push and pull-request CI runs 29166208230 and 29166209758 on Python 3.10 and 3.13.",

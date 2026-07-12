@@ -4,19 +4,19 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: retain the completed, locally validated ARA-029 CI least-privilege/runtime contract,
-  publish and verify it, then continue with isolated ARA-042 UI cache identity handling.
+- Current goal: retain the completed, locally validated ARA-042 project/artifact-scoped UI cloud
+  cache, publish and verify it, then reassess the deferred/blocked-only queue.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `685a36c7d7a9826c6f20d095935a9536aabedca5` (the exact HEAD
+- State recorded against commit: `6f03ec8e7c2005543d8b8dbaf20fc6d6cceaa94d` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `685a36c7d7a9826c6f20d095935a9536aabedca5` (exact local,
+- Last externally verified fallback: `6f03ec8e7c2005543d8b8dbaf20fc6d6cceaa94d` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-029 is `DONE` with focused, full-gate, and two independent
-  reviews passing locally; publication is pending. ARA-043 remains the exact external fallback at
-  `685a36c`, verified by push/PR runs `29166629408`/`29166630511` on Python 3.10/3.13.
+- Active task at this snapshot: none. ARA-042 is `DONE` with focused, full-gate, and two independent
+  reviews passing locally; publication is pending. ARA-029 remains the exact external fallback at
+  `6f03ec8`, verified by push/PR runs `29180344621`/`29180345488` on Python 3.10/3.13.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -537,23 +537,43 @@ Updated: 2026-07-12 (Asia/Shanghai)
   hosted-runner compatibility, cache permission boundary, and timeout headroom. No dependency,
   release, artifact, provider, experiment, or application behavior changed.
 
+## ARA-042 Project And Artifact Scoped UI Cloud Cache
+
+- Reproduced cross-project and same-ID external metadata staleness before adding a shared session
+  cache identity for both discovery and profile lists.
+- The identity combines validated canonical project path/device/inode with safe content hashes for
+  both artifacts. It distinguishes missing/unreadable/unsafe states, clears legacy or torn values on
+  a miss, rechecks after loading, retries once, and returns uncached empty lists if still unstable.
+- UI saves invalidate identity before updating their in-memory value. Equal inode/size/mtime content
+  rewrites, blocked-to-healthy recommendation changes, unreadable recovery, and unsafe symlinks are
+  covered without provider calls or artifact/schema changes.
+
 ## Remaining Steps
 
-- Publish completed ARA-029 and verify exact remote equality plus all four Python 3.10/3.13 event
+- Publish completed ARA-042 and verify exact remote equality plus all four Python 3.10/3.13 event
   jobs before recording it as the external fallback.
-- Continue with ARA-042 after ARA-029 remote verification; do not cross remaining
-  owner/configuration approval gates.
-- Keep ARA-018 and ARA-030 behind their recorded owner/long-task approval gates; ARA-029 has owner
-  approval, but do not fold dependency, release, wheel-smoke, or publication policy into it.
+- Reassess the deferred/blocked-only queue after ARA-042 remote verification; do not cross remaining
+  owner/configuration/long-task approval gates or manufacture low-value changes.
+- Keep ARA-018, ARA-030, and ARA-041 behind their recorded owner/long-task approval gates; keep
+  dependency, release, wheel-smoke, and publication policy out of ARA-042.
 
 ## Test Status
 
+- ARA-042 pre-fix two-project and external same-ID cache controls failed as expected; five focused
+  project/content/race/malformed/unsafe regressions now pass provider-free.
+- ARA-042 related UI/cloud-free/recovery tests passed `97 passed, 44 subtests passed`; local `make
+  check` passed Ruff format/lint, imports, repository-safety self-test, worktree/staged scans, and
+  pytest (`339 passed, 227 subtests passed`; 101 tracked files and zero findings). Two independent
+  final reviews returned GO.
+- ARA-029 remote verification: exact local/upstream/`ls-remote` equality at `6f03ec8`, ahead/behind
+  `0/0`; push run `29180344621` and pull-request run `29180345488` passed Python 3.10/3.13. All four
+  annotation sets are empty and draft PR 13 is open, mergeable, and updated.
 - ARA-029 pre-fix contract failed three checks as expected; the fixed CI/recovery contract passed
   `10 passed, 1 subtest passed`, YAML parsed with the expected fields, and Ruff/diff checks passed.
 - ARA-029 local `make check` passed Ruff format/lint, imports, repository-safety self-test,
   worktree/staged scans, and pytest (`334 passed, 227 subtests passed`; zero findings). Two
-  independent reviews returned GO. `actionlint` was unavailable and not installed; the four real
-  GitHub jobs remain pending publication validation.
+  independent reviews returned GO. `actionlint` was unavailable and not installed; all four real
+  GitHub jobs subsequently passed without annotations.
 - ARA-043 remote verification: exact local/upstream/`ls-remote` equality at `685a36c`, ahead/behind
   `0/0`; push run `29166629408` and pull-request run `29166630511` passed Python 3.10/3.13. Draft
   PR 13 is open, mergeable, and updated.

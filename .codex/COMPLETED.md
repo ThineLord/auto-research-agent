@@ -639,3 +639,24 @@ Validation and implementation outcomes will be appended only after they are actu
   passed, 227 subtests passed` with zero safety findings. Two independent reviews returned GO;
   `actionlint` was unavailable and was not installed, so GitHub's four real jobs remain the final
   publication validation.
+- Committed as `6f03ec8`, pushed with exact local/upstream/`ls-remote` equality, updated draft PR
+  13, and confirmed push run `29180344621` plus pull-request run `29180345488` passed every Python
+  3.10/3.13 job with zero annotations.
+
+## 2026-07-12 - Project- and artifact-scoped UI cloud cache
+
+- Reproduced global Streamlit discovery/profile lists retaining the first project's data across an
+  A-to-B switch and ignoring external same-model-ID metadata changes; both controls failed before
+  the helper existed.
+- Bound the two lists to one joint identity containing the validated canonical project path,
+  device/inode, and safe SHA-256 content states for both artifacts. Missing, unreadable, and unsafe
+  content receives non-content sentinels without exposing file content or paths.
+- On a miss, old session state is cleared before loading; the joint identity is rechecked, retried
+  once if it changes, and never committed when instability persists. UI-owned saves invalidate the
+  identity before publishing their new in-memory list.
+- Added provider-free regressions for A-to-B-to-A switching, legacy global session values,
+  equal-length same-inode/size/mtime content rewrites, blocked-to-healthy recommendation refresh,
+  stable retry, persistent-instability fail-empty, unreadable recovery, and unsafe symlink clearing.
+- Related UI/cloud-free/recovery tests passed `97 passed, 44 subtests passed`; local `make check`
+  passed `339 passed, 227 subtests passed` with zero safety findings. Two independent final reviews
+  returned GO; no provider call, artifact/schema migration, or ignored runtime access occurred.
