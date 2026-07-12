@@ -4,19 +4,19 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: preserve the remotely verified ARA-045 checkpoint and wait for owner approval or a
-  new evidence-backed maintenance task; no implementation task is active.
+- Current goal: complete owner-approved P2 ARA-041 by making resume startup metadata recoverable
+  across every multi-file write failure before any agent invocation.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `47c0c26b7fd65a9d83ab2f8f9b195a9989203296` (the exact HEAD
+- State recorded against commit: `510ef848a8fde3a27a80804aced78d5437175d1e` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `47c0c26b7fd65a9d83ab2f8f9b195a9989203296` (exact local,
+- Last externally verified fallback: `510ef848a8fde3a27a80804aced78d5437175d1e` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-045 is `DONE`, pushed through state checkpoint `47c0c26`,
-  exact local/upstream/remote equal, reflected in draft PR 13, and verified by push/PR runs
-  `29182280005`/`29182281056` on Python 3.10/3.13 with zero annotations.
+- Active task at this snapshot: ARA-041 is `IN_PROGRESS` with explicit owner approval. ARA-045's
+  final state closeout `510ef84` is exact local/upstream/remote equal, reflected in draft PR 13, and
+  verified by push/PR runs `29182427059`/`29182428029` on Python 3.10/3.13 with zero annotations.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -572,14 +572,21 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Remaining Steps
 
-- ARA-045 has no remaining implementation, validation, synchronization, CI, or draft-PR step in
-  this snapshot. Resolve live state before any future task and do not make a provider request merely
-  to reconfirm the verified result.
-- Keep ARA-018, ARA-030, and ARA-041 behind their recorded owner/long-task approval gates; keep
-  dependency, release, wheel-smoke, and publication policy out of ARA-045.
+- Build ARA-041's provider-free per-write fault matrix around the exact resume startup sequence and
+  record the current split-generation behavior before changing production code.
+- Implement the smallest compatible recovery boundary, prove subsequent resume behavior, run
+  related/full validation and independent review, then publish through draft PR 13.
+- Keep ARA-018 and ARA-030 behind their separate owner/policy approval gates; keep provider,
+  release, packaging, scoring, and artifact-schema work out of ARA-041.
 
 ## Test Status
 
+- ARA-041 startup baseline: local `make check` passed Ruff format/lint, imports, repository-safety
+  self/worktree/staged scans, and pytest (`346 passed, 246 subtests passed`; 101 tracked files and
+  zero findings). No provider call or ignored runtime access occurred.
+- ARA-045 final closeout verification: exact local/upstream/`ls-remote` equality at `510ef84`,
+  ahead/behind `0/0`; push run `29182427059` and pull-request run `29182428029` passed Python
+  3.10/3.13 with zero annotations; draft PR 13 is open, mergeable, and exactly updated.
 - ARA-045 remote verification: exact local/upstream/`ls-remote` equality at `47c0c26`, ahead/behind
   `0/0`; push run `29182280005` and pull-request run `29182281056` passed Python 3.10/3.13. All four
   annotation sets are empty and draft PR 13 is open, mergeable, and updated with exact body readback.
@@ -1155,9 +1162,8 @@ Updated: 2026-07-12 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git status --short --branch
-git rev-parse --verify HEAD
-.venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
+sed -n '700,1020p' src/runner.py
+sed -n '1450,1690p' tests/test_round_loop.py
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
 ```
 
@@ -1195,4 +1201,7 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - ARA-045 preserves google-genai's built-in environment delegation. A theoretical same-process
   thread that mutates `os.environ` between snapshot and SDK construction remains outside this
   provider-free fix; changing that boundary would require a separate compatibility decision.
+- ARA-041 received explicit owner approval on 2026-07-12. Preserve existing run IDs, manifest
+  provenance, resume histories, atomic single-file writes, and fail-before-agent behavior; do not
+  introduce a silent schema migration or treat a partially started session as completed work.
 - Do not stage with `git add -A`; stage only reviewed paths.

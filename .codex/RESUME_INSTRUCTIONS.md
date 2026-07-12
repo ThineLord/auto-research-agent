@@ -46,13 +46,14 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-ARA-045 is `DONE`, pushed through state checkpoint `47c0c26`, exact local/upstream/`ls-remote`
-equal, reflected in draft PR 13, and verified by push/PR runs `29182280005`/`29182281056` on Python
-3.10/3.13 with zero annotations. Its provider-free source matrix, event/public/cause/context/client-
-init/discovery redaction tests, two independent reviews, and final `make check` pass. Do not repeat
-pre-fix credential probes, make a real provider request, or output credential values. Resume from
-the semantic checkpoint in `CURRENT_STATE.md`; use
-`47c0c26b7fd65a9d83ab2f8f9b195a9989203296` as the conservative exact externally verified fallback
+ARA-041 is `IN_PROGRESS` with explicit owner approval. Resume by inspecting the exact startup write
+sequence in `src/runner.py`, the existing resume fixtures in `tests/test_round_loop.py`, and any
+uncommitted fault-matrix changes before modifying production code. Re-run the smallest affected
+fault case first and verify no agent was invoked. Do not access ignored runtime or invoke a real
+provider. ARA-045's final closeout `510ef84` is exact local/upstream/`ls-remote` equal, reflected in
+draft PR 13, and verified by push/PR runs `29182427059`/`29182428029` on Python 3.10/3.13 with zero
+annotations. Resume from the semantic checkpoint in `CURRENT_STATE.md`; use
+`510ef848a8fde3a27a80804aced78d5437175d1e` as the conservative exact externally verified fallback
 if the semantic current `HEAD` has not yet been checked.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
@@ -90,10 +91,9 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-There is no unblocked implementation task after locally completing ARA-045. ARA-018 requires an
-explicit owner license/distribution decision; ARA-030 and ARA-041 require separate
-greater-than-30-minute approval. Do not start ARA-019, ARA-026, ARA-006, or ARA-007 until their
-recorded dependencies are satisfied.
+ARA-041 is the only `IN_PROGRESS` task. ARA-018 requires an explicit owner license/distribution
+decision and ARA-030 still requires separate greater-than-30-minute approval. Do not start ARA-019,
+ARA-026, ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
 

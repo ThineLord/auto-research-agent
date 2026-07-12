@@ -362,7 +362,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-041 - Make resume startup metadata recoverable across multi-file failure
 
-- Status: `DEFERRED`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: high
 - Description: a failure writing `run_manifest.json` after `run_config.json` can leave only the
@@ -373,8 +373,8 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   restores the complete prior metadata generation; no file silently claims an unstarted session.
 - Validation command: per-write fault-injection matrix, recovery/resume tests, then `make check`.
 - Commit required: yes.
-- Dependencies: explicit approval for a greater-than-30-minute, cross-file transaction design; do
-  not fold into ARA-034 or other local validation fixes.
+- Dependencies: owner approved the greater-than-30-minute cross-file transaction work on
+  2026-07-12; do not fold in unrelated resume validation, artifact schema, or provider behavior.
 
 ## ARA-042 - Scope and refresh UI cloud-free session caches
 
