@@ -4,6 +4,8 @@
 
 ### Security
 
+* CI now explicitly grants `GITHUB_TOKEN` only read access to repository contents; all unspecified
+  workflow permissions remain disabled.
 * Tracked reports now replace real local account names with explicit redaction wording. Local and
   CI validation scan only files reported by `git ls-files` for personal home paths, high-confidence
   provider/token shapes, and private-key headers without echoing matched values or reading ignored
@@ -131,6 +133,9 @@
 
 ### Maintenance
 
+* CI jobs now have a 15-minute timeout and use the supported Node 24 releases of
+  `actions/checkout` and `actions/setup-python`, while retaining the Python 3.10/3.13 push and
+  pull-request matrix.
 * Added tracked `.codex/` recovery state, task queue, validation evidence, decisions, known issues,
   and resume instructions for interruption-safe autonomous maintenance.
 

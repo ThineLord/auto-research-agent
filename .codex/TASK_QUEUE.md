@@ -160,7 +160,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-029 - Minimize CI token permissions and bound job runtime
 
-- Status: `DEFERRED`
+- Status: `DONE`
 - Priority: P2
 - Risk: low
 - Description: the CI workflow does not explicitly restrict `GITHUB_TOKEN` to read-only contents or
@@ -171,8 +171,8 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Validation command: local YAML/action validation when available, followed by all four push/PR CI
   jobs.
 - Commit required: yes.
-- Dependencies: explicit approval before changing configuration under the repository workflow
-  protocol; keep dependency, release, and publication policy out of scope.
+- Dependencies: owner approved ARA-029 CI configuration changes on 2026-07-12; keep dependency,
+  release, wheel-smoke, and publication policy out of scope.
 
 ## ARA-030 - Add an isolated real-wheel install smoke to CI
 

@@ -362,3 +362,13 @@ Updated: 2026-07-12 (Asia/Shanghai)
 - Current action: ARA-043 applies one blocking predicate to quality fast-path, normal scoring, and
   runtime fallback. All-blocked returns no recommendation/fallback; mixed unprofiled and healthy
   candidates retain existing behavior. UI distinguishes Manual from no eligible automatic result.
+
+## KI-029 - CI token permissions and runtime are implicit
+
+- Status: fixed and locally validated; publication pending
+- Severity: P2 CI security/reliability
+- Impact: CI inherits repository-default `GITHUB_TOKEN` permissions and the platform runtime ceiling;
+  old action runtimes also emit forced Node compatibility annotations on every matrix job.
+- Resolution: the workflow grants only `contents: read`, forbids an untested job-level permission
+  override, caps each matrix job at 15 minutes, and uses the official Node 24 action majors
+  `checkout@v7` and `setup-python@v6`. Push/PR filters and Python 3.10/3.13 remain unchanged.

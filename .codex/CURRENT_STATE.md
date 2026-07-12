@@ -4,19 +4,19 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: retain the completed, locally validated ARA-043 all-blocked recommendation contract,
-  publish that work, and continue with isolated ARA-042 UI cache identity handling.
+- Current goal: retain the completed, locally validated ARA-029 CI least-privilege/runtime contract,
+  publish and verify it, then continue with isolated ARA-042 UI cache identity handling.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `ba4b2c1e18aa19d0aa09848c06550db5539c2c91` (the exact HEAD
+- State recorded against commit: `685a36c7d7a9826c6f20d095935a9536aabedca5` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `ba4b2c1e18aa19d0aa09848c06550db5539c2c91` (exact local,
+- Last externally verified fallback: `685a36c7d7a9826c6f20d095935a9536aabedca5` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-043 is `DONE` with related, full-gate, and two independent
-  reviews passing locally; publication is pending. ARA-040 remains the exact external fallback at
-  `ba4b2c1`, verified by push/PR runs `29166208230`/`29166209758` on Python 3.10/3.13.
+- Active task at this snapshot: none. ARA-029 is `DONE` with focused, full-gate, and two independent
+  reviews passing locally; publication is pending. ARA-043 remains the exact external fallback at
+  `685a36c`, verified by push/PR runs `29166629408`/`29166630511` on Python 3.10/3.13.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -526,16 +526,37 @@ Updated: 2026-07-12 (Asia/Shanghai)
 - UI now distinguishes Manual from non-manual no-eligible results while retaining picker/manual
   effective selection. Extended property probes and two independent reviews returned GO.
 
+## ARA-029 CI Least-Privilege And Runtime Contract
+
+- Reproduced the missing permission/timeout and deprecated action-major contract as three expected
+  test failures while the existing triggers and Python matrix control passed.
+- Added workflow-level `contents: read`, no job-level override, a documented 15-minute job timeout,
+  and official Node 24 `checkout@v7`/`setup-python@v6` majors. Push/PR branch filters, Python
+  3.10/3.13, pip cache, install, and validation commands are unchanged.
+- Official release/action metadata and two independent reviews confirmed the action runtimes,
+  hosted-runner compatibility, cache permission boundary, and timeout headroom. No dependency,
+  release, artifact, provider, experiment, or application behavior changed.
+
 ## Remaining Steps
 
-- Resolve the semantic current HEAD publication, exact remote equality, and CI state live before
-  starting ARA-042, then record the new externally verified fallback.
-- Continue with ARA-042; do not cross owner/configuration approval gates.
-- Keep ARA-018, ARA-029, and ARA-030 behind their recorded owner/configuration/long-task approval
-  gates; do not fold release or CI-configuration policy into the analysis/compare fixes.
+- Publish completed ARA-029 and verify exact remote equality plus all four Python 3.10/3.13 event
+  jobs before recording it as the external fallback.
+- Continue with ARA-042 after ARA-029 remote verification; do not cross remaining
+  owner/configuration approval gates.
+- Keep ARA-018 and ARA-030 behind their recorded owner/long-task approval gates; ARA-029 has owner
+  approval, but do not fold dependency, release, wheel-smoke, or publication policy into it.
 
 ## Test Status
 
+- ARA-029 pre-fix contract failed three checks as expected; the fixed CI/recovery contract passed
+  `10 passed, 1 subtest passed`, YAML parsed with the expected fields, and Ruff/diff checks passed.
+- ARA-029 local `make check` passed Ruff format/lint, imports, repository-safety self-test,
+  worktree/staged scans, and pytest (`334 passed, 227 subtests passed`; zero findings). Two
+  independent reviews returned GO. `actionlint` was unavailable and not installed; the four real
+  GitHub jobs remain pending publication validation.
+- ARA-043 remote verification: exact local/upstream/`ls-remote` equality at `685a36c`, ahead/behind
+  `0/0`; push run `29166629408` and pull-request run `29166630511` passed Python 3.10/3.13. Draft
+  PR 13 is open, mergeable, and updated.
 - ARA-043 all-blocked Auto/Quality/Volume, runtime fallback, mixed/unprofiled, healthy, no-profile,
   UI/i18n, and recovery regression passed `121 passed, 68 subtests passed`.
 - ARA-043 local `make check` passed Ruff format/lint, imports, repository-safety self-test,
@@ -1091,6 +1112,6 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - ARA-022 changes the filesystem trust/write policy and is high risk. Owner approval was received;
   preserve configured `runs/` storage-link compatibility and fail closed on unsupported no-follow
   primitives rather than silently widening the trust boundary.
-- Do not start ARA-029 without explicit CI-configuration approval or ARA-030 without its separate
-  greater-than-30-minute approval checkpoint; keep release policy out of both scopes.
+- ARA-029 received explicit CI-configuration approval on 2026-07-12. Do not start ARA-030 without
+  its separate greater-than-30-minute approval checkpoint; keep release policy out of both scopes.
 - Do not stage with `git add -A`; stage only reviewed paths.

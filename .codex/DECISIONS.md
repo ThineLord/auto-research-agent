@@ -400,3 +400,17 @@
   automatic result exists and reports that state accurately.
 - Scope: no provider retry, scheduler, artifact schema/file, configuration, preset, prompt, score,
   experiment result, or historical conclusion changes.
+
+## 2026-07-12 - Bound CI authority and runtime
+
+- Decision: set workflow-level `permissions` to only `contents: read` and cap each matrix job at 15
+  minutes. The workflow only checks out and tests the repository, so no write permission is needed;
+  the timeout leaves substantial headroom over the observed minute-scale jobs.
+- Runtime maintenance: replace the deprecated Node 20 action majors with `actions/checkout@v7` and
+  `actions/setup-python@v6`. Their official current releases (`v7.0.0` and `v6.3.0`) both declare
+  `node24`; the hosted `ubuntu-latest` runner satisfies the documented minimum runner version.
+- Compatibility: preserve push and pull-request branch filters, Python 3.10/3.13 matrix, pip cache,
+  install command, and every validation step. Continue the repository's existing floating-major
+  convention; immutable action pinning remains separately owned by ARA-019.
+- Scope: no dependency, packaging, wheel-smoke, publication, release, provider, artifact, experiment,
+  or application runtime policy changes are included.

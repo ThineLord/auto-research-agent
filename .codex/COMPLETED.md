@@ -621,3 +621,21 @@ Validation and implementation outcomes will be appended only after they are actu
 - Related cloud-free/CLI/UI/recovery tests passed `121 passed, 68 subtests passed`; local `make
   check` passed `330 passed, 227 subtests passed` with 100 tracked files and zero findings. Two
   independent final reviews and extended property matrices returned GO; no provider call was made.
+- Committed as `685a36c`, pushed with exact local/upstream/`ls-remote` equality, updated draft PR
+  13, and confirmed push run `29166629408` plus pull-request run `29166630511` passed every Python
+  3.10/3.13 job.
+
+## 2026-07-12 - CI least-privilege and runtime boundary
+
+- Added a workflow contract regression that initially failed three checks because token permissions
+  and job timeout were absent and checkout still used a deprecated Node 20 action major.
+- Restricted the workflow token to `contents: read`, asserted that the test job cannot override that
+  boundary, and capped each matrix job at 15 minutes while preserving its triggers, branches,
+  Python 3.10/3.13 matrix, pip cache, install command, and validation steps.
+- Updated only the JavaScript action majors to official current Node 24 releases:
+  `actions/checkout@v7` and `actions/setup-python@v6`. Dependency, immutable action pinning, wheel
+  smoke, release, publication, application, provider, and artifact policy remain separate.
+- CI/recovery contract tests passed `10 passed, 1 subtest passed`; local `make check` passed `334
+  passed, 227 subtests passed` with zero safety findings. Two independent reviews returned GO;
+  `actionlint` was unavailable and was not installed, so GitHub's four real jobs remain the final
+  publication validation.
