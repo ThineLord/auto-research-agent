@@ -683,3 +683,24 @@ Validation and implementation outcomes will be appended only after they are actu
   passed, 235 subtests passed` with zero safety findings. Two independent final reviews returned GO;
   no real provider/network call, credential persistence/hash, configuration write, or artifact
   change occurred.
+- Committed as `dbf8e24`, pushed with exact local/upstream/`ls-remote` equality, updated draft PR
+  13, and confirmed push run `29181528872` plus pull-request run `29181529568` passed every Python
+  3.10/3.13 job with zero annotations.
+
+## 2026-07-12 - Gemini effective-key and exception-graph redaction
+
+- Reproduced the SDK selecting `GOOGLE_API_KEY` while wrapper redaction selected
+  `GEMINI_API_KEY` when both were populated. Separate provider-free controls exposed the used key
+  in provider events and through an implicit exception `__context__`.
+- Added one request-scoped credential snapshot for explicit, custom, Google-only, Gemini-only,
+  both-built-in, missing-custom fallback, and raw-truthy whitespace Google sources. Explicit/custom
+  values remain direct SDK arguments; built-in values remain delegated to google-genai.
+- Redacted every captured candidate before provider-event persistence, exception construction, SDK
+  client-initialization wrapping, and cloud-discovery truncation. Short and overlapping candidate
+  values are handled longest-first; the existing missing-dependency diagnostic is preserved.
+- Provider-free LLM/cloud/security tests passed `53 passed, 33 subtests passed`; related
+  UI/LLM/cloud/recovery tests passed `116 passed, 61 subtests passed`; final local `make check`
+  passed `346 passed, 246 subtests passed` with zero repository-safety findings. Two independent
+  final reviews returned GO and no real provider or ignored runtime artifact was accessed.
+- Committed the implementation, tests, and changelog as `938b9a2`; remote push, CI, and draft-PR
+  verification remain the only publication steps.

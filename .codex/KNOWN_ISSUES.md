@@ -377,7 +377,7 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-044 - UI health result can describe a previously selected target
 
-- Status: fixed and locally validated; publication pending
+- Status: fixed, pushed, and CI-verified
 - Severity: P2 diagnostic correctness
 - Impact: a successful or failed health check remains visible after changing the effective model or
   Ollama endpoint, so the UI can attribute stale evidence to a target that was never checked.
@@ -387,10 +387,12 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-045 - Gemini redaction can select a different built-in key than the SDK
 
-- Status: confirmed by provider-free mock; queued as ARA-045
+- Status: fixed and locally validated at `938b9a2`; publication verification pending
 - Severity: P1 credential disclosure
 - Impact: with both `GOOGLE_API_KEY` and `GEMINI_API_KEY` set, the SDK uses the Google key while the
   wrapper records the Gemini key as the known secret. An echoed Google key can therefore survive in
   provider events and exception chaining.
-- Current action: after ARA-044, unify effective credential resolution with SDK precedence and add
-  an explicit both-built-ins redaction regression; no live provider call is needed.
+- Resolution: one operation-scoped snapshot follows explicit/custom then SDK Google/Gemini
+  precedence, preserves built-in delegation, and redacts every captured candidate from events,
+  public/cause/context messages, client initialization, and cloud-discovery diagnostics before
+  truncation. Provider-free key-source, short/overlap-value, and exception-graph regressions pass.

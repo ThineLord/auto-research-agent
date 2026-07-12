@@ -452,3 +452,19 @@
   configuration files, artifacts, experiment behavior, and research conclusions are unchanged.
 - Follow-up: ARA-045 separately owns the P1 provider-event/chained-cause leak caused by
   `GeminiClient._available_api_key()` disagreeing with SDK built-in environment precedence.
+
+## 2026-07-12 - Snapshot Gemini credentials using the SDK's actual precedence
+
+- Decision: resolve explicit configuration, custom environment, then the SDK-managed
+  `GOOGLE_API_KEY` and `GEMINI_API_KEY` sources once per operation. Continue passing explicit and
+  custom keys directly while delegating built-in sources to google-genai; capture every populated
+  candidate for defense-in-depth redaction.
+- Reason: google-genai gives Google precedence when both built-ins exist, while the wrapper formerly
+  selected Gemini for redaction. The mismatch exposed the key actually used when an upstream error
+  echoed it.
+- Exception boundary: construct sanitized failures inside provider handlers, but raise them only
+  after leaving the handler so Python cannot retain the raw provider exception through
+  `__context__`. Apply the same exact-secret redaction before cloud-discovery diagnostics are
+  truncated.
+- Compatibility: preserve SDK built-in credential delegation, raw environment truthiness, timeout,
+  request/event classification, retry behavior, and public error types. Validation is provider-free.

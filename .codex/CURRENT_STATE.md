@@ -4,19 +4,19 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: retain the completed, locally validated ARA-044 target-scoped UI health snapshots,
-  publish and verify them, then immediately address P1 ARA-045 credential-redaction precedence.
+- Current goal: publish and remotely verify the locally completed P1 ARA-045 Gemini
+  effective-credential and exception-message redaction fix.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `609de6c3a3993fa89339f3d225e7b122d9e796cb` (the exact HEAD
+- State recorded against commit: `938b9a20b22dff9e14600b026338090b1b0563eb` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `609de6c3a3993fa89339f3d225e7b122d9e796cb` (exact local,
+- Last externally verified fallback: `dbf8e24e0d8a3efffa1fba7475aeaaa663404ad6` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-044 is `DONE` with focused, full-gate, and two independent
-  reviews passing locally; publication is pending. ARA-042 remains the exact external fallback at
-  `609de6c`, verified by push/PR runs `29180830633`/`29180831707` on Python 3.10/3.13.
+- Active task at this snapshot: none. ARA-045 is `DONE` locally at implementation commit `938b9a2`
+  after two independent GO reviews and final `make check`; remote publication state must be resolved
+  live. ARA-044 remains the last externally verified fallback at `dbf8e24`.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -559,17 +559,36 @@ Updated: 2026-07-12 (Asia/Shanghai)
   sanitized. Same-target snapshots remain compatible, and UI input/model-refresh changes clear the
   appropriate health key.
 
+## ARA-045 Gemini Effective-Credential Redaction
+
+- Reproduced a dual-built-in mismatch where google-genai used Google while the wrapper selected
+  Gemini for redaction, plus a raw provider exception still reachable through `__context__`.
+- Added one request-scoped credential snapshot across explicit/custom/Google/Gemini sources while
+  preserving SDK built-in delegation and raw environment truthiness. Every captured nonempty
+  candidate is redacted longest-first.
+- Detached raw provider exceptions before raising sanitized public/cause/context messages and
+  covered client initialization, runtime/value/quota paths, discovery redaction before truncation,
+  short/overlapping values, and the existing missing-dependency diagnostic.
+
 ## Remaining Steps
 
-- Publish completed ARA-044 and verify exact remote equality plus all four Python 3.10/3.13 event
-  jobs before recording it as the external fallback.
-- Start P1 ARA-045 immediately after ARA-044 remote verification; its provider-free mock reproduced
-  a used-key redaction mismatch when both built-in Gemini environment variables are populated.
+- ARA-045 has no remaining implementation or local validation step in this snapshot; resolve remote
+  synchronization, CI, and draft-PR publication state live without any provider request.
 - Keep ARA-018, ARA-030, and ARA-041 behind their recorded owner/long-task approval gates; keep
-  dependency, release, wheel-smoke, and publication policy out of ARA-044.
+  dependency, release, wheel-smoke, and publication policy out of ARA-045.
 
 ## Test Status
 
+- ARA-045 pre-fix provider-free controls failed in the expected dual-built-in event, effective-key,
+  hidden-context, client-construction, whitespace-source, and discovery-redaction cases.
+- ARA-045 focused LLM/cloud/security tests pass `53 passed, 33 subtests passed`; related
+  UI/LLM/cloud/recovery tests pass `116 passed, 61 subtests passed`. The final local `make check`
+  passed Ruff format/lint, imports, repository-safety self/worktree/staged scans, and pytest (`346
+  passed, 246 subtests passed`; 101 tracked files and zero findings). Two independent final reviews
+  returned GO.
+- ARA-044 remote verification: exact local/upstream/`ls-remote` equality at `dbf8e24`, ahead/behind
+  `0/0`; push run `29181528872` and pull-request run `29181529568` passed Python 3.10/3.13. All four
+  annotation sets are empty and draft PR 13 is open, mergeable, and updated.
 - ARA-044 pre-fix scoped health-session regression failed as expected; target/source normalization,
   legacy/malformed/missing-argument eviction, source precedence, and secret-free error cases now
   pass `3 passed, 8 subtests passed` provider-free.
@@ -957,6 +976,17 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- ARA-045's initial both-built-in regression failed because the fake SDK selected Google while the
+  wrapper selected Gemini; explicit/custom exception-graph controls exposed the raw provider error
+  through implicit context, and client-construction/discovery controls exposed unsanitized values.
+- Independent ARA-045 reviews found short cloud-discovery credentials, overlapping candidate
+  fragments, secret-bearing assertion reprs, an incomplete explicit-precedence fixture, and a
+  degraded missing-dependency diagnostic. Exact all-length longest-first replacement, fixed-message
+  assertions, a populated custom control, and fixed diagnostic preservation closed each issue
+  before the final full gate.
+- The first ARA-045 recovery-state validation correctly rejected a completed task described as
+  active, recursive closeout wording without an active task, and legacy SHA fields pointing away
+  from the unique externally verified fallback; the state contract was corrected before staging.
 - The initial ARA-043 blocking-profile regression failed four subtests as expected because each
   excluded candidate was immediately returned by the no-scored seed fallback.
 - Independent ARA-043 review found the Quality fast path and `choose_fallback_model` could bypass the
@@ -1119,9 +1149,9 @@ Updated: 2026-07-12 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git status --short --branch
-.venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
+git add .codex/COMPLETED.md .codex/CURRENT_STATE.md .codex/DECISIONS.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md .codex/TASK_QUEUE.md
 .venv/bin/python scripts/check_repo_safety.py --staged
+git commit -m "chore: record ARA-045 validation"
 ```
 
 ## Interruption Recovery
@@ -1155,4 +1185,7 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   primitives rather than silently widening the trust boundary.
 - ARA-029 received explicit CI-configuration approval on 2026-07-12. Do not start ARA-030 without
   its separate greater-than-30-minute approval checkpoint; keep release policy out of both scopes.
+- ARA-045 preserves google-genai's built-in environment delegation. A theoretical same-process
+  thread that mutates `os.environ` between snapshot and SDK construction remains outside this
+  provider-free fix; changing that boundary would require a separate compatibility decision.
 - Do not stage with `git add -A`; stage only reviewed paths.

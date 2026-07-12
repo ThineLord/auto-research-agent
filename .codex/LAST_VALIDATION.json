@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-12T13:40:19+08:00",
+  "recorded_at": "2026-07-12T14:10:24+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "609de6c3a3993fa89339f3d225e7b122d9e796cb",
-  "last_known_stable_commit": "609de6c3a3993fa89339f3d225e7b122d9e796cb",
+  "head_commit": "dbf8e24e0d8a3efffa1fba7475aeaaa663404ad6",
+  "last_known_stable_commit": "dbf8e24e0d8a3efffa1fba7475aeaaa663404ad6",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "609de6c3a3993fa89339f3d225e7b122d9e796cb",
+  "state_recorded_against_commit": "dbf8e24e0d8a3efffa1fba7475aeaaa663404ad6",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-12T13:13:27+08:00",
-    "commit": "609de6c3a3993fa89339f3d225e7b122d9e796cb",
+    "verified_at": "2026-07-12T13:42:05+08:00",
+    "commit": "dbf8e24e0d8a3efffa1fba7475aeaaa663404ad6",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29180830633,
+        "run_id": 29181528872,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "609de6c3a3993fa89339f3d225e7b122d9e796cb",
+        "head_sha": "dbf8e24e0d8a3efffa1fba7475aeaaa663404ad6",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29180831707,
+        "run_id": 29181529568,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "609de6c3a3993fa89339f3d225e7b122d9e796cb",
+        "head_sha": "dbf8e24e0d8a3efffa1fba7475aeaaa663404ad6",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,125 @@
       }
     }
   },
-  "status": "ara044_done_local_validation_passed_publication_pending",
+  "status": "ara045_local_complete_pending_publication",
   "commands": [
+    {
+      "command": ".venv/bin/python -m json.tool .codex/LAST_VALIDATION.json plus pytest tests/test_recovery_state.py and git diff --check after ARA-045 state reconciliation",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "json_valid": true,
+        "pytest_tests_passed": 6,
+        "pytest_subtests_passed": 1,
+        "task_counts": {
+          "done": 37,
+          "in_progress": 0,
+          "todo": 0,
+          "deferred": 6,
+          "blocked": 1
+        },
+        "diff_check": "passed"
+      }
+    },
+    {
+      "command": "ARA-045 provider-free pre-fix credential-source and exception-graph regressions",
+      "exit_code": 1,
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "dual_builtin_event_leak": true,
+        "wrapper_sdk_source_mismatch": true,
+        "implicit_exception_context_retained": true,
+        "client_initialization_unsanitized": true,
+        "whitespace_source_mismatch": true,
+        "provider_called": false,
+        "credential_value_recorded": false
+      }
+    },
+    {
+      "command": "ARA-045 provider-free pre-fix cloud-discovery exact-secret regression",
+      "exit_code": 1,
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "custom_environment_subtest_failed": true,
+        "both_builtin_subtest_failed": true,
+        "redaction_before_truncation_missing": true,
+        "provider_called": false,
+        "credential_value_recorded": false
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_llm.py tests/test_cloud_free.py tests/test_repo_safety.py",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 53,
+        "pytest_subtests_passed": 33,
+        "credential_source_matrix": "passed",
+        "event_public_cause_context_redaction": "passed",
+        "client_initialization_redaction": "passed",
+        "discovery_short_overlap_truncation_redaction": "passed",
+        "missing_dependency_diagnostic": "passed",
+        "provider_called": false
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_llm.py tests/test_cloud_free.py tests/test_ui_helpers.py tests/test_recovery_state.py",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 116,
+        "pytest_subtests_passed": 61,
+        "provider_called": false
+      }
+    },
+    {
+      "command": "make check after ARA-045 final review corrections",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 58,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 101,
+        "findings": 0,
+        "pytest_tests_passed": 346,
+        "pytest_subtests_passed": 246,
+        "pytest_duration_seconds": 12.68
+      }
+    },
+    {
+      "command": "two independent ARA-045 credential-resolution and regression reviews",
+      "result": "passed",
+      "summary": {
+        "security_review": "GO",
+        "test_review": "GO",
+        "blocking_findings": 0,
+        "provider_called": false
+      }
+    },
+    {
+      "command": "ARA-044 publication, remote equality, CI, annotation, and draft PR verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "dbf8e24e0d8a3efffa1fba7475aeaaa663404ad6",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29181528872,
+        "pull_request_run_id": 29181529568,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "job_annotations": 0,
+        "draft_pr_13_updated": true
+      }
+    },
     {
       "command": ".venv/bin/python -m pytest -q tests/test_ui_helpers.py -k health_session_result before ARA-044 fix",
       "exit_code": 1,
@@ -2243,8 +2360,9 @@
     }
   ],
   "notes": [
-    "ARA-044 is DONE and locally validated for target-scoped, non-secret UI health snapshots; publication and four-job GitHub verification remain pending.",
-    "ARA-045 is the next unblocked P1 after a provider-free mock confirmed the SDK can use GOOGLE_API_KEY while redaction selects GEMINI_API_KEY when both are populated.",
+    "ARA-045 is locally complete at implementation commit 938b9a2 after provider-free source, event, exception-graph, client-initialization, and cloud-discovery redaction validation plus two independent GO reviews; push and CI remain.",
+    "ARA-044 is complete at remote-equal commit dbf8e24 with successful push and pull-request CI runs 29181528872 and 29181529568 on Python 3.10 and 3.13 and zero job annotations.",
+    "ARA-045 preserves explicit/custom direct injection and google-genai built-in delegation with Google-before-Gemini raw-truthiness semantics; a same-process environment mutation between snapshot and SDK construction remains a documented non-blocking boundary.",
     "ARA-042 is complete at remote-equal commit 609de6c with successful push and pull-request CI runs 29180830633 and 29180831707 on Python 3.10 and 3.13 and zero job annotations.",
     "ARA-029 is complete at remote-equal commit 6f03ec8 with successful push and pull-request CI runs 29180344621 and 29180345488 on Python 3.10 and 3.13 and zero job annotations.",
     "ARA-043 is complete at remote-equal commit 685a36c with successful push and pull-request CI runs 29166629408 and 29166630511 on Python 3.10 and 3.13.",

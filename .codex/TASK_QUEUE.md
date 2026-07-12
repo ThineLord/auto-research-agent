@@ -430,21 +430,23 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-045 - Align Gemini credential redaction with the key actually used
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P1
 - Risk: medium
 - Description: when both built-in Gemini environment variables are populated, google-genai uses
   `GOOGLE_API_KEY` but `GeminiClient._available_api_key()` selects `GEMINI_API_KEY` for
   `known_secrets`, so a provider error can retain the actual Google key in events and exception
   causes.
-- Related files: `src/llm.py`, provider redaction tests
+- Related files: `src/llm.py`, `src/cloud_free.py`, provider redaction tests
 - Acceptance criteria: client creation/key-availability/redaction resolve one consistent effective
   credential source for explicit, custom-env, Google/Gemini fallback, and both-built-in cases; no
   used key survives provider events, public exceptions, or chained causes.
 - Validation command: provider-free fake-SDK credential precedence/redaction matrix, LLM/security
-  regressions, then `make check`.
+  regressions (`53 passed, 33 subtests passed`), two independent reviews, then `make check` (`346
+  passed, 246 subtests passed`).
 - Commit required: yes.
-- Dependencies: none; no real provider request and no credential value may enter test output/state.
+- Dependencies: completed provider-free at implementation commit `938b9a2`; no real provider request
+  or credential value entered persisted test output/state.
 
 ## ARA-011 - Prevent failed rounds from replacing a trusted best output
 
