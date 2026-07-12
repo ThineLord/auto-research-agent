@@ -1588,6 +1588,650 @@ class RoundLoopTests(unittest.TestCase):
                 self.assertIn("run_config.json", str(caught.exception))
                 self.assertNotIn(str(Path(tmp)), str(caught.exception))
 
+    def test_resume_manifest_write_failure_restores_startup_metadata_generation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            artifact_payloads = {
+                run_root / "run_config.json": {
+                    "schema_version": 1,
+                    "run_id": "resume-run",
+                    "status": "completed",
+                    "started_at": "2026-01-01T00:00:00+00:00",
+                    "completed_rounds": 0,
+                    "best_score": -1,
+                    "resume_sessions": [],
+                },
+                run_root / "run_manifest.json": {
+                    "run_id": "resume-run",
+                    "legacy_extension": {"preserve": True},
+                    "resume_metadata": {"legacy_resume_marker": "keep"},
+                },
+                run_root / "run_summary.json": {
+                    "run_id": "resume-run",
+                    "completed_rounds": 0,
+                    "best_score": -1,
+                },
+                run_root / "round_metrics.json": [],
+                project_dir / "score_history.json": [],
+                project_dir / "checkpoint.json": {
+                    "run_id": "resume-run",
+                    "run_root": str(run_root),
+                    "last_completed_round": 0,
+                    "best_score": -1,
+                    "can_resume": True,
+                },
+            }
+            for path, payload in artifact_payloads.items():
+                path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+            stop_path = project_dir / "STOP_REQUESTED"
+            stop_path.write_text("STOP_REQUESTED\n", encoding="utf-8")
+            tracked_paths = (*artifact_payloads, stop_path)
+            before = {path: path.read_bytes() for path in tracked_paths}
+            before_files = {
+                path.relative_to(project_dir): path.read_bytes()
+                for path in project_dir.rglob("*")
+                if path.is_file()
+            }
+            agents = RecordingAgents()
+            original_write = runner_module.write_json_file
+            manifest_failure_injected = False
+
+            def fail_manifest_once(path: Path, data: object, **kwargs: object) -> None:
+                nonlocal manifest_failure_injected
+                if Path(path).name == "run_manifest.json" and not manifest_failure_injected:
+                    manifest_failure_injected = True
+                    raise OSError("injected startup manifest failure")
+                original_write(path, data, **kwargs)
+
+            with (
+                patch.object(runner_module, "write_json_file", side_effect=fail_manifest_once),
+                self.assertRaises(ResumeHistoryError),
+            ):
+                run_resume_mode(
+                    console=Console(),
+                    agents=agents,
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    model_name="fake-model",
+                    max_rounds=1,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                )
+
+            after_failed_start = {path: path.read_bytes() for path in tracked_paths}
+            after_failed_files = {
+                path.relative_to(project_dir): path.read_bytes()
+                for path in project_dir.rglob("*")
+                if path.is_file()
+            }
+            failed_start_log_exists = (project_dir / "run.log").exists()
+            failed_start_round_exists = (run_root / "round_01").exists()
+            failed_start_agent_rounds = list(agents.draft_rounds)
+
+            self.assertTrue(
+                run_resume_mode(
+                    console=Console(),
+                    agents=agents,
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    model_name="fake-model",
+                    max_rounds=1,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                )
+            )
+            resumed_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+            resumed_manifest = json.loads(
+                (run_root / "run_manifest.json").read_text(encoding="utf-8")
+            )
+            successful_log_text = (project_dir / "run.log").read_text(encoding="utf-8")
+            transaction_exists_after_retry = (
+                run_root / runner_module._RESUME_STARTUP_TRANSACTION_NAME
+            ).exists()
+
+        self.assertTrue(manifest_failure_injected)
+        self.assertEqual(after_failed_start, before)
+        self.assertEqual(after_failed_files, before_files)
+        self.assertFalse(failed_start_log_exists)
+        self.assertFalse(failed_start_round_exists)
+        self.assertEqual(failed_start_agent_rounds, [])
+        self.assertEqual(agents.draft_rounds, [])
+        self.assertEqual(len(resumed_config["resume_sessions"]), 1)
+        self.assertEqual(resumed_manifest["legacy_extension"], {"preserve": True})
+        self.assertEqual(
+            resumed_manifest["resume_metadata"]["legacy_resume_marker"],
+            "keep",
+        )
+        self.assertEqual(successful_log_text.count("run_start"), 1)
+        self.assertFalse(transaction_exists_after_retry)
+
+    def test_resume_startup_transaction_rolls_back_each_write_point_failure(self) -> None:
+        stages = (
+            "journal_prepare",
+            "run_config",
+            "run_config_keyboard_interrupt",
+            "run_manifest",
+            "journal_cleanup_before_unlink",
+            "journal_cleanup_after_unlink",
+        )
+        for stage in stages:
+            with self.subTest(stage=stage), tempfile.TemporaryDirectory() as tmp:
+                run_root = Path(tmp) / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                before_payloads = {
+                    "run_config.json": {
+                        "schema_version": 1,
+                        "run_id": "resume-run",
+                        "status": "completed",
+                        "resume_sessions": [],
+                    },
+                    "run_manifest.json": {
+                        "run_id": "resume-run",
+                        "legacy_extension": {"preserve": True},
+                    },
+                }
+                after_payloads = {
+                    "run_config.json": {
+                        **before_payloads["run_config.json"],
+                        "status": "running",
+                        "resume_sessions": [{"start_round": 1}],
+                    },
+                    "run_manifest.json": {
+                        **before_payloads["run_manifest.json"],
+                        "resume_metadata": {"lifecycle_action": "resume_existing_run"},
+                    },
+                }
+                before_texts = {
+                    name: json.dumps(payload, indent=2) + "\n"
+                    for name, payload in before_payloads.items()
+                }
+                for name, text in before_texts.items():
+                    (run_root / name).write_text(text, encoding="utf-8")
+
+                original_write = runner_module.write_json_file
+                original_unlink = runner_module.unlink_artifact_file
+                write_target = {
+                    "journal_prepare": runner_module._RESUME_STARTUP_TRANSACTION_NAME,
+                    "run_config": "run_config.json",
+                    "run_config_keyboard_interrupt": "run_config.json",
+                    "run_manifest": "run_manifest.json",
+                }.get(stage)
+                write_failed = False
+                cleanup_failed = False
+
+                def fault_write(path: Path, data: object, **kwargs: object) -> None:
+                    nonlocal write_failed
+                    if Path(path).name == write_target and not write_failed:
+                        write_failed = True
+                        if stage == "run_config_keyboard_interrupt":
+                            raise KeyboardInterrupt
+                        raise OSError(f"injected {stage} failure")
+                    original_write(path, data, **kwargs)
+
+                def fault_unlink(path: Path, **kwargs: object) -> None:
+                    nonlocal cleanup_failed
+                    is_target = (
+                        Path(path).name == runner_module._RESUME_STARTUP_TRANSACTION_NAME
+                        and stage.startswith("journal_cleanup")
+                        and not cleanup_failed
+                    )
+                    if is_target:
+                        cleanup_failed = True
+                        if stage == "journal_cleanup_after_unlink":
+                            original_unlink(path, **kwargs)
+                        raise OSError(f"injected {stage} failure")
+                    original_unlink(path, **kwargs)
+
+                with (
+                    patch.object(runner_module, "write_json_file", side_effect=fault_write),
+                    patch.object(runner_module, "unlink_artifact_file", side_effect=fault_unlink),
+                    self.assertRaises(
+                        KeyboardInterrupt if stage == "run_config_keyboard_interrupt" else OSError
+                    ),
+                ):
+                    runner_module._write_resume_startup_metadata(
+                        run_root=run_root,
+                        run_id="resume-run",
+                        run_config=after_payloads["run_config.json"],
+                        run_manifest=after_payloads["run_manifest.json"],
+                    )
+
+                self.assertEqual(bool(write_target), write_failed)
+                self.assertEqual(stage.startswith("journal_cleanup"), cleanup_failed)
+                for name, text in before_texts.items():
+                    self.assertEqual((run_root / name).read_text(encoding="utf-8"), text)
+                self.assertFalse(
+                    (run_root / runner_module._RESUME_STARTUP_TRANSACTION_NAME).exists()
+                )
+
+    def test_resume_startup_transaction_does_not_change_new_run_order(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            (project_dir / "STOP_REQUESTED").write_text("STOP_REQUESTED\n", encoding="utf-8")
+            events: list[str] = []
+            original_write = runner_module.write_json_file
+
+            def record_write(path: Path, data: object, **kwargs: object) -> None:
+                events.append(f"write:{Path(path).name}")
+                original_write(path, data, **kwargs)
+
+            def record_log(
+                console: Console,
+                log_path: Path,
+                mode: str,
+                message: str,
+            ) -> None:
+                if message.startswith("run_start "):
+                    events.append("log:run_start")
+
+            agents = RecordingAgents()
+            with (
+                patch.object(runner_module, "write_json_file", side_effect=record_write),
+                patch.object(runner_module, "_log", side_effect=record_log),
+            ):
+                run_iterative_rounds(
+                    console=Console(),
+                    agents=agents,
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    mode="normal",
+                    model_name="fake-model",
+                    max_rounds=1,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                )
+
+            self.assertEqual(
+                events[:3],
+                ["write:run_config.json", "log:run_start", "write:run_manifest.json"],
+            )
+            self.assertEqual(agents.draft_rounds, [])
+
+    def test_resume_startup_transaction_recovers_after_interrupted_rollback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            before_config = {
+                "schema_version": 1,
+                "run_id": "resume-run",
+                "status": "completed",
+                "resume_sessions": [],
+                "best_score": -1,
+            }
+            before_manifest = {
+                "run_id": "resume-run",
+                "legacy_extension": {"preserve": True},
+            }
+            before_texts = {
+                "run_config.json": json.dumps(before_config, indent=2) + "\n",
+                "run_manifest.json": json.dumps(before_manifest, indent=2) + "\n",
+            }
+            for name, text in before_texts.items():
+                (run_root / name).write_text(text, encoding="utf-8")
+            (project_dir / "checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 0,
+                        "best_score": -1,
+                        "can_resume": True,
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            (project_dir / "STOP_REQUESTED").write_text("STOP_REQUESTED\n", encoding="utf-8")
+            agents = RecordingAgents()
+
+            original_write = runner_module.write_json_file
+            original_restore = runner_module.write_file_text
+            manifest_failed = False
+            rollback_failed = False
+
+            def fail_manifest(path: Path, data: object, **kwargs: object) -> None:
+                nonlocal manifest_failed
+                if Path(path).name == "run_manifest.json" and not manifest_failed:
+                    manifest_failed = True
+                    raise OSError("injected manifest failure")
+                original_write(path, data, **kwargs)
+
+            def fail_first_restore(path: Path, text: str, **kwargs: object) -> None:
+                nonlocal rollback_failed
+                if not rollback_failed:
+                    rollback_failed = True
+                    raise OSError("injected rollback failure")
+                original_restore(path, text, **kwargs)
+
+            with (
+                patch.object(runner_module, "write_json_file", side_effect=fail_manifest),
+                patch.object(runner_module, "write_file_text", side_effect=fail_first_restore),
+                self.assertRaisesRegex(ResumeHistoryError, "recovery is incomplete"),
+            ):
+                run_resume_mode(
+                    console=Console(),
+                    agents=agents,
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    model_name="fake-model",
+                    max_rounds=1,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                )
+
+            transaction_path = run_root / runner_module._RESUME_STARTUP_TRANSACTION_NAME
+            self.assertTrue(manifest_failed)
+            self.assertTrue(rollback_failed)
+            self.assertTrue(transaction_path.is_file())
+            interrupted_config = json.loads(
+                (run_root / "run_config.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(interrupted_config["status"], "running")
+            self.assertEqual(len(interrupted_config["resume_sessions"]), 1)
+            self.assertEqual(
+                (run_root / "run_manifest.json").read_text(encoding="utf-8"),
+                before_texts["run_manifest.json"],
+            )
+            self.assertFalse((project_dir / "run.log").exists())
+            self.assertEqual(agents.draft_rounds, [])
+
+            self.assertTrue(
+                run_resume_mode(
+                    console=Console(),
+                    agents=agents,
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    model_name="fake-model",
+                    max_rounds=1,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                )
+            )
+            resumed_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+            resumed_manifest = json.loads(
+                (run_root / "run_manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                len(resumed_config["resume_sessions"]),
+                1,
+            )
+            self.assertEqual(
+                resumed_manifest["legacy_extension"],
+                {"preserve": True},
+            )
+            self.assertFalse(transaction_path.exists())
+            self.assertEqual(agents.draft_rounds, [])
+            self.assertEqual(
+                (project_dir / "run.log").read_text(encoding="utf-8").count("run_start"),
+                1,
+            )
+
+    def test_resume_startup_transaction_recovers_each_interrupted_disk_state(self) -> None:
+        for state in (
+            "journal_only",
+            "config_written",
+            "pair_written",
+            "rollback_config_restored",
+        ):
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as tmp:
+                run_root = Path(tmp) / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                before_payloads = {
+                    "run_config.json": {"run_id": "resume-run", "resume_sessions": []},
+                    "run_manifest.json": {
+                        "run_id": "resume-run",
+                        "legacy_extension": "keep",
+                    },
+                }
+                after_payloads = {
+                    "run_config.json": {
+                        "run_id": "resume-run",
+                        "resume_sessions": [{"start_round": 1}],
+                    },
+                    "run_manifest.json": {
+                        "run_id": "resume-run",
+                        "legacy_extension": "keep",
+                        "resume_metadata": {"lifecycle_action": "resume_existing_run"},
+                    },
+                }
+                before_texts = {
+                    name: json.dumps(payload, indent=2) + "\n"
+                    for name, payload in before_payloads.items()
+                }
+                after_texts = {
+                    name: json.dumps(payload, indent=2) for name, payload in after_payloads.items()
+                }
+                for name, text in before_texts.items():
+                    (run_root / name).write_text(text, encoding="utf-8")
+                transaction = {
+                    "schema_version": 1,
+                    "kind": "resume_startup_metadata",
+                    "state": "prepared",
+                    "run_id": "resume-run",
+                    "artifacts": {
+                        name: {
+                            "before_present": True,
+                            "before_text": before_texts[name],
+                            "before_sha256": runner_module._startup_text_sha256(before_texts[name]),
+                            "after_sha256": runner_module._startup_text_sha256(after_texts[name]),
+                        }
+                        for name in before_texts
+                    },
+                }
+                transaction_path = run_root / runner_module._RESUME_STARTUP_TRANSACTION_NAME
+                transaction_path.write_text(json.dumps(transaction, indent=2), encoding="utf-8")
+                if state in {"config_written", "pair_written"}:
+                    (run_root / "run_config.json").write_text(
+                        after_texts["run_config.json"], encoding="utf-8"
+                    )
+                if state in {"pair_written", "rollback_config_restored"}:
+                    (run_root / "run_manifest.json").write_text(
+                        after_texts["run_manifest.json"], encoding="utf-8"
+                    )
+
+                self.assertTrue(
+                    runner_module._recover_resume_startup_transaction(
+                        run_root=run_root,
+                        run_id="resume-run",
+                    )
+                )
+
+                for name, text in before_texts.items():
+                    self.assertEqual((run_root / name).read_text(encoding="utf-8"), text)
+                self.assertFalse(transaction_path.exists())
+
+    def test_resume_startup_transaction_restores_legacy_missing_artifacts(self) -> None:
+        for missing_name in ("run_config.json", "run_manifest.json"):
+            with self.subTest(missing_name=missing_name), tempfile.TemporaryDirectory() as tmp:
+                run_root = Path(tmp) / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                before_texts = {
+                    "run_config.json": '{"run_id": "resume-run", "resume_sessions": []}\n',
+                    "run_manifest.json": '{"run_id": "resume-run", "legacy": true}\n',
+                }
+                for name, text in before_texts.items():
+                    if name != missing_name:
+                        (run_root / name).write_text(text, encoding="utf-8")
+                after_config = {"run_id": "resume-run", "resume_sessions": [{"start_round": 1}]}
+                after_manifest = {"run_id": "resume-run", "legacy": True}
+                original_unlink = runner_module.unlink_artifact_file
+                cleanup_failed = False
+
+                def fail_cleanup_once(path: Path, **kwargs: object) -> None:
+                    nonlocal cleanup_failed
+                    if (
+                        Path(path).name == runner_module._RESUME_STARTUP_TRANSACTION_NAME
+                        and not cleanup_failed
+                    ):
+                        cleanup_failed = True
+                        raise OSError("injected cleanup failure")
+                    original_unlink(path, **kwargs)
+
+                with (
+                    patch.object(
+                        runner_module,
+                        "unlink_artifact_file",
+                        side_effect=fail_cleanup_once,
+                    ),
+                    self.assertRaises(OSError),
+                ):
+                    runner_module._write_resume_startup_metadata(
+                        run_root=run_root,
+                        run_id="resume-run",
+                        run_config=after_config,
+                        run_manifest=after_manifest,
+                    )
+
+                self.assertTrue(cleanup_failed)
+                self.assertFalse((run_root / missing_name).exists())
+                preserved_name = next(name for name in before_texts if name != missing_name)
+                self.assertEqual(
+                    (run_root / preserved_name).read_text(encoding="utf-8"),
+                    before_texts[preserved_name],
+                )
+                self.assertFalse(
+                    (run_root / runner_module._RESUME_STARTUP_TRANSACTION_NAME).exists()
+                )
+
+    def test_resume_startup_transaction_rejects_invalid_or_conflicting_state(self) -> None:
+        valid_before_config = '{"run_id": "resume-run"}\n'
+        valid_before_manifest = '{"run_id": "resume-run"}\n'
+        valid_transaction: dict[str, object] = {
+            "schema_version": 1,
+            "kind": "resume_startup_metadata",
+            "state": "prepared",
+            "run_id": "resume-run",
+            "artifacts": {
+                "run_config.json": {
+                    "before_present": True,
+                    "before_text": valid_before_config,
+                    "before_sha256": runner_module._startup_text_sha256(valid_before_config),
+                    "after_sha256": runner_module._startup_text_sha256(valid_before_config),
+                },
+                "run_manifest.json": {
+                    "before_present": True,
+                    "before_text": valid_before_manifest,
+                    "before_sha256": runner_module._startup_text_sha256(valid_before_manifest),
+                    "after_sha256": runner_module._startup_text_sha256(valid_before_manifest),
+                },
+            },
+        }
+        invalid_cases: dict[str, str | dict[str, object]] = {
+            "invalid_json": "{",
+            "wrong_run_id": {
+                **valid_transaction,
+                "run_id": "other-run",
+            },
+            "extra_top_level_field": {
+                **valid_transaction,
+                "unexpected": True,
+            },
+        }
+        for name, transaction in invalid_cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
+                run_root = Path(tmp) / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                config_path = run_root / "run_config.json"
+                manifest_path = run_root / "run_manifest.json"
+                config_path.write_text(valid_before_config, encoding="utf-8")
+                manifest_path.write_text(valid_before_manifest, encoding="utf-8")
+                transaction_path = run_root / runner_module._RESUME_STARTUP_TRANSACTION_NAME
+                transaction_text = (
+                    transaction if isinstance(transaction, str) else json.dumps(transaction)
+                )
+                transaction_path.write_text(transaction_text, encoding="utf-8")
+                before = {
+                    path.name: path.read_bytes()
+                    for path in (config_path, manifest_path, transaction_path)
+                }
+
+                with self.assertRaises(ResumeHistoryError) as caught:
+                    runner_module._recover_resume_startup_transaction(
+                        run_root=run_root,
+                        run_id="resume-run",
+                    )
+
+                self.assertNotIn(str(Path(tmp)), str(caught.exception))
+                self.assertEqual(
+                    {
+                        path.name: path.read_bytes()
+                        for path in (config_path, manifest_path, transaction_path)
+                    },
+                    before,
+                )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            config_path = run_root / "run_config.json"
+            manifest_path = run_root / "run_manifest.json"
+            before_config = '{"run_id": "resume-run"}\n'
+            before_manifest = '{"run_id": "resume-run", "legacy": true}\n'
+            after_config = '{"run_id": "resume-run", "status": "running"}'
+            after_manifest = '{"run_id": "resume-run", "legacy": true}'
+            config_path.write_text('{"external": "change"}\n', encoding="utf-8")
+            manifest_path.write_text(before_manifest, encoding="utf-8")
+            transaction = {
+                "schema_version": 1,
+                "kind": "resume_startup_metadata",
+                "state": "prepared",
+                "run_id": "resume-run",
+                "artifacts": {
+                    "run_config.json": {
+                        "before_present": True,
+                        "before_text": before_config,
+                        "before_sha256": runner_module._startup_text_sha256(before_config),
+                        "after_sha256": runner_module._startup_text_sha256(after_config),
+                    },
+                    "run_manifest.json": {
+                        "before_present": True,
+                        "before_text": before_manifest,
+                        "before_sha256": runner_module._startup_text_sha256(before_manifest),
+                        "after_sha256": runner_module._startup_text_sha256(after_manifest),
+                    },
+                },
+            }
+            transaction_path = run_root / runner_module._RESUME_STARTUP_TRANSACTION_NAME
+            transaction_path.write_text(json.dumps(transaction), encoding="utf-8")
+            before = {
+                path.name: path.read_bytes()
+                for path in (config_path, manifest_path, transaction_path)
+            }
+
+            with self.assertRaisesRegex(ResumeHistoryError, "changed outside"):
+                runner_module._recover_resume_startup_transaction(
+                    run_root=run_root,
+                    run_id="resume-run",
+                )
+
+            self.assertEqual(
+                {
+                    path.name: path.read_bytes()
+                    for path in (config_path, manifest_path, transaction_path)
+                },
+                before,
+            )
+
     def test_repeated_resume_does_not_invent_sparse_manifest_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_dir = Path(tmp) / "project"
@@ -1764,6 +2408,7 @@ class RoundLoopTests(unittest.TestCase):
             "future_round",
             "previous_output",
             "state_artifact",
+            "transaction_artifact",
         ):
             with self.subTest(unsafe_kind=unsafe_kind), tempfile.TemporaryDirectory() as tmp:
                 repo_root = Path(tmp)
@@ -1793,9 +2438,14 @@ class RoundLoopTests(unittest.TestCase):
                     previous_round.mkdir()
                     (previous_round / "04_judge.md").symlink_to(outside_path)
                     start_round = 2
-                else:
+                elif unsafe_kind == "state_artifact":
                     outside_path.write_text('{"private": true}\n', encoding="utf-8")
                     (run_root / "run_config.json").symlink_to(outside_path)
+                else:
+                    outside_path.write_text('{"private": true}\n', encoding="utf-8")
+                    (run_root / runner_module._RESUME_STARTUP_TRANSACTION_NAME).symlink_to(
+                        outside_path
+                    )
                 outside_bytes = outside_path.read_bytes() if outside_path.is_file() else None
                 memory_path = project_dir / "memory.md"
                 memory_path.write_text("Manual memory.\n", encoding="utf-8")

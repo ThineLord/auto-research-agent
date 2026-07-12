@@ -44,6 +44,11 @@
 
 ### Fixed
 
+* Existing-run resume startup now journals `run_config.json` and `run_manifest.json` as one
+  recoverable generation before replacing either file. Pre-commit I/O failures, interrupts, and
+  interrupted rollback restore the exact prior pair; a surviving journal is recovered before
+  logging or agent work, while malformed or conflicting state fails closed. Legacy missing/sparse
+  metadata and new-run startup ordering remain compatible.
 * UI health results are now displayed only for the provider, effective model, and non-secret
   connection/credential source that was checked. Target changes and malformed or legacy snapshots
   clear stale results; endpoint/provider errors are sanitized before session storage, and a

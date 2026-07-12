@@ -350,6 +350,17 @@ checkpoint 若显式提供 `run_id`，必须与 canonical run 目录名一致；
 会保留旧 `run_manifest.json` 的创建期 provenance 和未知扩展字段；若 manifest 无法无损读取或
 合并，会在写入任何新 artifact 前停止。
 
+恢复同一个 run 时，`run_config.json` 和 `run_manifest.json` 作为一个启动元数据单元更新。
+写入期间 run 目录可能短暂出现隐藏文件 `.resume_startup_transaction.json`；若普通 I/O 异常、
+`Ctrl+C` 或进程终止留下该文件，下次 `--resume` 在 provider/client 初始化成功并进入 resume
+runner 后，会在记录日志或调用 agent 之前回退到上一组完整元数据，再开始新的恢复会话。不要
+手动编辑或删除该文件；如果校验检测到 canonical 元数据已被外部程序改动，resume 会 fail
+closed 并要求先备份 run 目录后人工核对，而不会覆盖无法归属的内容。该机制依赖单文件原子
+替换并覆盖正常
+异常/进程中断，不承诺断电级持久性。journal 删除是恢复会话的启动提交点；若进程恰在提交后、
+写 `run_start` 日志前被强制终止，完整的 config/manifest 会保留这个零工作量会话，后续 resume
+会把它视为一次已启动但未进入 agent 的历史尝试，而不是回退其中一个文件。
+
 如果要看本次 run 总览和每轮指标，查看：
 
 - `projects/example/runs/<run_id>/run_summary.json`

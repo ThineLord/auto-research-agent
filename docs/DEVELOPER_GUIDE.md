@@ -206,6 +206,19 @@ Progress comes from:
 - `runs/<run_id>/run_config.json` for reproducibility metadata: provider/model settings, runtime
   limits, topic snapshot, prompt hashes, Git commit, start/end timestamps, stop reason, and resume
   eligibility.
+- Existing-run startup treats `run_config.json` and `run_manifest.json` as one recoverable metadata
+  generation. It first atomically writes `.resume_startup_transaction.json` with exact prior text
+  and before/after SHA-256 values, replaces both canonical files, and commits by unlinking the
+  journal before `run_start` is logged or an agent can run. A surviving valid journal is rolled back
+  idempotently on the next attempt that reaches the resume runner; CLI provider/client construction
+  still precedes that boundary. Malformed journals, unexpected hashes, unsafe leaves, and externally
+  changed metadata detected during validation fail closed. Journal unlink defines the resume-session
+  start: a hard termination after that commit but before `run_start` logging may retain a complete
+  zero-work session, which a later resume preserves as a started attempt rather than a split
+  generation. This boundary deliberately excludes checkpoint,
+  histories, summaries, and per-round writes, which have not changed at startup. Atomic leaf writes
+  are fsynced, but parent-directory entries are not, so this is process/error recovery rather than a
+  claim of sudden-power-loss durability.
 - `runs/<run_id>/round_metrics.json` for per-round agent timings, error flags, scores, rubric
   subscores when Judge returns structured JSON, per-agent `agent_io_metrics`, and
   `evolution_metrics` for draft/revised/judge text similarity and adjacent score deltas.

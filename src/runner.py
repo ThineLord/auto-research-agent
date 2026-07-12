@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
@@ -75,6 +76,7 @@ from .storage import (
     unlink_artifact_file,
     update_project_memory,
     update_research_state,
+    write_file_text,
     write_interrupted_report,
     write_json_file,
     write_score_history,
@@ -87,6 +89,10 @@ class ResumeHistoryError(ValueError):
 
 
 _MAX_RESUME_JSON_DEPTH = 128
+_RESUME_STARTUP_TRANSACTION_NAME = ".resume_startup_transaction.json"
+_RESUME_STARTUP_TRANSACTION_KIND = "resume_startup_metadata"
+_RESUME_STARTUP_TRANSACTION_SCHEMA_VERSION = 1
+_RESUME_STARTUP_ARTIFACT_NAMES = ("run_config.json", "run_manifest.json")
 
 
 def _resume_json_nesting_is_safe(value: Any) -> bool:
@@ -209,6 +215,203 @@ def _read_resume_manifest(path: Path, *, canonical_run_id: str) -> Optional[Dict
     if manifest_resume_metadata is not None and not isinstance(manifest_resume_metadata, dict):
         raise ResumeHistoryError(f"{path.name} resume_metadata must contain a JSON object")
     return dict(payload)
+
+
+def _startup_text_sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _read_startup_artifact_text(path: Path) -> tuple[bool, str]:
+    try:
+        return True, read_regular_text(path)
+    except FileNotFoundError:
+        return False, ""
+    except (OSError, UnicodeError):
+        raise ResumeHistoryError(
+            "resume startup metadata is unreadable; manual recovery is required"
+        ) from None
+
+
+def _read_resume_startup_transaction(
+    *,
+    run_root: Path,
+    run_id: str,
+) -> Dict[str, Any] | None:
+    transaction_path = run_root / _RESUME_STARTUP_TRANSACTION_NAME
+    try:
+        text = read_regular_text(transaction_path)
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeError):
+        raise ResumeHistoryError(
+            "resume startup transaction is unreadable; manual recovery is required"
+        ) from None
+    try:
+        payload = json.loads(text)
+    except (ValueError, RecursionError):
+        raise ResumeHistoryError(
+            "resume startup transaction is invalid; manual recovery is required"
+        ) from None
+    if not isinstance(payload, dict) or not _resume_json_nesting_is_safe(payload):
+        raise ResumeHistoryError(
+            "resume startup transaction is invalid; manual recovery is required"
+        )
+    if (
+        set(payload) != {"schema_version", "kind", "state", "run_id", "artifacts"}
+        or type(payload.get("schema_version")) is not int
+        or payload.get("schema_version") != _RESUME_STARTUP_TRANSACTION_SCHEMA_VERSION
+        or payload.get("kind") != _RESUME_STARTUP_TRANSACTION_KIND
+        or payload.get("state") != "prepared"
+        or payload.get("run_id") != run_id
+    ):
+        raise ResumeHistoryError(
+            "resume startup transaction is invalid; manual recovery is required"
+        )
+    artifacts = payload.get("artifacts")
+    if not isinstance(artifacts, dict) or set(artifacts) != set(_RESUME_STARTUP_ARTIFACT_NAMES):
+        raise ResumeHistoryError(
+            "resume startup transaction is invalid; manual recovery is required"
+        )
+    for artifact_name in _RESUME_STARTUP_ARTIFACT_NAMES:
+        record = artifacts.get(artifact_name)
+        if not isinstance(record, dict) or set(record) != {
+            "before_present",
+            "before_text",
+            "before_sha256",
+            "after_sha256",
+        }:
+            raise ResumeHistoryError(
+                "resume startup transaction is invalid; manual recovery is required"
+            )
+        before_present = record.get("before_present")
+        before_text = record.get("before_text")
+        before_sha256 = record.get("before_sha256")
+        after_sha256 = record.get("after_sha256")
+        if type(before_present) is not bool or not isinstance(before_text, str):
+            raise ResumeHistoryError(
+                "resume startup transaction is invalid; manual recovery is required"
+            )
+        expected_before_sha256 = _startup_text_sha256(before_text) if before_present else None
+        if (
+            (not before_present and before_text)
+            or before_sha256 != expected_before_sha256
+            or not isinstance(after_sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", after_sha256) is None
+        ):
+            raise ResumeHistoryError(
+                "resume startup transaction is invalid; manual recovery is required"
+            )
+    return payload
+
+
+def _restore_resume_startup_transaction(
+    *,
+    run_root: Path,
+    payload: Dict[str, Any],
+    transaction_missing_ok: bool,
+) -> None:
+    artifacts = payload["artifacts"]
+    current_states: Dict[str, tuple[bool, str]] = {}
+    for artifact_name in _RESUME_STARTUP_ARTIFACT_NAMES:
+        artifact_path = run_root / artifact_name
+        present, text = _read_startup_artifact_text(artifact_path)
+        current_sha256 = _startup_text_sha256(text) if present else None
+        record = artifacts[artifact_name]
+        if current_sha256 not in {record["before_sha256"], record["after_sha256"]}:
+            raise ResumeHistoryError(
+                "resume startup metadata changed outside its transaction; "
+                "manual recovery is required"
+            )
+        current_states[artifact_name] = (present, text)
+
+    try:
+        for artifact_name in _RESUME_STARTUP_ARTIFACT_NAMES:
+            artifact_path = run_root / artifact_name
+            record = artifacts[artifact_name]
+            if record["before_present"]:
+                if current_states[artifact_name] != (True, record["before_text"]):
+                    write_file_text(artifact_path, record["before_text"])
+            elif current_states[artifact_name][0]:
+                unlink_artifact_file(artifact_path, missing_ok=True)
+        unlink_artifact_file(
+            run_root / _RESUME_STARTUP_TRANSACTION_NAME,
+            missing_ok=transaction_missing_ok,
+        )
+    except (OSError, UnicodeError):
+        raise ResumeHistoryError(
+            "resume startup metadata recovery is incomplete; retry resume to recover"
+        ) from None
+
+
+def _recover_resume_startup_transaction(*, run_root: Path, run_id: str) -> bool:
+    payload = _read_resume_startup_transaction(run_root=run_root, run_id=run_id)
+    if payload is None:
+        return False
+    _restore_resume_startup_transaction(
+        run_root=run_root,
+        payload=payload,
+        transaction_missing_ok=False,
+    )
+    return True
+
+
+def _write_resume_startup_metadata(
+    *,
+    run_root: Path,
+    run_id: str,
+    run_config: Dict[str, Any],
+    run_manifest: Dict[str, Any],
+) -> None:
+    if _read_resume_startup_transaction(run_root=run_root, run_id=run_id) is not None:
+        raise ResumeHistoryError(
+            "resume startup transaction is still pending; retry resume to recover"
+        )
+    payloads = {
+        "run_config.json": run_config,
+        "run_manifest.json": run_manifest,
+    }
+    artifacts: Dict[str, Any] = {}
+    for artifact_name in _RESUME_STARTUP_ARTIFACT_NAMES:
+        before_present, before_text = _read_startup_artifact_text(run_root / artifact_name)
+        after_text = json.dumps(payloads[artifact_name], indent=2)
+        artifacts[artifact_name] = {
+            "before_present": before_present,
+            "before_text": before_text,
+            "before_sha256": _startup_text_sha256(before_text) if before_present else None,
+            "after_sha256": _startup_text_sha256(after_text),
+        }
+    transaction_path = run_root / _RESUME_STARTUP_TRANSACTION_NAME
+    transaction = {
+        "schema_version": _RESUME_STARTUP_TRANSACTION_SCHEMA_VERSION,
+        "kind": _RESUME_STARTUP_TRANSACTION_KIND,
+        "state": "prepared",
+        "run_id": run_id,
+        "artifacts": artifacts,
+    }
+    try:
+        write_json_file(transaction_path, transaction)
+        for artifact_name in _RESUME_STARTUP_ARTIFACT_NAMES:
+            write_json_file(run_root / artifact_name, payloads[artifact_name])
+        unlink_artifact_file(transaction_path, missing_ok=False)
+    except BaseException:
+        try:
+            pending_transaction = _read_resume_startup_transaction(
+                run_root=run_root,
+                run_id=run_id,
+            )
+            if pending_transaction is not None and pending_transaction != transaction:
+                raise ResumeHistoryError(
+                    "resume startup transaction changed while it was active; "
+                    "manual recovery is required"
+                )
+            _restore_resume_startup_transaction(
+                run_root=run_root,
+                payload=transaction,
+                transaction_missing_ok=pending_transaction is None,
+            )
+        except ResumeHistoryError:
+            raise
+        raise
 
 
 def _build_run_manifest(
@@ -772,6 +975,7 @@ def run_iterative_rounds(
             run_root / "run_summary.json",
             round_metrics_path,
             run_root / "run_manifest.json",
+            run_root / _RESUME_STARTUP_TRANSACTION_NAME,
         )
         if not resume_artifact_links_are_safe(
             parent_dir=run_root,
@@ -815,6 +1019,8 @@ def run_iterative_rounds(
 
         for pending_round in range(start_round, max_rounds + 1):
             _validate_pending_resume_round_dir(run_root, pending_round)
+
+        _recover_resume_startup_transaction(run_root=run_root, run_id=run_id)
 
     initial_best_output = read_text(best_output_path)
     base_resume_metadata = _base_resume_metadata(
@@ -957,31 +1163,44 @@ def run_iterative_rounds(
         existing_run_config=existing_run_config,
         resume_metadata=base_resume_metadata,
     )
-    write_json_file(run_config_path, run_config)
-    _log(
-        console,
-        log_path,
-        mode,
-        f"run_start run_id={run_id} run_root={display_path(run_root, repo_root)} "
-        f"model={model_name}",
+    run_manifest = _build_run_manifest(
+        existing_manifest=existing_run_manifest,
+        existing_run_config=existing_run_config,
+        resumes_existing_run=resumes_existing_run,
+        run_id=run_id,
+        run_root=run_root,
+        mode=mode,
+        model_name=model_name,
+        drafting_mode=drafting_mode,
+        started_at=started_at_iso,
+        project_metadata=project_metadata,
+        run_config_path=run_config_path,
+        resume_metadata=base_resume_metadata,
     )
-    write_json_file(
-        run_root / "run_manifest.json",
-        _build_run_manifest(
-            existing_manifest=existing_run_manifest,
-            existing_run_config=existing_run_config,
-            resumes_existing_run=resumes_existing_run,
-            run_id=run_id,
+    if resumes_existing_run:
+        _write_resume_startup_metadata(
             run_root=run_root,
-            mode=mode,
-            model_name=model_name,
-            drafting_mode=drafting_mode,
-            started_at=started_at_iso,
-            project_metadata=project_metadata,
-            run_config_path=run_config_path,
-            resume_metadata=base_resume_metadata,
-        ),
-    )
+            run_id=run_id,
+            run_config=run_config,
+            run_manifest=run_manifest,
+        )
+        _log(
+            console,
+            log_path,
+            mode,
+            f"run_start run_id={run_id} run_root={display_path(run_root, repo_root)} "
+            f"model={model_name}",
+        )
+    else:
+        write_json_file(run_config_path, run_config)
+        _log(
+            console,
+            log_path,
+            mode,
+            f"run_start run_id={run_id} run_root={display_path(run_root, repo_root)} "
+            f"model={model_name}",
+        )
+        write_json_file(run_root / "run_manifest.json", run_manifest)
     if project_metadata:
         _log(
             console,
