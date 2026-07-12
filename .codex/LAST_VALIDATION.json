@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-12T13:11:46+08:00",
+  "recorded_at": "2026-07-12T13:40:19+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "6f03ec8e7c2005543d8b8dbaf20fc6d6cceaa94d",
-  "last_known_stable_commit": "6f03ec8e7c2005543d8b8dbaf20fc6d6cceaa94d",
+  "head_commit": "609de6c3a3993fa89339f3d225e7b122d9e796cb",
+  "last_known_stable_commit": "609de6c3a3993fa89339f3d225e7b122d9e796cb",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "6f03ec8e7c2005543d8b8dbaf20fc6d6cceaa94d",
+  "state_recorded_against_commit": "609de6c3a3993fa89339f3d225e7b122d9e796cb",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-12T12:53:32+08:00",
-    "commit": "6f03ec8e7c2005543d8b8dbaf20fc6d6cceaa94d",
+    "verified_at": "2026-07-12T13:13:27+08:00",
+    "commit": "609de6c3a3993fa89339f3d225e7b122d9e796cb",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29180344621,
+        "run_id": 29180830633,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "6f03ec8e7c2005543d8b8dbaf20fc6d6cceaa94d",
+        "head_sha": "609de6c3a3993fa89339f3d225e7b122d9e796cb",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29180345488,
+        "run_id": 29180831707,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "6f03ec8e7c2005543d8b8dbaf20fc6d6cceaa94d",
+        "head_sha": "609de6c3a3993fa89339f3d225e7b122d9e796cb",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,99 @@
       }
     }
   },
-  "status": "ara042_done_local_validation_passed_publication_pending",
+  "status": "ara044_done_local_validation_passed_publication_pending",
   "commands": [
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_ui_helpers.py -k health_session_result before ARA-044 fix",
+      "exit_code": 1,
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "pytest_tests_failed": 1,
+        "stale_raw_health_session": true,
+        "provider_called": false
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_ui_helpers.py -k 'health_session_result or fast_model_health or gemini_health_check'",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 3,
+        "pytest_subtests_passed": 8,
+        "same_target_retained": "passed",
+        "model_provider_endpoint_source_changes": "passed",
+        "legacy_and_malformed_eviction": "passed",
+        "credential_source_precedence": "passed",
+        "secret_free_scope_and_errors": "passed"
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_ui_helpers.py tests/test_recovery_state.py",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 75,
+        "pytest_subtests_passed": 30,
+        "provider_called": false
+      }
+    },
+    {
+      "command": "make check after ARA-044 final explicit staging",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 58,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 101,
+        "findings": 0,
+        "pytest_tests_passed": 340,
+        "pytest_subtests_passed": 235,
+        "pytest_duration_seconds": 13.15
+      }
+    },
+    {
+      "command": "two independent ARA-044 health identity and regression reviews",
+      "result": "passed",
+      "summary": {
+        "identity_review": "GO",
+        "test_review": "GO",
+        "blocking_findings": 0,
+        "provider_called": false
+      }
+    },
+    {
+      "command": "initial ARA-044 start-state consistency check",
+      "result": "corrected_before_implementation",
+      "summary": {
+        "pytest_tests_failed": 1,
+        "cause": "a finalization Remaining Steps bullet omitted the active ARA-044 identifier",
+        "runtime_failure": false
+      }
+    },
+    {
+      "command": "ARA-042 publication, remote equality, CI, annotation, and draft PR verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "609de6c3a3993fa89339f3d225e7b122d9e796cb",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29180830633,
+        "pull_request_run_id": 29180831707,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "job_annotations": 0,
+        "draft_pr_13_updated": true
+      }
+    },
     {
       "command": ".venv/bin/python -m pytest -q tests/test_ui_helpers.py -k cloud_free_session_cache before ARA-042 fix",
       "exit_code": 1,
@@ -2091,6 +2182,10 @@
   ],
   "not_run": [
     {
+      "check": "real provider health requests for ARA-044",
+      "reason": "Health snapshot scoping, source resolution, sanitization, and malformed eviction are deterministic UI/session boundaries; mocked request/client results cover them without credentials, network access, or cost."
+    },
+    {
       "check": "real provider smoke for ARA-042",
       "reason": "UI cache identity, content refresh, and fail-empty behavior are deterministic local session/artifact boundaries; real project-switch, same-ID rewrite, malformed, race, and symlink fixtures cover them without credentials or cost."
     },
@@ -2148,7 +2243,9 @@
     }
   ],
   "notes": [
-    "ARA-042 is DONE and locally validated for canonical-project and safe artifact-content scoped UI cloud-free session state; publication and four-job GitHub verification remain pending.",
+    "ARA-044 is DONE and locally validated for target-scoped, non-secret UI health snapshots; publication and four-job GitHub verification remain pending.",
+    "ARA-045 is the next unblocked P1 after a provider-free mock confirmed the SDK can use GOOGLE_API_KEY while redaction selects GEMINI_API_KEY when both are populated.",
+    "ARA-042 is complete at remote-equal commit 609de6c with successful push and pull-request CI runs 29180830633 and 29180831707 on Python 3.10 and 3.13 and zero job annotations.",
     "ARA-029 is complete at remote-equal commit 6f03ec8 with successful push and pull-request CI runs 29180344621 and 29180345488 on Python 3.10 and 3.13 and zero job annotations.",
     "ARA-043 is complete at remote-equal commit 685a36c with successful push and pull-request CI runs 29166629408 and 29166630511 on Python 3.10 and 3.13.",
     "ARA-043 uses one blocking predicate for Quality, normal scoring, and runtime fallback; all-blocked returns no selection while mixed unprofiled and healthy candidates remain eligible.",

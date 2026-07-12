@@ -344,7 +344,7 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-042 - UI cloud-free session cache is not project or artifact scoped
 
-- Status: fixed and locally validated; publication pending
+- Status: fixed, pushed, and CI-verified
 - Severity: P2 selection consistency
 - Impact: switching projects or refreshing cloud artifacts outside Streamlit can leave global
   in-memory discovery/profile values active; equal model IDs can hide stale metadata from ARA-040's
@@ -367,10 +367,30 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-029 - CI token permissions and runtime are implicit
 
-- Status: fixed and locally validated; publication pending
+- Status: fixed, pushed, and CI-verified
 - Severity: P2 CI security/reliability
 - Impact: CI inherits repository-default `GITHUB_TOKEN` permissions and the platform runtime ceiling;
   old action runtimes also emit forced Node compatibility annotations on every matrix job.
 - Resolution: the workflow grants only `contents: read`, forbids an untested job-level permission
   override, caps each matrix job at 15 minutes, and uses the official Node 24 action majors
   `checkout@v7` and `setup-python@v6`. Push/PR filters and Python 3.10/3.13 remain unchanged.
+
+## KI-044 - UI health result can describe a previously selected target
+
+- Status: fixed and locally validated; publication pending
+- Severity: P2 diagnostic correctness
+- Impact: a successful or failed health check remains visible after changing the effective model or
+  Ollama endpoint, so the UI can attribute stale evidence to a target that was never checked.
+- Resolution: health snapshots are wrapped with normalized provider/model plus non-secret Ollama
+  endpoint or actual Gemini credential-source identity. Legacy, malformed, missing-format,
+  mismatched, and credential-bearing error states are removed or sanitized before display.
+
+## KI-045 - Gemini redaction can select a different built-in key than the SDK
+
+- Status: confirmed by provider-free mock; queued as ARA-045
+- Severity: P1 credential disclosure
+- Impact: with both `GOOGLE_API_KEY` and `GEMINI_API_KEY` set, the SDK uses the Google key while the
+  wrapper records the Gemini key as the known secret. An echoed Google key can therefore survive in
+  provider events and exception chaining.
+- Current action: after ARA-044, unify effective credential resolution with SDK precedence and add
+  an explicit both-built-ins redaction regression; no live provider call is needed.

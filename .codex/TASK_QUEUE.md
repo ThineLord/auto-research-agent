@@ -411,6 +411,41 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Commit required: yes.
 - Dependencies: ARA-040 cached membership guard; no provider call.
 
+## ARA-044 - Scope UI health results to the checked target
+
+- Status: `DONE`
+- Priority: P2
+- Risk: low
+- Description: Streamlit stores raw Ollama and Gemini health results under provider-global session
+  keys, so changing the effective model or Ollama base URL can display a prior target's success or
+  failure beside the current target.
+- Related files: `ui/app.py`, UI helper tests
+- Acceptance criteria: health results are displayed only when provider, normalized effective model,
+  and non-secret connection scope match the check that produced them; legacy/malformed entries and
+  changed targets disappear, while an unchanged target retains its result.
+- Validation command: provider-free scoped-session regressions, existing health/UI/recovery tests,
+  then `make check`.
+- Commit required: yes.
+- Dependencies: none; do not perform a real health request or persist/hash credentials.
+
+## ARA-045 - Align Gemini credential redaction with the key actually used
+
+- Status: `TODO`
+- Priority: P1
+- Risk: medium
+- Description: when both built-in Gemini environment variables are populated, google-genai uses
+  `GOOGLE_API_KEY` but `GeminiClient._available_api_key()` selects `GEMINI_API_KEY` for
+  `known_secrets`, so a provider error can retain the actual Google key in events and exception
+  causes.
+- Related files: `src/llm.py`, provider redaction tests
+- Acceptance criteria: client creation/key-availability/redaction resolve one consistent effective
+  credential source for explicit, custom-env, Google/Gemini fallback, and both-built-in cases; no
+  used key survives provider events, public exceptions, or chained causes.
+- Validation command: provider-free fake-SDK credential precedence/redaction matrix, LLM/security
+  regressions, then `make check`.
+- Commit required: yes.
+- Dependencies: none; no real provider request and no credential value may enter test output/state.
+
 ## ARA-011 - Prevent failed rounds from replacing a trusted best output
 
 - Status: `DONE`

@@ -42,6 +42,10 @@
 
 ### Fixed
 
+* UI health results are now displayed only for the provider, effective model, and non-secret
+  connection/credential source that was checked. Target changes and malformed or legacy snapshots
+  clear stale results; endpoint/provider errors are sanitized before session storage, and a
+  whitespace-only Gemini password no longer masks a valid configured key.
 * Streamlit cloud-free discovery/profile session values are now scoped to the validated canonical
   project and safe content state of both artifacts. Project switches, legacy global session values,
   and external same-model-ID metadata updates reload together; unstable or unsafe snapshots fail

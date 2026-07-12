@@ -433,3 +433,22 @@
 - Residual boundary: a mutation after the final fingerprint can affect at most one render. Atomic
   cross-file discovery/profile generations require a transaction or provenance schema and remain
   outside this no-schema UI cache fix.
+
+## 2026-07-12 - Bind UI health snapshots without retaining credentials
+
+- Decision: wrap each cached health result with normalized provider/model plus a non-secret
+  connection identity. Ollama stores normalized origin, an allowlisted safe-path label or redacted
+  path shape, and only userinfo/query presence. Gemini stores only session/config/environment source
+  labels, following actual custom-env then SDK Google/Gemini precedence.
+- Validation boundary: accept only known health message keys with their required format arguments,
+  string messages, boolean `ok`, and mapping arguments. Evict raw legacy, malformed, unknown,
+  missing-argument, or mismatched entries before localization.
+- Privacy boundary: never persist or hash credential values. Sanitize endpoint display and provider
+  error details before session storage; arbitrary URL paths, userinfo, query values, and exception
+  text are excluded. Same-source external credential rotation can remain indistinguishable under
+  this constraint and requires a fresh health check.
+- Compatibility: same-target success/failure snapshots remain visible. Widget changes, effective
+  model/endpoint/source changes, and Ollama model refresh invalidate stale state. Provider calls,
+  configuration files, artifacts, experiment behavior, and research conclusions are unchanged.
+- Follow-up: ARA-045 separately owns the P1 provider-event/chained-cause leak caused by
+  `GeminiClient._available_api_key()` disagreeing with SDK built-in environment precedence.

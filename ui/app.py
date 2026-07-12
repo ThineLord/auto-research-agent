@@ -6,9 +6,10 @@ import os
 import re
 import stat
 import sys
-from collections.abc import MutableMapping
+from collections.abc import Mapping, MutableMapping
 from pathlib import Path
 from typing import Any, Sequence
+from urllib.parse import urlsplit
 
 import requests
 import streamlit as st
@@ -120,6 +121,19 @@ DRAFTING_MODE_LABEL_KEYS = {
 CLOUD_FREE_CACHE_IDENTITY_KEY = "cloud_free_cache_identity"
 CLOUD_FREE_DISCOVERY_SESSION_KEY = "cloud_free_discovered_models"
 CLOUD_FREE_PROFILE_SESSION_KEY = "cloud_free_profile_results"
+OLLAMA_HEALTH_SESSION_KEY = "model_health"
+GEMINI_HEALTH_SESSION_KEY = "gemini_model_health"
+HEALTH_MESSAGE_REQUIRED_ARGS = {
+    "health_no_model": frozenset(),
+    "health_timeout": frozenset({"base_url"}),
+    "health_api_unhealthy": frozenset({"base_url", "error"}),
+    "health_model_missing": frozenset({"model"}),
+    "health_model_ok": frozenset({"model"}),
+    "gemini_health_missing_key": frozenset(),
+    "gemini_health_failed": frozenset({"error"}),
+    "gemini_health_ok": frozenset({"model"}),
+}
+SAFE_OLLAMA_HEALTH_PATH_SEGMENTS = frozenset({"api", "ollama", "proxy", "service"})
 
 
 def relative_repo_path(path: Path) -> str:
@@ -446,6 +460,145 @@ def load_scoped_cloud_free_cache(
     return discovered_models, profile_results
 
 
+def ollama_health_connection_scope(base_url: str) -> tuple[str, ...]:
+    try:
+        parsed = urlsplit(str(base_url or "").strip())
+        hostname = parsed.hostname
+    except ValueError:
+        return ("invalid_endpoint",)
+    if not parsed.scheme or not hostname:
+        return ("invalid_endpoint",)
+    try:
+        port = parsed.port
+    except ValueError:
+        netloc_without_userinfo = parsed.netloc.rsplit("@", 1)[-1]
+        numeric_port = re.search(r":([0-9]+)$", netloc_without_userinfo)
+        port_scope = f"invalid_port:{numeric_port.group(1)}" if numeric_port else "invalid_port"
+    else:
+        if port is None:
+            if parsed.scheme.lower() == "http":
+                port = 80
+            elif parsed.scheme.lower() == "https":
+                port = 443
+        port_scope = "" if port is None else str(port)
+    normalized_path = parsed.path.rstrip("/") or "/"
+    path_segments = tuple(segment for segment in normalized_path.split("/") if segment)
+    path_is_non_secret = all(
+        segment.lower() in SAFE_OLLAMA_HEALTH_PATH_SEGMENTS
+        or re.fullmatch(r"v[0-9]+", segment.lower())
+        for segment in path_segments
+    )
+    path_scope = (
+        ("path", normalized_path)
+        if path_is_non_secret
+        else ("redacted_path", *(str(len(segment)) for segment in path_segments))
+    )
+    return (
+        "endpoint",
+        parsed.scheme.lower(),
+        hostname.lower(),
+        port_scope,
+        *path_scope,
+        "userinfo" if parsed.username is not None or parsed.password is not None else "anonymous",
+        "query" if parsed.query else "no_query",
+    )
+
+
+def ollama_health_display_endpoint(base_url: str) -> str:
+    scope = ollama_health_connection_scope(base_url)
+    if not scope or scope[0] != "endpoint":
+        return "<configured endpoint>"
+    _label, scheme, hostname, port, *_non_secret_details = scope
+    display_host = f"[{hostname}]" if ":" in hostname else hostname
+    if port.startswith("invalid_port"):
+        return f"{scheme}://{display_host}:<invalid-port>"
+    return f"{scheme}://{display_host}:{port}" if port else f"{scheme}://{display_host}"
+
+
+def resolve_ui_gemini_api_key(session_value: str, config_value: str) -> str:
+    return str(session_value or "").strip() or str(config_value or "").strip()
+
+
+def gemini_health_connection_scope(
+    *,
+    api_key_env: str,
+    session_key_present: bool,
+    config_key_present: bool,
+    environment: Mapping[str, str] | None = None,
+) -> tuple[str, ...]:
+    if session_key_present:
+        return ("session_key",)
+    if config_key_present:
+        return ("config_key",)
+    environment = os.environ if environment is None else environment
+    configured_env = str(api_key_env or "").strip()
+    built_in_envs = {DEFAULT_GEMINI_API_KEY_ENV, "GOOGLE_API_KEY"}
+    if (
+        configured_env
+        and configured_env not in built_in_envs
+        and str(environment.get(configured_env, "")).strip()
+    ):
+        return ("environment", configured_env)
+    for env_name in ("GOOGLE_API_KEY", DEFAULT_GEMINI_API_KEY_ENV):
+        if str(environment.get(env_name, "")):
+            return ("environment", env_name)
+    return ("missing",)
+
+
+def build_model_health_identity(
+    *,
+    provider: str,
+    model: str,
+    connection_scope: Sequence[str],
+) -> tuple[str, str, tuple[str, ...]]:
+    return (
+        str(provider or "").strip().lower(),
+        str(model or "").strip(),
+        tuple(str(part) for part in connection_scope),
+    )
+
+
+def store_scoped_health_result(
+    session_state: MutableMapping[str, Any],
+    *,
+    key: str,
+    identity: tuple[str, str, tuple[str, ...]],
+    result: dict[str, Any],
+) -> None:
+    session_state[key] = {"identity": identity, "result": result}
+
+
+def load_scoped_health_result(
+    session_state: MutableMapping[str, Any],
+    *,
+    key: str,
+    identity: tuple[str, str, tuple[str, ...]],
+) -> dict[str, Any] | None:
+    cached = session_state.get(key)
+    if not isinstance(cached, Mapping) or cached.get("identity") != identity:
+        session_state.pop(key, None)
+        return None
+    result = cached.get("result")
+    message_key = result.get("message_key") if isinstance(result, dict) else None
+    message_args = result.get("message_args") if isinstance(result, dict) else None
+    if (
+        not isinstance(result, dict)
+        or not isinstance(result.get("ok"), bool)
+        or not isinstance(result.get("message"), str)
+        or not isinstance(message_key, str)
+        or message_key not in HEALTH_MESSAGE_REQUIRED_ARGS
+        or not isinstance(message_args, Mapping)
+        or not HEALTH_MESSAGE_REQUIRED_ARGS[message_key].issubset(message_args)
+    ):
+        session_state.pop(key, None)
+        return None
+    return result
+
+
+def clear_session_health_result(key: str) -> None:
+    st.session_state.pop(key, None)
+
+
 def localized_stage(stage: Any) -> str:
     stage_text = str(stage)
     if stage_text == "Idle":
@@ -507,6 +660,7 @@ def check_ollama_model_health(
             "message_args": {},
         }
 
+    display_endpoint = ollama_health_display_endpoint(base_url)
     url = f"{base_url.rstrip('/')}/api/tags"
     try:
         response = requests.get(url, timeout=timeout_seconds)
@@ -517,18 +671,19 @@ def check_ollama_model_health(
             "ok": False,
             "api_ok": False,
             "model_ok": False,
-            "message": f"Ollama API timed out at {base_url}.",
+            "message": f"Ollama API timed out at {display_endpoint}.",
             "message_key": "health_timeout",
-            "message_args": {"base_url": base_url},
+            "message_args": {"base_url": display_endpoint},
         }
     except (requests.RequestException, ValueError) as exc:
+        error_type = type(exc).__name__
         return {
             "ok": False,
             "api_ok": False,
             "model_ok": False,
-            "message": f"Ollama API is not healthy at {base_url}: {exc}",
+            "message": f"Ollama API is not healthy at {display_endpoint}: {error_type}",
             "message_key": "health_api_unhealthy",
-            "message_args": {"base_url": base_url, "error": exc},
+            "message_args": {"base_url": display_endpoint, "error": error_type},
         }
 
     api_models = [
@@ -603,13 +758,14 @@ def check_gemini_model_health(
             top_p=0.9,
         )
     except RuntimeError as exc:
+        error_type = type(exc).__name__
         return {
             "ok": False,
             "api_ok": False,
             "model_ok": False,
-            "message": f"Gemini health check failed: {exc}",
+            "message": f"Gemini health check failed: {error_type}",
             "message_key": "gemini_health_failed",
-            "message_args": {"error": exc},
+            "message_args": {"error": error_type},
         }
 
     if not output.strip():
@@ -1876,6 +2032,7 @@ def main() -> None:
         refresh_col, model_status_col = st.columns([1, 4])
         with refresh_col:
             if st.button(t("refresh_models")):
+                st.session_state.pop(OLLAMA_HEALTH_SESSION_KEY, None)
                 refresh_ollama_model_cache(base_url=app_config.ollama_base_url)
                 st.session_state["model_list_refreshed"] = True
 
@@ -1953,12 +2110,22 @@ def main() -> None:
             t("gemini_api_key_env"),
             value=app_config.model.gemini.api_key_env,
             key="gemini_api_key_env",
+            on_change=clear_session_health_result,
+            args=(GEMINI_HEALTH_SESSION_KEY,),
         )
         gemini_api_key_password = st.text_input(
             t("gemini_api_key_password"),
             type="password",
             key="gemini_api_key_password",
             help=t("gemini_api_key_password_help"),
+            on_change=clear_session_health_result,
+            args=(GEMINI_HEALTH_SESSION_KEY,),
+        )
+        gemini_session_api_key = gemini_api_key_password.strip()
+        gemini_config_api_key = app_config.model.gemini.api_key.strip()
+        gemini_inline_api_key = resolve_ui_gemini_api_key(
+            gemini_session_api_key,
+            gemini_config_api_key,
         )
         cloud_models = list(app_config.model.gemini.models or DEFAULT_GEMINI_MODELS)
         cloud_default_model = (
@@ -1968,15 +2135,14 @@ def main() -> None:
         )
         key_available = has_gemini_api_key_source(
             api_key_env=gemini_api_key_env,
-            api_key_value=gemini_api_key_password,
-            config_api_key=app_config.model.gemini.api_key,
+            api_key_value=gemini_inline_api_key,
         )
         if not key_available:
             st.warning(t("gemini_health_missing_key"))
         provider_env_overrides = build_provider_env_overrides(
             selected_provider,
             gemini_api_key_env,
-            gemini_api_key_password,
+            gemini_session_api_key,
         )
 
         st.markdown(f"**{t('cloud_free_runner')}**")
@@ -2007,7 +2173,7 @@ def main() -> None:
                 with st.spinner(t("discovering_free_cloud_models")):
                     discovered, error = discover_free_cloud_models(
                         api_key_env=gemini_api_key_env,
-                        api_key=gemini_api_key_password or app_config.model.gemini.api_key,
+                        api_key=gemini_inline_api_key,
                         config=app_config.cloud_free,
                     )
                 if error:
@@ -2033,7 +2199,7 @@ def main() -> None:
                     profiles = profile_free_cloud_models(
                         candidates=safe_candidates,
                         api_key_env=gemini_api_key_env,
-                        api_key=gemini_api_key_password or app_config.model.gemini.api_key,
+                        api_key=gemini_inline_api_key,
                     )
                 save_profile_artifact(proj_path, profiles)
                 st.session_state.pop(CLOUD_FREE_CACHE_IDENTITY_KEY, None)
@@ -2128,15 +2294,34 @@ def main() -> None:
         )
 
         gemini_health_col, gemini_health_result_col = st.columns([1, 3])
+        gemini_health_identity = build_model_health_identity(
+            provider=MODEL_PROVIDER_GEMINI,
+            model=effective_model,
+            connection_scope=gemini_health_connection_scope(
+                api_key_env=gemini_api_key_env,
+                session_key_present=bool(gemini_session_api_key),
+                config_key_present=bool(gemini_config_api_key),
+            ),
+        )
         with gemini_health_col:
             if st.button(t("check_gemini_health")):
-                st.session_state["gemini_model_health"] = check_gemini_model_health(
+                gemini_health = check_gemini_model_health(
                     selected_model=effective_model,
                     api_key_env=gemini_api_key_env,
-                    api_key_value=gemini_api_key_password or app_config.model.gemini.api_key,
+                    api_key_value=gemini_inline_api_key,
+                )
+                store_scoped_health_result(
+                    st.session_state,
+                    key=GEMINI_HEALTH_SESSION_KEY,
+                    identity=gemini_health_identity,
+                    result=gemini_health,
                 )
         with gemini_health_result_col:
-            gemini_health = st.session_state.get("gemini_model_health")
+            gemini_health = load_scoped_health_result(
+                st.session_state,
+                key=GEMINI_HEALTH_SESSION_KEY,
+                identity=gemini_health_identity,
+            )
             if gemini_health:
                 if gemini_health["ok"]:
                     st.success(localized_message(gemini_health))
@@ -2348,16 +2533,31 @@ def main() -> None:
             st.caption(t("no_installed_model"))
 
         health_col, health_result_col = st.columns([1, 3])
+        ollama_health_identity = build_model_health_identity(
+            provider=MODEL_PROVIDER_OLLAMA,
+            model=effective_model,
+            connection_scope=ollama_health_connection_scope(app_config.ollama_base_url),
+        )
         with health_col:
             if st.button(t("check_model_health")):
-                st.session_state["model_health"] = check_model_health(
+                model_health = check_model_health(
                     provider=MODEL_PROVIDER_OLLAMA,
                     base_url=app_config.ollama_base_url,
                     selected_model=effective_model,
                     installed_model_names=installed_model_names,
                 )
+                store_scoped_health_result(
+                    st.session_state,
+                    key=OLLAMA_HEALTH_SESSION_KEY,
+                    identity=ollama_health_identity,
+                    result=model_health,
+                )
         with health_result_col:
-            model_health = st.session_state.get("model_health")
+            model_health = load_scoped_health_result(
+                st.session_state,
+                key=OLLAMA_HEALTH_SESSION_KEY,
+                identity=ollama_health_identity,
+            )
             if model_health:
                 if model_health["ok"]:
                     st.success(localized_message(model_health))

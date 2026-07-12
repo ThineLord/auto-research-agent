@@ -2593,6 +2593,254 @@ release_run_lock(handle)
         self.assertFalse(health["model_ok"])
         self.assertIn("not installed", health["message"])
 
+        private_endpoint = "https://user:private-token@localhost:11434/proxy?key=private-token"
+        with patch.object(
+            ui_app.requests,
+            "get",
+            side_effect=ui_app.requests.ConnectionError(f"request failed for {private_endpoint}"),
+        ):
+            health = ui_app.check_model_health(
+                base_url=private_endpoint,
+                selected_model="qwen3:8b",
+                installed_model_names=[],
+            )
+
+        self.assertFalse(health["ok"])
+        self.assertNotIn("private-token", repr(health))
+        self.assertIn("https://localhost:11434", health["message"])
+
+    def test_ui_health_session_result_is_scoped_to_checked_target(self) -> None:
+        import ui.app as ui_app
+
+        session_state: dict[str, object] = {"model_health": {"ok": True}}
+        ollama_scope = ui_app.ollama_health_connection_scope(
+            "https://user:private-token@LOCALHOST:11434/proxy/?token=private-token"
+        )
+        ollama_identity = ui_app.build_model_health_identity(
+            provider="ollama",
+            model=" qwen3:8b ",
+            connection_scope=ollama_scope,
+        )
+        self.assertNotIn("private-token", repr(ollama_identity))
+        self.assertNotIn(
+            "sk_live_abc123",
+            repr(ui_app.ollama_health_connection_scope("https://localhost/sk_live_abc123")),
+        )
+        self.assertEqual(
+            ui_app.ollama_health_connection_scope("http://LOCALHOST:80/"),
+            ui_app.ollama_health_connection_scope("http://localhost"),
+        )
+        self.assertNotEqual(
+            ui_app.ollama_health_connection_scope("http://localhost/proxy"),
+            ui_app.ollama_health_connection_scope("http://localhost/api"),
+        )
+        self.assertNotEqual(
+            ui_app.ollama_health_connection_scope("http://localhost:99999"),
+            ui_app.ollama_health_connection_scope("http://localhost:99998"),
+        )
+        self.assertNotIn(
+            "private-token",
+            repr(ui_app.ollama_health_connection_scope("http://localhost:private-token")),
+        )
+        self.assertEqual(
+            ui_app.build_model_health_identity(
+                provider=" OLLAMA ",
+                model="qwen3:8b",
+                connection_scope=ollama_scope,
+            ),
+            ollama_identity,
+        )
+        self.assertIsNone(
+            ui_app.load_scoped_health_result(
+                session_state,
+                key="model_health",
+                identity=ollama_identity,
+            )
+        )
+        self.assertNotIn("model_health", session_state)
+
+        result = {
+            "ok": False,
+            "message": "model was not installed",
+            "message_key": "health_model_missing",
+            "message_args": {"model": "qwen3:8b"},
+        }
+        ui_app.store_scoped_health_result(
+            session_state,
+            key="model_health",
+            identity=ollama_identity,
+            result=result,
+        )
+        self.assertEqual(
+            ui_app.load_scoped_health_result(
+                session_state,
+                key="model_health",
+                identity=ollama_identity,
+            ),
+            result,
+        )
+        self.assertNotIn("private-token", repr(session_state))
+
+        changed_identities = (
+            ui_app.build_model_health_identity(
+                provider="ollama",
+                model="qwen3:14b",
+                connection_scope=ollama_scope,
+            ),
+            ui_app.build_model_health_identity(
+                provider="ollama",
+                model="qwen3:8b",
+                connection_scope=ui_app.ollama_health_connection_scope("http://localhost:11435"),
+            ),
+            ui_app.build_model_health_identity(
+                provider="gemini",
+                model="qwen3:8b",
+                connection_scope=ollama_scope,
+            ),
+        )
+        for changed_identity in changed_identities:
+            with self.subTest(changed_identity=changed_identity):
+                ui_app.store_scoped_health_result(
+                    session_state,
+                    key="model_health",
+                    identity=ollama_identity,
+                    result=result,
+                )
+                self.assertIsNone(
+                    ui_app.load_scoped_health_result(
+                        session_state,
+                        key="model_health",
+                        identity=changed_identity,
+                    )
+                )
+                self.assertNotIn("model_health", session_state)
+
+        self.assertEqual(
+            ui_app.resolve_ui_gemini_api_key("   ", " config-key "),
+            "config-key",
+        )
+        custom_environment = {
+            "TEAM_KEY": "private-custom-key",
+            "GOOGLE_API_KEY": "private-google-key",
+            "GEMINI_API_KEY": "private-gemini-key",
+        }
+        custom_scope = ui_app.gemini_health_connection_scope(
+            api_key_env="TEAM_KEY",
+            session_key_present=False,
+            config_key_present=False,
+            environment=custom_environment,
+        )
+        google_scope = ui_app.gemini_health_connection_scope(
+            api_key_env="GEMINI_API_KEY",
+            session_key_present=False,
+            config_key_present=False,
+            environment=custom_environment,
+        )
+        gemini_scope = ui_app.gemini_health_connection_scope(
+            api_key_env="GEMINI_API_KEY",
+            session_key_present=False,
+            config_key_present=False,
+            environment={"GEMINI_API_KEY": "private-gemini-key"},
+        )
+        whitespace_google_scope = ui_app.gemini_health_connection_scope(
+            api_key_env="GEMINI_API_KEY",
+            session_key_present=False,
+            config_key_present=False,
+            environment={"GOOGLE_API_KEY": "   ", "GEMINI_API_KEY": "private-gemini-key"},
+        )
+        session_scope = ui_app.gemini_health_connection_scope(
+            api_key_env="TEAM_KEY",
+            session_key_present=True,
+            config_key_present=True,
+            environment=custom_environment,
+        )
+        config_scope = ui_app.gemini_health_connection_scope(
+            api_key_env="TEAM_KEY",
+            session_key_present=False,
+            config_key_present=True,
+            environment=custom_environment,
+        )
+        self.assertEqual(custom_scope, ("environment", "TEAM_KEY"))
+        self.assertEqual(google_scope, ("environment", "GOOGLE_API_KEY"))
+        self.assertEqual(gemini_scope, ("environment", "GEMINI_API_KEY"))
+        self.assertEqual(whitespace_google_scope, ("environment", "GOOGLE_API_KEY"))
+        self.assertEqual(session_scope, ("session_key",))
+        self.assertEqual(config_scope, ("config_key",))
+        self.assertNotIn("private-", repr((custom_scope, google_scope, gemini_scope)))
+
+        gemini_environment_identity = ui_app.build_model_health_identity(
+            provider="gemini",
+            model="gemini-3.5-flash",
+            connection_scope=google_scope,
+        )
+        gemini_config_identity = ui_app.build_model_health_identity(
+            provider="gemini",
+            model="gemini-3.5-flash",
+            connection_scope=config_scope,
+        )
+        ui_app.store_scoped_health_result(
+            session_state,
+            key="gemini_model_health",
+            identity=gemini_environment_identity,
+            result={
+                "ok": True,
+                "message": "healthy",
+                "message_key": "gemini_health_ok",
+                "message_args": {"model": "gemini-3.5-flash"},
+            },
+        )
+        self.assertIsNone(
+            ui_app.load_scoped_health_result(
+                session_state,
+                key="gemini_model_health",
+                identity=gemini_config_identity,
+            )
+        )
+        self.assertNotIn("gemini_model_health", session_state)
+
+        malformed_entries: tuple[object, ...] = (
+            ["not a mapping"],
+            {"ok": True},
+            {
+                "identity": ollama_identity,
+                "result": {
+                    "ok": 1,
+                    "message": "bad ok",
+                    "message_key": "health_model_ok",
+                    "message_args": {},
+                },
+            },
+            {
+                "identity": ollama_identity,
+                "result": {
+                    "ok": True,
+                    "message": "bad args",
+                    "message_key": "health_model_ok",
+                    "message_args": None,
+                },
+            },
+            {
+                "identity": ollama_identity,
+                "result": {
+                    "ok": True,
+                    "message": "missing format argument",
+                    "message_key": "health_model_ok",
+                    "message_args": {},
+                },
+            },
+        )
+        for malformed in malformed_entries:
+            with self.subTest(malformed=malformed):
+                session_state["model_health"] = malformed
+                self.assertIsNone(
+                    ui_app.load_scoped_health_result(
+                        session_state,
+                        key="model_health",
+                        identity=ollama_identity,
+                    )
+                )
+                self.assertNotIn("model_health", session_state)
+
     def test_gemini_health_check_uses_mocked_client_and_missing_key_short_circuits(self) -> None:
         import ui.app as ui_app
 
@@ -2622,6 +2870,23 @@ release_run_lock(handle)
         self.assertTrue(health["ok"])
         self.assertEqual(health["message_key"], "gemini_health_ok")
         generate.assert_called_once()
+
+        with (
+            patch.object(ui_app, "has_gemini_api_key_source", return_value=True),
+            patch.object(
+                ui_app.GeminiClient,
+                "generate",
+                side_effect=RuntimeError("private-key-from-provider"),
+            ),
+        ):
+            health = ui_app.check_gemini_model_health(
+                selected_model="gemini-3.5-flash",
+                api_key_env="GEMINI_API_KEY",
+                api_key_value="secret-key",
+            )
+
+        self.assertFalse(health["ok"])
+        self.assertNotIn("private-key-from-provider", repr(health))
 
 
 if __name__ == "__main__":

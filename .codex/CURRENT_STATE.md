@@ -4,19 +4,19 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: retain the completed, locally validated ARA-042 project/artifact-scoped UI cloud
-  cache, publish and verify it, then reassess the deferred/blocked-only queue.
+- Current goal: retain the completed, locally validated ARA-044 target-scoped UI health snapshots,
+  publish and verify them, then immediately address P1 ARA-045 credential-redaction precedence.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `6f03ec8e7c2005543d8b8dbaf20fc6d6cceaa94d` (the exact HEAD
+- State recorded against commit: `609de6c3a3993fa89339f3d225e7b122d9e796cb` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `6f03ec8e7c2005543d8b8dbaf20fc6d6cceaa94d` (exact local,
+- Last externally verified fallback: `609de6c3a3993fa89339f3d225e7b122d9e796cb` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-042 is `DONE` with focused, full-gate, and two independent
-  reviews passing locally; publication is pending. ARA-029 remains the exact external fallback at
-  `6f03ec8`, verified by push/PR runs `29180344621`/`29180345488` on Python 3.10/3.13.
+- Active task at this snapshot: none. ARA-044 is `DONE` with focused, full-gate, and two independent
+  reviews passing locally; publication is pending. ARA-042 remains the exact external fallback at
+  `609de6c`, verified by push/PR runs `29180830633`/`29180831707` on Python 3.10/3.13.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -548,17 +548,38 @@ Updated: 2026-07-12 (Asia/Shanghai)
   rewrites, blocked-to-healthy recommendation changes, unreadable recovery, and unsafe symlinks are
   covered without provider calls or artifact/schema changes.
 
+## ARA-044 Target-Scoped UI Health Snapshots
+
+- Reproduced provider-global raw health state describing an old effective model/endpoint. Added a
+  strict wrapper keyed by normalized provider/model and non-secret connection/source identity.
+- Ollama identity/error display excludes userinfo, query values, arbitrary path text, and exception
+  text; Gemini identity records only session/config/environment source labels and follows actual SDK
+  fallback order. No credential is stored or hashed.
+- Legacy, mismatched, malformed, missing-argument, and unsafe error payloads are evicted or
+  sanitized. Same-target snapshots remain compatible, and UI input/model-refresh changes clear the
+  appropriate health key.
+
 ## Remaining Steps
 
-- Publish completed ARA-042 and verify exact remote equality plus all four Python 3.10/3.13 event
+- Publish completed ARA-044 and verify exact remote equality plus all four Python 3.10/3.13 event
   jobs before recording it as the external fallback.
-- Reassess the deferred/blocked-only queue after ARA-042 remote verification; do not cross remaining
-  owner/configuration/long-task approval gates or manufacture low-value changes.
+- Start P1 ARA-045 immediately after ARA-044 remote verification; its provider-free mock reproduced
+  a used-key redaction mismatch when both built-in Gemini environment variables are populated.
 - Keep ARA-018, ARA-030, and ARA-041 behind their recorded owner/long-task approval gates; keep
-  dependency, release, wheel-smoke, and publication policy out of ARA-042.
+  dependency, release, wheel-smoke, and publication policy out of ARA-044.
 
 ## Test Status
 
+- ARA-044 pre-fix scoped health-session regression failed as expected; target/source normalization,
+  legacy/malformed/missing-argument eviction, source precedence, and secret-free error cases now
+  pass `3 passed, 8 subtests passed` provider-free.
+- ARA-044 related UI/recovery tests passed `75 passed, 30 subtests passed`; local `make check` passed
+  Ruff format/lint, imports, repository-safety self-test, worktree/staged scans, and pytest (`340
+  passed, 235 subtests passed`; 101 tracked files and zero findings). Two independent final reviews
+  returned GO.
+- ARA-042 remote verification: exact local/upstream/`ls-remote` equality at `609de6c`, ahead/behind
+  `0/0`; push run `29180830633` and pull-request run `29180831707` passed Python 3.10/3.13. All four
+  annotation sets are empty and draft PR 13 is open, mergeable, and updated.
 - ARA-042 pre-fix two-project and external same-ID cache controls failed as expected; five focused
   project/content/race/malformed/unsafe regressions now pass provider-free.
 - ARA-042 related UI/cloud-free/recovery tests passed `97 passed, 44 subtests passed`; local `make

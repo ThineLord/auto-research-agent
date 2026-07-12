@@ -660,3 +660,26 @@ Validation and implementation outcomes will be appended only after they are actu
 - Related UI/cloud-free/recovery tests passed `97 passed, 44 subtests passed`; local `make check`
   passed `339 passed, 227 subtests passed` with zero safety findings. Two independent final reviews
   returned GO; no provider call, artifact/schema migration, or ignored runtime access occurred.
+- Committed as `609de6c`, pushed with exact local/upstream/`ls-remote` equality, updated draft PR
+  13, and confirmed push run `29180830633` plus pull-request run `29180831707` passed every Python
+  3.10/3.13 job with zero annotations.
+
+## 2026-07-12 - Target-scoped UI health snapshots
+
+- Confirmed raw Ollama/Gemini health dicts remained under provider-global session keys and could be
+  displayed after changing the effective model or Ollama endpoint. The new provider-free scoped
+  snapshot regression failed before the helper existed.
+- Wrapped each result with normalized provider/model and a non-secret connection identity. Ollama
+  scope normalizes scheme/host/default port, allowlists only fixed safe path labels, redacts all
+  other path values, and records only the presence of userinfo/query. Gemini scope follows the
+  actual session/config/custom-env/Google/Gemini source order without storing or hashing key values.
+- Legacy, malformed, mismatched, unknown-message, and missing-format-argument snapshots are evicted.
+  Same-target success or failure remains visible; target/source changes disappear. Password/env
+  widget changes and Ollama model refresh explicitly invalidate their snapshots.
+- Sanitized Ollama/Gemini health errors to fixed endpoint/type details before session storage.
+  Whitespace-only Gemini password input no longer masks a valid configured key, and the same
+  resolved inline key is used by discovery, profiling, and health operations.
+- Related UI/recovery tests passed `75 passed, 30 subtests passed`; local `make check` passed `340
+  passed, 235 subtests passed` with zero safety findings. Two independent final reviews returned GO;
+  no real provider/network call, credential persistence/hash, configuration write, or artifact
+  change occurred.
