@@ -362,7 +362,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-041 - Make resume startup metadata recoverable across multi-file failure
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P2
 - Risk: high
 - Description: a failure writing `run_manifest.json` after `run_config.json` can leave only the
@@ -377,8 +377,9 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   2026-07-12; do not fold in unrelated resume validation, artifact schema, or provider behavior.
 - Progress: the red regression, fixed hidden-journal protocol, crash/rollback/write-point matrix,
   related `90 passed, 103 subtests passed` regression, and user/developer recovery documentation are
-  committed as `2480a61`. Independent review and full `make check` are green; GitHub publication
-  and remote CI closeout remain.
+  committed as `2480a61`; validation state is `877562e`. Independent review and full `make check`
+  are green, exact remote equality is verified, and push/PR runs `29187626378`/`29187628011`
+  passed Python 3.10/3.13 with zero annotations.
 
 ## ARA-042 - Scope and refresh UI cloud-free session caches
 

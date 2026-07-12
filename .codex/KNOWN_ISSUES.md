@@ -335,13 +335,14 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-041 - Resume startup metadata can split across generations
 
-- Status: fix implemented locally; validation and publication in progress
+- Status: fixed, pushed, and CI-verified
 - Severity: P2 recovery consistency
 - Impact: a manifest write failure after config replacement leaves only `run_config.json` claiming
   a new running resume session although no agent ran and other state remains old.
-- Current action: validate and publish the fixed config/manifest journal protocol. Local
-  write-point, crash-state, interrupted-rollback, legacy, invalid-journal, and unsafe-leaf coverage
-  is green; full validation and remote CI remain.
+- Resolution: the fixed config/manifest journal protocol restores pre-commit failures and surviving
+  partial states before logging or agent work. Write-point, crash-state, interrupted-rollback,
+  legacy, invalid-journal, unsafe-leaf, local full-gate, and Python 3.10/3.13 remote CI coverage is
+  green through `877562e`.
 
 ## KI-042 - UI cloud-free session cache is not project or artifact scoped
 

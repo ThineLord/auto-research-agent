@@ -46,17 +46,14 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-ARA-041 is `IN_PROGRESS` with explicit owner approval. Implementation commit `2480a61` uses
-`.resume_startup_transaction.json` to restore the exact prior config/manifest generation before a
-retry; the recovery-state checkpoint may still be pending commit. Inspect live Git status and the six
-`.codex` files before editing. Re-run the ARA-041 targeted selector first; it last passed `8 passed, 50
-deselected, 20 subtests passed`, and related runner/config/storage tests passed `90 passed, 103
-subtests passed`. Then run `make check`; do not access ignored runtime or invoke a real provider.
-ARA-045's final closeout `510ef84` is exact local/upstream/`ls-remote` equal, reflected in
-draft PR 13, and verified by push/PR runs `29182427059`/`29182428029` on Python 3.10/3.13 with zero
-annotations. Resume from the semantic checkpoint in `CURRENT_STATE.md`; use
-`510ef848a8fde3a27a80804aced78d5437175d1e` as the conservative exact externally verified fallback
-if the semantic current `HEAD` has not yet been checked.
+There is no unblocked implementation task. ARA-041 is complete through remote-equal checkpoint
+`877562e`; implementation `2480a61` uses `.resume_startup_transaction.json` to restore the exact
+prior config/manifest generation before a retry. Push/PR runs `29187626378`/`29187628011` passed
+Python 3.10/3.13 with zero annotations, and draft PR 13 remains open, draft, and mergeable. Resume
+from the semantic checkpoint in `CURRENT_STATE.md`; use
+`877562ea2b82e4ff012a1a908ba25ee9d180b6de` as the conservative exact externally verified fallback
+if the semantic current `HEAD` has not yet been checked. Do not access ignored runtime or invoke a
+real provider merely to verify recovery.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
 it imported the editable checkout and advanced ignored `projects/example` state after a missing
@@ -73,9 +70,9 @@ The last successful local full validation command was:
 make check
 ```
 
-The current full expected result is Ruff/import/safety success and `346 passed, 246 subtests
-passed`; ARA-045 focused LLM/cloud/security validation passes `53 passed, 33 subtests passed`, and
-the related UI/LLM/cloud/recovery layer passes `116 passed, 61 subtests passed`.
+The current full expected result is Ruff/import/safety success and `353 passed, 262 subtests
+passed`; ARA-041's targeted matrix passes `8 passed, 50 deselected, 20 subtests passed`, and the
+related runner/config/storage layer passes `90 passed, 103 subtests passed`.
 Both safety modes should scan only tracked/staged files with zero findings.
 Resolve `HEAD`, compare it with upstream and `ls-remote`, and inspect current PR checks before
 starting another task. If the current HEAD lacks successful remote evidence, use
@@ -93,7 +90,7 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-ARA-041 is the only `IN_PROGRESS` task. ARA-018 requires an explicit owner license/distribution
+There is no unblocked implementation task. ARA-018 requires an explicit owner license/distribution
 decision and ARA-030 still requires separate greater-than-30-minute approval. Do not start ARA-019,
 ARA-026, ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 

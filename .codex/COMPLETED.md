@@ -709,3 +709,23 @@ Validation and implementation outcomes will be appended only after they are actu
 - Pushed final remote-verification state closeout `510ef84`; push run `29182427059` and pull-request
   run `29182428029` passed every Python 3.10/3.13 job with zero annotations, and draft PR 13 was
   updated with exact readback at the final HEAD.
+
+## 2026-07-12 - Recoverable resume startup metadata
+
+- Reproduced `run_config.json` advancing to a new running resume session when the following
+  `run_manifest.json` write failed before any agent ran.
+- Added a fixed hidden write-ahead journal for the two existing-run startup files. It stores exact
+  prior text and before/after SHA-256 values, restores pre-commit failures idempotently, recovers a
+  surviving journal before logging or agent work, and fails closed on malformed/conflicting state.
+- Covered journal/config/manifest writes, `KeyboardInterrupt`, unlink-before/after failures,
+  interrupted rollback and retry, every reachable mixed disk generation, legacy missing/sparse
+  artifacts, external hash conflicts, unsafe journal leaves, no-agent/no-log guarantees, and the
+  unchanged new-run write order.
+- Documented provider/client initialization ordering, unlink commit semantics, zero-work sessions,
+  parent-directory durability limits, and the cooperative-lock same-UID TOCTOU boundary.
+- Targeted tests passed `8 passed, 50 deselected, 20 subtests passed`; related runner/config/storage
+  tests passed `90 passed, 103 subtests passed`; local `make check` passed `353 passed, 262 subtests
+  passed` with zero safety findings. Two independent reviews and focused re-reviews were green.
+- Committed implementation/docs/tests/changelog as `2480a61` and validation state as `877562e`.
+  Exact local/upstream/`ls-remote` equality was verified; push run `29187626378` and pull-request run
+  `29187628011` passed Python 3.10/3.13 with zero annotations.

@@ -4,22 +4,20 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: complete owner-approved P2 ARA-041 by making resume startup metadata recoverable
-  across every multi-file write failure before any agent invocation.
+- Current goal: preserve the remote-verified ARA-041 recovery checkpoint and wait for the next
+  owner-approved maintenance scope.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `510ef848a8fde3a27a80804aced78d5437175d1e` (the exact
+- State recorded against commit: `877562ea2b82e4ff012a1a908ba25ee9d180b6de` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `510ef848a8fde3a27a80804aced78d5437175d1e` (exact local,
+- Last externally verified fallback: `877562ea2b82e4ff012a1a908ba25ee9d180b6de` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: ARA-041 is `IN_PROGRESS` with explicit owner approval. The startup
-  journal implementation, public recovery documentation, changelog, and provider-free fault matrix
-  are committed as `2480a61b5a769f13eead82cf6f5d74a855ee7371`; only the ARA-041 recovery-state
-  checkpoint is pending commit before publication. ARA-045's last externally verified fallback
-  remains `510ef84`.
+- Active task at this snapshot: none. ARA-041 is complete through remote-equal checkpoint
+  `877562e`; push/PR runs `29187626378`/`29187628011` passed Python 3.10/3.13 with zero
+  annotations. The queue has no `TODO` task; deferred and blocked work retains its approval gates.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -575,10 +573,8 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Remaining Steps
 
-- Commit this ARA-041 recovery-state checkpoint, push it with implementation `2480a61`, update draft
-  PR 13, and verify exact remote equality plus Python 3.10/3.13 push/PR CI.
-- Keep ARA-018 and ARA-030 behind their separate owner/policy approval gates; keep provider,
-  release, packaging, scoring, and artifact-schema work out of ARA-041.
+- There is no unblocked implementation task. Keep ARA-018 and ARA-030 behind their separate owner
+  or policy approval gates, and preserve all recorded dependencies for deferred work.
 
 ## Test Status
 
@@ -593,8 +589,10 @@ Updated: 2026-07-12 (Asia/Shanghai)
 - ARA-041 final local `make check` passes Ruff format/lint, imports, repository-safety self/worktree/
   staged scans, and pytest (`353 passed, 262 subtests passed`; 101 tracked files and zero findings).
   Two independent final reviews and their focused re-reviews report no blockers.
-- ARA-041 implementation, tests, changelog, and public guides are committed as `2480a61`; remote
-  publication and CI verification have not yet been claimed.
+- ARA-041 implementation `2480a61` and validation checkpoint `877562e` are pushed with exact
+  local/upstream/`ls-remote` equality. Push run `29187626378` and pull-request run `29187628011`
+  passed Python 3.10/3.13; all four annotation sets are empty. Draft PR 13 remains open, draft, and
+  mergeable.
 - One attempted related-suite command named nonexistent `tests/test_resume.py` and exited 4 before
   collection; the corrected command used the repository's actual three test files and passed.
 - ARA-041 startup baseline: local `make check` passed Ruff format/lint, imports, repository-safety
@@ -1178,7 +1176,9 @@ Updated: 2026-07-12 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-make check
+git status --short --branch
+git log --oneline --decorate -n 10
+.venv/bin/python -m pytest -q tests/test_recovery_state.py
 ```
 
 ## Interruption Recovery
