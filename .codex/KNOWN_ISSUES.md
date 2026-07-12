@@ -387,7 +387,7 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-045 - Gemini redaction can select a different built-in key than the SDK
 
-- Status: fixed and locally validated at `938b9a2`; publication verification pending
+- Status: fixed, pushed, and CI-verified through `47c0c26`
 - Severity: P1 credential disclosure
 - Impact: with both `GOOGLE_API_KEY` and `GEMINI_API_KEY` set, the SDK uses the Google key while the
   wrapper records the Gemini key as the known secret. An echoed Google key can therefore survive in

@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-12T14:10:24+08:00",
+  "recorded_at": "2026-07-12T14:16:24+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "dbf8e24e0d8a3efffa1fba7475aeaaa663404ad6",
-  "last_known_stable_commit": "dbf8e24e0d8a3efffa1fba7475aeaaa663404ad6",
+  "head_commit": "47c0c26b7fd65a9d83ab2f8f9b195a9989203296",
+  "last_known_stable_commit": "47c0c26b7fd65a9d83ab2f8f9b195a9989203296",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "dbf8e24e0d8a3efffa1fba7475aeaaa663404ad6",
+  "state_recorded_against_commit": "47c0c26b7fd65a9d83ab2f8f9b195a9989203296",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-12T13:42:05+08:00",
-    "commit": "dbf8e24e0d8a3efffa1fba7475aeaaa663404ad6",
+    "verified_at": "2026-07-12T14:14:37+08:00",
+    "commit": "47c0c26b7fd65a9d83ab2f8f9b195a9989203296",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29181528872,
+        "run_id": 29182280005,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "dbf8e24e0d8a3efffa1fba7475aeaaa663404ad6",
+        "head_sha": "47c0c26b7fd65a9d83ab2f8f9b195a9989203296",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29181529568,
+        "run_id": 29182281056,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "dbf8e24e0d8a3efffa1fba7475aeaaa663404ad6",
+        "head_sha": "47c0c26b7fd65a9d83ab2f8f9b195a9989203296",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,45 @@
       }
     }
   },
-  "status": "ara045_local_complete_pending_publication",
+  "status": "ara045_remote_complete_no_active_task",
   "commands": [
+    {
+      "command": "ARA-045 remote-closeout JSON, recovery-state, and diff reconciliation",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "json_valid": true,
+        "pytest_tests_passed": 6,
+        "pytest_subtests_passed": 1,
+        "remote_evidence_consistent": true,
+        "no_active_or_todo_task": true,
+        "diff_check": "passed"
+      }
+    },
+    {
+      "command": "ARA-045 push, remote equality, CI, annotation, and draft PR verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "verified_commit": "47c0c26b7fd65a9d83ab2f8f9b195a9989203296",
+        "implementation_commit": "938b9a20b22dff9e14600b026338090b1b0563eb",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29182280005,
+        "pull_request_run_id": 29182281056,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "job_annotations": 0,
+        "draft_pr_13_updated": true,
+        "draft_pr_body_readback_exact": true,
+        "draft_pr_open": true,
+        "draft_pr_mergeable": true
+      }
+    },
     {
       "command": ".venv/bin/python -m json.tool .codex/LAST_VALIDATION.json plus pytest tests/test_recovery_state.py and git diff --check after ARA-045 state reconciliation",
       "exit_code": 0,
@@ -2360,7 +2397,7 @@
     }
   ],
   "notes": [
-    "ARA-045 is locally complete at implementation commit 938b9a2 after provider-free source, event, exception-graph, client-initialization, and cloud-discovery redaction validation plus two independent GO reviews; push and CI remain.",
+    "ARA-045 is complete at remote-equal state checkpoint 47c0c26 with implementation commit 938b9a2, successful push and pull-request CI runs 29182280005 and 29182281056 on Python 3.10 and 3.13, zero annotations, and exact draft PR body readback.",
     "ARA-044 is complete at remote-equal commit dbf8e24 with successful push and pull-request CI runs 29181528872 and 29181529568 on Python 3.10 and 3.13 and zero job annotations.",
     "ARA-045 preserves explicit/custom direct injection and google-genai built-in delegation with Google-before-Gemini raw-truthiness semantics; a same-process environment mutation between snapshot and SDK construction remains a documented non-blocking boundary.",
     "ARA-042 is complete at remote-equal commit 609de6c with successful push and pull-request CI runs 29180830633 and 29180831707 on Python 3.10 and 3.13 and zero job annotations.",

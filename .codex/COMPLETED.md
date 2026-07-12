@@ -702,5 +702,7 @@ Validation and implementation outcomes will be appended only after they are actu
   UI/LLM/cloud/recovery tests passed `116 passed, 61 subtests passed`; final local `make check`
   passed `346 passed, 246 subtests passed` with zero repository-safety findings. Two independent
   final reviews returned GO and no real provider or ignored runtime artifact was accessed.
-- Committed the implementation, tests, and changelog as `938b9a2`; remote push, CI, and draft-PR
-  verification remain the only publication steps.
+- Committed the implementation, tests, and changelog as `938b9a2` and recovery state as `47c0c26`.
+  Pushed with exact local/upstream/`ls-remote` equality, updated draft PR 13 with exact body readback,
+  and confirmed push run `29182280005` plus pull-request run `29182281056` passed every Python
+  3.10/3.13 job with zero annotations.

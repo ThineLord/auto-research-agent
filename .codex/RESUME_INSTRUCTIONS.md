@@ -46,15 +46,13 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-ARA-045 is `DONE` locally at implementation commit `938b9a2`; its provider-free source matrix,
-event/public/cause/context/client-init/discovery redaction tests, two independent reviews, and final
-`make check` pass. Resume by validating and committing the tracked recovery-state files, then push
-both ARA-045 commits, verify exact remote equality, wait for push/PR CI, and update draft PR 13. Do
-not repeat pre-fix credential probes, make a real provider request, or output credential values.
-ARA-044 remains the last externally verified checkpoint at `dbf8e24`, reflected in draft PR 13 and
-verified by push/PR runs `29181528872`/`29181529568` on Python 3.10/3.13 with zero annotations.
-Resume from the semantic checkpoint in `CURRENT_STATE.md`; use
-`dbf8e24e0d8a3efffa1fba7475aeaaa663404ad6` as the conservative exact externally verified fallback
+ARA-045 is `DONE`, pushed through state checkpoint `47c0c26`, exact local/upstream/`ls-remote`
+equal, reflected in draft PR 13, and verified by push/PR runs `29182280005`/`29182281056` on Python
+3.10/3.13 with zero annotations. Its provider-free source matrix, event/public/cause/context/client-
+init/discovery redaction tests, two independent reviews, and final `make check` pass. Do not repeat
+pre-fix credential probes, make a real provider request, or output credential values. Resume from
+the semantic checkpoint in `CURRENT_STATE.md`; use
+`47c0c26b7fd65a9d83ab2f8f9b195a9989203296` as the conservative exact externally verified fallback
 if the semantic current `HEAD` has not yet been checked.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:

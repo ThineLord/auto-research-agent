@@ -4,19 +4,19 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: publish and remotely verify the locally completed P1 ARA-045 Gemini
-  effective-credential and exception-message redaction fix.
+- Current goal: preserve the remotely verified ARA-045 checkpoint and wait for owner approval or a
+  new evidence-backed maintenance task; no implementation task is active.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `938b9a20b22dff9e14600b026338090b1b0563eb` (the exact HEAD
+- State recorded against commit: `47c0c26b7fd65a9d83ab2f8f9b195a9989203296` (the exact HEAD
   observed immediately before this additive state snapshot).
-- Last externally verified fallback: `dbf8e24e0d8a3efffa1fba7475aeaaa663404ad6` (exact local,
+- Last externally verified fallback: `47c0c26b7fd65a9d83ab2f8f9b195a9989203296` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-045 is `DONE` locally at implementation commit `938b9a2`
-  after two independent GO reviews and final `make check`; remote publication state must be resolved
-  live. ARA-044 remains the last externally verified fallback at `dbf8e24`.
+- Active task at this snapshot: none. ARA-045 is `DONE`, pushed through state checkpoint `47c0c26`,
+  exact local/upstream/remote equal, reflected in draft PR 13, and verified by push/PR runs
+  `29182280005`/`29182281056` on Python 3.10/3.13 with zero annotations.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -572,13 +572,17 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Remaining Steps
 
-- ARA-045 has no remaining implementation or local validation step in this snapshot; resolve remote
-  synchronization, CI, and draft-PR publication state live without any provider request.
+- ARA-045 has no remaining implementation, validation, synchronization, CI, or draft-PR step in
+  this snapshot. Resolve live state before any future task and do not make a provider request merely
+  to reconfirm the verified result.
 - Keep ARA-018, ARA-030, and ARA-041 behind their recorded owner/long-task approval gates; keep
   dependency, release, wheel-smoke, and publication policy out of ARA-045.
 
 ## Test Status
 
+- ARA-045 remote verification: exact local/upstream/`ls-remote` equality at `47c0c26`, ahead/behind
+  `0/0`; push run `29182280005` and pull-request run `29182281056` passed Python 3.10/3.13. All four
+  annotation sets are empty and draft PR 13 is open, mergeable, and updated with exact body readback.
 - ARA-045 pre-fix provider-free controls failed in the expected dual-built-in event, effective-key,
   hidden-context, client-construction, whitespace-source, and discovery-redaction cases.
 - ARA-045 focused LLM/cloud/security tests pass `53 passed, 33 subtests passed`; related
@@ -986,7 +990,9 @@ Updated: 2026-07-12 (Asia/Shanghai)
   before the final full gate.
 - The first ARA-045 recovery-state validation correctly rejected a completed task described as
   active, recursive closeout wording without an active task, and legacy SHA fields pointing away
-  from the unique externally verified fallback; the state contract was corrected before staging.
+  from the unique externally verified fallback. The remote closeout validation also rejected a
+  negated completion sentence containing a reserved finalization term; both state-contract wording
+  issues were corrected before staging.
 - The initial ARA-043 blocking-profile regression failed four subtests as expected because each
   excluded candidate was immediately returned by the no-scored seed fallback.
 - Independent ARA-043 review found the Quality fast path and `choose_fallback_model` could bypass the
@@ -1149,9 +1155,10 @@ Updated: 2026-07-12 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git add .codex/COMPLETED.md .codex/CURRENT_STATE.md .codex/DECISIONS.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md .codex/TASK_QUEUE.md
-.venv/bin/python scripts/check_repo_safety.py --staged
-git commit -m "chore: record ARA-045 validation"
+git status --short --branch
+git rev-parse --verify HEAD
+.venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
+.venv/bin/python -m pytest -q tests/test_recovery_state.py
 ```
 
 ## Interruption Recovery
