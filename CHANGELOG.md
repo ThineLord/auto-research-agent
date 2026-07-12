@@ -10,9 +10,11 @@
   CI validation scan only files reported by `git ls-files` for personal home paths, high-confidence
   provider/token shapes, and private-key headers without echoing matched values or reading ignored
   runtime artifacts.
-* Provider event messages and displayed Gemini exception tracebacks now redact the exact configured
-  API key, including credentials supplied through a custom environment variable, even when the
-  upstream error echoes a key that does not match a known token pattern.
+* Gemini credential handling now resolves one request-scoped source across explicit configuration,
+  custom environment variables, and the SDK's `GOOGLE_API_KEY`-before-`GEMINI_API_KEY` precedence.
+  Provider events, public exception messages, linked cause/context messages,
+  client-construction failures, and cloud discovery diagnostics redact every captured candidate
+  before persistence or truncation, including keys that do not match a known token pattern.
 * Resume now accepts only canonical absolute per-run directories directly under the selected
   project's `runs/` directory. Cross-project, relative, traversal, non-directory, and escaping
   root paths fail closed before inspecting that directory. Resume-consumed run config, legacy

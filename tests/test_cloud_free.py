@@ -9,6 +9,7 @@ from unittest.mock import patch
 from rich.console import Console
 
 import src.cli as cli_module
+import src.llm as llm_module
 from src.cloud_free import (
     FREE_RUNNER_AUTO,
     FREE_RUNNER_QUALITY,
@@ -118,8 +119,9 @@ class CloudFreePolicyTests(unittest.TestCase):
         ):
             with self.subTest(error=lazy_error.__class__.__name__):
                 wrapper = SimpleNamespace(
-                    _ensure_api_key_available=lambda: None,
-                    _create_client=lambda: SimpleNamespace(
+                    _resolve_api_key=lambda: SimpleNamespace(known_secrets=(secret,)),
+                    _ensure_api_key_available=lambda _credential=None: None,
+                    _create_client=lambda _credential=None: SimpleNamespace(
                         models=SimpleNamespace(list=lambda: FailingPager(lazy_error))
                     ),
                 )
@@ -136,8 +138,9 @@ class CloudFreePolicyTests(unittest.TestCase):
 
         legacy_wrapper = SimpleNamespace(models=[SimpleNamespace(name="models/gemini-3.5-flash")])
         wrapper = SimpleNamespace(
-            _ensure_api_key_available=lambda: None,
-            _create_client=lambda: SimpleNamespace(
+            _resolve_api_key=lambda: SimpleNamespace(known_secrets=(secret,)),
+            _ensure_api_key_available=lambda _credential=None: None,
+            _create_client=lambda _credential=None: SimpleNamespace(
                 models=SimpleNamespace(list=lambda: legacy_wrapper)
             ),
         )
@@ -149,6 +152,99 @@ class CloudFreePolicyTests(unittest.TestCase):
 
         self.assertEqual([model.model_id for model in discovered], ["gemini-3.5-flash"])
         self.assertEqual(error, "")
+
+    def test_model_discovery_redacts_effective_environment_key_before_truncation(
+        self,
+    ) -> None:
+        cases = (
+            (
+                "short-custom",
+                {"CUSTOM_PROVIDER_KEY": "xyz"},
+                "CUSTOM_PROVIDER_KEY",
+                "xyz",
+                "xyz",
+            ),
+            (
+                "custom",
+                {
+                    "CUSTOM_PROVIDER_KEY": (
+                        "discovery-custom-credential-with-an-unrecognized-shape"
+                    ),
+                    "GOOGLE_API_KEY": "unused-google-credential",
+                    "GEMINI_API_KEY": "unused-gemini-credential",
+                },
+                "CUSTOM_PROVIDER_KEY",
+                "discovery-custom-credential-with-an-unrecognized-shape",
+                "discovery-custom-credential-with-an-unrecognized-shape",
+            ),
+            (
+                "both-builtins",
+                {
+                    "GOOGLE_API_KEY": ("discovery-google-credential-with-an-unrecognized-shape"),
+                    "GEMINI_API_KEY": ("discovery-gemini-credential-with-an-unrecognized-shape"),
+                },
+                "GEMINI_API_KEY",
+                "discovery-google-credential-with-an-unrecognized-shape",
+                "discovery-google-credential-with-an-unrecognized-shape",
+            ),
+            (
+                "overlapping-candidates",
+                {
+                    "CUSTOM_PROVIDER_KEY": "overlap-credential",
+                    "GOOGLE_API_KEY": "overlap-credential-long-tail",
+                },
+                "CUSTOM_PROVIDER_KEY",
+                "overlap-credential",
+                "overlap-credential-long-tail",
+            ),
+        )
+
+        for case_name, environment, api_key_env, expected_key, echoed_key in cases:
+            with self.subTest(case=case_name):
+                selected_key = ""
+
+                class FailingClient:
+                    def __init__(self, **kwargs):
+                        nonlocal selected_key
+                        selected_key = (
+                            kwargs.get("api_key")
+                            or llm_module.os.environ.get("GOOGLE_API_KEY")
+                            or llm_module.os.environ.get("GEMINI_API_KEY")
+                            or ""
+                        )
+                        self.models = SimpleNamespace(list=self.list_models)
+
+                    def list_models(self):
+                        raise RuntimeError("x" * 210 + echoed_key)
+
+                fake_genai = SimpleNamespace(Client=FailingClient)
+                with (
+                    patch.object(
+                        llm_module,
+                        "_load_google_genai",
+                        return_value=(fake_genai, SimpleNamespace()),
+                    ),
+                    patch.dict(llm_module.os.environ, environment, clear=True),
+                ):
+                    discovered, error = discover_free_cloud_models(
+                        api_key_env=api_key_env,
+                    )
+
+                self.assertEqual(discovered, [])
+                self.assertTrue(selected_key == expected_key, "fake SDK selected wrong key")
+                leak_probe = (
+                    echoed_key.removeprefix(expected_key)
+                    if echoed_key != expected_key and echoed_key.startswith(expected_key)
+                    else echoed_key[:12]
+                )
+                self.assertFalse(
+                    leak_probe in error,
+                    "discovery error retained a captured credential fragment",
+                )
+                self.assertTrue(
+                    "[redacted-api-key]" in error,
+                    "discovery error was truncated before credential redaction",
+                )
 
     def test_model_discovery_metadata_handles_missing_fields(self) -> None:
         info = model_info_from_sdk_model(SimpleNamespace(name="models/gemma-3-1b-it"))

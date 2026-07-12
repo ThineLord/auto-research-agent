@@ -407,8 +407,12 @@ def build_cached_candidate_pool(
     return [candidate for candidate in configured_candidates if candidate.model_id in profiled_ids]
 
 
-def _safe_error_message(exc: BaseException) -> str:
-    text = str(exc) or exc.__class__.__name__
+def _safe_error_message(
+    exc: BaseException,
+    *,
+    secrets: Sequence[str] = (),
+) -> str:
+    text = _redact_known_secrets(str(exc) or exc.__class__.__name__, secrets)
     text = re.sub(r"AIza[0-9A-Za-z_\-]{20,}", "[redacted-api-key]", text)
     text = re.sub(r"(?i)(api[_ -]?key|key|token)=['\"]?[^'\"\s,;]+", r"\1=[redacted]", text)
     text = re.sub(r"\s+", " ", text).strip()
@@ -417,10 +421,9 @@ def _safe_error_message(exc: BaseException) -> str:
 
 def _redact_known_secrets(text: str, secrets: Sequence[str]) -> str:
     redacted = text
-    for secret in secrets:
-        secret = str(secret or "").strip()
-        if len(secret) >= 4:
-            redacted = redacted.replace(secret, "[redacted-api-key]")
+    known_secrets = {str(secret or "").strip() for secret in secrets}
+    for secret in sorted(known_secrets - {""}, key=len, reverse=True):
+        redacted = redacted.replace(secret, "[redacted-api-key]")
     return redacted
 
 
@@ -1068,13 +1071,20 @@ def discover_free_cloud_models(
     config: CloudFreeConfig | None = None,
 ) -> tuple[list[CloudModelInfo], str]:
     config = config or CloudFreeConfig()
+    known_secrets = (api_key,)
     try:
         client_wrapper = _create_genai_client(api_key_env=api_key_env, api_key=api_key)
-        client_wrapper._ensure_api_key_available()  # noqa: SLF001 - shared internal key resolver.
-        client = client_wrapper._create_client()  # noqa: SLF001 - keeps API key handling centralized.
+        credential = client_wrapper._resolve_api_key()  # noqa: SLF001 - shared key snapshot.
+        known_secrets = credential.known_secrets
+        client_wrapper._ensure_api_key_available(  # noqa: SLF001 - shared key resolver.
+            credential
+        )
+        client = client_wrapper._create_client(  # noqa: SLF001 - centralized key handling.
+            credential
+        )
         raw_models = client.models.list()
     except Exception as exc:  # noqa: BLE001
-        return [], _redact_known_secrets(_safe_error_message(exc), (api_key,))
+        return [], _safe_error_message(exc, secrets=known_secrets)
 
     try:
         try:
