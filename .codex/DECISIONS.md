@@ -468,3 +468,22 @@
   truncated.
 - Compatibility: preserve SDK built-in credential delegation, raw environment truthiness, timeout,
   request/event classification, retry behavior, and public error types. Validation is provider-free.
+
+## 2026-07-12 - Recover resume startup metadata as one generation
+
+- Decision: for an existing-run resume only, atomically prepare a fixed hidden journal containing
+  the exact prior `run_config.json`/`run_manifest.json` text plus before/after SHA-256 values, replace
+  both canonical files, and use journal unlink as the commit point before logging `run_start`.
+- Recovery: ordinary exceptions, `KeyboardInterrupt`, interrupted rollback, and a surviving journal
+  restore the exact prior generation idempotently. A missing journal after an unlink-side exception
+  is recovered from the in-memory transaction. Unknown hashes, changed journals, malformed content,
+  and unsafe leaves fail closed without overwriting external changes.
+- Commit semantics: journal unlink marks the resume session started. A hard termination after unlink
+  but before `run_start` logging can retain a complete zero-work session; the next resume preserves
+  it as a started attempt rather than rolling back one canonical file. Detected external changes fail
+  closed, but the cooperative project lock is not a hostile same-UID sandbox across hash/restore.
+- Compatibility: preserve schema-v1 config behavior, schema-less/sparse legacy manifests, unknown
+  manifest fields, missing legacy artifacts, run IDs, histories, checkpoints, and provider-free
+  fail-before-agent behavior. New-run writes remain ordinary single-file atomic replacements.
+- Boundary: this is a two-file startup recovery protocol, not a schema migration, cross-round
+  transaction, or sudden-power-loss guarantee; parent directories are not fsynced.

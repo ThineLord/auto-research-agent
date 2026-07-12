@@ -375,6 +375,10 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Commit required: yes.
 - Dependencies: owner approved the greater-than-30-minute cross-file transaction work on
   2026-07-12; do not fold in unrelated resume validation, artifact schema, or provider behavior.
+- Progress: the red regression, fixed hidden-journal protocol, crash/rollback/write-point matrix,
+  related `90 passed, 103 subtests passed` regression, and user/developer recovery documentation are
+  committed as `2480a61`. Independent review and full `make check` are green; GitHub publication
+  and remote CI closeout remain.
 
 ## ARA-042 - Scope and refresh UI cloud-free session caches
 

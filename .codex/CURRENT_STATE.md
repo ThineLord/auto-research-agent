@@ -9,14 +9,17 @@ Updated: 2026-07-12 (Asia/Shanghai)
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `510ef848a8fde3a27a80804aced78d5437175d1e` (the exact HEAD
-  observed immediately before this additive state snapshot).
+- State recorded against commit: `510ef848a8fde3a27a80804aced78d5437175d1e` (the exact
+  externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
+  live).
 - Last externally verified fallback: `510ef848a8fde3a27a80804aced78d5437175d1e` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: ARA-041 is `IN_PROGRESS` with explicit owner approval. ARA-045's
-  final state closeout `510ef84` is exact local/upstream/remote equal, reflected in draft PR 13, and
-  verified by push/PR runs `29182427059`/`29182428029` on Python 3.10/3.13 with zero annotations.
+- Active task at this snapshot: ARA-041 is `IN_PROGRESS` with explicit owner approval. The startup
+  journal implementation, public recovery documentation, changelog, and provider-free fault matrix
+  are committed as `2480a61b5a769f13eead82cf6f5d74a855ee7371`; only the ARA-041 recovery-state
+  checkpoint is pending commit before publication. ARA-045's last externally verified fallback
+  remains `510ef84`.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -572,15 +575,28 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Remaining Steps
 
-- Build ARA-041's provider-free per-write fault matrix around the exact resume startup sequence and
-  record the current split-generation behavior before changing production code.
-- Implement the smallest compatible recovery boundary, prove subsequent resume behavior, run
-  related/full validation and independent review, then publish through draft PR 13.
+- Commit this ARA-041 recovery-state checkpoint, push it with implementation `2480a61`, update draft
+  PR 13, and verify exact remote equality plus Python 3.10/3.13 push/PR CI.
 - Keep ARA-018 and ARA-030 behind their separate owner/policy approval gates; keep provider,
   release, packaging, scoring, and artifact-schema work out of ARA-041.
 
 ## Test Status
 
+- ARA-041 pre-fix manifest-write regression failed as expected before production changes. The
+  implemented fault matrix now passes `8 passed, 50 deselected, 20 subtests passed`, covering
+  journal prepare, config/manifest replacement, `KeyboardInterrupt`, cleanup failure before and
+  after unlink, interrupted rollback, journal-only/config-only/pair crash snapshots, legacy missing
+  artifacts, invalid/conflicting journals, an unsafe transaction symlink, and unchanged new-run
+  startup ordering.
+- ARA-041 related runner/config/storage regression passes `90 passed, 103 subtests passed`. Ruff on
+  both changed Python files and `git diff --check` pass. No agent/provider was invoked.
+- ARA-041 final local `make check` passes Ruff format/lint, imports, repository-safety self/worktree/
+  staged scans, and pytest (`353 passed, 262 subtests passed`; 101 tracked files and zero findings).
+  Two independent final reviews and their focused re-reviews report no blockers.
+- ARA-041 implementation, tests, changelog, and public guides are committed as `2480a61`; remote
+  publication and CI verification have not yet been claimed.
+- One attempted related-suite command named nonexistent `tests/test_resume.py` and exited 4 before
+  collection; the corrected command used the repository's actual three test files and passed.
 - ARA-041 startup baseline: local `make check` passed Ruff format/lint, imports, repository-safety
   self/worktree/staged scans, and pytest (`346 passed, 246 subtests passed`; 101 tracked files and
   zero findings). No provider call or ignored runtime access occurred.
@@ -1162,9 +1178,7 @@ Updated: 2026-07-12 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-sed -n '700,1020p' src/runner.py
-sed -n '1450,1690p' tests/test_round_loop.py
-.venv/bin/python -m pytest -q tests/test_recovery_state.py
+make check
 ```
 
 ## Interruption Recovery
@@ -1204,4 +1218,7 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - ARA-041 received explicit owner approval on 2026-07-12. Preserve existing run IDs, manifest
   provenance, resume histories, atomic single-file writes, and fail-before-agent behavior; do not
   introduce a silent schema migration or treat a partially started session as completed work.
+- ARA-041's journal covers only the existing-run startup pair `run_config.json` and
+  `run_manifest.json`. It deliberately does not claim sudden-power-loss durability or transactional
+  checkpoint/history/per-round writes; do not widen that scope during closeout.
 - Do not stage with `git add -A`; stage only reviewed paths.

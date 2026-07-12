@@ -46,11 +46,13 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-ARA-041 is `IN_PROGRESS` with explicit owner approval. Resume by inspecting the exact startup write
-sequence in `src/runner.py`, the existing resume fixtures in `tests/test_round_loop.py`, and any
-uncommitted fault-matrix changes before modifying production code. Re-run the smallest affected
-fault case first and verify no agent was invoked. Do not access ignored runtime or invoke a real
-provider. ARA-045's final closeout `510ef84` is exact local/upstream/`ls-remote` equal, reflected in
+ARA-041 is `IN_PROGRESS` with explicit owner approval. Implementation commit `2480a61` uses
+`.resume_startup_transaction.json` to restore the exact prior config/manifest generation before a
+retry; the recovery-state checkpoint may still be pending commit. Inspect live Git status and the six
+`.codex` files before editing. Re-run the ARA-041 targeted selector first; it last passed `8 passed, 50
+deselected, 20 subtests passed`, and related runner/config/storage tests passed `90 passed, 103
+subtests passed`. Then run `make check`; do not access ignored runtime or invoke a real provider.
+ARA-045's final closeout `510ef84` is exact local/upstream/`ls-remote` equal, reflected in
 draft PR 13, and verified by push/PR runs `29182427059`/`29182428029` on Python 3.10/3.13 with zero
 annotations. Resume from the semantic checkpoint in `CURRENT_STATE.md`; use
 `510ef848a8fde3a27a80804aced78d5437175d1e` as the conservative exact externally verified fallback

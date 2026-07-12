@@ -335,12 +335,13 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-041 - Resume startup metadata can split across generations
 
-- Status: confirmed; owner-approved ARA-041 implementation in progress
+- Status: fix implemented locally; validation and publication in progress
 - Severity: P2 recovery consistency
 - Impact: a manifest write failure after config replacement leaves only `run_config.json` claiming
   a new running resume session although no agent ran and other state remains old.
-- Current action: reproduce every startup write-point failure, choose the smallest compatible
-  recoverable transaction boundary, and verify no unstarted resume session remains authoritative.
+- Current action: validate and publish the fixed config/manifest journal protocol. Local
+  write-point, crash-state, interrupted-rollback, legacy, invalid-journal, and unsafe-leaf coverage
+  is green; full validation and remote CI remain.
 
 ## KI-042 - UI cloud-free session cache is not project or artifact scoped
 
