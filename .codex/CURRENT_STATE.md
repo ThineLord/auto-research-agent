@@ -4,19 +4,19 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: preserve the remote-verified ARA-057 argument dependency boundary, then continue
-  with the highest-priority queued task ARA-053.
+- Current goal: complete ARA-053 by eliminating equal-length private Ollama path collisions in
+  target-scoped health identity without storing path or credential material.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `eabedff99d5e1b1b4194b9ea6ba5254bd2ebe847` (the exact
+- State recorded against commit: `cc8519eb8ebe93d1e84d35609aedfcdd38a8bad4` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `eabedff99d5e1b1b4194b9ea6ba5254bd2ebe847` (exact local,
+- Last externally verified fallback: `cc8519eb8ebe93d1e84d35609aedfcdd38a8bad4` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-057 is complete, independently reviewed GO, pushed with
-  exact local/upstream/`ls-remote`/PR-head equality, and passed push/PR CI on Python 3.10/3.13.
+- Active task at this snapshot: ARA-053. The deterministic equal-length private-path collision is
+  fixed, explicitly staged, and locally validated; commit, push, remote CI, and closeout remain.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -712,13 +712,41 @@ Updated: 2026-07-13 (Asia/Shanghai)
   pass `141 passed, 352 subtests`; full `make check` passes `388 passed, 555 subtests`. Three
   independent final reviews report GO.
 
+## ARA-053 Private Ollama Health Path Identity
+
+- Reproduced `/alpha` and `/bravo`, two equal-shape multi-segment pairs, and a reordered pair sharing
+  the same length-only identity. A valid `/alpha` result was consequently returned for `/bravo`.
+- Added a normally imported helper that creates one random 256-bit process-local key and computes a
+  domain-separated full HMAC-SHA256 over only the existing normalized private path. The key, raw
+  path, userinfo, query, fragment, and reversible encodings never enter session state or files.
+- Preserved explicit allowlisted path identities, origin/default-port/trailing-slash normalization,
+  credential/query presence markers, fragment omission, request behavior, and same-target reuse.
+  Ordinary `ui.app` reloads retain the helper key; process/helper reload safely invalidates evidence.
+- The expected pre-fix regression produced `4 failed, 1 passed`. Focused final coverage passes `4
+  passed, 14 subtests`; UI/recovery tests pass `84 passed, 69 subtests`; package/wheel helper tests
+  pass `20 passed, 41 subtests`; full `make check` passes `392 passed, 569 subtests`. Three independent
+  final reviews report GO.
+
 ## Remaining Steps
 
-- Resolve live Git/remote state, then start only ARA-053, the first queued unblocked P2 task.
-- Leave ARA-056, ARA-058, and owner-blocked/deferred tasks untouched until separately activated.
+- Review the explicit staged ARA-053 diff, commit, push, verify exact remote/PR-head equality plus
+  Python 3.10/3.13 CI, then record closeout.
+- Leave ARA-056, ARA-058, and owner-blocked/deferred tasks untouched.
 
 ## Test Status
 
+- ARA-053 pre-fix collision/cache regression produced the expected `4 failed, 1 passed`: all three
+  equal-shape path pairs shared an identity and `/bravo` loaded `/alpha` health evidence.
+- ARA-053 focused final coverage passes `4 passed, 14 subtests`; UI/recovery tests pass `84 passed,
+  69 subtests`; package-resource/wheel-helper tests pass `20 passed, 41 subtests`; the import smoke
+  includes `src.ui_health_identity` and `ui.app`.
+- ARA-053 local `make check` passes Ruff format/lint over 61 files, imports, repository-safety
+  self/worktree/staged scans, and pytest (`392 passed, 569 subtests passed` in 18.61 seconds; 103
+  tracked/index files and zero findings before the new helper is staged). Three independent reviews
+  report GO; the indexed gate and Python 3.10/3.13 remote CI remain.
+- After explicit staging, ARA-053 `make check` again passes all gates (`392 passed, 569 subtests`
+  in 18.08 seconds); both safety modes scan 104 tracked/index files with zero findings. Python
+  3.10/3.13 remote CI remains.
 - ARA-057 pre-fix provider-free matrix produced `79 failed, 3 passed, 6 subtests passed`: every
   dependency context parsed, direct/module entrypoints reached runtime layout, and temporary
   copied-installed mock mismatches completed ordinary writes.
@@ -734,6 +762,10 @@ Updated: 2026-07-13 (Asia/Shanghai)
 - ARA-057 recovery-closeout `make check` again passes all gates (`388 passed, 555 subtests passed`
   in 17.70 seconds) after the queue, completion log, decision, known-issue, validation JSON, and
   resume instructions were synchronized.
+- ARA-057 remote-verification closeout `cc8519e` is pushed with exact local/upstream/`ls-remote`/
+  PR-head equality. Closeout push run `29261174469` and pull-request run `29261177283` passed Python
+  3.10/3.13, all four isolated-wheel steps, and zero annotations; final draft PR body normalized
+  readback is exact at SHA-256 `f5df1d618bece0aeb2881655ce651670e4fc36db88e8370e361b3a95501c1bce`.
 - ARA-052 pre-fix provider-free response matrix produced the expected five shape failures before
   boolean coverage was added: list, string, number, and null values reached `.get` and raised
   `AttributeError` (`5 failed, 1 passed`).
@@ -1290,6 +1322,10 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- The initial ARA-053 regression produced the expected `4 failed, 1 passed`: length-only private
+  path identities collided and reused stale health state. The same focused layer now passes.
+- Two initial test invocations used unavailable interpreters: unqualified `python` was absent and
+  the Xcode `python3` lacked pytest. Both changed no files; `.venv/bin/python` ran all accepted tests.
 - The initial ARA-057 parser/entrypoint/installed regression produced the expected `79 failed, 3
   passed, 6 subtests passed`: invalid output/mode combinations were accepted, entrypoints reached
   layout, and temporary installed mock cases wrote ordinary temporary workspace artifacts. The
@@ -1534,10 +1570,8 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ```bash
 git status --short --branch
-git rev-parse --verify HEAD
-git rev-list --left-right --count @{upstream}...HEAD
 git diff --check
-.venv/bin/python -m pytest -q tests/test_recovery_state.py
+.venv/bin/python -m pytest -q tests/test_ui_helpers.py tests/test_recovery_state.py
 ```
 
 ## Interruption Recovery
@@ -1563,6 +1597,8 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   snapshots, the exact `/api/tags` request target, mapping response behavior, and redaction.
 - Keep ARA-057 at the argument boundary. Correct mode/output pairs and output-free primary modes
   must remain compatible; do not dispatch, call a provider, or touch ignored runtime during tests.
+- Keep ARA-053 confined to non-secret Ollama health identity. Do not retain raw private path,
+  userinfo, query, fragments, credentials, or reversible encodings; same target must remain stable.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

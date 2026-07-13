@@ -81,6 +81,7 @@ from src.storage import (
     tail_file_lines,
     write_file_text,
 )
+from src.ui_health_identity import private_ollama_path_id
 from ui.i18n import LANGUAGE_LABELS, translate
 from ui.theme import DEFAULT_THEME, THEME_LABEL_KEYS, build_theme_css, normalize_theme
 
@@ -492,7 +493,7 @@ def ollama_health_connection_scope(base_url: str) -> tuple[str, ...]:
     path_scope = (
         ("path", normalized_path)
         if path_is_non_secret
-        else ("redacted_path", *(str(len(segment)) for segment in path_segments))
+        else ("private_path_id", private_ollama_path_id(normalized_path))
     )
     return (
         "endpoint",

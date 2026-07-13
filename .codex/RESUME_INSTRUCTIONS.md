@@ -46,13 +46,16 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-No task is active. ARA-057 is complete and remote-verified at `eabedff`; push/PR runs
-`29260853734`/`29260855184` passed Python 3.10/3.13, all four wheel-smoke steps, and zero annotations.
-Its full dependency/order/empty-value matrix, correct-pair compatibility, direct/module/installed
-no-work controls, full gate, and three reviews pass. Start ARA-053 only after resolving live Git
-state. Do not call a provider or read ignored runtime. Use
-`eabedff99d5e1b1b4194b9ea6ba5254bd2ebe847` as the conservative exact externally verified fallback
-until a later checkpoint is itself externally verified.
+ARA-053 is locally implemented, explicitly staged, and validated but remains active until commit,
+push, and CI. Review the explicit ARA-053 staged diff, confirm `src/ui_health_identity.py` remains
+staged with its caller/tests, then commit and push. The indexed `make check` passed with 104 files
+in both safety scans. The helper uses a process-local keyed private-path
+identity; do not persist its key or add userinfo/query/fragment values. Preserve ARA-044 cache
+scoping and ARA-046 endpoint diagnostics. Do not call a provider or read ignored runtime. ARA-057
+is complete through remote-equal closeout
+`cc8519e`; closeout push/PR runs `29261174469`/`29261177283` passed Python 3.10/3.13, all four
+wheel-smoke steps, and zero annotations. Use `cc8519eb8ebe93d1e84d35609aedfcdd38a8bad4` as the
+conservative exact externally verified fallback.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
 it imported the editable checkout and advanced ignored `projects/example` state after a missing
@@ -99,9 +102,10 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-There is no `IN_PROGRESS` task; ARA-053 is the next `TODO`, while ARA-056 and ARA-058 remain
-separate. ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019,
-ARA-026, ARA-006, or ARA-007 until their recorded dependencies are satisfied.
+ARA-053 is the sole `IN_PROGRESS` task and awaits implementation commit/push/CI; ARA-056 and
+ARA-058 remain separate. ARA-018 requires an
+explicit owner license/distribution decision. Do not start ARA-019, ARA-026, ARA-006, or ARA-007
+until their recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
 

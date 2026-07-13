@@ -2884,6 +2884,160 @@ release_run_lock(handle)
         get.assert_called_once_with(f"{private_endpoint}api/tags", timeout=7)
         self.assertNotIn("private-token", repr(health))
 
+    def test_ui_ollama_private_path_scope_avoids_equal_length_collisions(self) -> None:
+        import ui.app as ui_app
+
+        private_path_pairs = (
+            ("/alpha", "/bravo"),
+            ("/alpha/charlie", "/bravo/foxtrot"),
+            ("/alpha/bravo", "/bravo/alpha"),
+        )
+        for first_path, second_path in private_path_pairs:
+            with self.subTest(first_path=first_path, second_path=second_path):
+                first_scope = ui_app.ollama_health_connection_scope(f"http://localhost{first_path}")
+                second_scope = ui_app.ollama_health_connection_scope(
+                    f"http://localhost{second_path}"
+                )
+                self.assertNotEqual(first_scope, second_scope)
+
+        self.assertEqual(
+            ui_app.ollama_health_connection_scope(" HTTP://LOCALHOST:80/alpha/ "),
+            ui_app.ollama_health_connection_scope("http://localhost/alpha"),
+        )
+
+    def test_ui_ollama_private_path_change_evicts_cached_health_result(self) -> None:
+        import ui.app as ui_app
+
+        session_state: dict[str, object] = {}
+        first_identity = ui_app.build_model_health_identity(
+            provider="ollama",
+            model="qwen3:8b",
+            connection_scope=ui_app.ollama_health_connection_scope("http://localhost/alpha"),
+        )
+        second_identity = ui_app.build_model_health_identity(
+            provider="ollama",
+            model="qwen3:8b",
+            connection_scope=ui_app.ollama_health_connection_scope("http://localhost/bravo"),
+        )
+        result = {
+            "ok": True,
+            "message": "healthy",
+            "message_key": "health_model_ok",
+            "message_args": {"model": "qwen3:8b"},
+        }
+
+        ui_app.store_scoped_health_result(
+            session_state,
+            key="model_health",
+            identity=first_identity,
+            result=result,
+        )
+        self.assertEqual(
+            ui_app.load_scoped_health_result(
+                session_state,
+                key="model_health",
+                identity=first_identity,
+            ),
+            result,
+        )
+        self.assertIsNone(
+            ui_app.load_scoped_health_result(
+                session_state,
+                key="model_health",
+                identity=second_identity,
+            )
+        )
+        self.assertNotIn("model_health", session_state)
+
+    def test_ui_ollama_private_path_scope_is_opaque_and_preserves_presence(self) -> None:
+        import base64
+        import hashlib
+
+        import src.ui_health_identity as health_identity
+        import ui.app as ui_app
+
+        private_path = "/private-%E2%98%83-alpha"
+        first_url = (
+            f"https://first-user:first-password@localhost{private_path}"
+            "?token=first-query#first-fragment"
+        )
+        rotated_url = (
+            f"https://second-user:second-password@localhost{private_path}"
+            "?token=second-query#second-fragment"
+        )
+        fixed_key = b"K" * 32
+        with patch.object(health_identity, "_PRIVATE_PATH_ID_KEY", fixed_key):
+            first_scope = ui_app.ollama_health_connection_scope(first_url)
+            rotated_scope = ui_app.ollama_health_connection_scope(rotated_url)
+            no_userinfo_scope = ui_app.ollama_health_connection_scope(
+                f"https://localhost{private_path}?token=first-query"
+            )
+            no_query_scope = ui_app.ollama_health_connection_scope(
+                f"https://first-user:first-password@localhost{private_path}"
+            )
+
+        self.assertEqual(first_scope, rotated_scope)
+        self.assertNotEqual(first_scope, no_userinfo_scope)
+        self.assertNotEqual(first_scope, no_query_scope)
+        self.assertEqual(first_scope[4], "private_path_id")
+        self.assertEqual(len(first_scope[5]), 64)
+
+        serialized_scope = repr(first_scope)
+        reversible_values = (
+            private_path,
+            private_path.encode("utf-8").hex(),
+            base64.b64encode(private_path.encode("utf-8")).decode("ascii"),
+            base64.urlsafe_b64encode(private_path.encode("utf-8")).decode("ascii"),
+            hashlib.sha256(private_path.encode("utf-8")).hexdigest(),
+            fixed_key.hex(),
+            base64.b64encode(fixed_key).decode("ascii"),
+            "first-user",
+            "first-password",
+            "first-query",
+            "first-fragment",
+        )
+        for value in reversible_values:
+            with self.subTest(value=value):
+                self.assertNotIn(value, serialized_scope)
+
+        self.assertEqual(
+            ui_app.ollama_health_connection_scope("http://localhost/api/v1"),
+            (
+                "endpoint",
+                "http",
+                "localhost",
+                "80",
+                "path",
+                "/api/v1",
+                "anonymous",
+                "no_query",
+            ),
+        )
+
+    def test_ui_ollama_private_path_identity_is_process_scoped(self) -> None:
+        import importlib
+
+        import src.ui_health_identity as health_identity
+        import ui.app as ui_app
+
+        private_url = "http://localhost/private-alpha"
+        safe_url = "http://localhost/proxy"
+        before_reload = ui_app.ollama_health_connection_scope(private_url)
+        self.assertEqual(
+            importlib.reload(ui_app).ollama_health_connection_scope(private_url),
+            before_reload,
+        )
+
+        with patch.object(health_identity, "_PRIVATE_PATH_ID_KEY", b"A" * 32):
+            private_scope_a = ui_app.ollama_health_connection_scope(private_url)
+            safe_scope_a = ui_app.ollama_health_connection_scope(safe_url)
+        with patch.object(health_identity, "_PRIVATE_PATH_ID_KEY", b"B" * 32):
+            private_scope_b = ui_app.ollama_health_connection_scope(private_url)
+            safe_scope_b = ui_app.ollama_health_connection_scope(safe_url)
+
+        self.assertNotEqual(private_scope_a, private_scope_b)
+        self.assertEqual(safe_scope_a, safe_scope_b)
+
     def test_ui_health_session_result_is_scoped_to_checked_target(self) -> None:
         import ui.app as ui_app
 

@@ -587,3 +587,20 @@
   enter normal/provider work.
 - Privacy: dependency errors interpolate only fixed option names and never the user-provided output
   value.
+
+## 2026-07-13 - Pseudonymize private Ollama health paths within one process
+
+- Decision: retain explicit identities for the existing allowlisted path segments, but represent
+  every other normalized path with a full HMAC-SHA256 identifier keyed by 32 random process-local
+  bytes. The random key lives only in a normally imported helper module so ordinary Streamlit
+  reruns reuse it without placing it in session state, configuration, logs, or files.
+- Privacy boundary: authenticate only `parsed.path.rstrip("/") or "/"`. Userinfo, passwords, query
+  values, and fragments never enter the HMAC or key; existing userinfo/query presence markers and
+  fragment omission remain unchanged. A persistent, hardcoded, or unkeyed digest is rejected
+  because low-entropy private paths would remain enumerable or correlatable across processes.
+- Compatibility: scheme, lowercased host, default-port normalization, safe path identities, and
+  same-target cache reuse remain unchanged. A different private path now invalidates prior health
+  evidence; process restart or helper reload rotates the key and safely invalidates old evidence.
+- Assurance boundary: a fixed digest cannot be mathematically injective over arbitrary-length
+  paths. The full 256-bit keyed identifier removes the deterministic length collisions with
+  negligible cryptographic collision risk while satisfying the no-raw/no-reversible-state rule.

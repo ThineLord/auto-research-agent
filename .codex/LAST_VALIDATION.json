@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-13T23:10:43+08:00",
+  "recorded_at": "2026-07-13T23:26:54+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "eabedff99d5e1b1b4194b9ea6ba5254bd2ebe847",
-  "last_known_stable_commit": "eabedff99d5e1b1b4194b9ea6ba5254bd2ebe847",
+  "head_commit": "cc8519eb8ebe93d1e84d35609aedfcdd38a8bad4",
+  "last_known_stable_commit": "cc8519eb8ebe93d1e84d35609aedfcdd38a8bad4",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "eabedff99d5e1b1b4194b9ea6ba5254bd2ebe847",
+  "state_recorded_against_commit": "cc8519eb8ebe93d1e84d35609aedfcdd38a8bad4",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-13T23:08:54+08:00",
-    "commit": "eabedff99d5e1b1b4194b9ea6ba5254bd2ebe847",
+    "verified_at": "2026-07-13T23:14:26+08:00",
+    "commit": "cc8519eb8ebe93d1e84d35609aedfcdd38a8bad4",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29260853734,
+        "run_id": 29261174469,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "eabedff99d5e1b1b4194b9ea6ba5254bd2ebe847",
+        "head_sha": "cc8519eb8ebe93d1e84d35609aedfcdd38a8bad4",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29260855184,
+        "run_id": 29261177283,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "eabedff99d5e1b1b4194b9ea6ba5254bd2ebe847",
+        "head_sha": "cc8519eb8ebe93d1e84d35609aedfcdd38a8bad4",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,94 @@
       }
     }
   },
-  "status": "ara057_complete_remote_verified",
+  "status": "ara053_indexed_validation_passed_awaiting_commit_push_ci",
   "commands": [
+    {
+      "command": "ARA-053 indexed implementation make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_files": 61,
+        "pytest_passed": 392,
+        "pytest_subtests_passed": 569,
+        "tracked_files_scanned": 104,
+        "staged_files_scanned": 104,
+        "safety_findings": 0,
+        "duration_seconds": 18.08,
+        "new_helper_staged": true
+      }
+    },
+    {
+      "command": "ARA-053 local make check before explicit staging",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_files": 61,
+        "pytest_passed": 392,
+        "pytest_subtests_passed": 569,
+        "tracked_files_scanned": 103,
+        "safety_findings": 0,
+        "duration_seconds": 18.61,
+        "new_helper_staged": false
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest tests/test_ui_helpers.py tests/test_recovery_state.py -q",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_passed": 84,
+        "pytest_subtests_passed": 69,
+        "duration_seconds": 1.01
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest tests/test_package_resources.py tests/test_wheel_install_smoke.py -q",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_passed": 20,
+        "pytest_subtests_passed": 41,
+        "duration_seconds": 4.38
+      }
+    },
+    {
+      "command": "ARA-053 focused private-path identity and cache regression",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_passed": 4,
+        "pytest_subtests_passed": 14,
+        "independent_reviews_go": 3,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-057 remote-verification closeout push, exact equality, CI, annotations, and final PR body verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "closeout_commit": "cc8519eb8ebe93d1e84d35609aedfcdd38a8bad4",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "pull_request_head_equal": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29261174469,
+        "pull_request_run_id": 29261177283,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "wheel_smoke_steps_passed": 4,
+        "job_annotations": 0,
+        "draft_pr_13_open": true,
+        "draft_pr_13_draft": true,
+        "draft_pr_13_mergeable": true,
+        "draft_pr_body_readback_normalized_exact": true,
+        "draft_pr_body_sha256": "f5df1d618bece0aeb2881655ce651670e4fc36db88e8370e361b3a95501c1bce"
+      }
+    },
     {
       "command": "ARA-057 recovery-closeout make check",
       "exit_code": 0,
@@ -3319,6 +3405,27 @@
   ],
   "failures": [
     {
+      "command": "ARA-053 focused private-path identity and cache regression before implementation",
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "pytest_failed": 4,
+        "pytest_passed": 1,
+        "cause": "private Ollama paths were reduced to segment lengths, so equal-shape targets shared one identity and stale health evidence",
+        "corrected_before_commit": true
+      }
+    },
+    {
+      "command": "initial ARA-053 test interpreter probes",
+      "result": "corrected_environment_invocation",
+      "summary": {
+        "unqualified_python_exit_code": 127,
+        "system_python3_exit_code": 1,
+        "cause": "unqualified python was absent and Xcode python3 did not have pytest",
+        "fix": "all accepted tests used .venv/bin/python",
+        "files_changed": false
+      }
+    },
+    {
       "command": "focused ARA-037 direct and module subprocess regressions before implementation",
       "result": "expected_pre_fix_failure",
       "summary": {
@@ -3655,7 +3762,11 @@
     }
   ],
   "notes": [
-    "No task is active; ARA-053 is the next queued unblocked P2 task after live Git recovery verification.",
+    "ARA-053 explicit staged validation passes all make check gates with 392 tests, 569 subtests, 104 tracked/index files, and zero safety findings; commit, push, CI, and closeout remain.",
+    "ARA-053 is locally implemented and validated: private Ollama paths use a full process-local keyed HMAC identity over only normalized path; raw path, key, userinfo, query, fragment, and reversible forms are not stored.",
+    "ARA-053 focused tests pass 4 tests and 14 subtests, related UI/recovery and package/wheel tests pass 104 tests and 110 subtests, full make check passes 392 tests and 569 subtests, and three independent reviews report GO; commit, push, CI, and closeout remain.",
+    "ARA-053 is the sole active task; its scope is provider-free non-secret Ollama health identity collision removal with ARA-044 and ARA-046 preserved.",
+    "ARA-057 is complete through remote-equal closeout cc8519e; closeout push and pull-request runs 29261174469 and 29261177283 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations with exact final PR body readback.",
     "ARA-057 is complete and remote-verified at eabedff with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 29260853734 and 29260855184 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations.",
     "ARA-057 enforces only survey, compare, and analyze output ownership after parsing while preserving ARA-048 mutual exclusion, compare arity, help, correct pairs, empty owned outputs, and output-free modes.",
     "ARA-052 is complete through remote-equal closeout 5e0d1ab; closeout push and pull-request runs 29259960658 and 29259966810 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations with exact final PR body readback.",

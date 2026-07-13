@@ -606,7 +606,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-053 - Remove unsafe-path collisions from UI health identity
 
-- Status: `TODO`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: low
 - Description: non-allowlisted Ollama paths are represented only by segment lengths, so equal-length
@@ -618,6 +618,10 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   `make check`.
 - Commit required: yes.
 - Dependencies: design a non-secret identity consistent with ARA-044; do not hash credentials.
+- Local validation: deterministic length collisions and stale-cache reuse are fixed by a
+  process-local keyed path identifier. Focused tests pass `4 passed, 14 subtests`, related tests pass
+  `104 passed, 110 subtests`, and indexed full `make check` passes `392 passed, 569 subtests` with 104
+  files in both safety scans; three reviews report GO. Commit, push, and remote CI remain.
 
 ## ARA-054 - Reconcile resumable mid-round stops with partial output directories
 
