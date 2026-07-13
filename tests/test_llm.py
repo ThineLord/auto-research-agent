@@ -131,6 +131,125 @@ class LlmClientTests(unittest.TestCase):
         self.assertEqual(extra["prompt_chars"], 8)
         self.assertEqual(extra["timeout_seconds"], 120)
 
+    def test_ollama_failures_redact_private_endpoint_without_changing_request(self) -> None:
+        private_user = "fixture-user"
+        private_password = "private-token"
+        private_query = "query-private-token"
+        private_path = "private-route"
+        endpoint = (
+            f"https://{private_user}:{private_password}@localhost:11434/"
+            f"{private_path}?key={private_query}"
+        )
+        request_url = f"{endpoint}/api/chat"
+        failures = (
+            (
+                "timeout",
+                llm_module.requests.Timeout(
+                    f"provider-private-detail timed out for /{private_path}?key={private_query}"
+                ),
+            ),
+            (
+                "request_error",
+                llm_module.requests.ConnectionError(
+                    f"provider-private-detail failed for /{private_path}?key={private_query}"
+                ),
+            ),
+        )
+
+        for expected_error_type, failure in failures:
+            with self.subTest(failure=type(failure).__name__), tempfile.TemporaryDirectory() as tmp:
+                event_path = Path(tmp) / "provider_events.jsonl"
+                client = OllamaClient(
+                    base_url=endpoint,
+                    model="test",
+                    provider_event_path=event_path,
+                )
+
+                with patch.object(llm_module.requests, "post", side_effect=failure) as post:
+                    with self.assertRaises(RuntimeError) as raised:
+                        client.generate(system_prompt=None, user_prompt="hello")
+
+                event_text = event_path.read_text(encoding="utf-8")
+                events = [json.loads(line) for line in event_text.splitlines()]
+                error_event = events[-1]
+                traceback_text = "".join(
+                    traceback.format_exception(
+                        type(raised.exception),
+                        raised.exception,
+                        raised.exception.__traceback__,
+                    )
+                )
+
+                self.assertEqual(post.call_args.args[0], request_url)
+                self.assertEqual(post.call_args.kwargs["timeout"], (10, 120))
+                self.assertEqual(error_event["event"], "request_error")
+                self.assertEqual(error_event["error_type"], expected_error_type)
+                self.assertEqual(error_event["provider"], "ollama")
+                self.assertEqual(error_event["model"], "test")
+                self.assertIsNone(error_event["round"])
+                self.assertEqual(error_event["run_id"], "")
+                for private_value in (
+                    private_user,
+                    private_password,
+                    private_query,
+                    private_path,
+                    "provider-private-detail",
+                ):
+                    with self.subTest(private_value=private_value):
+                        self.assertNotIn(private_value, str(raised.exception))
+                        self.assertNotIn(private_value, event_text)
+                        self.assertNotIn(private_value, traceback_text)
+                        self.assertFalse(exception_chain_contains(raised.exception, private_value))
+                self.assertIn("https://localhost:11434", str(raised.exception))
+                self.assertIn("https://localhost:11434", event_text)
+
+    def test_ollama_plain_endpoint_request_error_keeps_public_contract(self) -> None:
+        with patch.object(
+            llm_module.requests,
+            "post",
+            side_effect=llm_module.requests.ConnectionError("service unavailable"),
+        ):
+            with self.assertRaises(RuntimeError) as raised:
+                OllamaClient(base_url="http://localhost:11434", model="test").generate(
+                    system_prompt=None,
+                    user_prompt="hello",
+                )
+
+        self.assertEqual(
+            str(raised.exception),
+            "Failed to call Ollama API. Ensure Ollama is running at "
+            "http://localhost:11434 and model 'test' is available.",
+        )
+
+    def test_ollama_ambiguous_authority_fails_closed_only_in_diagnostics(self) -> None:
+        endpoint = "http://localhost\\private-route:11434?key=query-private-token"
+        request_url = f"{endpoint}/api/chat"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            event_path = Path(tmp) / "provider_events.jsonl"
+            client = OllamaClient(
+                base_url=endpoint,
+                model="test",
+                provider_event_path=event_path,
+            )
+            with patch.object(
+                llm_module.requests,
+                "post",
+                side_effect=llm_module.requests.ConnectionError("service unavailable"),
+            ) as post:
+                with self.assertRaises(RuntimeError) as raised:
+                    client.generate(system_prompt=None, user_prompt="hello")
+            event_text = event_path.read_text(encoding="utf-8")
+
+        self.assertEqual(post.call_args.args[0], request_url)
+        self.assertIn("<configured Ollama endpoint>", str(raised.exception))
+        self.assertIn("<configured Ollama endpoint>", event_text)
+        for private_value in ("private-route", "query-private-token"):
+            with self.subTest(private_value=private_value):
+                self.assertNotIn(private_value, str(raised.exception))
+                self.assertNotIn(private_value, event_text)
+                self.assertFalse(exception_chain_contains(raised.exception, private_value))
+
     def test_gemini_generate_calls_google_genai_client(self) -> None:
         generate_content = Mock(return_value=SimpleNamespace(text=" OK "))
         fake_client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))

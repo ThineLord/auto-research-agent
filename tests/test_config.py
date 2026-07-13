@@ -19,6 +19,7 @@ from src.config import (
     ConfigValidationError,
     LiteratureSurveyConfig,
     format_model_label,
+    format_ollama_endpoint_for_display,
     format_topic_context,
     load_app_config,
     load_config,
@@ -40,6 +41,24 @@ class ConfigValidationTests(unittest.TestCase):
         config_path = Path(tmp.name) / "config.yaml"
         config_path.write_text(text, encoding="utf-8")
         return config_path
+
+    def test_ollama_endpoint_display_keeps_only_unambiguous_origin(self) -> None:
+        self.assertEqual(
+            format_ollama_endpoint_for_display(
+                "https://fixture-user:private-token@münich.local:11434/private?key=value"
+            ),
+            "https://xn--mnich-kva.local:11434",
+        )
+        for endpoint in (
+            "http://localhost\\private-route:11434/private",
+            "http://[fe80::1%25en0]:11434/private",
+            "http://localhost:invalid/private",
+        ):
+            with self.subTest(endpoint=endpoint):
+                self.assertEqual(
+                    format_ollama_endpoint_for_display(endpoint),
+                    "<configured Ollama endpoint>",
+                )
 
     def test_sample_config_file_loads_as_typed_and_normalized_config(self) -> None:
         config_path = ROOT / "config.example.yaml"

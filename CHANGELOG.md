@@ -4,6 +4,10 @@
 
 ### Security
 
+* Ollama request, timeout, and model-list fallback failures now render only the configured
+  scheme/host/port. URL userinfo, private paths, query values, and provider-controlled exception
+  text no longer reach provider events, public errors, or linked exception causes; request targets
+  and accepted endpoint forms remain unchanged.
 * CI now explicitly grants `GITHUB_TOKEN` only read access to repository contents; all unspecified
   workflow permissions remain disabled.
 * Tracked reports now replace real local account names with explicit redaction wording. Local and

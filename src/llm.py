@@ -28,6 +28,7 @@ from .config import (
     MODEL_PROVIDER_GEMINI,
     MODEL_PROVIDER_OLLAMA,
     GeminiConfig,
+    format_ollama_endpoint_for_display,
 )
 from .storage import append_file_text
 
@@ -187,6 +188,7 @@ class OllamaClient:
                 "structured_response": response_format is not None,
             },
         )
+        request_failure: tuple[str, str, str] | None = None
         try:
             response = requests.post(
                 url,
@@ -195,42 +197,41 @@ class OllamaClient:
             )
             response.raise_for_status()
             data = response.json()
-        except requests.Timeout as exc:
-            _write_provider_event(
-                self.provider_event_path,
-                {
-                    "event": "request_error",
-                    "provider": MODEL_PROVIDER_OLLAMA,
-                    "model": self.model,
-                    "stage": agent_name,
-                    "round": self.current_round,
-                    "run_id": self.run_id,
-                    "error_type": "timeout",
-                    "message": _redact_provider_message(str(exc)),
-                },
+        except requests.Timeout:
+            endpoint = format_ollama_endpoint_for_display(self.base_url)
+            request_failure = (
+                "timeout",
+                f"Ollama request timed out at {endpoint}.",
+                "Ollama request timed out. Increase timeout_seconds or check model/server health "
+                f"at {endpoint}.",
             )
-            raise RuntimeError(
-                "Ollama request timed out. "
-                f"Increase timeout_seconds or check model/server health at {self.base_url}."
-            ) from exc
-        except requests.RequestException as exc:
-            _write_provider_event(
-                self.provider_event_path,
-                {
-                    "event": "request_error",
-                    "provider": MODEL_PROVIDER_OLLAMA,
-                    "model": self.model,
-                    "stage": agent_name,
-                    "round": self.current_round,
-                    "run_id": self.run_id,
-                    "error_type": "request_error",
-                    "message": _redact_provider_message(str(exc)),
-                },
-            )
-            raise RuntimeError(
+        except requests.RequestException:
+            endpoint = format_ollama_endpoint_for_display(self.base_url)
+            request_failure = (
+                "request_error",
+                f"Ollama request failed at {endpoint}.",
                 "Failed to call Ollama API. Ensure Ollama is running at "
-                f"{self.base_url} and model '{self.model}' is available."
-            ) from exc
+                f"{endpoint} and model '{self.model}' is available.",
+            )
+
+        # Leave the provider's exception handler before raising. Otherwise the raw
+        # request error remains reachable through __context__ even with a sanitized cause.
+        if request_failure is not None:
+            error_type, safe_message, public_message = request_failure
+            _write_provider_event(
+                self.provider_event_path,
+                {
+                    "event": "request_error",
+                    "provider": MODEL_PROVIDER_OLLAMA,
+                    "model": self.model,
+                    "stage": agent_name,
+                    "round": self.current_round,
+                    "run_id": self.run_id,
+                    "error_type": error_type,
+                    "message": safe_message,
+                },
+            )
+            raise RuntimeError(public_message) from RuntimeError(safe_message)
 
         elapsed = time.monotonic() - started
         content = data.get("message", {}).get("content", "").strip()

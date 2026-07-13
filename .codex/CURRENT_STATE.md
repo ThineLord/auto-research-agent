@@ -4,8 +4,8 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: preserve the remote-verified ARA-030 wheel-install CI checkpoint and wait for the
-  next owner-approved maintenance scope.
+- Current goal: preserve the locally validated ARA-046 endpoint-redaction result through its next
+  publication checkpoint, then continue with the highest-priority queued task ARA-047.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
@@ -15,9 +15,9 @@ Updated: 2026-07-13 (Asia/Shanghai)
 - Last externally verified fallback: `4cda4302dee19006263902cbb486e375ea0142f8` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-030 is complete through remote-equal implementation
-  `4cda430`; push/PR runs `29232341316`/`29232344581` passed Python 3.10/3.13, all four wheel steps,
-  and zero annotations. The queue has no `TODO` task; deferred and blocked work retains its gates.
+- Active task at this snapshot: none. ARA-046 is locally complete and independently reviewed GO;
+  its provider-free focused tests and code paths pass. ARA-047 is the highest-priority `TODO` and
+  must not begin until live Git state confirms the ARA-046 checkpoint is safely published.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -587,14 +587,43 @@ Updated: 2026-07-13 (Asia/Shanghai)
   covered client initialization, runtime/value/quota paths, discovery redaction before truncation,
   short/overlapping values, and the existing missing-dependency diagnostic.
 
+## ARA-046 Ollama Endpoint Credential Redaction
+
+- Reconfirmed a clean, remote-equal dedicated branch and reran `make check`: Ruff, imports,
+  repository safety, and pytest passed (`359 passed, 277 subtests passed`).
+- Reproduced without network access that a credential-bearing Ollama URL survives in
+  `OllamaClient` public/cause errors and `query_ollama_api_models` fallback output.
+- Scope is redaction only: keep accepted endpoint forms and request targets unchanged, make no real
+  provider call, and do not access ignored runtime artifacts.
+- Added one shared diagnostic endpoint formatter: unambiguous hosts retain scheme/host/port, IDNs
+  become ASCII, and ambiguous authority/port/encoded forms fail to a fixed label without changing
+  the request target or URL acceptance.
+- Detached requests exceptions before raising fixed safe causes; urllib Request construction,
+  transport/HTTP, decoding, and invalid-URL failures now share fixed classified output. Failed
+  `ollama list` stdout/stderr and exception text no longer enter the combined API fallback.
+- Provider-free regressions cover timeout/request event types and fields, public/cause/traceback
+  graphs, ambiguous authority, InvalidURL, non-object responses, command/API fallback, exact request
+  targets/timeouts, ordinary endpoint compatibility, and IDN/scoped/invalid endpoint labels.
+- Two independent final reviews report GO with no remaining P1/P2 blocker.
+
 ## Remaining Steps
 
-- There is no unblocked implementation task. Preserve ARA-030's verified wheel-only boundary and
-  keep sdist, uploads, version/dependency/license policy, ARA-018, ARA-026, and ignored runtime
-  behind their recorded approval or policy gates.
+- Resolve live Git/remote evidence for the locally complete ARA-046 result before beginning ARA-047;
+  if publication evidence is absent, preserve this exact worktree and recovery record.
+- Once ARA-046 is externally stable, start only ARA-047 with a provider-free unrepresentable-score
+  regression and leave the separately queued CLI/UI/recovery candidates untouched.
 
 ## Test Status
 
+- ARA-046 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
+  self/worktree/staged scans, and pytest (`366 passed, 310 subtests passed` in 13.17 seconds; 103
+  tracked/index files and zero findings). Related config/LLM/UI/CLI tests pass `138 passed, 129
+  subtests`; both independent final reviews report GO with no P1/P2 blocker.
+- ARA-046 startup baseline: `make check` passes Ruff format/lint over 60 files, imports,
+  repository-safety self/worktree/staged scans, and pytest (`359 passed, 277 subtests passed`).
+- The provider-free ARA-046 reproduction completed without network access and exposed both fixture
+  credential values in all three pre-fix diagnostic strings; this is expected pre-fix evidence,
+  not a passing security result.
 - ARA-030's expected pre-fix CI contract failed only on the absent wheel step (`1 failed, 4 passed`).
   The implemented CI/package/safety regression passes `19 passed, 23 subtests passed`; Ruff and
   `git diff --check` pass.
@@ -1035,6 +1064,13 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- The first final ARA-046 `make check` after marking its queue entry complete correctly failed only
+  two recovery-state consistency assertions because `CURRENT_STATE.md` still described ARA-046 as
+  active and requested finalization work. All 364 other tests and 310 subtests passed; this snapshot
+  removes that cross-file mismatch before the corrected full rerun.
+- The provider-free ARA-046 pre-fix probe exposed URL userinfo and query values in the public
+  Ollama request error, its chained cause, and the model-list API fallback error. No provider or
+  ignored repository runtime was accessed.
 - ARA-045's initial both-built-in regression failed because the fake SDK selected Google while the
   wrapper selected Gemini; explicit/custom exception-graph controls exposed the raw provider error
   through implicit context, and client-construction/discovery controls exposed unsanitized values.
@@ -1210,9 +1246,8 @@ Updated: 2026-07-13 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git status --short --branch
-git log --oneline --decorate -n 10
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
+make check
 ```
 
 ## Interruption Recovery
@@ -1221,6 +1256,8 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 
 ## Current Risks And Prohibitions
 
+- Keep ARA-046 provider-free and redaction-only: do not reject previously accepted Ollama endpoint
+  forms, change request targets, print fixture credentials, or contact a real Ollama service.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

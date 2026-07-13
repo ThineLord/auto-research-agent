@@ -46,12 +46,13 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-There is no unblocked implementation task. ARA-030 is complete through remote-equal implementation
-`4cda430`; push/PR runs `29232341316`/`29232344581` passed Python 3.10/3.13, every real-wheel step,
-and zero annotations. Its helper must keep builds, installs, workspaces, and outputs under fresh
-temporary directories; exclude the source checkout from installed import resolution and never
-touch ignored `projects/example`, the recorded pip cache residue, sdist policy, or any provider.
-Resume from the semantic checkpoint in `CURRENT_STATE.md`; use
+No task is active. ARA-046 is locally complete and independently reviewed GO; resolve live Git,
+remote, and validation evidence before starting ARA-047, the highest-priority `TODO`. If ARA-046
+is not yet published, preserve its exact tracked worktree and rerun recovery plus full validation;
+do not duplicate the fix. Its endpoint formatter and fixed failure classifiers must preserve actual
+request targets and accepted URL forms while preventing userinfo/path/query/provider text from
+reaching diagnostics or exception graphs. Do not call a real provider or read ignored runtime.
+ARA-030 remains complete. Resume from the semantic checkpoint in `CURRENT_STATE.md`; use
 `4cda4302dee19006263902cbb486e375ea0142f8` as the conservative exact externally verified fallback
 if the semantic current `HEAD` has not yet been checked. Do not access ignored runtime or invoke a
 real provider merely to verify recovery.
@@ -92,8 +93,8 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-There is no `TODO` or `IN_PROGRESS` task. ARA-018 requires an explicit owner license/distribution
-decision. Do not start ARA-019,
+There is no `IN_PROGRESS` task; ARA-047 is the next `TODO`. ARA-018 requires an explicit owner
+license/distribution decision. Do not start ARA-019,
 ARA-026, ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
@@ -110,5 +111,6 @@ git status --short --branch
 git rev-parse --verify HEAD
 .venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
-.venv/bin/python -m pytest -q tests/test_ci_workflow.py tests/test_wheel_install_smoke.py tests/test_package_resources.py
+.venv/bin/python -m pytest -q tests/test_recovery_state.py
+.venv/bin/python -m pytest -q tests/test_config.py tests/test_llm.py tests/test_ui_helpers.py tests/test_cli_exit_codes.py
 ```

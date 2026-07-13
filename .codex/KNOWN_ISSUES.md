@@ -409,3 +409,15 @@ Updated: 2026-07-12 (Asia/Shanghai)
   jobs. Local hostile-environment wheel smoke, targeted safety/package tests, full gate, and three
   reviews are green; implementation `4cda430` plus push/PR runs
   `29232341316`/`29232344581` verify all four Python 3.10/3.13 wheel steps with zero annotations.
+
+## KI-046 - Ollama endpoint credentials can escape through failures
+
+- Status: fixed locally; full validation and independent review passed
+- Severity: P1
+- Evidence: provider-free fake request and API fallback failures retained configured URL userinfo
+  and query values in the public request error, chained cause, and model-list diagnostic.
+- Impact: credentials embedded in a supported Ollama endpoint can be written to run logs/provider
+  events or displayed by CLI diagnostics after an ordinary connection failure.
+- Resolution: diagnostics now retain only an unambiguous safe endpoint label, use fixed request/API
+  failure classifications, detach raw exception graphs, and discard failed command output. Actual
+  request targets and accepted URL forms are unchanged; ambiguous labels fail generic.

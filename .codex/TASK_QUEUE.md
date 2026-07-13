@@ -1,6 +1,6 @@
 # Codex Task Queue
 
-Updated: 2026-07-12 (Asia/Shanghai)
+Updated: 2026-07-13 (Asia/Shanghai)
 
 Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
@@ -457,6 +457,184 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Commit required: yes.
 - Dependencies: completed provider-free at implementation commit `938b9a2`; no real provider request
   or credential value entered persisted test output/state.
+
+## ARA-046 - Redact credentials from Ollama endpoint failures
+
+- Status: `DONE`
+- Priority: P1
+- Risk: low
+- Description: a valid Ollama base URL may contain URL userinfo or query credentials; request and
+  API-fallback failures currently copy the configured endpoint and raw exception into console/run
+  errors and provider events, exposing those credentials.
+- Related files: `src/config.py`, `src/llm.py`, provider-free config/LLM tests, recovery state
+- Acceptance criteria: Ollama request, timeout, and model-list fallback diagnostics retain a useful
+  scheme/host/port endpoint label but never expose configured userinfo, query values, or private
+  path text in public errors, event payloads, or exception chains; ordinary credential-free URLs
+  and request behavior remain unchanged.
+- Validation command: provider-free fake-request redaction regressions; related config/LLM/UI/CLI
+  tests passed `138 passed, 129 subtests`; final `make check` passed `366 passed, 310 subtests`.
+- Commit required: yes.
+- Dependencies: implementation complete and independently security-reviewed GO; no URL acceptance
+  change, real Ollama call, or ignored runtime access.
+
+## ARA-047 - Reject unrepresentable resume-history scores without traceback
+
+- Status: `TODO`
+- Priority: P1
+- Risk: low
+- Description: `_history_float()` directly converts numeric history values, so a valid 400-digit
+  JSON integer raises `OverflowError` during resume instead of following invalid-history handling.
+- Related files: `src/runner.py`, resume history tests
+- Acceptance criteria: positive and negative unrepresentable history scores fail before writes or
+  agent calls through the existing privacy-safe `ResumeHistoryError`/status-2 boundary; finite
+  historical values remain unchanged.
+- Validation command: provider-free unsafe-history fault cases, related resume/runner/CLI tests,
+  then `make check`.
+- Commit required: yes.
+- Dependencies: none.
+
+## ARA-048 - Reject conflicting primary CLI modes before any work
+
+- Status: `TODO`
+- Priority: P1
+- Risk: medium
+- Description: primary flags are not mutually exclusive; for example `--mock --resume` selects the
+  earlier mock branch, creates a new run, and replaces the active checkpoint instead of rejecting
+  an invalid command.
+- Related files: `src/cli.py`, parser/entrypoint/installed-layout tests
+- Acceptance criteria: conflicting execution modes exit 2 during argument handling before layout,
+  config, project, or artifact access; every individual mode and compatible modifier remains
+  accepted.
+- Validation command: parser conflict matrix plus source/module and temporary installed-layout
+  no-write subprocess regressions, then `make check`.
+- Commit required: yes.
+- Dependencies: none; identify modifiers separately from primary modes before changing the parser.
+
+## ARA-049 - Make UI session credentials authoritative for the launched run
+
+- Status: `TODO`
+- Priority: P1
+- Risk: medium
+- Description: Streamlit health/discovery selects its password-box key over config, but the child
+  CLI can still select an explicit config key or inherited `GOOGLE_API_KEY`, so the real run uses a
+  different account/quota than the UI checked.
+- Related files: `ui/app.py`, `src/runtime.py`, provider environment/credential tests
+- Acceptance criteria: a nonempty session key is the actual child-run key even with competing
+  config/Google/Gemini sources; when no session key is supplied, existing precedence is unchanged;
+  credentials never enter argv or process metadata.
+- Validation command: provider-free child-environment and fake-client precedence matrix plus UI/LLM
+  regressions, then `make check`.
+- Commit required: yes.
+- Dependencies: preserve the ARA-045 effective-key and redaction contract.
+
+## ARA-050 - Preflight installed generation resources before writing
+
+- Status: `TODO`
+- Priority: P2
+- Risk: medium
+- Description: an installed mock can complete successfully with a missing bundled prompt and write
+  incomplete prompt provenance because deterministic agents never read the missing file.
+- Related files: `src/package_resources.py`, `src/cli.py`, installed-layout tests
+- Acceptance criteria: generation modes require all four readable, nonempty, valid-UTF-8 prompt
+  resources before seeding or artifact writes; analysis/comparison early exits and healthy packaged
+  behavior remain unchanged.
+- Validation command: temporary installed-layout missing/corrupt resource matrix, package/CLI tests,
+  isolated wheel smoke, then `make check`.
+- Commit required: yes.
+- Dependencies: preserve ARA-004/030 resource inventory and never use repository ignored runtime.
+
+## ARA-051 - Fail closed on duplicate conflicting cloud profiles
+
+- Status: `TODO`
+- Priority: P2
+- Risk: low
+- Description: duplicate profile IDs are reduced by last-record-wins dictionaries, so ordering can
+  let a healthy duplicate override a blocked record and re-enable an ineligible model.
+- Related files: `src/cloud_free.py`, cloud recommendation/fallback tests
+- Acceptance criteria: duplicate conflicting profiles cannot recommend or select that model in any
+  order; unique healthy profiles and ordinary cached candidates remain compatible.
+- Validation command: both duplicate orders across cached pool, recommendation, and fallback plus
+  cloud/UI regressions, then `make check`.
+- Commit required: yes.
+- Dependencies: preserve ARA-040/043 candidate-membership and all-blocked behavior.
+
+## ARA-052 - Normalize malformed Ollama health response shapes
+
+- Status: `TODO`
+- Priority: P2
+- Risk: low
+- Description: Streamlit Ollama health assumes a mapping response; valid JSON lists/strings raise
+  `AttributeError` instead of returning a structured unhealthy result.
+- Related files: `ui/app.py`, UI health tests
+- Acceptance criteria: non-object response JSON produces a fixed credential-safe health failure;
+  valid object responses and request targets remain unchanged.
+- Validation command: provider-free response-shape matrix and UI health/recovery tests, then
+  `make check`.
+- Commit required: yes.
+- Dependencies: preserve ARA-044 target-scoped snapshot behavior.
+
+## ARA-053 - Remove unsafe-path collisions from UI health identity
+
+- Status: `TODO`
+- Priority: P2
+- Risk: low
+- Description: non-allowlisted Ollama paths are represented only by segment lengths, so equal-length
+  paths such as `/alpha` and `/bravo` can share an identity and display stale health evidence.
+- Related files: `ui/app.py`, target-scoped UI health tests
+- Acceptance criteria: distinct private paths never share health identity while no path value or
+  reversible credential-derived material is stored; same target remains stable.
+- Validation command: same-length private-path collision regressions plus UI/recovery tests, then
+  `make check`.
+- Commit required: yes.
+- Dependencies: design a non-secret identity consistent with ARA-044; do not hash credentials.
+
+## ARA-054 - Reconcile resumable mid-round stops with partial output directories
+
+- Status: `DEFERRED`
+- Priority: P2
+- Risk: high
+- Description: interrupts or quota stops after review/revise/Judge persist a partial next-round
+  directory and mark `can_resume=true`, but immediate preview correctly rejects that directory as
+  uncheckpointed, making the claimed resume state unusable without manual file movement.
+- Related files: `src/runner.py`, `src/resume.py`, round lifecycle/recovery tests
+- Acceptance criteria: checkpoint eligibility and immediate preview agree after every stage without
+  deleting or overwriting partial evidence; completed rounds remain intact.
+- Validation command: per-stage interrupt/quota matrix, byte-preservation/retry tests, then
+  `make check`.
+- Commit required: yes after scoped design approval.
+- Dependencies: requires an explicit staging/quarantine or partial-round compatibility design;
+  estimated greater than 30 minutes and must not silently delete partial outputs.
+
+## ARA-055 - Make round history publication recoverable across two filesystems
+
+- Status: `DEFERRED`
+- Priority: P2
+- Risk: high
+- Description: project-global score history is written before run-local round metrics; failure of
+  the second write leaves split generations that cannot be retried, and configured run storage may
+  reside on another filesystem.
+- Related files: `src/runner.py`, `src/storage.py`, history transaction tests
+- Acceptance criteria: second-write I/O/interrupt failures recover deterministically without
+  duplicate rounds or cross-filesystem atomic-rename assumptions.
+- Validation command: two-write fault/crash/retry matrix with internal and external run storage,
+  then `make check`.
+- Commit required: yes after architecture approval.
+- Dependencies: cross-file/cross-filesystem transaction design; estimated greater than 30 minutes.
+
+## ARA-056 - Cover interrupts before the protected agent phase
+
+- Status: `TODO`
+- Priority: P2
+- Risk: medium
+- Description: an interrupt after round directory creation but before the agent-stage `try` can
+  leave `status=running`, an empty round directory, and no checkpoint/summary/recovery entry.
+- Related files: `src/runner.py`, interrupt lifecycle tests
+- Acceptance criteria: round creation/log/memory-load interrupts either roll back pre-publication
+  state or finalize the standard manual-interrupt recovery artifacts without corrupting a run.
+- Validation command: pre-agent interrupt fault matrix plus manual-interrupt/resume tests and
+  `make check`.
+- Commit required: yes.
+- Dependencies: preserve ARA-023 status 130 and ARA-041 startup transaction ordering.
 
 ## ARA-011 - Prevent failed rounds from replacing a trusted best output
 

@@ -749,3 +749,21 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed implementation/workflow/tests/docs/recovery state as `4cda430` and pushed with exact
   local/upstream/`ls-remote` equality. Push run `29232341316` and PR run `29232344581` passed every
   Python 3.10/3.13 job, all four real-wheel steps, and zero annotations.
+
+## 2026-07-13 - Ollama endpoint failure redaction
+
+- Reproduced URL userinfo, private path, and query values escaping through Ollama public errors,
+  provider events, linked request exceptions, API fallback diagnostics, and failed `ollama list`
+  output using only mocked requests and temporary files.
+- Added one safe endpoint formatter: ordinary IPv4/IPv6 and IDN hosts retain an origin label, while
+  invalid ports, delimiter ambiguity, encoded/scoped authorities, and backslashes fail to a fixed
+  placeholder without changing the accepted URL or actual request target.
+- Replaced provider-controlled requests/urllib/command error text with fixed timeout, HTTP-status,
+  invalid-JSON, or request-failure classifications and raised only after leaving the raw exception
+  handler, preventing credential recovery through `__cause__` or `__context__`.
+- Preserved request URLs/timeouts, ordinary public error wording, event fields/error types, model
+  discovery return shape, and healthy response parsing. No real provider, ignored runtime, config,
+  experiment artifact, score, prompt, or research result was accessed or changed.
+- Related config/LLM/UI/CLI tests passed `138 passed, 129 subtests`; final `make check` passed `366
+  passed, 310 subtests` with 103 tracked/index files and zero findings. Two independent final reviews
+  reported GO with no remaining P1/P2 blocker.

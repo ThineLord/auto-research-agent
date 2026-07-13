@@ -9,6 +9,7 @@ import threading
 import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
+from http.client import InvalidURL
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -1218,6 +1219,92 @@ release_run_lock(handle)
 
         self.assertIsNone(error)
         self.assertEqual([model["name"] for model in models], ["phi3:mini"])
+
+    def test_query_ollama_api_error_redacts_private_endpoint(self) -> None:
+        private_values = ("fixture-user", "private-token", "private-route", "query-private-token")
+        endpoint = (
+            "https://fixture-user:private-token@localhost:11434/"
+            "private-route?key=query-private-token"
+        )
+        request_url = f"{endpoint}/api/tags"
+
+        failures = (
+            config_module.URLError(
+                "provider-private-detail failed for /private-route?key=query-private-token/api/tags"
+            ),
+            InvalidURL(
+                "provider-private-detail invalid /private-route?key=query-private-token/api/tags"
+            ),
+        )
+
+        for failure in failures:
+            with (
+                self.subTest(failure=type(failure).__name__),
+                patch.object(
+                    config_module,
+                    "urlopen",
+                    side_effect=failure,
+                ) as urlopen,
+            ):
+                models, error = config_module.query_ollama_api_models(base_url=endpoint)
+
+            self.assertEqual(models, [])
+            self.assertEqual(urlopen.call_args.args[0].full_url, request_url)
+            self.assertIn("https://localhost:11434", error or "")
+            for private_value in (*private_values, "provider-private-detail"):
+                with self.subTest(private_value=private_value):
+                    self.assertNotIn(private_value, error or "")
+
+    def test_query_ollama_api_non_object_response_keeps_safe_failure_contract(self) -> None:
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = b"[]"
+
+        with patch.object(config_module, "urlopen", return_value=response) as urlopen:
+            models, error = config_module.query_ollama_api_models(
+                base_url="http://localhost:11434/proxy",
+                timeout_seconds=7,
+            )
+
+        self.assertEqual(models, [])
+        self.assertEqual(
+            error,
+            "Failed to query Ollama API at http://localhost:11434: response was not a JSON object",
+        )
+        self.assertEqual(
+            urlopen.call_args.args[0].full_url, "http://localhost:11434/proxy/api/tags"
+        )
+        self.assertEqual(urlopen.call_args.kwargs["timeout"], 7)
+
+    def test_query_ollama_models_drops_command_and_api_failure_text(self) -> None:
+        private_values = ("fixture-user", "private-token", "private-route", "query-private-token")
+        endpoint = (
+            "https://fixture-user:private-token@localhost:11434/"
+            "private-route?key=query-private-token"
+        )
+        result = SimpleNamespace(
+            returncode=9,
+            stdout="",
+            stderr=f"command failed for {endpoint}",
+        )
+
+        with (
+            patch.object(config_module.subprocess, "run", return_value=result),
+            patch.object(
+                config_module,
+                "urlopen",
+                side_effect=config_module.URLError(
+                    "provider failure at /private-route?key=query-private-token/api/tags"
+                ),
+            ),
+        ):
+            models, error = query_ollama_models(base_url=endpoint)
+
+        self.assertEqual(models, [])
+        self.assertIn("ollama list failed with status 9", error or "")
+        self.assertIn("https://localhost:11434", error or "")
+        for private_value in private_values:
+            with self.subTest(private_value=private_value):
+                self.assertNotIn(private_value, error or "")
 
     def test_default_model_helpers_read_and_update_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

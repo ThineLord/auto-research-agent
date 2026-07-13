@@ -507,3 +507,21 @@
 - Boundary: the checkout and same-UID tracked-source reads remain trusted; the runtime proxy guard is
   not a syscall-level network sandbox. The deterministic mock path and artifact/provider assertions
   support provider-free behavior without claiming arbitrary code cannot open a socket.
+
+## 2026-07-13 - Separate Ollama request targets from diagnostic endpoint labels
+
+- Decision: keep configured endpoint acceptance and the exact `/api/chat`/`/api/tags` request target
+  construction unchanged, but render only an unambiguous scheme/host/port diagnostic origin. Convert
+  IDNs to ASCII; ambiguous authority delimiters, encoded/scoped hosts, and invalid ports use a fixed
+  generic label rather than guessing.
+- Error boundary: never persist provider-controlled requests/urllib exception text or failed
+  `ollama list` stdout/stderr. Classify only safe timeout, HTTP status, invalid-JSON, command status,
+  and generic request failures, and construct the public/safe cause after leaving raw exception
+  handlers so Python cannot retain secret-bearing context.
+- Reason: exact string replacement does not cover normalized or relative URLs, urllib `InvalidURL`,
+  decode failures, backslash authorities, or command fallback output; fixed classification closes
+  the whole diagnostic surface without altering provider calls.
+- Compatibility: preserve outer `RuntimeError`, normal public wording for plain origins, event
+  schema/error types, helper return shapes, actual request URL/timeout, config acceptance, and
+  healthy parsing. The linked cause is intentionally a sanitized `RuntimeError` rather than the raw
+  requests exception because exposing its type object also retained attacker/provider text.
