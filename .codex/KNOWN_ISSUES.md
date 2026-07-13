@@ -401,10 +401,11 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-030 - Editable-only CI can miss wheel packaging regressions
 
-- Status: fixed locally; remote Python 3.10/3.13 CI verification pending
+- Status: fixed, pushed, and CI-verified
 - Severity: P2 packaging reliability
 - Impact: CI installs only the editable checkout, while the installed-layout unit fixture copies
   `src`; build-backend, entry-point, package-data, or RECORD regressions can bypass the gate.
-- Current action: ARA-030 adds one temporary, source-excluded real-wheel install smoke to both
-  matrix jobs. Local hostile-environment wheel smoke, targeted safety/package tests, full gate, and
-  three independent reviews are green; push/PR GitHub jobs remain before this issue is fully closed.
+- Resolution: ARA-030 adds one temporary, source-excluded real-wheel install smoke to both matrix
+  jobs. Local hostile-environment wheel smoke, targeted safety/package tests, full gate, and three
+  reviews are green; implementation `4cda430` plus push/PR runs
+  `29232341316`/`29232344581` verify all four Python 3.10/3.13 wheel steps with zero annotations.

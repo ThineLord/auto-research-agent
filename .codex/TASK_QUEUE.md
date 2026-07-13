@@ -176,7 +176,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-030 - Add an isolated real-wheel install smoke to CI
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P2
 - Risk: medium
 - Description: CI installs only the editable checkout, while the installed-layout unit fixture
@@ -191,9 +191,11 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Commit required: yes.
 - Dependencies: owner approved this greater-than-30-minute packaging/CI task on 2026-07-13;
   ARA-018, ARA-026, version, dependency, and publication policy remain out of scope.
-- Progress: the failing workflow contract, isolated helper, environment-safety regressions, docs,
-  two real temporary wheel smokes, hostile redirect canary, final `make check`, and three independent
-  reviews are green locally. Explicit commit/push and all four Python 3.10/3.13 push/PR jobs remain.
+- Resolution: implementation `4cda430` is pushed and remote-equal. The failing workflow contract,
+  isolated helper, environment-safety regressions, docs, two real temporary wheel smokes, hostile
+  redirect canary, final `make check`, and three reviews are green; push/PR runs
+  `29232341316`/`29232344581` passed Python 3.10/3.13 with four successful wheel steps and zero
+  annotations.
 
 ## ARA-031 - Fail closed on invalid existing run config during resume
 

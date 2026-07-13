@@ -729,3 +729,23 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed implementation/docs/tests/changelog as `2480a61` and validation state as `877562e`.
   Exact local/upstream/`ls-remote` equality was verified; push run `29187626378` and pull-request run
   `29187628011` passed Python 3.10/3.13 with zero annotations.
+
+## 2026-07-13 - Isolated real-wheel CI smoke
+
+- Reproduced that the CI matrix installed only the editable checkout and that the installed-layout
+  unit fixture copied `src`, leaving build-backend, entry-point, wheel package-data, and RECORD
+  regressions outside the recurring gate.
+- Added a standard-library helper that copies only explicit tracked inputs to an external temporary
+  source tree, builds exactly one wheel, installs it with dependencies into a fresh venv, and checks
+  source-excluded/non-editable import origin, exact six-resource bytes/RECORD, console/module help,
+  one deterministic mock round, null foreign-Git provenance, and package-tree immutability.
+- Closed review-found ambient pip/Git/temp redirect and child-output risks with minimal environments,
+  isolated pip/Git config, checkout-local temp rejection, fixed diagnostics, dead runtime proxies,
+  and one 600-second deadline. A hostile-environment real smoke passed without creating its guard
+  path, using pip cache, calling a provider, touching ignored runtime, building an sdist, or upload.
+- Targeted tests passed `19 passed, 23 subtests passed`; final local `make check` passed `359 passed,
+  277 subtests passed` with 103 tracked/index files and zero findings. Three independent final
+  reviews reported no P0/P1/P2 blocker.
+- Committed implementation/workflow/tests/docs/recovery state as `4cda430` and pushed with exact
+  local/upstream/`ls-remote` equality. Push run `29232341316` and PR run `29232344581` passed every
+  Python 3.10/3.13 job, all four real-wheel steps, and zero annotations.

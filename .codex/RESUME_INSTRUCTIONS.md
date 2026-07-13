@@ -46,16 +46,13 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-ARA-030 is `IN_PROGRESS` with explicit owner approval from 2026-07-13. Its locally complete
-CI/helper/tests/docs/recovery diff passes the hostile-environment real-wheel smoke, targeted tests,
-full gate, and three independent reviews; explicit staging, commit/push, and real Python 3.10/3.13
-GitHub jobs remain. Resume by inspecting that exact diff and running the smallest recovery/state
-and CI contracts before changing it. All builds, installs, workspaces, and outputs must stay under
-fresh temporary directories; exclude the source checkout from installed import resolution and
-never touch ignored `projects/example`, the recorded pip cache residue, sdist policy, or any
-provider. ARA-041 remains complete through
-remote-equal checkpoint `877562e`. Resume from the semantic checkpoint in `CURRENT_STATE.md`; use
-`877562ea2b82e4ff012a1a908ba25ee9d180b6de` as the conservative exact externally verified fallback
+There is no unblocked implementation task. ARA-030 is complete through remote-equal implementation
+`4cda430`; push/PR runs `29232341316`/`29232344581` passed Python 3.10/3.13, every real-wheel step,
+and zero annotations. Its helper must keep builds, installs, workspaces, and outputs under fresh
+temporary directories; exclude the source checkout from installed import resolution and never
+touch ignored `projects/example`, the recorded pip cache residue, sdist policy, or any provider.
+Resume from the semantic checkpoint in `CURRENT_STATE.md`; use
+`4cda4302dee19006263902cbb486e375ea0142f8` as the conservative exact externally verified fallback
 if the semantic current `HEAD` has not yet been checked. Do not access ignored runtime or invoke a
 real provider merely to verify recovery.
 
@@ -77,8 +74,8 @@ make check
 The current ARA-030 full expected result is Ruff/import/safety success and `359 passed, 277 subtests
 passed`; its targeted CI/package/safety regression passes `19 passed, 23 subtests passed`. The final
 real wheel canary passed with ambient pip/Git/provider redirects injected and did not create the
-external guard path. Before commit, explicitly stage only the reviewed paths and rerun both safety
-modes so the new helper and test are included with zero findings.
+external guard path. Both final safety modes included 103 tracked/index files with zero findings;
+the real push/PR matrix confirmed all four wheel steps.
 Resolve `HEAD`, compare it with upstream and `ls-remote`, and inspect current PR checks before
 starting another task. If the current HEAD lacks successful remote evidence, use
 `last_external_verification.commit` as the conservative stable fallback. Do not restart ARA-005.
@@ -95,7 +92,7 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-ARA-030 is the only `IN_PROGRESS` task. ARA-018 requires an explicit owner license/distribution
+There is no `TODO` or `IN_PROGRESS` task. ARA-018 requires an explicit owner license/distribution
 decision. Do not start ARA-019,
 ARA-026, ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 

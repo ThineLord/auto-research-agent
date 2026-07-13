@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-13T15:30:46+08:00",
+  "recorded_at": "2026-07-13T15:33:41+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "877562ea2b82e4ff012a1a908ba25ee9d180b6de",
-  "last_known_stable_commit": "877562ea2b82e4ff012a1a908ba25ee9d180b6de",
+  "head_commit": "4cda4302dee19006263902cbb486e375ea0142f8",
+  "last_known_stable_commit": "4cda4302dee19006263902cbb486e375ea0142f8",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "877562ea2b82e4ff012a1a908ba25ee9d180b6de",
+  "state_recorded_against_commit": "4cda4302dee19006263902cbb486e375ea0142f8",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-12T17:34:10+08:00",
-    "commit": "877562ea2b82e4ff012a1a908ba25ee9d180b6de",
+    "verified_at": "2026-07-13T15:33:41+08:00",
+    "commit": "4cda4302dee19006263902cbb486e375ea0142f8",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29187626378,
+        "run_id": 29232341316,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "877562ea2b82e4ff012a1a908ba25ee9d180b6de",
+        "head_sha": "4cda4302dee19006263902cbb486e375ea0142f8",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29187628011,
+        "run_id": 29232344581,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "877562ea2b82e4ff012a1a908ba25ee9d180b6de",
+        "head_sha": "4cda4302dee19006263902cbb486e375ea0142f8",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,31 @@
       }
     }
   },
-  "status": "ara030_in_progress_real_wheel_ci_smoke",
+  "status": "ara030_complete_remote_verified",
   "commands": [
+    {
+      "command": "ARA-030 implementation push, exact remote equality, four wheel steps, annotations, and draft PR verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "implementation_commit": "4cda4302dee19006263902cbb486e375ea0142f8",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29232341316,
+        "pull_request_run_id": 29232344581,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "wheel_smoke_steps_passed": 4,
+        "job_annotations": 0,
+        "draft_pr_13_open": true,
+        "draft_pr_13_draft": true,
+        "draft_pr_13_mergeable": true
+      }
+    },
     {
       "command": "make check after final ARA-030 helper, safety regressions, documentation, and independent reviews",
       "exit_code": 0,
@@ -2651,10 +2674,10 @@
     }
   ],
   "notes": [
-    "ARA-030 is locally complete through a hostile-environment real-wheel smoke, targeted safety/package regression, final make check, and three blocker-free independent reviews; explicit commit/push and real Python 3.10/3.13 push/PR jobs remain.",
+    "ARA-030 is complete through remote-equal implementation 4cda430; push and pull-request runs 29232341316 and 29232344581 passed Python 3.10/3.13, all four real-wheel steps, and zero annotations.",
     "The wheel helper uses only explicit tracked packaging inputs, one external temporary wheel, a fresh venv, exact six-resource and RECORD verification, source-excluded import/help/mock checks, minimal pip/runtime/Git environments, fixed child diagnostics, and a shared 600-second deadline.",
     "ARA-030's runtime proxy guard plus deterministic mock/provider metadata supports a provider-free workflow but is not a syscall-level network sandbox; same-UID replacement of trusted checkout files also remains outside the helper's guarantee.",
-    "ARA-030 is IN_PROGRESS with explicit owner approval from 2026-07-13 for a source-excluded real-wheel install smoke in the existing Python 3.10 and 3.13 CI jobs.",
+    "ARA-030 had explicit owner approval from 2026-07-13 and is now complete; no TODO or IN_PROGRESS task remains.",
     "ARA-030 excludes sdist work, uploads, versions, dependencies, license/publication policy, provider calls, ignored repository runtime, and the recorded external pip-cache residue.",
     "ARA-041 is complete through exact remote-equal checkpoint 877562e; implementation is 2480a61 and push/pull-request CI runs 29187626378 and 29187628011 passed Python 3.10 and 3.13 with zero annotations.",
     "ARA-041 final local make check passes 353 tests and 262 subtests with zero repository-safety findings; both independent reviews and focused re-reviews report no blockers.",

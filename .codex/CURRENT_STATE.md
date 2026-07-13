@@ -4,22 +4,20 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: complete owner-approved P2 ARA-030 by adding a real-wheel, source-excluded install
-  smoke to both Python 3.10/3.13 CI jobs without widening release or publication policy.
+- Current goal: preserve the remote-verified ARA-030 wheel-install CI checkpoint and wait for the
+  next owner-approved maintenance scope.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `877562ea2b82e4ff012a1a908ba25ee9d180b6de` (the exact
+- State recorded against commit: `4cda4302dee19006263902cbb486e375ea0142f8` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `877562ea2b82e4ff012a1a908ba25ee9d180b6de` (exact local,
+- Last externally verified fallback: `4cda4302dee19006263902cbb486e375ea0142f8` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: ARA-030 is `IN_PROGRESS` with explicit owner approval on
-  2026-07-13. Clean local/upstream/`ls-remote` equality at `db38fb0` and the existing draft PR were
-  reverified before work. The locally complete helper/workflow/tests/docs pass the real wheel smoke,
-  hostile-environment redirect canary, targeted regression, full gate, and independent review;
-  explicit staging, commit, push, and Python 3.10/3.13 GitHub CI remain.
+- Active task at this snapshot: none. ARA-030 is complete through remote-equal implementation
+  `4cda430`; push/PR runs `29232341316`/`29232344581` passed Python 3.10/3.13, all four wheel steps,
+  and zero annotations. The queue has no `TODO` task; deferred and blocked work retains its gates.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -52,6 +50,9 @@ Updated: 2026-07-13 (Asia/Shanghai)
 - Verified the corrected helper under deliberately poisoned pip/Git/provider environment variables;
   it passed and created none of the external guard paths. Targeted regression, final `make check`,
   and three independent final reviews are green.
+- Committed ARA-030 as `4cda430`, pushed with exact local/upstream/`ls-remote` equality, and verified
+  push/PR runs `29232341316`/`29232344581`: Python 3.10/3.13, all four wheel smoke steps, and every
+  annotation set passed cleanly.
 - Reproduced the single-path compare CLI mismatch with exit code 0 and `run_count: 1`.
 - Added a regression test that failed before the fix and passed after it.
 - Added CLI-boundary validation while preserving the single-run internal helper behavior.
@@ -588,11 +589,9 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Remaining Steps
 
-- Explicitly stage and safety-scan only ARA-030's reviewed helper, workflow, tests, docs, and recovery
-  files; commit and push the verified implementation through draft PR 13.
-- Verify both push and pull-request Python 3.10/3.13 jobs execute the wheel step successfully, check
-  annotations and exact remote equality, then mark ARA-030 complete in a durable closeout.
-- Keep sdist, uploads, version/dependency/license policy, ignored runtime, and ARA-026 out of scope.
+- There is no unblocked implementation task. Preserve ARA-030's verified wheel-only boundary and
+  keep sdist, uploads, version/dependency/license policy, ARA-018, ARA-026, and ignored runtime
+  behind their recorded approval or policy gates.
 
 ## Test Status
 
@@ -606,7 +605,10 @@ Updated: 2026-07-13 (Asia/Shanghai)
 - ARA-030 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
   self/worktree/staged scans, and pytest (`359 passed, 277 subtests passed` in 14.21 seconds; 103
   tracked/index files and zero findings). Three independent final reviews report no P0/P1/P2
-  blocker; Python 3.10/3.13 installed-wheel proof remains for real GitHub CI.
+  blocker.
+- ARA-030 implementation `4cda430` is pushed with exact local/upstream/`ls-remote` equality. Push
+  run `29232341316` and pull-request run `29232344581` passed Python 3.10/3.13; every one of the
+  four `Build and smoke-test isolated wheel` steps passed and all four annotation sets are empty.
 - ARA-030 pre-change baseline at clean `db38fb0`: local `make check` passes Ruff format/lint,
   imports, repository-safety self/worktree/staged scans, and pytest (`353 passed, 262 subtests
   passed`; 101 tracked files and zero findings). No provider call or ignored runtime access occurred.
@@ -1208,10 +1210,9 @@ Updated: 2026-07-13 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git diff --check
 git status --short --branch
-git add .github/workflows/ci.yml scripts/check_wheel_install.py tests/test_ci_workflow.py tests/test_wheel_install_smoke.py README.md docs/DEVELOPER_GUIDE.md CHANGELOG.md .codex/CURRENT_STATE.md .codex/TASK_QUEUE.md .codex/DECISIONS.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
-.venv/bin/python scripts/check_repo_safety.py --staged
+git log --oneline --decorate -n 10
+.venv/bin/python -m pytest -q tests/test_recovery_state.py
 ```
 
 ## Interruption Recovery
