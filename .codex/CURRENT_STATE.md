@@ -17,7 +17,9 @@ Updated: 2026-07-13 (Asia/Shanghai)
   passed)
 - Active task at this snapshot: ARA-030 is `IN_PROGRESS` with explicit owner approval on
   2026-07-13. Clean local/upstream/`ls-remote` equality at `db38fb0` and the existing draft PR were
-  reverified before work; the pre-change full baseline is green.
+  reverified before work. The locally complete helper/workflow/tests/docs pass the real wheel smoke,
+  hostile-environment redirect canary, targeted regression, full gate, and independent review;
+  explicit staging, commit, push, and Python 3.10/3.13 GitHub CI remain.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -37,6 +39,19 @@ Updated: 2026-07-13 (Asia/Shanghai)
 - Reviewed the tracked workflow, CI, packaging, release, test, and maintenance documentation.
 - Classified ignored project runs, logs, local configuration, and research artifacts as out of scope for cleanup or commit.
 - Ran the current canonical baseline: `make check` passed with 137 tests and 43 subtests.
+- Added the ARA-030 CI workflow contract and reproduced the intended pre-fix failure: no
+  `Build and smoke-test isolated wheel` step exists yet (`1 failed, 4 passed`).
+- Added a standard-library wheel helper that exports only explicit tracked packaging inputs into a
+  safe temporary tree, builds exactly one wheel, installs it into a fresh venv, and verifies import
+  origin, exact bundled resource/RECORD bytes, console/module help, one deterministic mock round,
+  null foreign-Git provenance, and an unchanged installed package tree.
+- Rebuilt pip, runtime, and Git subprocess environments from minimal allowlists after independent
+  review reproduced ambient redirect and child-output risks. The helper rejects checkout-local
+  temp roots, ignores pip/Git/user-site redirects, uses isolated Git config/hooks/signing, blocks
+  runtime proxy access, emits fixed failure categories, and shares a 600-second overall deadline.
+- Verified the corrected helper under deliberately poisoned pip/Git/provider environment variables;
+  it passed and created none of the external guard paths. Targeted regression, final `make check`,
+  and three independent final reviews are green.
 - Reproduced the single-path compare CLI mismatch with exit code 0 and `run_count: 1`.
 - Added a regression test that failed before the fix and passed after it.
 - Added CLI-boundary validation while preserving the single-run internal helper behavior.
@@ -573,14 +588,25 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Remaining Steps
 
-- Build a provider-free failing CI contract for a real wheel smoke, implement the smallest isolated
-  build/install helper or workflow step, and verify exact wheel resources/import origin/help/mock.
-- Run targeted and full validation plus independent review, then commit and publish only ARA-030's
-  verified CI/test/docs/recovery files through draft PR 13.
+- Explicitly stage and safety-scan only ARA-030's reviewed helper, workflow, tests, docs, and recovery
+  files; commit and push the verified implementation through draft PR 13.
+- Verify both push and pull-request Python 3.10/3.13 jobs execute the wheel step successfully, check
+  annotations and exact remote equality, then mark ARA-030 complete in a durable closeout.
 - Keep sdist, uploads, version/dependency/license policy, ignored runtime, and ARA-026 out of scope.
 
 ## Test Status
 
+- ARA-030's expected pre-fix CI contract failed only on the absent wheel step (`1 failed, 4 passed`).
+  The implemented CI/package/safety regression passes `19 passed, 23 subtests passed`; Ruff and
+  `git diff --check` pass.
+- Two complete temporary wheel install smokes passed without an sdist, upload, provider call, cache
+  reuse, or repository runtime write. The final run injected pip install redirects, Git repository/
+  index/object redirects, provider credentials, and a foreign config path; the helper still passed
+  and did not create the guard path.
+- ARA-030 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
+  self/worktree/staged scans, and pytest (`359 passed, 277 subtests passed` in 14.21 seconds; 103
+  tracked/index files and zero findings). Three independent final reviews report no P0/P1/P2
+  blocker; Python 3.10/3.13 installed-wheel proof remains for real GitHub CI.
 - ARA-030 pre-change baseline at clean `db38fb0`: local `make check` passes Ruff format/lint,
   imports, repository-safety self/worktree/staged scans, and pytest (`353 passed, 262 subtests
   passed`; 101 tracked files and zero findings). No provider call or ignored runtime access occurred.
@@ -1182,9 +1208,10 @@ Updated: 2026-07-13 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-sed -n '1,260p' tests/test_ci_workflow.py
-sed -n '1,320p' tests/test_package_resources.py
-.venv/bin/python -m pytest -q tests/test_ci_workflow.py tests/test_package_resources.py
+git diff --check
+git status --short --branch
+git add .github/workflows/ci.yml scripts/check_wheel_install.py tests/test_ci_workflow.py tests/test_wheel_install_smoke.py README.md docs/DEVELOPER_GUIDE.md CHANGELOG.md .codex/CURRENT_STATE.md .codex/TASK_QUEUE.md .codex/DECISIONS.md .codex/KNOWN_ISSUES.md .codex/LAST_VALIDATION.json .codex/RESUME_INSTRUCTIONS.md
+.venv/bin/python scripts/check_repo_safety.py --staged
 ```
 
 ## Interruption Recovery

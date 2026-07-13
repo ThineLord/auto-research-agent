@@ -191,6 +191,9 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Commit required: yes.
 - Dependencies: owner approved this greater-than-30-minute packaging/CI task on 2026-07-13;
   ARA-018, ARA-026, version, dependency, and publication policy remain out of scope.
+- Progress: the failing workflow contract, isolated helper, environment-safety regressions, docs,
+  two real temporary wheel smokes, hostile redirect canary, final `make check`, and three independent
+  reviews are green locally. Explicit commit/push and all four Python 3.10/3.13 push/PR jobs remain.
 
 ## ARA-031 - Fail closed on invalid existing run config during resume
 

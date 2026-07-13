@@ -43,6 +43,21 @@ class CIWorkflowContractTests(unittest.TestCase):
         self.assertEqual(actions_by_name["Check out repository"], "actions/checkout@v7")
         self.assertEqual(actions_by_name["Set up Python"], "actions/setup-python@v6")
 
+    def test_python_matrix_builds_and_smoke_tests_one_isolated_wheel(self) -> None:
+        steps = self.test_job["steps"]
+        smoke_steps = [
+            step for step in steps if step.get("name") == "Build and smoke-test isolated wheel"
+        ]
+
+        self.assertEqual(len(smoke_steps), 1)
+        self.assertEqual(smoke_steps[0].get("run"), "python scripts/check_wheel_install.py")
+        install_index = next(
+            index
+            for index, step in enumerate(steps)
+            if step.get("name") == "Install project with development tools"
+        )
+        self.assertGreater(steps.index(smoke_steps[0]), install_index)
+
 
 if __name__ == "__main__":
     unittest.main()

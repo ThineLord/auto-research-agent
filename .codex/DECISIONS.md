@@ -487,3 +487,23 @@
   fail-before-agent behavior. New-run writes remain ordinary single-file atomic replacements.
 - Boundary: this is a two-file startup recovery protocol, not a schema migration, cross-round
   transaction, or sudden-power-loss guarantee; parent directories are not fsynced.
+
+## 2026-07-13 - Gate CI on one source-excluded wheel install
+
+- Decision: add one standard-library helper to the existing Python 3.10/3.13 matrix after editable
+  dependency installation. It copies only explicit tracked packaging inputs into an external
+  temporary source snapshot, builds exactly one wheel, and installs it into a fresh venv.
+- Contract: require the real import and console entry point to come from that venv; require the exact
+  six bundled resources, canonical bytes, and RECORD hashes/sizes; run console/module help and one
+  deterministic mock round; reject source/foreign-Git provenance and package-tree mutation.
+- Isolation: ignore pip/user-site/Git redirect variables, disable pip cache reuse, isolate Git
+  config/hooks/signing, reject checkout-local temporary roots, strip provider credentials from the
+  runtime environment, blackhole upper/lower proxy variables, suppress raw child output, and share
+  a 600-second helper deadline beneath the 15-minute job limit.
+- Compatibility: preserve workflow triggers, read-only permissions, action versions, matrix,
+  editable development install, application/provider behavior, prompts, scores, artifacts, and
+  historical results. Do not build an sdist, upload an artifact, or change version, dependency,
+  license, release, or publication policy.
+- Boundary: the checkout and same-UID tracked-source reads remain trusted; the runtime proxy guard is
+  not a syscall-level network sandbox. The deterministic mock path and artifact/provider assertions
+  support provider-free behavior without claiming arbitrary code cannot open a socket.

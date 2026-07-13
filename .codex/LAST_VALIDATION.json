@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-13T15:05:53+08:00",
+  "recorded_at": "2026-07-13T15:30:46+08:00",
   "branch": "codex/sol-autonomous-hardening",
   "head_commit": "877562ea2b82e4ff012a1a908ba25ee9d180b6de",
   "last_known_stable_commit": "877562ea2b82e4ff012a1a908ba25ee9d180b6de",
@@ -56,6 +56,87 @@
   },
   "status": "ara030_in_progress_real_wheel_ci_smoke",
   "commands": [
+    {
+      "command": "make check after final ARA-030 helper, safety regressions, documentation, and independent reviews",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 60,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 103,
+        "findings": 0,
+        "pytest_tests_passed": 359,
+        "pytest_subtests_passed": 277,
+        "pytest_duration_seconds": 14.21,
+        "provider_called": false
+      }
+    },
+    {
+      "command": "ARA-030 real temporary wheel smoke with hostile ambient pip, Git, and provider redirects",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "tracked_source_snapshot": "temporary_only",
+        "wheel_count": 1,
+        "sdist_built": false,
+        "artifact_uploaded": false,
+        "fresh_venv": true,
+        "source_checkout_excluded": true,
+        "exact_bundled_resources": 6,
+        "record_hashes_and_sizes_verified": true,
+        "console_help": "passed",
+        "module_help": "passed",
+        "mock_rounds": 1,
+        "mock_provider": "mock",
+        "provider_called": false,
+        "foreign_git_commit_recorded": false,
+        "installed_package_tree_unchanged": true,
+        "pip_cache_used": false,
+        "ambient_redirects_ignored": true,
+        "external_guard_path_created": false,
+        "repository_ignored_runtime_accessed": false
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_wheel_install_smoke.py tests/test_ci_workflow.py tests/test_package_resources.py plus Ruff and git diff --check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests_passed": 19,
+        "pytest_subtests_passed": 23,
+        "ruff": "passed",
+        "diff_check": "passed",
+        "independent_final_reviews": 3,
+        "review_p0_p1_p2_blockers": 0,
+        "provider_called": false
+      }
+    },
+    {
+      "command": "ARA-030 pre-fix CI wheel-step contract",
+      "exit_code": 1,
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "pytest_tests_failed": 1,
+        "pytest_tests_passed": 4,
+        "missing_step": "Build and smoke-test isolated wheel",
+        "provider_called": false
+      }
+    },
+    {
+      "command": "ARA-030 hostile ambient Git redirect control before source-enumeration isolation",
+      "exit_code": 1,
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "git_ls_files_redirected": true,
+        "wheel_build_started": false,
+        "external_guard_path_created": false,
+        "provider_called": false
+      }
+    },
     {
       "command": "ARA-030 startup repository/remote/PR recovery and pre-change make check",
       "exit_code": 0,
@@ -2570,6 +2651,9 @@
     }
   ],
   "notes": [
+    "ARA-030 is locally complete through a hostile-environment real-wheel smoke, targeted safety/package regression, final make check, and three blocker-free independent reviews; explicit commit/push and real Python 3.10/3.13 push/PR jobs remain.",
+    "The wheel helper uses only explicit tracked packaging inputs, one external temporary wheel, a fresh venv, exact six-resource and RECORD verification, source-excluded import/help/mock checks, minimal pip/runtime/Git environments, fixed child diagnostics, and a shared 600-second deadline.",
+    "ARA-030's runtime proxy guard plus deterministic mock/provider metadata supports a provider-free workflow but is not a syscall-level network sandbox; same-UID replacement of trusted checkout files also remains outside the helper's guarantee.",
     "ARA-030 is IN_PROGRESS with explicit owner approval from 2026-07-13 for a source-excluded real-wheel install smoke in the existing Python 3.10 and 3.13 CI jobs.",
     "ARA-030 excludes sdist work, uploads, versions, dependencies, license/publication policy, provider calls, ignored repository runtime, and the recorded external pip-cache residue.",
     "ARA-041 is complete through exact remote-equal checkpoint 877562e; implementation is 2480a61 and push/pull-request CI runs 29187626378 and 29187628011 passed Python 3.10 and 3.13 with zero annotations.",

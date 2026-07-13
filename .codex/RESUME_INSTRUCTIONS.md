@@ -46,11 +46,14 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-ARA-030 is `IN_PROGRESS` with explicit owner approval from 2026-07-13. Resume by inspecting the
-current CI/package-resource diff, then run the smallest wheel-smoke contract before editing. All
-builds, installs, workspaces, and outputs must stay under fresh temporary directories; exclude the
-source checkout from installed import resolution and never touch ignored `projects/example`, the
-recorded pip cache residue, sdist policy, or any provider. ARA-041 remains complete through
+ARA-030 is `IN_PROGRESS` with explicit owner approval from 2026-07-13. Its locally complete
+CI/helper/tests/docs/recovery diff passes the hostile-environment real-wheel smoke, targeted tests,
+full gate, and three independent reviews; explicit staging, commit/push, and real Python 3.10/3.13
+GitHub jobs remain. Resume by inspecting that exact diff and running the smallest recovery/state
+and CI contracts before changing it. All builds, installs, workspaces, and outputs must stay under
+fresh temporary directories; exclude the source checkout from installed import resolution and
+never touch ignored `projects/example`, the recorded pip cache residue, sdist policy, or any
+provider. ARA-041 remains complete through
 remote-equal checkpoint `877562e`. Resume from the semantic checkpoint in `CURRENT_STATE.md`; use
 `877562ea2b82e4ff012a1a908ba25ee9d180b6de` as the conservative exact externally verified fallback
 if the semantic current `HEAD` has not yet been checked. Do not access ignored runtime or invoke a
@@ -71,10 +74,11 @@ The last successful local full validation command was:
 make check
 ```
 
-The current full expected result is Ruff/import/safety success and `353 passed, 262 subtests
-passed`; ARA-041's targeted matrix passes `8 passed, 50 deselected, 20 subtests passed`, and the
-related runner/config/storage layer passes `90 passed, 103 subtests passed`.
-Both safety modes should scan only tracked/staged files with zero findings.
+The current ARA-030 full expected result is Ruff/import/safety success and `359 passed, 277 subtests
+passed`; its targeted CI/package/safety regression passes `19 passed, 23 subtests passed`. The final
+real wheel canary passed with ambient pip/Git/provider redirects injected and did not create the
+external guard path. Before commit, explicitly stage only the reviewed paths and rerun both safety
+modes so the new helper and test are included with zero findings.
 Resolve `HEAD`, compare it with upstream and `ls-remote`, and inspect current PR checks before
 starting another task. If the current HEAD lacks successful remote evidence, use
 `last_external_verification.commit` as the conservative stable fallback. Do not restart ARA-005.
@@ -109,4 +113,5 @@ git status --short --branch
 git rev-parse --verify HEAD
 .venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
+.venv/bin/python -m pytest -q tests/test_ci_workflow.py tests/test_wheel_install_smoke.py tests/test_package_resources.py
 ```

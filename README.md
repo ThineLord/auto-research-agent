@@ -299,15 +299,17 @@ It does not call Ollama or Gemini. Configure source scanning under `literature_s
 ## CI / 开发检查
 
 GitHub Actions 会在推送到 `master`、`codex/**` 分支以及提交到 `master` 的 PR 时运行。
-CI 使用 Python 3.10 和 3.13，执行和本地完整检查相同的步骤：
+CI 使用 Python 3.10 和 3.13，并在两个版本上执行本地完整检查：
 
 ```bash
 make check
 ```
 
 这个命令会检查 Ruff 格式、Ruff lint、基础导入、Git 跟踪文件中的个人路径/高置信密钥模式，
-以及测试套件。CI 不会启动 Ollama
-或运行需要本地模型的研究流程。
+以及测试套件。CI 还会运行 `python scripts/check_wheel_install.py`：它只把明确的 Git 跟踪
+打包输入复制到临时目录，构建一个 wheel，在全新虚拟环境中验证导入来源、内置资源、
+console/module help 和一轮确定性 mock，然后删除临时环境。这个附加检查不构建或上传
+source distribution，也不会启动 Ollama、调用 Gemini 或运行需要模型的研究流程。
 
 ## Graphical UI
 

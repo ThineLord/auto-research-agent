@@ -148,6 +148,10 @@
 
 ### Maintenance
 
+* Python 3.10/3.13 CI now builds one wheel from a temporary tracked-source snapshot and installs it
+  into a fresh virtual environment. The smoke verifies source-excluded imports, the exact bundled
+  resource allowlist and RECORD entries, console/module help, and one deterministic provider-free
+  mock round without building or uploading an sdist.
 * CI jobs now have a 15-minute timeout and use the supported Node 24 releases of
   `actions/checkout` and `actions/setup-python`, while retaining the Python 3.10/3.13 push and
   pull-request matrix.

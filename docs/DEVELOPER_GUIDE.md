@@ -23,10 +23,17 @@ make import-check
 make repo-safety
 make test
 make check
+python scripts/check_wheel_install.py
 ```
 
-Use `make check` before committing. It matches the CI sequence: Ruff format check, Ruff lint,
+Use `make check` before committing. It covers the core CI sequence: Ruff format check, Ruff lint,
 import smoke check, a tracked-file personal-path/high-confidence-secret scan, and `pytest -q`.
+CI additionally runs `python scripts/check_wheel_install.py` in both supported Python jobs. That
+bounded network-install smoke copies only explicit tracked packaging inputs into a temporary source
+snapshot, builds one wheel, installs it with runtime dependencies into a fresh virtual environment,
+and checks its import origin, exact bundled resources and RECORD metadata, console/module help, and
+one provider-free mock round. Run it locally after packaging changes; it never builds an sdist,
+uploads an artifact, or writes generated project state into the checkout.
 The safety scan reads the tracked worktree and complete stage-0 index, never follows tracked
 symlinks or enumerates ignored runtime artifacts, and reports only relative file names, line
 numbers, and finding categories instead of echoing matched values.
