@@ -767,3 +767,6 @@ Validation and implementation outcomes will be appended only after they are actu
 - Related config/LLM/UI/CLI tests passed `138 passed, 129 subtests`; final `make check` passed `366
   passed, 310 subtests` with 103 tracked/index files and zero findings. Two independent final reviews
   reported GO with no remaining P1/P2 blocker.
+- Committed as `3f3826b`, pushed with exact local/upstream/`ls-remote`/PR-head equality, and updated
+  draft PR 13. Push run `29250140431` and pull-request run `29250143238` passed Python 3.10/3.13,
+  every isolated-wheel step, and all four job annotation sets are empty.

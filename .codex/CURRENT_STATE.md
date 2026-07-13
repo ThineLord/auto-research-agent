@@ -4,20 +4,20 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: preserve the locally validated ARA-046 endpoint-redaction result through its next
-  publication checkpoint, then continue with the highest-priority queued task ARA-047.
+- Current goal: preserve the remote-verified ARA-046 endpoint-redaction result, then continue with
+  the highest-priority queued task ARA-047.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `4cda4302dee19006263902cbb486e375ea0142f8` (the exact
+- State recorded against commit: `3f3826b6a357b50ebf944f74a6e953ea3f6727e9` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `4cda4302dee19006263902cbb486e375ea0142f8` (exact local,
+- Last externally verified fallback: `3f3826b6a357b50ebf944f74a6e953ea3f6727e9` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-046 is locally complete and independently reviewed GO;
-  its provider-free focused tests and code paths pass. ARA-047 is the highest-priority `TODO` and
-  must not begin until live Git state confirms the ARA-046 checkpoint is safely published.
+- Active task at this snapshot: none. ARA-046 is complete, independently reviewed GO, pushed with
+  exact local/upstream/`ls-remote`/PR-head equality, and passed push/PR CI on Python 3.10/3.13.
+  ARA-047 is the highest-priority `TODO`.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -608,13 +608,15 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Remaining Steps
 
-- Resolve live Git/remote evidence for the locally complete ARA-046 result before beginning ARA-047;
-  if publication evidence is absent, preserve this exact worktree and recovery record.
-- Once ARA-046 is externally stable, start only ARA-047 with a provider-free unrepresentable-score
-  regression and leave the separately queued CLI/UI/recovery candidates untouched.
+- Start only ARA-047 with a provider-free unrepresentable-score regression and leave the separately
+  queued CLI/UI/recovery candidates untouched.
 
 ## Test Status
 
+- ARA-046 implementation `3f3826b` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Push run `29250140431` and pull-request run `29250143238` passed Python 3.10/3.13, including all
+  four isolated-wheel steps, and all four job annotation sets are empty. Draft PR 13 remains open,
+  draft, and mergeable with a normalized-exact body readback.
 - ARA-046 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
   self/worktree/staged scans, and pytest (`366 passed, 310 subtests passed` in 13.17 seconds; 103
   tracked/index files and zero findings). Related config/LLM/UI/CLI tests pass `138 passed, 129
@@ -1064,6 +1066,9 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- An initial ARA-046 queue-count command put backticked state labels inside a double-quoted shell
+  pattern, causing harmless command-not-found/regex errors. A literal single-quoted `rg` rerun
+  returned 40 DONE, 8 TODO, 6 DEFERRED, 1 BLOCKED, and no IN_PROGRESS; no file changed.
 - The first final ARA-046 `make check` after marking its queue entry complete correctly failed only
   two recovery-state consistency assertions because `CURRENT_STATE.md` still described ARA-046 as
   active and requested finalization work. All 364 other tests and 310 subtests passed; this snapshot
@@ -1246,8 +1251,8 @@ Updated: 2026-07-13 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-.venv/bin/python -m pytest -q tests/test_recovery_state.py
-make check
+git status --short --branch
+.venv/bin/python -m pytest -q tests/test_round_loop.py -k unsafe_resume_histories
 ```
 
 ## Interruption Recovery

@@ -412,7 +412,7 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-046 - Ollama endpoint credentials can escape through failures
 
-- Status: fixed locally; full validation and independent review passed
+- Status: fixed, pushed, and CI-verified through `3f3826b`
 - Severity: P1
 - Evidence: provider-free fake request and API fallback failures retained configured URL userinfo
   and query values in the public request error, chained cause, and model-list diagnostic.

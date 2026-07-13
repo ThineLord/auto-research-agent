@@ -46,14 +46,14 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-No task is active. ARA-046 is locally complete and independently reviewed GO; resolve live Git,
-remote, and validation evidence before starting ARA-047, the highest-priority `TODO`. If ARA-046
-is not yet published, preserve its exact tracked worktree and rerun recovery plus full validation;
-do not duplicate the fix. Its endpoint formatter and fixed failure classifiers must preserve actual
+No task is active. ARA-046 is complete and remote-verified at `3f3826b`; push/PR runs
+`29250140431`/`29250143238` passed Python 3.10/3.13 with zero annotations. Start ARA-047, the
+highest-priority `TODO`, only after resolving live Git state; do not duplicate ARA-046. Its endpoint
+formatter and fixed failure classifiers must preserve actual
 request targets and accepted URL forms while preventing userinfo/path/query/provider text from
 reaching diagnostics or exception graphs. Do not call a real provider or read ignored runtime.
 ARA-030 remains complete. Resume from the semantic checkpoint in `CURRENT_STATE.md`; use
-`4cda4302dee19006263902cbb486e375ea0142f8` as the conservative exact externally verified fallback
+`3f3826b6a357b50ebf944f74a6e953ea3f6727e9` as the conservative exact externally verified fallback
 if the semantic current `HEAD` has not yet been checked. Do not access ignored runtime or invoke a
 real provider merely to verify recovery.
 
@@ -112,5 +112,5 @@ git rev-parse --verify HEAD
 .venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
-.venv/bin/python -m pytest -q tests/test_config.py tests/test_llm.py tests/test_ui_helpers.py tests/test_cli_exit_codes.py
+.venv/bin/python -m pytest -q tests/test_round_loop.py -k unsafe_resume_histories
 ```

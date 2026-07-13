@@ -474,7 +474,8 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Validation command: provider-free fake-request redaction regressions; related config/LLM/UI/CLI
   tests passed `138 passed, 129 subtests`; final `make check` passed `366 passed, 310 subtests`.
 - Commit required: yes.
-- Dependencies: implementation complete and independently security-reviewed GO; no URL acceptance
+- Dependencies: completed at remote-equal implementation `3f3826b`; push/PR runs
+  `29250140431`/`29250143238` passed Python 3.10/3.13 with zero annotations. No URL acceptance
   change, real Ollama call, or ignored runtime access.
 
 ## ARA-047 - Reject unrepresentable resume-history scores without traceback
