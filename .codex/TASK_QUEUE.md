@@ -545,7 +545,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-050 - Preflight installed generation resources before writing
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P2
 - Risk: medium
 - Description: an installed mock can complete successfully with a missing bundled prompt and write
@@ -558,8 +558,11 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   isolated wheel smoke, then `make check`.
 - Commit required: yes.
 - Dependencies: preserve ARA-004/030 resource inventory and never use repository ignored runtime.
-- Progress: local implementation, focused/related/full tests, isolated wheel smoke, and three
-  independent reviews are green; commit, push, remote equality, and GitHub CI remain.
+- Completion: implementation `be3bc04` is pushed with exact local/upstream/`ls-remote`/PR-head
+  equality. Focused tests pass `5 passed, 23 subtests`, related tests pass `92 passed, 71 subtests`,
+  and full `make check` passes `381 passed, 449 subtests`; isolated wheel smoke and three
+  independent reviews are green. Push/PR runs `29257476266`/`29257478876` passed Python 3.10/3.13,
+  all four wheel steps, and zero annotations.
 
 ## ARA-051 - Fail closed on duplicate conflicting cloud profiles
 

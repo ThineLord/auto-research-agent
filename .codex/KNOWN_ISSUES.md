@@ -424,10 +424,11 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-050 - Installed mock can omit generation prompts from provenance
 
-- Status: fixed locally; remote verification pending
+- Status: fixed, pushed, and CI-verified through `be3bc04`
 - Severity: P2 packaging and provenance reliability
 - Impact: deterministic installed mock agents do not read prompt files, so a missing or corrupt
   prompt could still produce a successful run with incomplete prompt provenance.
-- Current action: ARA-050 validates all four generation prompts before any generation-side write,
-  preserves prompt-independent CLI paths and regular hardlink installation compatibility, and has
-  passed focused, related, isolated-wheel, full-gate, and independent review validation.
+- Resolution: ARA-050 validates all four generation prompts before any generation-side write,
+  preserves prompt-independent CLI paths and regular hardlink installation compatibility, and
+  passed focused, related, isolated-wheel, full-gate, independent review, exact remote-equality,
+  and Python 3.10/3.13 push/PR CI validation.

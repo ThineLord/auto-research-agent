@@ -825,3 +825,19 @@ Validation and implementation outcomes will be appended only after they are actu
   `29255525721` and pull-request run `29255530241` passed Python 3.10/3.13, every isolated-wheel
   step, and all four annotation sets are empty. Draft PR 13 remains open, draft, mergeable, and its
   normalized body readback is exact.
+
+## 2026-07-13 - Installed generation resource preflight
+
+- Reproduced installed deterministic mock generation succeeding with a missing prompt and writing
+  incomplete prompt provenance.
+- Added anchored, no-follow, stable-identity validation for all four nonblank UTF-8 generation
+  prompts before config, seeding, provider startup, locks, or artifacts in the six prompt-consuming
+  modes. Analysis, comparison, survey, and cloud helpers preserve their prompt-independent paths.
+- Preserved valid hardlink-based package installations while keeping automatic artifact reads
+  single-link by default; symlink and special-node rejection remains intact.
+- Focused tests passed `5 passed, 23 subtests`; related tests passed `92 passed, 71 subtests`;
+  isolated real-wheel smoke and final `make check` (`381 passed, 449 subtests`) passed. Three
+  independent final reviews returned GO.
+- Committed as `be3bc04` and pushed with exact local/upstream/`ls-remote`/PR-head equality. Push run
+  `29257476266` and pull-request run `29257478876` passed Python 3.10/3.13, every isolated-wheel
+  step, and all four job annotation sets are empty. Draft PR 13 remains open, draft, and mergeable.

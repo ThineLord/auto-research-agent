@@ -4,20 +4,20 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: publish and remotely verify the locally green ARA-050 generation-resource
-  preflight while preserving provider-free and prompt-independent CLI paths.
+- Current goal: preserve the remote-verified ARA-050 generation-resource boundary, then continue
+  with the highest-priority queued task ARA-051.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `51212901503ac38713ba70efb4d0e7a90f9ab7fa` (the exact
+- State recorded against commit: `be3bc04acebc1a62656e38ac9ca153b95ab84f7a` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `51212901503ac38713ba70efb4d0e7a90f9ab7fa` (exact local,
+- Last externally verified fallback: `be3bc04acebc1a62656e38ac9ca153b95ab84f7a` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: ARA-050. The installed-layout prompt preflight, compatibility
-  matrix, wheel smoke, full gate, and three independent reviews are locally green; commit, push,
-  GitHub CI, and remote-equality verification remain.
+- Active task at this snapshot: none. ARA-050 is complete, independently reviewed GO, pushed with
+  exact local/upstream/`ls-remote`/PR-head equality, and passed push/PR CI on Python 3.10/3.13.
+  ARA-051 is the highest-priority `TODO`.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -670,9 +670,8 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Remaining Steps
 
-- Review and stage only ARA-050 code, tests, changelog, and recovery-state paths; commit, push,
-  verify exact remote equality and GitHub push/PR CI, then record the remote-verified completion.
-- Leave ARA-051 through ARA-057 and the owner-blocked/deferred tasks untouched.
+- Start only ARA-051 after resolving live Git state and confirming remote synchronization; leave
+  ARA-052 through ARA-057 and the owner-blocked/deferred tasks untouched.
 
 ## Test Status
 
@@ -685,6 +684,13 @@ Updated: 2026-07-13 (Asia/Shanghai)
 - ARA-050 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
   self/worktree/staged scans, and pytest (`381 passed, 449 subtests passed` in 16.23 seconds; 103
   tracked/index files and zero findings). Three independent final reviews report GO.
+- ARA-050 implementation `be3bc04` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Push run `29257476266` and pull-request run `29257478876` passed Python 3.10/3.13, including all
+  four isolated-wheel steps; all four job annotation sets are empty. Draft PR 13 remains open,
+  draft, and mergeable.
+- ARA-050 remote-closeout `make check` again passes all gates (`381 passed, 449 subtests passed` in
+  18.57 seconds) after the queue, completion log, validation JSON, and resume instructions were
+  synchronized.
 - ARA-049 pre-fix focused regressions produced the expected `6 failed, 1 passed, 1 subtest passed`.
   After implementation and review strengthening, the focused layer passes `4 passed, 10 subtests`
   and the UI/CLI/LLM/cloud/recovery layer passes `157 passed, 127 subtests`.
@@ -1413,9 +1419,10 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ```bash
 git status --short --branch
+git rev-parse --verify HEAD
+git rev-list --left-right --count @{upstream}...HEAD
 git diff --check
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
-git diff -- CHANGELOG.md src/cli.py src/package_resources.py src/storage.py tests/test_cli_exit_codes.py tests/test_package_resources.py tests/test_storage.py .codex
 ```
 
 ## Interruption Recovery
