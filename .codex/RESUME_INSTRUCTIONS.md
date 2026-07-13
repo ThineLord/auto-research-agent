@@ -46,16 +46,14 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-ARA-047 is locally complete and awaiting its implementation commit, push, and GitHub CI. Resume by
-validating the recovery files and diff, then explicitly stage only the six task-owned tracked files.
-The provider-free fix converts overflow to the existing invalid-history result and rejects explicit
-unrepresentable native numeric scores before writes or agent calls; finite values, legacy numeric
-strings, missing/bool scores, and explicitly unsuccessful rounds retain prior read behavior. Do not
-touch other queued CLI/UI/recovery tasks, call a provider, or read ignored runtime. ARA-046 is
-complete through remote-equal closeout `70cec0b`; closeout push/PR runs
-`29250470168`/`29250471823` passed Python 3.10/3.13 with zero annotations. Use
-`70cec0b88f24d535bdc69f1f76acfe4da6333007` as the conservative exact externally verified fallback
-until ARA-047 is pushed and its CI passes.
+No task is active. ARA-047 is complete and remote-verified at `d7708b3`; push/PR runs
+`29251545910`/`29251548644` passed Python 3.10/3.13, all four wheel-smoke steps, and zero
+annotations. Start ARA-048, the highest-priority `TODO`, only after resolving live Git state; do not
+duplicate ARA-047 or fold in the separately queued UI/cloud/recovery findings. The completed fix
+rejects explicit unrepresentable native numeric history scores before writes or agent calls while
+preserving finite values, legacy numeric strings, missing/bool scores, and explicit unsuccessful
+rounds. Use `d7708b3854476b7a54a9751ef5e150bc30ad179d` as the conservative exact externally verified
+fallback if the semantic current `HEAD` has not yet been checked.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
 it imported the editable checkout and advanced ignored `projects/example` state after a missing
@@ -71,6 +69,10 @@ The last successful local full validation command was:
 ```bash
 make check
 ```
+
+ARA-047's final local result is Ruff/import/safety success and `368 passed, 316 subtests passed`;
+its focused unsafe-history/CLI/compatibility layer passes `4 passed, 20 subtests`, and related tests
+pass `95 passed, 130 subtests`. Three independent reviews returned GO.
 
 The current ARA-030 full expected result is Ruff/import/safety success and `359 passed, 277 subtests
 passed`; its targeted CI/package/safety regression passes `19 passed, 23 subtests passed`. The final
@@ -93,9 +95,9 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-ARA-047 is the sole `IN_PROGRESS` task and must be remotely verified before ARA-048 starts. ARA-018
-requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026, ARA-006,
-or ARA-007 until their recorded dependencies are satisfied.
+There is no `IN_PROGRESS` task; ARA-048 is the next `TODO`. ARA-018 requires an explicit owner
+license/distribution decision. Do not start ARA-019, ARA-026, ARA-006, or ARA-007 until their
+recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
 

@@ -4,20 +4,20 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: publish and remotely verify the locally complete ARA-047 resume-history numeric
-  hardening without changing finite or explicit unsuccessful-history semantics.
+- Current goal: preserve the remote-verified ARA-047 resume-history hardening, then continue with
+  the highest-priority queued task ARA-048.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `70cec0b88f24d535bdc69f1f76acfe4da6333007` (the exact
+- State recorded against commit: `d7708b3854476b7a54a9751ef5e150bc30ad179d` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `70cec0b88f24d535bdc69f1f76acfe4da6333007` (exact local,
+- Last externally verified fallback: `d7708b3854476b7a54a9751ef5e150bc30ad179d` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: ARA-047 is locally complete and awaiting its implementation commit,
-  push, and GitHub CI verification. Positive and negative 400-digit scores now reach the existing
-  privacy-safe invalid-history boundary before any artifact write or agent call.
+- Active task at this snapshot: none. ARA-047 is complete, independently reviewed GO, pushed with
+  exact local/upstream/`ls-remote`/PR-head equality, and passed push/PR CI on Python 3.10/3.13.
+  ARA-048 is the highest-priority `TODO`.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -622,9 +622,8 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Remaining Steps
 
-- Commit and push the reviewed ARA-047 implementation and recovery snapshot.
-- Verify exact local/upstream/`ls-remote` equality, push and pull-request CI, annotations, and draft
-  PR 13 before marking ARA-047 `DONE` and selecting another queued task.
+- Start only ARA-048 with a provider-free conflicting-primary-mode parser/entrypoint regression;
+  leave the separately queued UI, packaging, cloud, and recovery candidates untouched.
 
 ## Test Status
 
@@ -633,8 +632,10 @@ Updated: 2026-07-13 (Asia/Shanghai)
 - ARA-047 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
   self/worktree/staged scans, and pytest (`368 passed, 316 subtests passed` in 13.62 seconds; 103
   tracked/index files and zero findings). Three independent reviews report GO with no P1/P2.
-- ARA-047 remote verification is pending; the conservative externally verified fallback remains
-  ARA-046 closeout `70cec0b` until the new commit is pushed and its CI completes.
+- ARA-047 implementation `d7708b3` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Push run `29251545910` and pull-request run `29251548644` passed Python 3.10/3.13, including all
+  four isolated-wheel steps, and all four job annotation sets are empty. Draft PR 13 remains open,
+  draft, and mergeable.
 - ARA-046 implementation `3f3826b` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
   Push run `29250140431` and pull-request run `29250143238` passed Python 3.10/3.13, including all
   four isolated-wheel steps, and all four job annotation sets are empty. Draft PR 13 remains open,
@@ -1284,9 +1285,9 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ```bash
 git status --short --branch
-.venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
-.venv/bin/python -m pytest -q tests/test_recovery_state.py
-git diff --check
+git rev-parse --verify HEAD
+git rev-list --left-right --count @{upstream}...HEAD
+.venv/bin/python -m pytest -q tests/test_cli_exit_codes.py tests/test_recovery_state.py
 ```
 
 ## Interruption Recovery
@@ -1295,8 +1296,8 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 
 ## Current Risks And Prohibitions
 
-- Keep ARA-047 provider-free and numeric-history-only: do not reinterpret finite scores, rewrite
-  canonical artifacts, call an agent/provider, or read ignored project runtime to validate it.
+- Keep ARA-048 parser/entrypoint-only and provider-free: reproduce conflicting primary modes in
+  temporary projects, never against ignored project runtime or canonical experiment artifacts.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

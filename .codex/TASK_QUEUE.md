@@ -480,7 +480,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-047 - Reject unrepresentable resume-history scores without traceback
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P1
 - Risk: low
 - Description: `_history_float()` directly converts numeric history values, so a valid 400-digit
@@ -493,8 +493,9 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   subtests`; related resume/runner/CLI/recovery tests passed `95 passed, 130 subtests`; final `make
   check` passed `368 passed, 316 subtests`.
 - Commit required: yes.
-- Dependencies: local implementation and three independent reviews are complete with no P1/P2;
-  commit, push, and GitHub CI verification remain before changing status to `DONE`.
+- Dependencies: completed at remote-equal implementation `d7708b3`; push/PR runs
+  `29251545910`/`29251548644` passed Python 3.10/3.13, all four wheel-smoke steps, and zero
+  annotations. No provider call or ignored runtime access.
 
 ## ARA-048 - Reject conflicting primary CLI modes before any work
 

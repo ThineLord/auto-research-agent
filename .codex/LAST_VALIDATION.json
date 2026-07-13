@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-13T20:50:25+08:00",
+  "recorded_at": "2026-07-13T20:55:37+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "70cec0b88f24d535bdc69f1f76acfe4da6333007",
-  "last_known_stable_commit": "70cec0b88f24d535bdc69f1f76acfe4da6333007",
+  "head_commit": "d7708b3854476b7a54a9751ef5e150bc30ad179d",
+  "last_known_stable_commit": "d7708b3854476b7a54a9751ef5e150bc30ad179d",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "70cec0b88f24d535bdc69f1f76acfe4da6333007",
+  "state_recorded_against_commit": "d7708b3854476b7a54a9751ef5e150bc30ad179d",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-13T20:38:25+08:00",
-    "commit": "70cec0b88f24d535bdc69f1f76acfe4da6333007",
+    "verified_at": "2026-07-13T20:55:37+08:00",
+    "commit": "d7708b3854476b7a54a9751ef5e150bc30ad179d",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29250470168,
+        "run_id": 29251545910,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "70cec0b88f24d535bdc69f1f76acfe4da6333007",
+        "head_sha": "d7708b3854476b7a54a9751ef5e150bc30ad179d",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29250471823,
+        "run_id": 29251548644,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "70cec0b88f24d535bdc69f1f76acfe4da6333007",
+        "head_sha": "d7708b3854476b7a54a9751ef5e150bc30ad179d",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,32 @@
       }
     }
   },
-  "status": "ara047_locally_validated_pending_commit_and_remote_verification",
+  "status": "ara047_complete_remote_verified",
   "commands": [
+    {
+      "command": "ARA-047 push, exact remote equality, push/PR CI, annotations, and draft PR verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "implementation_commit": "d7708b3854476b7a54a9751ef5e150bc30ad179d",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "pull_request_head_equal": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29251545910,
+        "pull_request_run_id": 29251548644,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "wheel_smoke_steps_passed": 4,
+        "job_annotations": 0,
+        "draft_pr_13_open": true,
+        "draft_pr_13_draft": true,
+        "draft_pr_13_mergeable": true
+      }
+    },
     {
       "command": "make check after final ARA-047 single-history validation and compatibility coverage",
       "exit_code": 0,
@@ -2878,9 +2902,9 @@
     }
   ],
   "notes": [
-    "ARA-047 is locally complete and pending its implementation commit, push, and GitHub CI; ARA-048 through ARA-056 remain separate and must not be folded into this numeric-history fix.",
+    "ARA-047 is complete and remote-verified at d7708b3; push and pull-request runs 29251545910 and 29251548644 passed Python 3.10/3.13, all four wheel-smoke steps, and zero annotations.",
     "ARA-047 rejects positive and negative unrepresentable native numeric scores in dual and round_metrics-only resume histories before writes or agent calls, while preserving finite, numeric-string, missing, bool, and explicit unsuccessful legacy read behavior.",
-    "The conservative externally verified fallback remains ARA-046 closeout 70cec0b until the reviewed ARA-047 commit is pushed and its push/pull-request jobs pass.",
+    "ARA-048 is the next unblocked TODO. ARA-049 through ARA-056 remain separate confirmed findings and must not be folded into ARA-047.",
     "ARA-046 is complete and remote-verified at 3f3826b; push and pull-request runs 29250140431 and 29250143238 passed Python 3.10/3.13 with zero annotations.",
     "ARA-046 preserves endpoint acceptance and exact request targets while limiting diagnostics to an unambiguous origin or fixed placeholder; raw requests, urllib, and failed command output never enter events, public messages, or exception graphs.",
     "ARA-030 is complete through remote-equal implementation 4cda430; push and pull-request runs 29232341316 and 29232344581 passed Python 3.10/3.13, all four real-wheel steps, and zero annotations.",

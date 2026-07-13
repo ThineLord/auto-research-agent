@@ -770,3 +770,22 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed as `3f3826b`, pushed with exact local/upstream/`ls-remote`/PR-head equality, and updated
   draft PR 13. Push run `29250140431` and pull-request run `29250143238` passed Python 3.10/3.13,
   every isolated-wheel step, and all four job annotation sets are empty.
+
+## 2026-07-13 - Unrepresentable resume-history score boundary
+
+- Reproduced positive and negative 400-digit JSON scores escaping dual-history resume as raw
+  `OverflowError`, then found the `round_metrics.json`-only legacy path silently ignored the same
+  values and continued into agent work and artifact writes.
+- Converted overflow to the existing invalid-history result and rejected explicit native numeric
+  scores that cannot become finite floats for any round not explicitly marked unsuccessful.
+  Finite scores, legacy numeric strings, missing/bool scores, and explicit unsuccessful rounds keep
+  their prior read behavior.
+- Added dual- and single-history positive/negative regressions, complete temporary-project byte
+  snapshots, no-agent/no-new-round/path-safe checks, CLI status-2 and lock-release coverage, plus
+  explicit unsuccessful-round compatibility.
+- Focused tests passed `4 passed, 20 subtests`; related resume/CLI/recovery tests passed `95 passed,
+  130 subtests`; final `make check` passed `368 passed, 316 subtests` with 103 tracked/index files
+  and zero safety findings. Three independent final reviews returned GO with no P1/P2 blocker.
+- Committed as `d7708b3` and pushed with exact local/upstream/`ls-remote`/PR-head equality. Push run
+  `29251545910` and pull-request run `29251548644` passed Python 3.10/3.13, every isolated-wheel
+  step, and all four job annotation sets are empty.
