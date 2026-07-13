@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-12T17:34:10+08:00",
+  "recorded_at": "2026-07-13T15:05:53+08:00",
   "branch": "codex/sol-autonomous-hardening",
   "head_commit": "877562ea2b82e4ff012a1a908ba25ee9d180b6de",
   "last_known_stable_commit": "877562ea2b82e4ff012a1a908ba25ee9d180b6de",
@@ -54,8 +54,39 @@
       }
     }
   },
-  "status": "ara041_complete_remote_verified",
+  "status": "ara030_in_progress_real_wheel_ci_smoke",
   "commands": [
+    {
+      "command": "ARA-030 startup repository/remote/PR recovery and pre-change make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "observed_head": "db38fb0cb3e75d507017fad41af5dd101c8f3a1e",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "ahead": 0,
+        "behind": 0,
+        "working_tree_clean": true,
+        "active_git_operation": false,
+        "stash_entries": 0,
+        "known_stale_rebase_head_preserved": true,
+        "draft_pr_13_open": true,
+        "draft_pr_13_draft": true,
+        "draft_pr_13_mergeable": true,
+        "ruff_format_files": 58,
+        "ruff_lint": "passed",
+        "import_smoke": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 101,
+        "findings": 0,
+        "pytest_tests_passed": 353,
+        "pytest_subtests_passed": 262,
+        "pytest_duration_seconds": 13.38,
+        "provider_called": false
+      }
+    },
     {
       "command": "ARA-041 push, exact remote equality, push/PR CI, annotation, and draft PR verification",
       "exit_code": 0,
@@ -2539,6 +2570,8 @@
     }
   ],
   "notes": [
+    "ARA-030 is IN_PROGRESS with explicit owner approval from 2026-07-13 for a source-excluded real-wheel install smoke in the existing Python 3.10 and 3.13 CI jobs.",
+    "ARA-030 excludes sdist work, uploads, versions, dependencies, license/publication policy, provider calls, ignored repository runtime, and the recorded external pip-cache residue.",
     "ARA-041 is complete through exact remote-equal checkpoint 877562e; implementation is 2480a61 and push/pull-request CI runs 29187626378 and 29187628011 passed Python 3.10 and 3.13 with zero annotations.",
     "ARA-041 final local make check passes 353 tests and 262 subtests with zero repository-safety findings; both independent reviews and focused re-reviews report no blockers.",
     "ARA-041 is green through the provider-free write-point/crash/retry matrix, related runner/config/storage regression, full make check, independent review, exact remote verification, and GitHub CI.",

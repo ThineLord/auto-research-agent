@@ -176,7 +176,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-030 - Add an isolated real-wheel install smoke to CI
 
-- Status: `DEFERRED`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: medium
 - Description: CI installs only the editable checkout, while the installed-layout unit fixture
@@ -189,8 +189,8 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Validation command: isolated wheel build/install smoke, `make check`, then Python 3.10/3.13
   push/pull-request CI.
 - Commit required: yes.
-- Dependencies: separately approved greater-than-30-minute packaging/CI task; ARA-018, ARA-026,
-  version, dependency, and publication policy remain out of scope.
+- Dependencies: owner approved this greater-than-30-minute packaging/CI task on 2026-07-13;
+  ARA-018, ARA-026, version, dependency, and publication policy remain out of scope.
 
 ## ARA-031 - Fail closed on invalid existing run config during resume
 

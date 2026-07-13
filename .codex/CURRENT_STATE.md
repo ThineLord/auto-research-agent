@@ -1,11 +1,11 @@
 # Codex Current State
 
-Updated: 2026-07-12 (Asia/Shanghai)
+Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: preserve the remote-verified ARA-041 recovery checkpoint and wait for the next
-  owner-approved maintenance scope.
+- Current goal: complete owner-approved P2 ARA-030 by adding a real-wheel, source-excluded install
+  smoke to both Python 3.10/3.13 CI jobs without widening release or publication policy.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
@@ -15,9 +15,9 @@ Updated: 2026-07-12 (Asia/Shanghai)
 - Last externally verified fallback: `877562ea2b82e4ff012a1a908ba25ee9d180b6de` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-041 is complete through remote-equal checkpoint
-  `877562e`; push/PR runs `29187626378`/`29187628011` passed Python 3.10/3.13 with zero
-  annotations. The queue has no `TODO` task; deferred and blocked work retains its approval gates.
+- Active task at this snapshot: ARA-030 is `IN_PROGRESS` with explicit owner approval on
+  2026-07-13. Clean local/upstream/`ls-remote` equality at `db38fb0` and the existing draft PR were
+  reverified before work; the pre-change full baseline is green.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -573,11 +573,17 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## Remaining Steps
 
-- There is no unblocked implementation task. Keep ARA-018 and ARA-030 behind their separate owner
-  or policy approval gates, and preserve all recorded dependencies for deferred work.
+- Build a provider-free failing CI contract for a real wheel smoke, implement the smallest isolated
+  build/install helper or workflow step, and verify exact wheel resources/import origin/help/mock.
+- Run targeted and full validation plus independent review, then commit and publish only ARA-030's
+  verified CI/test/docs/recovery files through draft PR 13.
+- Keep sdist, uploads, version/dependency/license policy, ignored runtime, and ARA-026 out of scope.
 
 ## Test Status
 
+- ARA-030 pre-change baseline at clean `db38fb0`: local `make check` passes Ruff format/lint,
+  imports, repository-safety self/worktree/staged scans, and pytest (`353 passed, 262 subtests
+  passed`; 101 tracked files and zero findings). No provider call or ignored runtime access occurred.
 - ARA-041 pre-fix manifest-write regression failed as expected before production changes. The
   implemented fault matrix now passes `8 passed, 50 deselected, 20 subtests passed`, covering
   journal prepare, config/manifest replacement, `KeyboardInterrupt`, cleanup failure before and
@@ -1176,9 +1182,9 @@ Updated: 2026-07-12 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git status --short --branch
-git log --oneline --decorate -n 10
-.venv/bin/python -m pytest -q tests/test_recovery_state.py
+sed -n '1,260p' tests/test_ci_workflow.py
+sed -n '1,320p' tests/test_package_resources.py
+.venv/bin/python -m pytest -q tests/test_ci_workflow.py tests/test_package_resources.py
 ```
 
 ## Interruption Recovery
@@ -1221,4 +1227,7 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - ARA-041's journal covers only the existing-run startup pair `run_config.json` and
   `run_manifest.json`. It deliberately does not claim sudden-power-loss durability or transactional
   checkpoint/history/per-round writes; do not widen that scope during closeout.
+- ARA-030 received explicit approval on 2026-07-13. Build only a wheel into fresh temporary
+  directories, exclude the checkout from installed smoke imports, never upload artifacts, and do
+  not touch the recorded KI-023 ignored state or KI-027 pip-cache residue.
 - Do not stage with `git add -A`; stage only reviewed paths.

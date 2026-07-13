@@ -46,11 +46,12 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-There is no unblocked implementation task. ARA-041 is complete through remote-equal checkpoint
-`877562e`; implementation `2480a61` uses `.resume_startup_transaction.json` to restore the exact
-prior config/manifest generation before a retry. Push/PR runs `29187626378`/`29187628011` passed
-Python 3.10/3.13 with zero annotations, and draft PR 13 remains open, draft, and mergeable. Resume
-from the semantic checkpoint in `CURRENT_STATE.md`; use
+ARA-030 is `IN_PROGRESS` with explicit owner approval from 2026-07-13. Resume by inspecting the
+current CI/package-resource diff, then run the smallest wheel-smoke contract before editing. All
+builds, installs, workspaces, and outputs must stay under fresh temporary directories; exclude the
+source checkout from installed import resolution and never touch ignored `projects/example`, the
+recorded pip cache residue, sdist policy, or any provider. ARA-041 remains complete through
+remote-equal checkpoint `877562e`. Resume from the semantic checkpoint in `CURRENT_STATE.md`; use
 `877562ea2b82e4ff012a1a908ba25ee9d180b6de` as the conservative exact externally verified fallback
 if the semantic current `HEAD` has not yet been checked. Do not access ignored runtime or invoke a
 real provider merely to verify recovery.
@@ -90,8 +91,8 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-There is no unblocked implementation task. ARA-018 requires an explicit owner license/distribution
-decision and ARA-030 still requires separate greater-than-30-minute approval. Do not start ARA-019,
+ARA-030 is the only `IN_PROGRESS` task. ARA-018 requires an explicit owner license/distribution
+decision. Do not start ARA-019,
 ARA-026, ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
