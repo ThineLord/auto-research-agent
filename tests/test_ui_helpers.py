@@ -541,6 +541,110 @@ class SharedUiBackendHelperTests(unittest.TestCase):
             self.assertIsNone(result.pid)
             self.assertIn("Failed to start run process", result.error or "")
 
+    def test_ui_session_credential_stays_in_child_environment_only(self) -> None:
+        import ui.app as ui_app
+
+        transport_env = "AUTO_RESEARCH_AGENT_UI_GEMINI_API_KEY"
+        session_secret = "synthetic-ui-session-credential"
+        inherited_secret = "synthetic-inherited-google-credential"
+        stale_transport_secret = "synthetic-stale-ui-credential"
+        command = ui_app.build_run_command(
+            provider="gemini",
+            mode="diagnostic",
+            model="gemini-test",
+            gemini_api_key_env="TEAM_GEMINI_KEY",
+            project="selected",
+            gemini_api_key_override_env=transport_env,
+        )
+        env_overrides = ui_app.build_provider_env_overrides(
+            provider="gemini",
+            api_key_env="TEAM_GEMINI_KEY",
+            api_key_value=session_secret,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            log_path = root / "run.log"
+            meta_path = root / "ui_run_process.json"
+            with (
+                patch.dict(
+                    runtime_module.os.environ,
+                    {
+                        "GOOGLE_API_KEY": inherited_secret,
+                        transport_env: stale_transport_secret,
+                    },
+                    clear=True,
+                ),
+                patch.object(
+                    runtime_module.subprocess,
+                    "Popen",
+                    return_value=SimpleNamespace(pid=456),
+                ) as popen,
+            ):
+                result = start_background_process(
+                    command=command,
+                    cwd=root,
+                    log_path=log_path,
+                    meta_path=meta_path,
+                    kind="run",
+                    env_overrides=env_overrides,
+                )
+
+            child_command = popen.call_args.args[0]
+            child_env = popen.call_args.kwargs["env"]
+            meta_text = meta_path.read_text(encoding="utf-8")
+            self.assertEqual(result.pid, 456)
+            self.assertEqual(child_env[transport_env], session_secret)
+            self.assertEqual(child_env["GOOGLE_API_KEY"], inherited_secret)
+            self.assertIn("--gemini-api-key-override-env", child_command)
+            self.assertIn(transport_env, child_command)
+            for secret in (session_secret, inherited_secret, stale_transport_secret):
+                with self.subTest(secret_kind=secret.split("-")[1]):
+                    self.assertFalse(
+                        any(secret in str(argument) for argument in child_command),
+                        "credential retained in child argv",
+                    )
+                    self.assertNotIn(secret, meta_text)
+
+            empty_overrides = ui_app.build_provider_env_overrides(
+                provider="gemini",
+                api_key_env="TEAM_GEMINI_KEY",
+                api_key_value="   ",
+            )
+            with (
+                patch.dict(
+                    runtime_module.os.environ,
+                    {transport_env: stale_transport_secret},
+                    clear=True,
+                ),
+                patch.object(
+                    runtime_module.subprocess,
+                    "Popen",
+                    return_value=SimpleNamespace(pid=789),
+                ) as empty_popen,
+            ):
+                empty_result = start_background_process(
+                    command=ui_app.build_run_command(
+                        provider="gemini",
+                        mode="diagnostic",
+                        model="gemini-test",
+                        gemini_api_key_env="TEAM_GEMINI_KEY",
+                        project="selected",
+                    ),
+                    cwd=root,
+                    log_path=root / "empty.log",
+                    meta_path=root / "empty-process.json",
+                    kind="run",
+                    env_overrides=empty_overrides,
+                )
+
+            self.assertEqual(empty_result.pid, 789)
+            self.assertEqual(empty_popen.call_args.kwargs["env"][transport_env], "")
+            self.assertNotIn(
+                "--gemini-api-key-override-env",
+                empty_popen.call_args.args[0],
+            )
+
     def test_start_background_process_masks_stale_log_path_errors(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1430,6 +1534,7 @@ release_run_lock(handle)
             benchmark_preset="free_smoke",
             max_provider_quota_failures=2,
             drafting_mode="continue_from_previous_draft",
+            gemini_api_key_override_env="AUTO_RESEARCH_AGENT_UI_GEMINI_API_KEY",
         )
 
         self.assertIn("--provider", command)
@@ -1438,6 +1543,8 @@ release_run_lock(handle)
         self.assertIn("gemini-3.5-flash", command)
         self.assertIn("--gemini-api-key-env", command)
         self.assertIn("TEAM_GEMINI_KEY", command)
+        self.assertIn("--gemini-api-key-override-env", command)
+        self.assertIn("AUTO_RESEARCH_AGENT_UI_GEMINI_API_KEY", command)
         self.assertIn("--project", command)
         self.assertIn("example", command)
         self.assertIn("--free-runner-preset", command)
@@ -1448,14 +1555,25 @@ release_run_lock(handle)
         self.assertIn("2", command)
         self.assertIn("--drafting-mode", command)
         self.assertIn("continue_from_previous_draft", command)
-        self.assertNotIn("secret-key", command)
+        self.assertFalse(
+            any("secret-key" in str(argument) for argument in command),
+            "credential retained in generated argv",
+        )
         self.assertEqual(
             ui_app.build_provider_env_overrides(
                 provider="gemini",
                 api_key_env="TEAM_GEMINI_KEY",
                 api_key_value=" secret-key ",
             ),
-            {"TEAM_GEMINI_KEY": "secret-key"},
+            {"AUTO_RESEARCH_AGENT_UI_GEMINI_API_KEY": "secret-key"},
+        )
+        self.assertEqual(
+            ui_app.build_provider_env_overrides(
+                provider="gemini",
+                api_key_env="TEAM_GEMINI_KEY",
+                api_key_value="   ",
+            ),
+            {"AUTO_RESEARCH_AGENT_UI_GEMINI_API_KEY": ""},
         )
         self.assertEqual(
             ui_app.build_provider_env_overrides(

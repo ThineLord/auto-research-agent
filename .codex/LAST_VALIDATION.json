@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-13T21:27:20+08:00",
+  "recorded_at": "2026-07-13T21:50:44+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "1ab338a158b8492404e007809ed557065a3ec3ea",
-  "last_known_stable_commit": "1ab338a158b8492404e007809ed557065a3ec3ea",
+  "head_commit": "a740344e306c3170eac46a5131f977bcfff6969f",
+  "last_known_stable_commit": "a740344e306c3170eac46a5131f977bcfff6969f",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "1ab338a158b8492404e007809ed557065a3ec3ea",
+  "state_recorded_against_commit": "a740344e306c3170eac46a5131f977bcfff6969f",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-13T21:24:42+08:00",
-    "commit": "1ab338a158b8492404e007809ed557065a3ec3ea",
+    "verified_at": "2026-07-13T21:33:51+08:00",
+    "commit": "a740344e306c3170eac46a5131f977bcfff6969f",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,11 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29253175885,
-        "run_attempt": 2,
+        "run_id": 29253912508,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "1ab338a158b8492404e007809ed557065a3ec3ea",
+        "head_sha": "a740344e306c3170eac46a5131f977bcfff6969f",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -43,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29253180079,
+        "run_id": 29253915360,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "1ab338a158b8492404e007809ed557065a3ec3ea",
+        "head_sha": "a740344e306c3170eac46a5131f977bcfff6969f",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -55,8 +54,86 @@
       }
     }
   },
-  "status": "ara048_complete_remote_verified",
+  "status": "ara049_local_validated_pending_commit_push_ci",
   "commands": [
+    {
+      "command": "ARA-049 provider-free pre-fix credential-authority regressions",
+      "exit_code": 1,
+      "result": "expected_failure",
+      "summary": {
+        "passed": 1,
+        "failed": 6,
+        "subtests_passed": 1,
+        "provider_calls": 0,
+        "ignored_runtime_access": false
+      }
+    },
+    {
+      "command": "ARA-049 focused child-environment, parser, fake-client, and no-activation regressions",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "passed": 4,
+        "subtests_passed": 10,
+        "credential_values": "synthetic_only"
+      }
+    },
+    {
+      "command": "ARA-049 related UI, CLI, LLM, cloud-free, and recovery tests",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "passed": 157,
+        "subtests_passed": 127
+      }
+    },
+    {
+      "command": "make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_files": 60,
+        "pytest_passed": 376,
+        "pytest_subtests_passed": 426,
+        "tracked_files_scanned": 103,
+        "safety_findings": 0
+      }
+    },
+    {
+      "command": "ARA-049 independent security, compatibility, and test-quality reviews",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "security": "GO",
+        "compatibility": "GO",
+        "test_quality": "GO_after_strengthening"
+      }
+    },
+    {
+      "command": "ARA-048 remote-verification closeout push, exact equality, CI, annotations, and PR body verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "closeout_commit": "a740344e306c3170eac46a5131f977bcfff6969f",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "pull_request_head_equal": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29253912508,
+        "pull_request_run_id": 29253915360,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "wheel_smoke_steps_passed": 4,
+        "job_annotations": 0,
+        "draft_pr_13_open": true,
+        "draft_pr_13_draft": true,
+        "draft_pr_13_mergeable": true,
+        "draft_pr_body_readback_normalized_exact": true
+      }
+    },
     {
       "command": "ARA-048 push, exact remote equality, push/PR CI, annotations, and draft PR verification",
       "exit_code": 0,
@@ -3068,6 +3145,10 @@
     }
   ],
   "notes": [
+    "ARA-049 is locally complete and provider-free: a nonempty UI session key is the explicit child credential, empty sessions clear stale transport state without activation, and existing no-session precedence is unchanged.",
+    "ARA-049 focused tests pass 4 tests and 10 subtests, related tests pass 157 tests and 127 subtests, full make check passes 376 tests and 426 subtests, and three independent reviews report GO; commit, push, CI, PR verification, and closeout remain.",
+    "ARA-049 is the sole active task; its scope is UI child-run credential authority with no-session-key precedence and credential-redaction compatibility preserved.",
+    "ARA-048 is complete through remote-equal closeout a740344; closeout push and pull-request runs 29253912508 and 29253915360 passed Python 3.10/3.13, all four wheel-smoke steps, and zero annotations with exact normalized PR body readback.",
     "ARA-048 is complete and remote-verified at 1ab338a; no task is active and ARA-049 is the next highest-priority TODO.",
     "ARA-048 rejects every pair of ten primary selectors during argument parsing before logging/layout/config/project/provider/artifact work while preserving normal mode, each individual selector, and ordinary modifiers.",
     "ARA-048 push run 29253175885 reached final success on attempt 2 after the first Python 3.13 setup attempt failed before checkout on GitHub action-download HTTP 503 Service Unavailable responses; pull-request run 29253180079 passed directly, all four final wheel steps passed, and all four annotation sets are empty.",

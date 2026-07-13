@@ -523,7 +523,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-049 - Make UI session credentials authoritative for the launched run
 
-- Status: `TODO`
+- Status: `IN_PROGRESS`
 - Priority: P1
 - Risk: medium
 - Description: Streamlit health/discovery selects its password-box key over config, but the child
@@ -537,6 +537,9 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   regressions, then `make check`.
 - Commit required: yes.
 - Dependencies: preserve the ARA-045 effective-key and redaction contract.
+- Progress: implementation is locally validated (`4 passed, 10 subtests`; related `157 passed, 127
+  subtests`; full `376 passed, 426 subtests`) and three independent reviews report GO. Commit,
+  remote equality, CI, PR readback, and closeout remain.
 
 ## ARA-050 - Preflight installed generation resources before writing
 

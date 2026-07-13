@@ -48,6 +48,11 @@
 
 ### Fixed
 
+* A nonempty Gemini key entered in the Streamlit password box now remains the launched child
+  run's authoritative credential even when configuration or inherited Google/Gemini variables
+  contain competing keys. The value travels only through a child-only environment entry, never
+  through argv or process metadata; an empty session explicitly clears stale transport state and
+  preserves the existing configuration/custom/Google/Gemini precedence.
 * The CLI now rejects any combination of two primary execution modes during argument parsing,
   before runtime layout, configuration, project, provider, or artifact access. Normal mode, every
   individual selector, and their existing output/runtime modifiers remain compatible.

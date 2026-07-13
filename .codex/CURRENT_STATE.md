@@ -4,20 +4,19 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: preserve the remote-verified ARA-048 CLI-mode boundary, then continue with the
-  highest-priority queued task ARA-049.
+- Current goal: complete ARA-049 by making a nonempty UI session credential authoritative for the
+  launched child run without changing no-session-key credential precedence.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `1ab338a158b8492404e007809ed557065a3ec3ea` (the exact
+- State recorded against commit: `a740344e306c3170eac46a5131f977bcfff6969f` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `1ab338a158b8492404e007809ed557065a3ec3ea` (exact local,
+- Last externally verified fallback: `a740344e306c3170eac46a5131f977bcfff6969f` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-048 is complete, independently reviewed GO, pushed with
-  exact local/upstream/`ls-remote`/PR-head equality, and passed push/PR CI on Python 3.10/3.13.
-  ARA-049 is the highest-priority `TODO`.
+- Active task at this snapshot: ARA-049. The provider-free implementation and local validation are
+  complete; commit, push, remote equality, GitHub CI, PR readback, and closeout remain.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -636,13 +635,36 @@ Updated: 2026-07-13 (Asia/Shanghai)
   and three independent read-only reviews are green. ARA-057 separately owns orphan
   mode-specific output options and was not folded into this fix.
 
+## ARA-049 Authoritative UI Session Credential
+
+- Reproduced the launched child selecting an explicit config key or inherited `GOOGLE_API_KEY`
+  after Streamlit health/discovery had selected the password-box key (`6 failed, 1 passed, 1
+  subtest passed` across the initial boundary set).
+- Added a fixed child-only environment transport and a hidden activation option containing only
+  that environment variable's name. A nonempty session value now feeds preflight, cloud helper,
+  and actual client creation as the explicit key; empty sessions clear stale transport state and
+  omit activation, preserving config/custom/Google/Gemini precedence.
+- Added provider-free Popen/metadata, parse-time fail-closed, real client-factory/fake-SDK
+  competition, stale-unactivated transport, and argv-substring regressions. No actual credential,
+  provider, ignored runtime, config, experiment, or research artifact was accessed.
+- Focused, related, recovery, and full checks pass. Security, compatibility, and test-quality
+  reviews all report GO after strengthening the argv and no-activation assertions.
+
 ## Remaining Steps
 
-- Start only ARA-049 with provider-free child-environment and credential-precedence regressions;
-  leave ARA-050 through ARA-057 and the owner-blocked/deferred tasks untouched.
+- Commit and push only the locally validated ARA-049 implementation, verify exact remote/PR equality
+  and Python 3.10/3.13 CI, update the draft PR, then record a separate remote closeout checkpoint.
+- Leave ARA-050 through ARA-057 and the owner-blocked/deferred tasks untouched until ARA-049 is
+  remotely closed.
 
 ## Test Status
 
+- ARA-049 pre-fix focused regressions produced the expected `6 failed, 1 passed, 1 subtest passed`.
+  After implementation and review strengthening, the focused layer passes `4 passed, 10 subtests`
+  and the UI/CLI/LLM/cloud/recovery layer passes `157 passed, 127 subtests`.
+- ARA-049 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
+  self/worktree/staged scans, and pytest (`376 passed, 426 subtests passed` in 14.27 seconds; 103
+  tracked/index files and zero findings). Three independent reviews report GO.
 - ARA-048 pre-fix conflict regression failed as expected (`93 failed, 1 passed`): 90 pair/order
   subtests plus direct, module, and copied-installed entrypoint boundaries all exposed the missing
   parser rejection. The post-fix focused layer passes `6 passed, 100 subtests`; related
@@ -657,6 +679,9 @@ Updated: 2026-07-13 (Asia/Shanghai)
   its first Python 3.13 setup attempt failed before checkout when GitHub could not download actions,
   and the failed-job rerun then passed every step. All four final wheel-smoke steps passed, all four
   final annotation sets are empty, and the draft PR body normalized readback is exact.
+- ARA-048 remote-verification closeout `a740344` is pushed with exact local/upstream/`ls-remote`/
+  PR-head equality. Closeout push run `29253912508` and pull-request run `29253915360` passed Python
+  3.10/3.13, all four isolated-wheel steps, and zero annotations; draft PR body readback is exact.
 - ARA-047 focused unsafe-history/CLI/compatibility tests pass `4 passed, 20 subtests`; related
   round-loop/CLI-exit/recovery tests pass `95 passed, 130 subtests`.
 - ARA-047 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
@@ -1122,6 +1147,18 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- The first ARA-049 local-validation recovery snapshot used an unrecognized fallback label, so one
+  recovery consistency assertion failed while the other five passed. The resume wording now uses
+  the schema's explicit conservative externally verified fallback form.
+- ARA-049's initial focused regression failed as expected (`6 failed, 1 passed, 1 subtest passed`):
+  the UI command/helper lacked child-only transport activation and CLI rejected the new option.
+- The first ARA-049 related run failed only two cloud CLI tests because their legacy
+  `SimpleNamespace` fixtures lacked the new optional field (`2 failed, 155 passed, 126 subtests`).
+  A backward-compatible `getattr` corrected the fixture boundary; the same related layer now passes
+  `157 passed, 127 subtests`.
+- Test-quality review initially returned NO-GO because list membership would miss a secret embedded
+  inside an argv item and no CLI-level stale-unactivated transport case existed. Substring scanning
+  and the missing fake-SDK control were added; focused re-review returned GO.
 - ARA-048 push run `29253175885` initially failed only Python 3.13 during `Set up job`, before
   checkout or any project step, after three GitHub HTTP 503 `Service Unavailable` responses while
   resolving action downloads. The authorized failed-job rerun passed setup, wheel smoke, and the
@@ -1325,11 +1362,10 @@ Updated: 2026-07-13 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git status --short --branch
-git rev-parse --verify HEAD
-git rev-list --left-right --count @{upstream}...HEAD
 git diff --check
+.venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
+git status --short --branch
 ```
 
 ## Interruption Recovery
@@ -1341,6 +1377,8 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - ARA-048 covers only conflicts between primary selectors. ARA-057 owns orphan mode-specific
   output arguments and must remain a separate follow-up; neither task authorizes provider or
   ignored-runtime validation.
+- Keep ARA-049 provider-free and credential-value-safe: use synthetic secrets in patched child
+  environments, never print or inspect actual key values, and preserve ARA-045 redaction behavior.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

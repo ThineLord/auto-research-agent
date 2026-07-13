@@ -52,6 +52,7 @@ from src.config import (
     save_default_model_name,
     save_default_model_selection,
 )
+from src.constants import UI_GEMINI_API_KEY_ENV
 from src.llm import GeminiClient
 from src.resume import build_resume_preview
 from src.resume_safety import (
@@ -316,6 +317,7 @@ def build_run_command(
     benchmark_preset: str | None = None,
     max_provider_quota_failures: int | None = None,
     drafting_mode: str | None = None,
+    gemini_api_key_override_env: str | None = None,
 ) -> list[str]:
     mode_flags = {
         "diagnostic": ["--diagnostic"],
@@ -340,6 +342,8 @@ def build_run_command(
         command.extend(["--project", project])
     if provider == MODEL_PROVIDER_GEMINI and gemini_api_key_env:
         command.extend(["--gemini-api-key-env", gemini_api_key_env])
+    if provider == MODEL_PROVIDER_GEMINI and gemini_api_key_override_env:
+        command.extend(["--gemini-api-key-override-env", gemini_api_key_override_env])
     if provider == MODEL_PROVIDER_GEMINI and free_runner_preset:
         command.extend(["--free-runner-preset", free_runner_preset])
     if benchmark_preset:
@@ -358,11 +362,8 @@ def build_provider_env_overrides(
 ) -> dict[str, str]:
     if provider != MODEL_PROVIDER_GEMINI:
         return {}
-    env_name = api_key_env.strip()
-    key_value = api_key_value.strip()
-    if not env_name or not key_value:
-        return {}
-    return {env_name: key_value}
+    _ = api_key_env  # Retained for compatibility with existing helper callers.
+    return {UI_GEMINI_API_KEY_ENV: api_key_value.strip()}
 
 
 def has_gemini_api_key_source(
@@ -2396,6 +2397,11 @@ def main() -> None:
                 selected_benchmark_preset if mode == "continuous" else None,
                 selected_max_provider_quota_failures if mode == "continuous" else None,
                 selected_drafting_mode,
+                gemini_api_key_override_env=(
+                    UI_GEMINI_API_KEY_ENV
+                    if selected_provider == MODEL_PROVIDER_GEMINI and gemini_session_api_key
+                    else None
+                ),
             ),
             cwd=ROOT,
             log_path=run_log_path,

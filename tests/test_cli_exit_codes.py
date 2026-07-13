@@ -1,17 +1,26 @@
 from __future__ import annotations
 
+import io
 import json
 import os
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import src.cli as cli_module
-from src.config import AppConfig, ConfigValidationError, LiteratureSurveyConfig
+import src.llm as llm_module
+from src.config import (
+    AppConfig,
+    ConfigValidationError,
+    GeminiConfig,
+    LiteratureSurveyConfig,
+    ModelConfig,
+)
 from src.project_input import ProjectInputError
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -91,6 +100,166 @@ runpy.run_module("src.main", run_name="__main__")
         self.assertIn("not allowed with argument", result.stderr)
         self.assertNotIn("RUNTIME_LAYOUT_ACCESSED", combined)
         self.assertNotIn("Traceback", combined)
+
+    def test_gemini_override_env_must_be_populated_before_runtime_setup(self) -> None:
+        transport_env = "AUTO_RESEARCH_AGENT_UI_GEMINI_API_KEY"
+        for case_name, environment in (
+            ("missing", {}),
+            ("empty", {transport_env: ""}),
+            ("whitespace", {transport_env: "   "}),
+        ):
+            with (
+                self.subTest(case=case_name),
+                patch.dict(cli_module.os.environ, environment, clear=True),
+                redirect_stderr(io.StringIO()) as stderr,
+            ):
+                with self.assertRaises(SystemExit) as raised:
+                    cli_module.parse_args(["--gemini-api-key-override-env", transport_env])
+
+            self.assertEqual(raised.exception.code, 2)
+            self.assertIn("must name a populated environment variable", stderr.getvalue())
+
+    def test_gemini_ui_session_key_is_actual_child_client_credential(self) -> None:
+        transport_env = "AUTO_RESEARCH_AGENT_UI_GEMINI_API_KEY"
+        session_secret = "synthetic-ui-session-credential"
+        original_create_client = cli_module.create_llm_client
+
+        cases = (
+            (
+                "config-and-all-environments",
+                "synthetic-config-credential",
+                "TEAM_GEMINI_KEY",
+                {
+                    "TEAM_GEMINI_KEY": "synthetic-custom-credential",
+                    "GOOGLE_API_KEY": "synthetic-google-credential",
+                    "GEMINI_API_KEY": "synthetic-gemini-credential",
+                },
+                True,
+                session_secret,
+            ),
+            (
+                "dual-builtins",
+                "",
+                "GEMINI_API_KEY",
+                {
+                    "GOOGLE_API_KEY": "synthetic-google-credential",
+                    "GEMINI_API_KEY": "synthetic-gemini-credential",
+                },
+                True,
+                session_secret,
+            ),
+            ("session-only", "", "TEAM_GEMINI_KEY", {}, True, session_secret),
+            (
+                "stale-transport-without-activation",
+                "synthetic-config-credential",
+                "TEAM_GEMINI_KEY",
+                {
+                    "TEAM_GEMINI_KEY": "synthetic-custom-credential",
+                    "GOOGLE_API_KEY": "synthetic-google-credential",
+                    "GEMINI_API_KEY": "synthetic-gemini-credential",
+                },
+                False,
+                "synthetic-config-credential",
+            ),
+        )
+
+        class ProbeStop(RuntimeError):
+            pass
+
+        for (
+            case_name,
+            config_secret,
+            configured_env,
+            competing_environment,
+            activate_override,
+            expected_secret,
+        ) in cases:
+            with self.subTest(case=case_name), tempfile.TemporaryDirectory() as tmp:
+                project_dir = Path(tmp) / "projects" / "selected"
+                project_dir.mkdir(parents=True)
+                environment = dict(competing_environment)
+                environment[transport_env] = session_secret
+                selected_expected_credential = False
+
+                class FakeClient:
+                    def __init__(self, **kwargs: object) -> None:
+                        nonlocal selected_expected_credential
+                        selected_key = (
+                            kwargs.get("api_key")
+                            or llm_module.os.environ.get("GOOGLE_API_KEY")
+                            or llm_module.os.environ.get("GEMINI_API_KEY")
+                        )
+                        selected_expected_credential = selected_key == expected_secret
+
+                fake_genai = SimpleNamespace(Client=FakeClient)
+
+                def create_and_probe(**kwargs: object) -> object:
+                    client = original_create_client(**kwargs)
+                    client._create_client()  # type: ignore[attr-defined]
+                    raise ProbeStop("credential selection captured")
+
+                with patch.dict(cli_module.os.environ, environment, clear=True):
+                    argv = [
+                        "--diagnostic",
+                        "--provider",
+                        "gemini",
+                        "--model",
+                        "gemini-test",
+                        "--project",
+                        "selected",
+                        "--gemini-api-key-env",
+                        configured_env,
+                    ]
+                    if activate_override:
+                        argv.extend(["--gemini-api-key-override-env", transport_env])
+                    args = cli_module.parse_args(argv)
+                    with (
+                        patch.object(cli_module, "parse_args", return_value=args),
+                        patch.object(
+                            cli_module,
+                            "load_app_config",
+                            return_value=AppConfig(
+                                model=ModelConfig(
+                                    provider="gemini",
+                                    name="gemini-test",
+                                    gemini=GeminiConfig(
+                                        api_key_env=configured_env,
+                                        api_key=config_secret,
+                                    ),
+                                )
+                            ),
+                        ),
+                        patch.object(cli_module, "seed_default_mock_project", return_value=False),
+                        patch.object(
+                            cli_module,
+                            "load_project_input",
+                            return_value=_project_input(project_dir),
+                        ),
+                        patch.object(
+                            cli_module,
+                            "acquire_run_lock",
+                            return_value=(object(), None),
+                        ),
+                        patch.object(cli_module, "release_run_lock") as release_run_lock,
+                        patch.object(
+                            cli_module,
+                            "create_llm_client",
+                            side_effect=create_and_probe,
+                        ),
+                        patch.object(
+                            llm_module,
+                            "_load_google_genai",
+                            return_value=(fake_genai, SimpleNamespace()),
+                        ),
+                    ):
+                        with self.assertRaises(ProbeStop):
+                            cli_module.main()
+
+                self.assertTrue(
+                    selected_expected_credential,
+                    "child client selected a credential outside the expected precedence",
+                )
+                release_run_lock.assert_called_once()
 
     def test_project_preflight_os_errors_exit_two_before_runtime_setup(self) -> None:
         for error in (PermissionError("denied"), FileNotFoundError("missing")):

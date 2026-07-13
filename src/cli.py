@@ -181,6 +181,12 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         help="Environment variable name that contains the Gemini API key.",
     )
     parser.add_argument(
+        "--gemini-api-key-override-env",
+        type=str,
+        default=None,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
         "--project",
         type=str,
         default=None,
@@ -267,6 +273,15 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     if args.compare_runs is not None and len(args.compare_runs) < 2:
         parser.error("--compare-runs requires at least two RUN_DIR arguments")
+    if args.gemini_api_key_override_env is not None:
+        override_env = args.gemini_api_key_override_env.strip()
+        try:
+            override_value = os.environ.get(override_env, "")
+        except (OSError, ValueError):
+            override_value = ""
+        if not override_env or not override_value.strip():
+            parser.error("--gemini-api-key-override-env must name a populated environment variable")
+        args.gemini_api_key_override_env = override_env
     return args
 
 
@@ -489,6 +504,14 @@ def main() -> None:
             model_name = DEFAULT_GEMINI_MODEL
     gemini_api_key_env = args.gemini_api_key_env or config_gemini.api_key_env
     gemini_config = replace(config_gemini, api_key_env=gemini_api_key_env)
+    gemini_api_key_override = ""
+    gemini_api_key_override_env = getattr(args, "gemini_api_key_override_env", None)
+    if gemini_api_key_override_env:
+        gemini_api_key_override = os.environ.get(
+            gemini_api_key_override_env,
+            "",
+        ).strip()
+    effective_gemini_api_key = gemini_api_key_override or gemini_config.api_key
     cloud_free_config = _apply_cloud_free_arg_overrides(config, args)
     model_label = format_model_label(provider, model_name)
     base_url = config.ollama_base_url
@@ -714,7 +737,7 @@ def main() -> None:
     elif provider == MODEL_PROVIDER_GEMINI:
         if not _has_gemini_api_key_source(
             api_key_env=gemini_api_key_env,
-            config_api_key=gemini_config.api_key,
+            config_api_key=effective_gemini_api_key,
         ):
             console.print(
                 "[red]Gemini API key is missing. Set the configured environment variable, "
@@ -728,7 +751,7 @@ def main() -> None:
     if args.cloud_free_discover:
         discovered, error = discover_free_cloud_models(
             api_key_env=gemini_api_key_env,
-            api_key=gemini_config.api_key,
+            api_key=effective_gemini_api_key,
             config=cloud_free_config,
         )
         if error:
@@ -757,7 +780,7 @@ def main() -> None:
     if args.cloud_free_profile:
         discovered, error = discover_free_cloud_models(
             api_key_env=gemini_api_key_env,
-            api_key=gemini_config.api_key,
+            api_key=effective_gemini_api_key,
             config=cloud_free_config,
         )
         if error:
@@ -782,7 +805,7 @@ def main() -> None:
         profiles = profile_free_cloud_models(
             candidates=safe_candidates,
             api_key_env=gemini_api_key_env,
-            api_key=gemini_config.api_key,
+            api_key=effective_gemini_api_key,
             timeout_seconds=timeout_seconds,
         )
         try:
@@ -881,6 +904,7 @@ def main() -> None:
             timeout_seconds=timeout_seconds,
             max_prompt_chars=max_prompt_chars,
             gemini_config=gemini_config,
+            explicit_gemini_api_key=gemini_api_key_override,
             cloud_free_config=cloud_free_config
             if provider == MODEL_PROVIDER_GEMINI and cloud_free_config.cloud_free_mode
             else None,
