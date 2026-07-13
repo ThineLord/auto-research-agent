@@ -494,12 +494,31 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-059 - Non-string Ollama model names can become false healthy matches
 
-- Status: open; queued as ARA-059
+- Status: active ARA-059; locally fixed and independently reviewed, remote verification pending
 - Severity: P2 UI and discovery reliability
 - Evidence: provider-free list responses with null, boolean, numeric, list, or object `name` values
   are converted with `str(...)`; selecting the resulting text returns `health_model_ok` for all five
   shapes. The shared tags parser performs the same coercion.
 - Impact: malformed provider data can be displayed and cached as a real installed model rather than
   being ignored or rejected.
-- Boundary: ARA-058 validates only the `models` container. Record-field type policy and compatibility
-  require separate UI/parser coverage before changing normalization.
+- Resolution: a shared scalar normalizer accepts only string values before either inventory
+  de-duplication or UI health matching. Literal strings that resemble coerced values remain valid;
+  mixed records, metadata, request/redaction, list-container, and installed-fallback behavior remain
+  compatible. Exact parent-level mutation probes, focused/related/full validation, and
+  three independent reviews are green; staged and remote verification remain before closure.
+- Boundary: ARA-058 validates only the `models` container. Older process-local UI cache strings are
+  indistinguishable from genuine names and are naturally replaced on refresh or process restart;
+  text blacklists are explicitly rejected.
+
+## KI-060 - Pytest can return zero for unittest subtest-only failures
+
+- Status: open; queued as ARA-060
+- Severity: P1 CI and regression reliability
+- Evidence: the first ARA-059 pre-fix matrix reported 16 `SUBFAILED` cases and no failing parent
+  tests, yet `.venv/bin/python -m pytest` returned status 0. Adding aggregate parent assertions made
+  the same confirmed defects return status 1; pytest 9.0.3 is installed without `pytest-subtests`.
+- Impact: any regression asserted only inside one of 102 `subTest` call sites across 14 test files may be
+  visible in output but still pass local/CI gates.
+- Boundary: ARA-059 adds parent-level aggregate assertions only to its two new tests. A repository-wide
+  correction must preserve Python 3.10/3.13, avoid masking ordinary failures, and follow the safety
+  approval rule before changing test configuration or dependencies.

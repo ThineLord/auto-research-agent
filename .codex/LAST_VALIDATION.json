@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-13T23:53:40+08:00",
+  "recorded_at": "2026-07-14T00:21:29+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "0511a47739168af76d7163716d82c56e19bef9d7",
-  "last_known_stable_commit": "0511a47739168af76d7163716d82c56e19bef9d7",
+  "head_commit": "1419d5eedba2da65a11c7299aad6f7c81d799749",
+  "last_known_stable_commit": "1419d5eedba2da65a11c7299aad6f7c81d799749",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "0511a47739168af76d7163716d82c56e19bef9d7",
+  "state_recorded_against_commit": "1419d5eedba2da65a11c7299aad6f7c81d799749",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-13T23:51:36+08:00",
-    "commit": "0511a47739168af76d7163716d82c56e19bef9d7",
+    "verified_at": "2026-07-13T23:59:39+08:00",
+    "commit": "1419d5eedba2da65a11c7299aad6f7c81d799749",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29263804804,
+        "run_id": 29264305133,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "0511a47739168af76d7163716d82c56e19bef9d7",
+        "head_sha": "1419d5eedba2da65a11c7299aad6f7c81d799749",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29263808869,
+        "run_id": 29264308515,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "0511a47739168af76d7163716d82c56e19bef9d7",
+        "head_sha": "1419d5eedba2da65a11c7299aad6f7c81d799749",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,209 @@
       }
     }
   },
-  "status": "ara058_complete_remote_verified_no_active_task",
+  "status": "ara059_reviewed_indexed_full_passed_awaiting_commit_push_ci",
   "commands": [
+    {
+      "command": "ARA-059 explicit-index cached diff, staged safety, recovery, and make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "explicit_paths_staged": 10,
+        "cached_diff_check": "passed",
+        "staged_files_scanned": 104,
+        "staged_safety_findings": 0,
+        "recovery_pytest_passed": 6,
+        "recovery_subtests_passed": 1,
+        "ruff_files": 61,
+        "full_pytest_passed": 395,
+        "full_subtests_passed": 618,
+        "full_duration_seconds": 17.68,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-059 first pre-stage recovery gate",
+      "exit_code": 1,
+      "result": "operator_state_wording_error",
+      "summary": {
+        "failed_tests": 1,
+        "passed_tests": 5,
+        "passed_subtests": 1,
+        "cause": "the commit and push remaining-step bullet did not name the sole active ARA-059 task",
+        "staging_attempted": false,
+        "files_changed_by_command": 0,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-059 independent security/state, test-quality, and code/minimality/recovery reviews",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "security_state_review": "GO",
+        "test_quality_review": "GO",
+        "code_minimality_recovery_review": "GO",
+        "review_found_controls_corrected": 2,
+        "historical_validation_wording_corrected": true,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-059 final-control focused, related, and make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "focused_pytest_passed": 2,
+        "focused_subtests_passed": 37,
+        "related_pytest_passed": 103,
+        "related_subtests_passed": 157,
+        "ruff_files": 61,
+        "full_pytest_passed": 395,
+        "full_subtests_passed": 618,
+        "tracked_files_scanned": 104,
+        "staged_files_scanned": 104,
+        "safety_findings": 0,
+        "full_duration_seconds": 17.85,
+        "independent_review_full_duration_seconds": 18.45,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-059 exact-falsey and installed-whitespace parent aggregate mutation probes",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "subtest_assertion_errors_swallowed": true,
+        "falsey_non_list_parser_regression_parent_detected": true,
+        "installed_name_strip_regression_parent_detected": true,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_ui_helpers.py::TestUiHelpers::test_parse_ollama_tags_payload_rejects_non_string_model_names tests/test_ui_helpers.py::TestUiHelpers::test_ollama_health_rejects_non_string_model_names",
+      "exit_code": 4,
+      "result": "operator_selector_error",
+      "summary": {
+        "tests_collected": 0,
+        "cause": "the unittest class is SharedUiBackendHelperTests, not TestUiHelpers",
+        "files_changed": 0,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "python -m pytest -q ARA-059 focused selectors",
+      "exit_code": 127,
+      "result": "operator_environment_error",
+      "summary": {
+        "cause": "the unqualified python command is unavailable in this shell",
+        "files_changed": 0,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-059 post-review-correction focused, related, and make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "focused_pytest_passed": 2,
+        "focused_subtests_passed": 36,
+        "related_pytest_passed": 103,
+        "related_subtests_passed": 156,
+        "ruff_files": 61,
+        "full_pytest_passed": 395,
+        "full_subtests_passed": 617,
+        "tracked_files_scanned": 104,
+        "staged_files_scanned": 104,
+        "safety_findings": 0,
+        "full_duration_seconds": 17.67
+      }
+    },
+    {
+      "command": "ARA-059 local make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_files": 61,
+        "pytest_passed": 395,
+        "pytest_subtests_passed": 617,
+        "tracked_files_scanned": 104,
+        "staged_files_scanned": 104,
+        "safety_findings": 0,
+        "duration_seconds": 17.98
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_ui_helpers.py tests/test_config.py tests/test_recovery_state.py",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_passed": 103,
+        "pytest_subtests_passed": 156,
+        "duration_seconds": 1.37,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-059 focused parser and UI model-name type matrix",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_passed": 2,
+        "pytest_subtests_passed": 36,
+        "duration_seconds": 0.16,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-059 strengthened model-name type matrix before implementation",
+      "exit_code": 1,
+      "result": "expected_failure",
+      "summary": {
+        "pytest_reported_failed": 18,
+        "parent_test_failures": 2,
+        "subtest_failures": 16,
+        "process_exit_nonzero": true,
+        "root_cause": "both shared inventory and UI health coerced every non-string name with str"
+      }
+    },
+    {
+      "command": "first ARA-059 subtest-only regression before implementation",
+      "exit_code": 0,
+      "result": "harness_gap_confirmed",
+      "summary": {
+        "pytest_reported_subfailures": 16,
+        "parent_tests_passed": 2,
+        "subtests_passed": 4,
+        "unexpected_zero_exit": true,
+        "queued_task": "ARA-060"
+      }
+    },
+    {
+      "command": "ARA-058 remote-verification closeout push, exact equality, CI, annotations, and final PR body verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "closeout_commit": "1419d5eedba2da65a11c7299aad6f7c81d799749",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "pull_request_head_equal": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29264305133,
+        "pull_request_run_id": 29264308515,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "wheel_smoke_steps_passed": 4,
+        "job_annotations": 0,
+        "draft_pr_13_open": true,
+        "draft_pr_13_draft": true,
+        "draft_pr_13_mergeable": true,
+        "draft_pr_body_readback_normalized_exact": true,
+        "draft_pr_body_sha256": "c474e3c5bf254dd6faf5095cc36d60c4fd3fdd0bd780cb30f5bb0c4ef15a4923"
+      }
+    },
     {
       "command": "ARA-058 recovery-closeout make check",
       "exit_code": 0,
@@ -3982,12 +4183,21 @@
     }
   ],
   "notes": [
+    "The explicit ten-path ARA-059 index passes cached diff, staged safety, recovery, and full make check; no unreviewed or ignored path was staged.",
+    "Three independent ARA-059 review lines report GO after exact-falsey and installed-whitespace controls plus unambiguous historical validation wording were verified.",
+    "The final ARA-059 controls distinguish the required empty list from every other falsey parser result and lock the verbatim installed-name whitespace boundary; mutation probes still trigger both parent assertions after subtest failures are swallowed.",
+    "ARA-059 focused tests pass 2 tests and 37 subtests, related UI/config/recovery tests pass 103 tests and 157 subtests, and full make check passes 395 tests and 618 subtests with 104 tracked/index files and zero safety findings; implementation and test review are green while final state re-review and remote work remain.",
+    "The first ARA-059 final reviews found incomplete parent aggregation, an unintended installed-name whitespace normalization, stale recovery wording, and an undercount of parenthesized subTest call sites; all were corrected before staging and the full gate passed again.",
+    "ARA-059 locally uses one scalar helper that trims only string names before shared inventory de-duplication and UI health matching; null, boolean, numeric, list, and object names are ignored without rejecting valid siblings.",
+    "The first post-review ARA-059 gate passed 2 tests and 36 subtests focused, 103 tests and 156 subtests related, and 395 tests and 617 subtests full before the final exact-falsey and installed-whitespace controls added one subtest to each layer.",
+    "ARA-060 separately tracks the confirmed pytest 9 subtest-only zero-exit gap across 102 subTest call sites in 14 files; every loop in ARA-059's two new tests now has a parent-level aggregate assertion covering its complete expected result.",
+    "ARA-058 is complete through remote-equal closeout 1419d5e; closeout push and pull-request runs 29264305133 and 29264308515 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations with exact final PR body readback.",
     "ARA-058 implementation 0511a47 is complete and remote-verified with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 29263804804 and 29263808869 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations.",
     "Three independent ARA-058 final reviews report GO after CURRENT_STATE, RESUME_INSTRUCTIONS, and KI-058 were synchronized to the locally complete boundary.",
     "ARA-058 locally requires the nested models container to be an actual list and reuses fixed InvalidResponse before installed fallback while preserving omitted and list-valued behavior.",
     "ARA-058 focused tests pass 3 tests and 18 subtests, related UI/config/recovery tests pass 101 tests and 120 subtests, indexed full make check passes 393 tests and 581 subtests, and three independent final reviews report GO.",
     "ARA-059 separately tracks confirmed non-string model names being coerced into false healthy matches in UI health and shared tags parsing; ARA-058 does not broaden beyond the models container.",
-    "No task is active; ARA-059 is the preferred low-risk TODO after live recovery checks, ARA-056 remains independent, and ARA-058 preserved ARA-044, ARA-046, ARA-052, and ARA-053.",
+    "ARA-059 is the sole active task; it is limited to provider-free non-string Ollama model-name rejection across UI health and shared tags parsing while preserving ARA-058 and valid-string behavior.",
     "ARA-053 is complete through remote-equal closeout 5cea1e2; closeout push and pull-request runs 29262706161 and 29262718135 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations with exact final PR body readback.",
     "ARA-053 is complete and remote-verified at 98dffb5; push and pull-request runs 29262351625 and 29262353455 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations.",
     "ARA-058 became active only after exact live verification of the ARA-053 closeout.",

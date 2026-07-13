@@ -618,3 +618,19 @@
   timeout, message keys, and target-scoped health storage.
 - Boundary: record-field typing is not changed. Confirmed non-string `name` coercion is tracked as
   ARA-059 rather than broadening this container-only guard or the shared parser contract.
+
+## 2026-07-14 - Require string-valued Ollama model names
+
+- Decision: normalize one raw model-name value through a shared scalar helper that trims only
+  `str` instances and returns empty for every other type. Both the shared inventory normalizer and
+  UI health extraction use that helper before de-duplication or availability matching.
+- Security: provider-controlled null, boolean, numeric, list, and object values are ignored rather
+  than converted to Python display text that can enter caches, selectors, diagnostics, or command
+  arguments. Invalid records do not poison valid siblings or reveal object content.
+- Compatibility: nonblank string values remain valid even when their text is `None`, `True`, a
+  number, list, or object representation. Existing trimming, case-sensitive first-valid de-duplication,
+  sorting, metadata coercion, exact request/timeout, endpoint redaction, list-container handling,
+  and valid installed-model fallback remain unchanged.
+- Boundary: the helper does not validate model-name syntax, length, control characters, Gemini or
+  artifact names, or legacy UI session strings that are indistinguishable from genuine names. A
+  refresh or process restart naturally replaces an older process-local inventory.

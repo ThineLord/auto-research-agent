@@ -874,10 +874,16 @@ def format_topic_context(topic: TopicConfig) -> str:
     return f"Title: {topic.title}\nDescription: {topic.description}\nKeywords: {keywords}"
 
 
+def normalize_ollama_model_name(value: Any) -> str:
+    """Normalize a model name without coercing provider-controlled non-string values."""
+
+    return value.strip() if isinstance(value, str) else ""
+
+
 def normalize_ollama_models(models: Iterable[Mapping[str, Any]]) -> List[Dict[str, str]]:
     normalized: Dict[str, Dict[str, str]] = {}
     for model in models:
-        name = str(model.get("name", "")).strip()
+        name = normalize_ollama_model_name(model.get("name", ""))
         if not name or name in normalized:
             continue
         normalized[name] = {

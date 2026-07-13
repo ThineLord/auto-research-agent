@@ -722,7 +722,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-059 - Reject non-string Ollama model names
 
-- Status: `TODO`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: low
 - Description: list-valued API responses coerce null, boolean, numeric, list, or object `name`
@@ -735,6 +735,32 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Commit required: yes.
 - Dependencies: satisfied by ARA-058 implementation `0511a47`, which kept record-field schema policy
   outside its container guard.
+- Local validation: one shared scalar helper now accepts and trims only strings before inventory
+  de-duplication or UI availability matching. The strengthened pre-fix matrix exited 1 with `18
+  failed`; focused final tests pass `2 passed, 37 subtests`, and related UI/config/recovery tests
+  pass `103 passed, 157 subtests`. Full `make check` passes `395 passed, 618 subtests` with 104
+  tracked/index files and zero safety findings. Parent-level mutation probes catch both falsey
+  non-list parser output and installed-name whitespace normalization even when subtest assertions
+  are swallowed. Three independent reviews and the indexed full gate (`395 passed, 618 subtests`)
+  are green; commit, push, and CI remain.
+
+## ARA-060 - Make unittest subtest failures fail the pytest process
+
+- Status: `TODO`
+- Priority: P1
+- Risk: medium
+- Description: under the current pytest 9 environment, failures reported only inside
+  `unittest.TestCase.subTest` are rendered as `SUBFAILED` but can leave the process status at zero;
+  the repository contains 102 `subTest` call sites across 14 files, so CI can miss regressions.
+- Related files: test infrastructure/configuration, a subprocess sentinel regression, CI tests
+- Acceptance criteria: an isolated subtest-only assertion failure deterministically makes the same
+  local and CI pytest command nonzero while normal passing subtests retain existing reporting;
+  existing tests need no bulk semantic rewrite.
+- Validation command: isolated subprocess sentinel, representative subtest suites, then
+  `make check` and Python 3.10/3.13 GitHub Actions.
+- Commit required: yes.
+- Dependencies: choose a no-dependency hook or an evidence-based pytest policy; any dependency or
+  test-configuration change must receive the repository-required safety approval before work.
 
 ## ARA-011 - Prevent failed rounds from replacing a trusted best output
 

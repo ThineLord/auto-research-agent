@@ -1267,6 +1267,76 @@ release_run_lock(handle)
         self.assertEqual(models[0]["id"], "def")
         self.assertEqual(models[1]["modified"], "today")
 
+    def test_parse_ollama_tags_payload_rejects_non_string_model_names(self) -> None:
+        invalid_pairs = (
+            (None, "None"),
+            (True, "True"),
+            (False, "False"),
+            (0, "0"),
+            (42, "42"),
+            (-3.5, "-3.5"),
+            (["nested"], "['nested']"),
+            ({"nested": "value"}, "{'nested': 'value'}"),
+        )
+        accepted_invalid_results = []
+
+        for invalid_name, _string_lookalike in invalid_pairs:
+            with self.subTest(invalid_name=invalid_name):
+                normalized = parse_ollama_tags_payload(
+                    {
+                        "models": [
+                            {
+                                "name": invalid_name,
+                                "digest": "provider-controlled-digest",
+                            }
+                        ]
+                    }
+                )
+                if normalized != []:
+                    accepted_invalid_results.append((invalid_name, normalized))
+                self.assertEqual(normalized, [])
+
+        self.assertEqual(accepted_invalid_results, [])
+
+        lookalike_failures = []
+        for invalid_name, string_lookalike in invalid_pairs:
+            with self.subTest(string_lookalike=string_lookalike):
+                actual = parse_ollama_tags_payload(
+                    {
+                        "models": [
+                            {"name": invalid_name, "digest": "invalid"},
+                            {"name": f" {string_lookalike} ", "digest": "valid"},
+                        ]
+                    }
+                )
+                expected = [
+                    {
+                        "name": string_lookalike,
+                        "id": "valid",
+                        "size": "",
+                        "modified": "",
+                    }
+                ]
+                if actual != expected:
+                    lookalike_failures.append((string_lookalike, actual))
+                self.assertEqual(actual, expected)
+
+        self.assertEqual(lookalike_failures, [])
+
+        models = parse_ollama_tags_payload(
+            {
+                "models": [
+                    None,
+                    "invalid-record",
+                    {"name": ""},
+                    {"name": "   "},
+                    {"name": " qwen3:8b ", "digest": "first"},
+                    {"name": "qwen3:8b", "digest": "duplicate"},
+                ]
+            }
+        )
+        self.assertEqual(models, [{"name": "qwen3:8b", "id": "first", "size": "", "modified": ""}])
+
     def test_query_ollama_models_parses_success_and_reports_missing_binary(self) -> None:
         result = SimpleNamespace(
             returncode=0,
@@ -2964,6 +3034,135 @@ release_run_lock(handle)
                 self.assertEqual(health["message_key"], expected_message_key)
                 self.assertEqual(health["ok"], expected_message_key == "health_model_ok")
                 self.assertEqual(health["model_ok"], expected_message_key == "health_model_ok")
+
+    def test_ollama_health_rejects_non_string_model_names(self) -> None:
+        import ui.app as ui_app
+
+        invalid_pairs = (
+            (None, "None"),
+            (True, "True"),
+            (False, "False"),
+            (0, "0"),
+            (42, "42"),
+            (-3.5, "-3.5"),
+            (["nested"], "['nested']"),
+            ({"nested": "value"}, "{'nested': 'value'}"),
+        )
+        private_endpoint = "https://fixture-user:private-token@localhost:11434/proxy/"
+        invalid_outcome_failures = []
+
+        for invalid_name, selected_model in invalid_pairs:
+            with self.subTest(invalid_name=invalid_name):
+                response = SimpleNamespace(
+                    raise_for_status=lambda: None,
+                    json=lambda invalid_name=invalid_name: {"models": [{"name": invalid_name}]},
+                )
+                with patch.object(ui_app.requests, "get", return_value=response) as get:
+                    health = ui_app.check_ollama_model_health(
+                        base_url=private_endpoint,
+                        selected_model=selected_model,
+                        installed_model_names=[],
+                        timeout_seconds=7,
+                    )
+
+                expected = {
+                    "ok": False,
+                    "api_ok": True,
+                    "model_ok": False,
+                    "message": f"Ollama is reachable, but `{selected_model}` is not installed.",
+                    "message_key": "health_model_missing",
+                    "message_args": {"model": selected_model},
+                }
+                request_matches = (
+                    get.call_count == 1
+                    and get.call_args.args == (f"{private_endpoint}api/tags",)
+                    and get.call_args.kwargs == {"timeout": 7}
+                )
+                endpoint_is_redacted = "private-token" not in repr(health)
+                if health != expected or not request_matches or not endpoint_is_redacted:
+                    invalid_outcome_failures.append(selected_model)
+                self.assertEqual(health, expected)
+                get.assert_called_once_with(f"{private_endpoint}api/tags", timeout=7)
+                self.assertTrue(endpoint_is_redacted)
+
+        self.assertEqual(invalid_outcome_failures, [])
+
+        lookalike_failures = []
+        for invalid_name, string_lookalike in invalid_pairs:
+            with self.subTest(string_lookalike=string_lookalike):
+                response = SimpleNamespace(
+                    raise_for_status=lambda: None,
+                    json=lambda invalid_name=invalid_name, string_lookalike=string_lookalike: {
+                        "models": [
+                            {"name": invalid_name},
+                            {"name": f" {string_lookalike} "},
+                        ]
+                    },
+                )
+                with patch.object(ui_app.requests, "get", return_value=response):
+                    health = ui_app.check_ollama_model_health(
+                        base_url="http://localhost:11434",
+                        selected_model=string_lookalike,
+                        installed_model_names=[],
+                    )
+
+                expected = {
+                    "ok": True,
+                    "api_ok": True,
+                    "model_ok": True,
+                    "message": (f"Ollama is reachable and `{string_lookalike}` is installed."),
+                    "message_key": "health_model_ok",
+                    "message_args": {"model": string_lookalike},
+                }
+                if health != expected:
+                    lookalike_failures.append((string_lookalike, health))
+                self.assertEqual(health, expected)
+
+        self.assertEqual(lookalike_failures, [])
+
+        controls = (
+            ({"models": [{"name": " qwen3:8b "}]}, [], "health_model_ok"),
+            (
+                {"models": [{"name": None}, {"name": "qwen3:8b"}]},
+                [],
+                "health_model_ok",
+            ),
+            ({"models": [{"name": None}]}, ["qwen3:8b"], "health_model_ok"),
+            ({"models": []}, [" qwen3:8b "], "health_model_missing"),
+            ({"models": [{"name": "   "}]}, [], "health_model_missing"),
+        )
+        control_failures = []
+        for payload, installed_models, expected_message_key in controls:
+            with self.subTest(payload=payload, installed_models=installed_models):
+                response = SimpleNamespace(
+                    raise_for_status=lambda: None,
+                    json=lambda payload=payload: payload,
+                )
+                with patch.object(ui_app.requests, "get", return_value=response):
+                    health = ui_app.check_ollama_model_health(
+                        base_url="http://localhost:11434",
+                        selected_model="qwen3:8b",
+                        installed_model_names=installed_models,
+                    )
+
+                expected_ok = expected_message_key == "health_model_ok"
+                expected = {
+                    "ok": expected_ok,
+                    "api_ok": True,
+                    "model_ok": expected_ok,
+                    "message": (
+                        "Ollama is reachable and `qwen3:8b` is installed."
+                        if expected_ok
+                        else "Ollama is reachable, but `qwen3:8b` is not installed."
+                    ),
+                    "message_key": expected_message_key,
+                    "message_args": {"model": "qwen3:8b"},
+                }
+                if health != expected:
+                    control_failures.append((payload, installed_models, health))
+                self.assertEqual(health, expected)
+
+        self.assertEqual(control_failures, [])
 
     def test_ui_ollama_private_path_scope_avoids_equal_length_collisions(self) -> None:
         import ui.app as ui_app

@@ -48,6 +48,7 @@ from src.config import (
     ConfigValidationError,
     format_model_label,
     load_app_config,
+    normalize_ollama_model_name,
     query_ollama_models,
     save_default_model_name,
     save_default_model_selection,
@@ -701,10 +702,12 @@ def check_ollama_model_health(
         }
 
     api_models = [
-        str(model.get("name", "")).strip() for model in raw_models if isinstance(model, dict)
+        name
+        for model in raw_models
+        if isinstance(model, dict) and (name := normalize_ollama_model_name(model.get("name", "")))
     ]
     available_models = {name for name in installed_model_names if name} | {
-        name for name in api_models if name
+        name for name in api_models
     }
     model_ok = model_name in available_models
     if not model_ok:

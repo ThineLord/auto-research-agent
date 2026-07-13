@@ -46,14 +46,22 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-No task is active. ARA-058 is complete at implementation `0511a47`: non-list nested `models` fail
-closed before installed fallback while omitted/list-valued fields, valid records, exact requests,
-and ARA-044/ARA-046/ARA-052 behavior remain compatible. Push/PR runs
-`29263804804`/`29263808869` passed Python 3.10/3.13, all four wheel steps, and zero annotations with
-exact local/upstream/`ls-remote`/PR-head equality. ARA-059 separately owns record-name typing and is
-the preferred low-risk TODO after live recovery checks; ARA-056 remains independent. Do not call a
-provider or read ignored runtime. Use `0511a47739168af76d7163716d82c56e19bef9d7` as the conservative
-exact externally verified fallback.
+ARA-059 is active and locally implemented. One shared scalar helper now accepts and trims only
+string names before shared inventory de-duplication or UI health matching. The strengthened pre-fix
+matrix exited 1 with `18 failed`; focused tests pass `2 passed, 37 subtests`, related tests pass `103
+passed, 157 subtests`, and full `make check` passes `395 passed, 618 subtests` with zero safety
+findings. Mutation probes confirm the parent assertions catch falsey non-list parser output and
+installed-name whitespace normalization even if subtest errors are swallowed. Implementation/test
+and final state review are green across three independent review lines; stage only the ten reviewed
+ARA-059 paths if the index was lost. The current explicit index passed cached-diff validation,
+staged safety, recovery, and full `make check` (`395 passed, 618 subtests`); commit those exact paths
+next. Preserve literal string lookalikes, metadata, requests, redaction, list-container behavior,
+and installed fallback; do not call a provider, read ignored runtime, or broaden into
+provider/artifact schema migration.
+ARA-058 is complete through remote-equal closeout `1419d5e`; closeout push/PR runs
+`29264305133`/`29264308515` passed Python 3.10/3.13, all four wheel steps, and zero annotations with
+exact PR body readback. Use `1419d5eedba2da65a11c7299aad6f7c81d799749` as the conservative exact
+externally verified fallback.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
 it imported the editable checkout and advanced ignored `projects/example` state after a missing
@@ -100,9 +108,9 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-No task is `IN_PROGRESS`; ARA-059 and ARA-056 are independent TODO tasks. ARA-018 requires an
-explicit owner license/distribution decision. Do not start ARA-019, ARA-026, ARA-006, or ARA-007
-until their recorded dependencies are satisfied.
+ARA-059 is the sole `IN_PROGRESS` task and ARA-056 remains separate. ARA-018 requires an explicit
+owner license/distribution decision. Do not start ARA-019, ARA-026, ARA-006, or ARA-007 until their
+recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
 
@@ -116,8 +124,7 @@ until their recorded dependencies are satisfied.
 ```bash
 git status --short --branch
 git rev-parse --verify HEAD
-git rev-parse '@{upstream}'
-git rev-list --left-right --count '@{upstream}'...HEAD
 .venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
+.venv/bin/python -m pytest -q tests/test_ui_helpers.py tests/test_config.py
 ```

@@ -1,22 +1,22 @@
 # Codex Current State
 
-Updated: 2026-07-13 (Asia/Shanghai)
+Updated: 2026-07-14 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: preserve the remote-verified ARA-058 nested-container fix and activate the
-  provider-free ARA-059 model-name typing task after live recovery checks.
+- Current goal: complete ARA-059 by rejecting non-string Ollama model names at the UI health and
+  shared normalized-inventory boundaries without changing valid-string behavior.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `0511a47739168af76d7163716d82c56e19bef9d7` (the exact
+- State recorded against commit: `1419d5eedba2da65a11c7299aad6f7c81d799749` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `0511a47739168af76d7163716d82c56e19bef9d7` (exact local,
+- Last externally verified fallback: `1419d5eedba2da65a11c7299aad6f7c81d799749` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-058 is implemented, reviewed, pushed, and remotely
-  verified; ARA-059 and ARA-056 remain independent TODO tasks.
+- Active task at this snapshot: ARA-059. The shared name-type guard is locally implemented and the
+  indexed full gate and three independent reviews pass; commit, push, and remote CI remain.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -741,12 +741,39 @@ Updated: 2026-07-13 (Asia/Shanghai)
   full `make check` passes `393 passed, 581 subtests`. Three independent final reviews report GO
   after the recovery-wording correction.
 
+## ARA-059 Ollama Model Name Typing
+
+- Provider-free probes confirmed null, boolean, numeric, list, and object `name` values are coerced
+  with `str(...)` by both UI health and shared tags parsing; selecting that text can report healthy.
+- Limit the task to accepting only nonblank strings while preserving valid trimming, de-duplication,
+  request/redaction behavior, list-container compatibility, and installed-model fallback.
+- Add a cross-boundary pre-fix regression before implementation; do not call a provider or inspect
+  ignored runtime.
+- Added one shared scalar helper that trims only strings, then used it in both inventory
+  normalization and UI health. Non-string records are ignored before de-duplication or matching;
+  the pre-existing verbatim installed-name fallback remains unchanged.
+- Strengthened the regression with parent-level aggregate assertions after the first pytest 9 run
+  exposed subtest-only failures returning status 0. The accepted pre-fix run exits 1 with `18
+  failed`; focused final tests pass `2 passed, 37 subtests`, and related UI/config/recovery tests pass
+  `103 passed, 157 subtests`.
+- Before initial review, the intermediate full `make check` passed Ruff format/lint over 61 files,
+  imports, both repository-safety modes over 104 tracked/index files with zero findings, and pytest
+  (`395 passed, 617 subtests` in 17.98 seconds).
+- Initial final reviews found that several compatibility assertions still depended only on pytest
+  subtest status, installed-name whitespace had changed unintentionally, two recovery claims were
+  stale, and ARA-060 undercounted parenthesized call sites. Every new loop now has a complete
+  parent-level aggregate, installed fallback is verbatim again, state/count claims are corrected,
+  and the first post-correction full gate passed `395 passed, 617 subtests` in 17.67 seconds.
+- A final delta review found that the invalid-parser aggregate did not distinguish `[]` from every
+  other falsey result and that installed-name whitespace compatibility lacked a direct regression.
+  Both controls are now exact. Focused and related tests pass `2 passed, 37 subtests` and `103
+  passed, 157 subtests`; `make check` passes `395 passed, 618 subtests` in 17.85 seconds. Mutation
+  probes that swallow subtest assertion errors confirm both parent-level failure paths remain live.
+
 ## Remaining Steps
 
-- Reconfirm the live branch, worktree, upstream, `ls-remote`, and PR checks before activating the
-  highest-value provider-free TODO task.
-- Prefer ARA-059's low-risk shared model-name typing boundary before the larger ARA-056 interrupt
-  lifecycle work; mark exactly one selected task `IN_PROGRESS` before code changes.
+- Commit and push the reviewed ARA-059 paths, then verify exact remote/PR-head equality and
+  Python 3.10/3.13 CI.
 - Leave ARA-056 and deferred tasks untouched.
 
 ## Test Status
@@ -766,6 +793,31 @@ Updated: 2026-07-13 (Asia/Shanghai)
   isolated-wheel steps, and zero annotations. Draft PR 13 remains open, draft, and mergeable.
 - ARA-058 recovery-closeout `make check` passes all gates again (`393 passed, 581 subtests passed`
   in 18.05 seconds) after queue, completion, known-issue, validation, and resume records were synced.
+- ARA-058 closeout `1419d5e` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Closeout push/PR runs `29264305133`/`29264308515` passed Python 3.10/3.13, all four wheel steps,
+  and zero annotations; final PR body normalized readback is exact at SHA-256
+  `c474e3c5bf254dd6faf5095cc36d60c4fd3fdd0bd780cb30f5bb0c4ef15a4923`.
+- ARA-059 strengthened pre-fix matrix exited 1 with `18 failed`: eight invalid name types were
+  accepted by each of the shared parser and UI health entrypoints. The initial subtest-only form
+  reported 16 failures but exited 0, now queued separately as ARA-060.
+- ARA-059 focused final matrix passes `2 passed, 37 subtests`; related UI/config/recovery coverage
+  passes `103 passed, 157 subtests`.
+- Before initial review, ARA-059's intermediate local `make check` passed all gates with `395
+  passed, 617 subtests` in 17.98 seconds; both safety modes scanned 104 tracked/index files with zero
+  findings.
+- The first post-review-correction ARA-059 `make check` again passed all gates with `395 passed, 617
+  subtests` in 17.67 seconds; focused and related reruns passed `2 passed, 36 subtests` and `103
+  passed, 156 subtests` respectively.
+- ARA-059 final-delta correction passes focused `2 passed, 37 subtests`, related `103 passed, 157
+  subtests`, and full `make check` at `395 passed, 618 subtests` in 17.85 seconds. Parent-aggregate
+  mutation probes catch both a falsey non-list parser result and whitespace-normalizing installed
+  fallback even when subtest assertion errors are swallowed.
+- Three independent ARA-059 reviews report GO for security/state, test quality, and final
+  code/minimality/recovery consistency after both review-found controls and the historical wording
+  correction.
+- The explicit ten-path index passes cached-diff validation, staged repository safety over 104
+  files, recovery `6 passed, 1 subtest`, and full `make check` with `395 passed, 618 subtests` in
+  17.68 seconds.
 - ARA-053 pre-fix collision/cache regression produced the expected `4 failed, 1 passed`: all three
   equal-shape path pairs shared an identity and `/bravo` loaded `/alpha` health evidence.
 - ARA-053 focused final coverage passes `4 passed, 14 subtests`; UI/recovery tests pass `84 passed,
@@ -1361,6 +1413,20 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- The first ARA-059 pre-stage recovery gate rejected an unattributed commit/push bullet; because
+  the checks were chained with `&&`, no staging occurred. The bullet now names the sole active task
+  explicitly before the gate is rerun.
+- An ARA-059 focused rerun first used the unavailable unqualified `python` command and exited 127;
+  the repository `.venv/bin/python` interpreter was used afterward. The next rerun used the wrong
+  unittest class selector and exited 4 with no tests collected; corrected selectors passed `2
+  passed, 37 subtests`. Neither failed invocation changed files or exercised a provider.
+- The first ARA-059 regression used only `subTest` assertions; pytest 9.0.3 reported 16
+  `SUBFAILED` cases but returned status 0. Parent-level aggregate assertions were added, and the
+  strengthened unchanged pre-fix behavior returned status 1 with `18 failed`. ARA-060 separately
+  owns the repository-wide test-gate correction.
+- The strengthened ARA-059 pre-fix matrix exited 1 with all eight non-string name types accepted at
+  each of the parser and health boundaries. The same two tests now pass with 36 compatibility
+  subtests.
 - The first ARA-058 locally-complete remaining-step bullet mentioned both active ARA-058 and
   untouched ARA-056 while requesting commit/push, so one recovery consistency assertion failed.
   The unrelated-task prohibition is now a separate non-finalization bullet.
@@ -1618,10 +1684,8 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ```bash
 git status --short --branch
-git rev-parse --verify HEAD
-git rev-parse '@{upstream}'
-git rev-list --left-right --count '@{upstream}'...HEAD
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
+.venv/bin/python -m pytest -q tests/test_ui_helpers.py tests/test_config.py
 ```
 
 ## Interruption Recovery
@@ -1651,6 +1715,12 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   userinfo, query, fragments, credentials, or reversible encodings; same target must remain stable.
 - Keep ARA-058 confined to the nested `models` container shape. ARA-059 separately owns non-string
   record names; do not broaden this fix into shared model-record normalization.
+- Keep ARA-059 confined to raw Ollama model-name typing. Preserve literal string lookalikes,
+  metadata coercion, case-sensitive de-duplication/sorting, installed fallback, exact requests, and
+  endpoint redaction; do not blacklist name text or reinterpret legacy artifacts.
+- ARA-060 owns the confirmed pytest subtest exit-status gap. Do not change dependencies or test
+  configuration without the repository-required safety approval, and do not fold that global test
+  infrastructure decision into ARA-059.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

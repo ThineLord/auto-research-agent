@@ -48,6 +48,10 @@
 
 ### Fixed
 
+* Ollama API inventories and UI health checks now ignore records whose `name` is not a string
+  instead of coercing null, boolean, numeric, list, or object values into false model identifiers.
+  Nonblank string lookalikes, trimming, de-duplication, metadata compatibility, installed-model
+  fallback, exact requests, and endpoint redaction remain unchanged.
 * Ollama health checks now reject a non-list nested `models` value with the same fixed,
   credential-safe `InvalidResponse` result used for a malformed outer response. Missing and
   list-valued fields, valid records, installed-model fallback, and exact request behavior remain
