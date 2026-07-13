@@ -569,3 +569,21 @@
   unchanged.
 - Boundary: nested `models` schema validation is not inferred from the outer-shape fix. Confirmed
   null/numeric inner values are tracked as ARA-058 rather than broadening ARA-052.
+
+## 2026-07-13 - Validate mode-specific output ownership after parsing
+
+- Decision: retain the three output flags as ordinary optional arguments, then enforce their owner
+  relationships immediately after parsing with `parser.error()`. Do not use order-sensitive custom
+  actions or place valid mode/output pairs in an exclusion group.
+- Contract: `--survey-output` requires truthy `--survey`, `--compare-output` requires truthy
+  `--compare-runs`, and `--analyze-output` requires truthy `--analyze-run`. Output presence is
+  tested with `is not None`, so an explicitly empty orphan remains invalid.
+- Ordering: preserve the existing compare minimum-count check before output ownership, while
+  argparse primary-mode conflicts remain earlier still. Hidden UI credential validation remains
+  later. All failures precede logging and runtime setup.
+- Compatibility: correct pairs in either argument order, empty values owned by a valid mode,
+  output-free modes, `--help`, and output-free blank analyze parsing retain prior behavior. An empty
+  analyze selector with an output is rejected because main's actual truthy dispatch would otherwise
+  enter normal/provider work.
+- Privacy: dependency errors interpolate only fixed option names and never the user-provided output
+  value.

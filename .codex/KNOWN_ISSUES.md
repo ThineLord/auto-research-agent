@@ -466,3 +466,14 @@ Updated: 2026-07-12 (Asia/Shanghai)
   action.
 - Boundary: omitted and list-valued `models`, valid records, exact requests, redaction, and ARA-052
   behavior must remain compatible; no broader artifact or provider schema migration is implied.
+
+## KI-057 - Orphan mode-specific outputs fall into unrelated work
+
+- Status: fixed, pushed, and CI-verified through `eabedff`
+- Severity: P1 CLI safety
+- Impact: `--survey-output`, `--compare-output`, or `--analyze-output` without its matching selector
+  is silently ignored and can enter normal/provider or another primary workflow, including artifact
+  writes, instead of reporting invalid arguments.
+- Resolution: ARA-057 enforces owner relationships at the post-parse boundary with fixed path-free
+  status-2 diagnostics. Full order/mode/empty-value coverage, direct/module/copied-installed no-work
+  controls, local gates, exact remote equality, and Python 3.10/3.13 push/PR CI are verified.

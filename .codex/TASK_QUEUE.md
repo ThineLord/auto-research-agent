@@ -669,7 +669,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-057 - Reject orphan mode-specific output options before work
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P1
 - Risk: low
 - Description: `--survey-output`, `--compare-output`, or `--analyze-output` without its matching
@@ -684,6 +684,11 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Commit required: yes.
 - Dependencies: complete ARA-048 without folding this separate requires-relationship into its
   primary-mode mutual-exclusion fix.
+- Completion: implementation `eabedff` is pushed with exact local/upstream/`ls-remote`/PR-head
+  equality. Focused tests pass `4 passed, 90 subtests`, related CLI/runner/package/survey/compare/
+  recovery tests pass `141 passed, 352 subtests`, and full `make check` passes `388 passed, 555
+  subtests`. Three independent reviews report GO; push/PR runs `29260853734`/`29260855184` passed
+  Python 3.10/3.13, all four wheel steps, and zero annotations.
 
 ## ARA-058 - Validate the nested Ollama models response shape
 

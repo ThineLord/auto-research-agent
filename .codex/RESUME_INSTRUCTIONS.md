@@ -46,12 +46,12 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-No task is active. ARA-052 is complete and remote-verified at `2141b7d`; push/PR runs
-`29259494746`/`29259495850` passed Python 3.10/3.13, all four wheel-smoke steps, and zero annotations.
-Its outer JSON shape matrix, private-endpoint redaction, exact request/timeout, empty mapping,
-target-scoped snapshot, full gate, and three reviews pass. Start ARA-057 only after resolving live
-Git state. Do not call a provider or read ignored runtime. Use
-`2141b7ddaecfa82a6a0a63a5f9d3057dac0b516e` as the conservative exact externally verified fallback
+No task is active. ARA-057 is complete and remote-verified at `eabedff`; push/PR runs
+`29260853734`/`29260855184` passed Python 3.10/3.13, all four wheel-smoke steps, and zero annotations.
+Its full dependency/order/empty-value matrix, correct-pair compatibility, direct/module/installed
+no-work controls, full gate, and three reviews pass. Start ARA-053 only after resolving live Git
+state. Do not call a provider or read ignored runtime. Use
+`eabedff99d5e1b1b4194b9ea6ba5254bd2ebe847` as the conservative exact externally verified fallback
 until a later checkpoint is itself externally verified.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
@@ -99,9 +99,9 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-There is no `IN_PROGRESS` task; ARA-057 is the highest-priority `TODO`, while ARA-053, ARA-056, and
-ARA-058 remain separate. ARA-018 requires an explicit owner license/distribution decision. Do not
-start ARA-019, ARA-026, ARA-006, or ARA-007 until their recorded dependencies are satisfied.
+There is no `IN_PROGRESS` task; ARA-053 is the next `TODO`, while ARA-056 and ARA-058 remain
+separate. ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019,
+ARA-026, ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
 

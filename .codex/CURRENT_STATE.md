@@ -4,18 +4,18 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: preserve the remote-verified ARA-052 response-shape boundary, then continue with
-  the highest-priority queued task ARA-057.
+- Current goal: preserve the remote-verified ARA-057 argument dependency boundary, then continue
+  with the highest-priority queued task ARA-053.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `2141b7ddaecfa82a6a0a63a5f9d3057dac0b516e` (the exact
+- State recorded against commit: `eabedff99d5e1b1b4194b9ea6ba5254bd2ebe847` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `2141b7ddaecfa82a6a0a63a5f9d3057dac0b516e` (exact local,
+- Last externally verified fallback: `eabedff99d5e1b1b4194b9ea6ba5254bd2ebe847` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-052 is complete, independently reviewed GO, pushed with
+- Active task at this snapshot: none. ARA-057 is complete, independently reviewed GO, pushed with
   exact local/upstream/`ls-remote`/PR-head equality, and passed push/PR CI on Python 3.10/3.13.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
@@ -696,14 +696,44 @@ Updated: 2026-07-13 (Asia/Shanghai)
 - Confirmed nested `models` null/numeric values remain a separate `TypeError` boundary and queued
   it as ARA-058 rather than widening this fix.
 
+## ARA-057 Mode-Specific Output Dependencies
+
+- Reproduced all three output flags across normal mode and every non-owner primary selector in both
+  argument orders. All invalid combinations parsed, and direct/module/copied-installed entrypoints
+  proceeded beyond argument handling; temporary installed mock mismatches completed real writes.
+- Added one post-parse dependency table requiring `--survey`, `--compare-runs`, or `--analyze-run`
+  whenever its corresponding output option is explicitly present. Errors contain only fixed option
+  names and occur before logging, layout, configuration, project, provider, or artifact work.
+- Preserved ARA-048 primary-mode mutual exclusion, compare arity error precedence, `--help`, correct
+  output pairs in either order, empty output values with a valid owner, and all output-free modes.
+  A falsey empty analyze selector plus output is rejected because main would otherwise dispatch the
+  normal/provider path; output-free blank analyze parsing remains compatible.
+- Focused tests pass `4 passed, 90 subtests`; related CLI/runner/package/survey/compare/recovery tests
+  pass `141 passed, 352 subtests`; full `make check` passes `388 passed, 555 subtests`. Three
+  independent final reviews report GO.
+
 ## Remaining Steps
 
-- Resolve live Git/remote state, then start only ARA-057, the highest-priority unblocked `TODO`.
-- Leave ARA-053, ARA-056, ARA-058, and owner-blocked/deferred tasks untouched until separately
-  activated.
+- Resolve live Git/remote state, then start only ARA-053, the first queued unblocked P2 task.
+- Leave ARA-056, ARA-058, and owner-blocked/deferred tasks untouched until separately activated.
 
 ## Test Status
 
+- ARA-057 pre-fix provider-free matrix produced `79 failed, 3 passed, 6 subtests passed`: every
+  dependency context parsed, direct/module entrypoints reached runtime layout, and temporary
+  copied-installed mock mismatches completed ordinary writes.
+- ARA-057 focused final coverage passes `4 passed, 90 subtests`; related CLI/runner/package/survey/
+  compare/recovery coverage passes `141 passed, 352 subtests`.
+- ARA-057 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
+  self/worktree/staged scans, and pytest (`388 passed, 555 subtests passed` in 17.98 seconds; 103
+  tracked/index files and zero findings). Three independent final reviews report GO.
+- ARA-057 implementation `eabedff` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Push run `29260853734` and pull-request run `29260855184` passed Python 3.10/3.13, including all
+  four isolated-wheel steps; all four job annotation sets are empty. Draft PR 13 remains open,
+  draft, and mergeable.
+- ARA-057 recovery-closeout `make check` again passes all gates (`388 passed, 555 subtests passed`
+  in 17.70 seconds) after the queue, completion log, decision, known-issue, validation JSON, and
+  resume instructions were synchronized.
 - ARA-052 pre-fix provider-free response matrix produced the expected five shape failures before
   boolean coverage was added: list, string, number, and null values reached `.get` and raised
   `AttributeError` (`5 failed, 1 passed`).
@@ -719,6 +749,10 @@ Updated: 2026-07-13 (Asia/Shanghai)
 - ARA-052 recovery-closeout `make check` again passes all gates (`384 passed, 465 subtests passed`
   in 16.21 seconds) after the queue, completion log, decision, known-issue, validation JSON, and
   resume instructions were synchronized.
+- ARA-052 remote-verification closeout `5e0d1ab` is pushed with exact local/upstream/`ls-remote`/
+  PR-head equality. Closeout push run `29259960658` and pull-request run `29259966810` passed Python
+  3.10/3.13, all four isolated-wheel steps, and zero annotations; final draft PR body normalized
+  readback is exact at SHA-256 `64be15ecb4b273cf0a48b24ff57a4b299e4a6ad79d1267ddcac08544675a507c`.
 - ARA-051 pre-fix duplicate-profile matrix produced `6 failed, 2 passed, 4 subtests passed`: both
   cached orders retained the conflict, and healthy-last order re-enabled all presets plus fallback.
 - ARA-051 focused final coverage passes `4 passed, 22 subtests`; related cloud/CLI/UI/recovery
@@ -1256,6 +1290,10 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- The initial ARA-057 parser/entrypoint/installed regression produced the expected `79 failed, 3
+  passed, 6 subtests passed`: invalid output/mode combinations were accepted, entrypoints reached
+  layout, and temporary installed mock cases wrote ordinary temporary workspace artifacts. The
+  same expanded matrix now passes before runtime work.
 - A post-ARA-052 stale-wording search placed backticked `IN_PROGRESS` inside a double-quoted zsh
   pattern, so zsh emitted `command not found` for that token. The read-only search changed no file;
   a literal-safe single-quoted rerun returned only the intended no-active-task records.
@@ -1523,6 +1561,8 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   reconciliation, ARA-043 all-blocked behavior, unique healthy profiles, and unprofiled candidates.
 - Keep ARA-052 confined to Ollama health response-shape normalization. Preserve ARA-044 scoped
   snapshots, the exact `/api/tags` request target, mapping response behavior, and redaction.
+- Keep ARA-057 at the argument boundary. Correct mode/output pairs and output-free primary modes
+  must remain compatible; do not dispatch, call a provider, or touch ignored runtime during tests.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

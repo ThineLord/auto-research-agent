@@ -875,3 +875,20 @@ Validation and implementation outcomes will be appended only after they are actu
   `29259494746` and pull-request run `29259495850` passed Python 3.10/3.13, every isolated-wheel
   step, and all four job annotation sets are empty. Nested malformed `models` values remain queued
   separately as ARA-058.
+
+## 2026-07-13 - Mode-specific output dependency rejection
+
+- Reproduced all three output options being accepted in normal mode and with every non-owner
+  primary selector in either argument order. Direct and module entrypoints reached runtime layout;
+  copied-installed mock mismatches completed ordinary writes in isolated temporary workspaces.
+- Added one post-parse dependency table that exits 2 with fixed option-only diagnostics before
+  logging, runtime layout, configuration, project, provider, or artifact work.
+- Preserved compare arity and ARA-048 mutual-exclusion precedence, correct pairs in both orders,
+  explicit empty output values owned by a valid mode, `--help`, and output-free behavior. Private
+  output values are not echoed.
+- Focused tests passed `4 passed, 90 subtests`; related CLI/runner/package/survey/compare/recovery
+  tests passed `141 passed, 352 subtests`; final `make check` passed `388 passed, 555 subtests`.
+  Three independent final reviews returned GO.
+- Committed as `eabedff` and pushed with exact local/upstream/`ls-remote`/PR-head equality. Push run
+  `29260853734` and pull-request run `29260855184` passed Python 3.10/3.13, every isolated-wheel
+  step, and all four job annotation sets are empty.
