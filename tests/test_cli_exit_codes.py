@@ -24,6 +24,38 @@ from src.config import (
 from src.project_input import ProjectInputError
 
 ROOT = Path(__file__).resolve().parent.parent
+MODE_OUTPUT_INVALID_ENTRYPOINT_CASES = (
+    (
+        "survey-orphan",
+        ["--survey-output", "survey.md"],
+        "--survey-output requires --survey",
+    ),
+    (
+        "survey-mismatched",
+        ["--mock", "--survey-output", "survey.md"],
+        "--survey-output requires --survey",
+    ),
+    (
+        "compare-orphan",
+        ["--compare-output", "comparison.json"],
+        "--compare-output requires --compare-runs",
+    ),
+    (
+        "compare-mismatched",
+        ["--mock", "--max-rounds", "1", "--compare-output", "comparison.json"],
+        "--compare-output requires --compare-runs",
+    ),
+    (
+        "analyze-orphan",
+        ["--analyze-output", "analysis.json"],
+        "--analyze-output requires --analyze-run",
+    ),
+    (
+        "analyze-mismatched",
+        ["--mock", "--max-rounds", "1", "--analyze-output", "analysis.json"],
+        "--analyze-output requires --analyze-run",
+    ),
+)
 
 
 def _project_input(project_dir: Path) -> SimpleNamespace:
@@ -78,6 +110,168 @@ class CliExitCodeTests(unittest.TestCase):
                     cli_module._requires_generation_resources(args),
                     expected,
                 )
+
+    def test_mode_specific_outputs_require_their_matching_primary_mode(self) -> None:
+        primary_modes = (
+            ("normal", []),
+            ("session", ["--session"]),
+            ("diagnostic", ["--diagnostic"]),
+            ("continuous", ["--continuous"]),
+            ("resume", ["--resume"]),
+            ("survey", ["--survey"]),
+            ("mock", ["--mock"]),
+            ("compare", ["--compare-runs", "run-a", "run-b"]),
+            ("analyze", ["--analyze-run", "run-a"]),
+            ("cloud-discover", ["--cloud-free-discover"]),
+            ("cloud-profile", ["--cloud-free-profile"]),
+        )
+        output_contracts = (
+            (
+                "survey",
+                "--survey-output",
+                "/private/user/token/survey.md",
+                "--survey",
+                "survey_output",
+            ),
+            (
+                "compare",
+                "--compare-output",
+                "/private/user/token/comparison.json",
+                "--compare-runs",
+                "compare_output",
+            ),
+            (
+                "analyze",
+                "--analyze-output",
+                "/private/user/token/analysis.json",
+                "--analyze-run",
+                "analyze_output",
+            ),
+        )
+
+        for matching_mode, output_option, output_value, mode_option, attribute in output_contracts:
+            for primary_mode, primary_argv in primary_modes:
+                if primary_mode == matching_mode:
+                    continue
+                ordered_argvs = (("output-last", [*primary_argv, output_option, output_value]),)
+                if primary_argv:
+                    ordered_argvs += (
+                        ("output-first", [output_option, output_value, *primary_argv]),
+                    )
+                for order, argv in ordered_argvs:
+                    with self.subTest(
+                        output=output_option,
+                        primary_mode=primary_mode,
+                        order=order,
+                    ):
+                        stderr = io.StringIO()
+                        with redirect_stderr(stderr), self.assertRaises(SystemExit) as raised:
+                            cli_module.parse_args(argv)
+                        self.assertEqual(raised.exception.code, 2)
+                        self.assertIn(
+                            f"{output_option} requires {mode_option}",
+                            stderr.getvalue(),
+                        )
+                        self.assertNotIn(output_value, stderr.getvalue())
+
+            with self.subTest(output=output_option, primary_mode="orphan-empty-value"):
+                stderr = io.StringIO()
+                with redirect_stderr(stderr), self.assertRaises(SystemExit) as raised:
+                    cli_module.parse_args([output_option, ""])
+                self.assertEqual(raised.exception.code, 2)
+                self.assertIn(f"{output_option} requires {mode_option}", stderr.getvalue())
+
+            matching_argv = dict(primary_modes)[matching_mode]
+            with self.subTest(output=output_option, primary_mode="matching"):
+                args = cli_module.parse_args([*matching_argv, output_option, output_value])
+                self.assertEqual(getattr(args, attribute), output_value)
+            with self.subTest(output=output_option, primary_mode="matching-output-first"):
+                args = cli_module.parse_args([output_option, output_value, *matching_argv])
+                self.assertEqual(getattr(args, attribute), output_value)
+            with self.subTest(output=output_option, primary_mode="matching-empty-value"):
+                args = cli_module.parse_args([*matching_argv, output_option, ""])
+                self.assertEqual(getattr(args, attribute), "")
+            with self.subTest(output=output_option, primary_mode="matching-output-free"):
+                args = cli_module.parse_args(matching_argv)
+                self.assertIsNone(getattr(args, attribute))
+
+        stderr = io.StringIO()
+        with redirect_stderr(stderr), self.assertRaises(SystemExit) as raised:
+            cli_module.parse_args(["--analyze-run", "", "--analyze-output", "analysis.json"])
+        self.assertEqual(raised.exception.code, 2)
+        self.assertIn("--analyze-output requires --analyze-run", stderr.getvalue())
+        self.assertNotIn("analysis.json", stderr.getvalue())
+
+        output_free_blank_analyze = cli_module.parse_args(["--analyze-run", ""])
+        self.assertEqual(output_free_blank_analyze.analyze_run, "")
+        self.assertIsNone(output_free_blank_analyze.analyze_output)
+
+    def test_mode_specific_output_mismatches_exit_two_before_runtime_setup(self) -> None:
+        for case_name, argv, expected_error in MODE_OUTPUT_INVALID_ENTRYPOINT_CASES:
+            with self.subTest(case=case_name):
+                stderr = io.StringIO()
+                with (
+                    patch.object(sys, "argv", ["auto-research-agent", *argv]),
+                    redirect_stderr(stderr),
+                    patch.object(cli_module, "configure_logging") as configure_logging,
+                    patch.object(
+                        cli_module,
+                        "resolve_runtime_layout",
+                        side_effect=AssertionError("runtime setup reached"),
+                    ) as resolve_runtime_layout,
+                    patch.object(cli_module, "load_app_config") as load_app_config,
+                    patch.object(cli_module, "load_project_input") as load_project_input,
+                    patch.object(
+                        cli_module, "seed_default_mock_project"
+                    ) as seed_default_mock_project,
+                ):
+                    with self.assertRaises(SystemExit) as raised:
+                        cli_module.main()
+
+                self.assertEqual(raised.exception.code, 2)
+                self.assertIn(expected_error, stderr.getvalue())
+                configure_logging.assert_not_called()
+                resolve_runtime_layout.assert_not_called()
+                load_app_config.assert_not_called()
+                load_project_input.assert_not_called()
+                seed_default_mock_project.assert_not_called()
+
+    def test_module_mode_specific_output_mismatches_exit_two_before_layout(self) -> None:
+        script = """
+import json
+import os
+import runpy
+import sys
+
+import src.cli as cli
+
+def forbidden_layout(**kwargs):
+    print("RUNTIME_LAYOUT_ACCESSED")
+    raise AssertionError("runtime layout must not be accessed")
+
+cli.resolve_runtime_layout = forbidden_layout
+sys.argv = ["auto-research-agent", *json.loads(os.environ["CLI_ARGS"])]
+runpy.run_module("src.main", run_name="__main__")
+"""
+
+        for case_name, argv, expected_error in MODE_OUTPUT_INVALID_ENTRYPOINT_CASES:
+            with self.subTest(case=case_name):
+                env = os.environ.copy()
+                env["CLI_ARGS"] = json.dumps(argv)
+                result = subprocess.run(
+                    [sys.executable, "-c", script],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                combined = result.stdout + result.stderr
+
+                self.assertEqual(result.returncode, 2, combined)
+                self.assertIn(expected_error, result.stderr)
+                self.assertNotIn("RUNTIME_LAYOUT_ACCESSED", combined)
+                self.assertNotIn("Traceback", combined)
 
     def test_conflicting_primary_modes_exit_two_before_runtime_setup(self) -> None:
         with (

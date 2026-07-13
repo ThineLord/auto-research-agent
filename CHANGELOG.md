@@ -48,6 +48,9 @@
 
 ### Fixed
 
+* `--survey-output`, `--compare-output`, and `--analyze-output` now require their matching primary
+  mode during argument parsing. Orphan and mismatched options exit before logging, runtime layout,
+  project, provider, or artifact work; correct pairs and output-free modes remain compatible.
 * Ollama health checks now reject valid non-object JSON responses with one fixed, credential-safe
   unhealthy result instead of raising `AttributeError`. Mapping responses, exact `/api/tags`
   request targets and timeouts, endpoint redaction, and target-scoped health snapshots retain their

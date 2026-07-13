@@ -186,6 +186,76 @@ main()
             self.assertEqual(list(workspace.iterdir()), [])
             self.assertEqual(_tree_hashes(package_parent), package_before)
 
+    def test_installed_mode_specific_output_mismatches_fail_before_workspace_writes(
+        self,
+    ) -> None:
+        invalid_cases = (
+            (
+                "survey-orphan",
+                ["--survey-output", "survey.md"],
+                "--survey-output requires --survey",
+            ),
+            (
+                "survey-mismatched",
+                ["--mock", "--max-rounds", "1", "--survey-output", "survey.md"],
+                "--survey-output requires --survey",
+            ),
+            (
+                "compare-orphan",
+                ["--compare-output", "comparison.json"],
+                "--compare-output requires --compare-runs",
+            ),
+            (
+                "compare-mismatched",
+                [
+                    "--mock",
+                    "--max-rounds",
+                    "1",
+                    "--compare-output",
+                    "comparison.json",
+                ],
+                "--compare-output requires --compare-runs",
+            ),
+            (
+                "analyze-orphan",
+                ["--analyze-output", "analysis.json"],
+                "--analyze-output requires --analyze-run",
+            ),
+            (
+                "analyze-mismatched",
+                [
+                    "--mock",
+                    "--max-rounds",
+                    "1",
+                    "--analyze-output",
+                    "analysis.json",
+                ],
+                "--analyze-output requires --analyze-run",
+            ),
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package_parent = self._copy_installed_package(root)
+            package_before = _tree_hashes(package_parent)
+            workspace = root / "workspace"
+            workspace.mkdir()
+
+            for case_name, argv, expected_error in invalid_cases:
+                with self.subTest(case=case_name):
+                    result = self._run_installed(
+                        package_parent=package_parent,
+                        workspace=workspace,
+                        argv=argv,
+                    )
+                    combined = result.stdout + result.stderr
+
+                    self.assertEqual(result.returncode, 2, combined)
+                    self.assertIn(expected_error, result.stderr)
+                    self.assertNotIn("Traceback", combined)
+                    self.assertEqual(list(workspace.iterdir()), [])
+                    self.assertEqual(_tree_hashes(package_parent), package_before)
+
     def test_installed_generation_modes_reject_missing_prompt_before_workspace_writes(
         self,
     ) -> None:

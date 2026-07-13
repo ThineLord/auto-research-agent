@@ -274,6 +274,14 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     if args.compare_runs is not None and len(args.compare_runs) < 2:
         parser.error("--compare-runs requires at least two RUN_DIR arguments")
+    output_dependencies = (
+        ("--survey-output", args.survey_output, "--survey", args.survey),
+        ("--compare-output", args.compare_output, "--compare-runs", args.compare_runs),
+        ("--analyze-output", args.analyze_output, "--analyze-run", args.analyze_run),
+    )
+    for output_option, output_value, mode_option, mode_value in output_dependencies:
+        if output_value is not None and not mode_value:
+            parser.error(f"{output_option} requires {mode_option}")
     if args.gemini_api_key_override_env is not None:
         override_env = args.gemini_api_key_override_env.strip()
         try:
