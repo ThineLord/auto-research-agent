@@ -858,3 +858,20 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed as `ab7d6fe` and pushed with exact local/upstream/`ls-remote`/PR-head equality. Push run
   `29258640040` and pull-request run `29258641820` passed Python 3.10/3.13, every isolated-wheel
   step, and all four job annotation sets are empty. Draft PR 13 remains open, draft, and mergeable.
+
+## 2026-07-13 - Malformed Ollama health response normalization
+
+- Reproduced valid top-level list, string, number, boolean, and null JSON reaching
+  `payload.get(...)` and raising `AttributeError` rather than returning UI health state.
+- Added one post-decode `Mapping` guard that returns the existing localizable unhealthy result with
+  a fixed `InvalidResponse` classification and the already-redacted display endpoint.
+- Preserved valid and empty mapping behavior, exact request URL/timeout, private endpoint redaction,
+  and ARA-044 target-scoped health snapshots. Provider-controlled response content is never stored
+  or rendered by the new branch.
+- Focused tests passed `3 passed, 14 subtests`; related config/UI/recovery tests passed `96 passed,
+  92 subtests`; final `make check` passed `384 passed, 465 subtests`. Three independent reviews
+  returned GO.
+- Committed as `2141b7d` and pushed with exact local/upstream/`ls-remote`/PR-head equality. Push run
+  `29259494746` and pull-request run `29259495850` passed Python 3.10/3.13, every isolated-wheel
+  step, and all four job annotation sets are empty. Nested malformed `models` values remain queued
+  separately as ARA-058.

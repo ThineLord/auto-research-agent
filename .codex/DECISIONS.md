@@ -556,3 +556,16 @@
 - Boundary: CLI/UI retain their existing configured or manually selected model when automatic
   recommendation returns none; changing that product behavior is outside the three ARA-051
   selection surfaces. UI recent-429 display still reads the first matching profile diagnostically.
+
+## 2026-07-13 - Fail closed on non-mapping Ollama health JSON
+
+- Decision: after successful `/api/tags` JSON decoding, require only that the top-level payload is
+  a `Mapping`. Non-mapping values return the existing `health_api_unhealthy` contract with
+  `api_ok=false`, `model_ok=false`, and fixed error token `InvalidResponse`.
+- Security: render only `ollama_health_display_endpoint(base_url)` and never include payload values,
+  raw endpoint paths, userinfo, query values, or response-derived type text in the result.
+- Compatibility: valid mappings, including an empty object, keep their existing reachable-API and
+  model-presence behavior; request URL, timeout, i18n keys, cache schema, and scoped identity are
+  unchanged.
+- Boundary: nested `models` schema validation is not inferred from the outer-shape fix. Confirmed
+  null/numeric inner values are tracked as ARA-058 rather than broadening ARA-052.

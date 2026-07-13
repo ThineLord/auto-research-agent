@@ -586,7 +586,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-052 - Normalize malformed Ollama health response shapes
 
-- Status: `TODO`
+- Status: `DONE`
 - Priority: P2
 - Risk: low
 - Description: Streamlit Ollama health assumes a mapping response; valid JSON lists/strings raise
@@ -598,6 +598,11 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   `make check`.
 - Commit required: yes.
 - Dependencies: preserve ARA-044 target-scoped snapshot behavior.
+- Completion: implementation `2141b7d` is pushed with exact local/upstream/`ls-remote`/PR-head
+  equality. Focused tests pass `3 passed, 14 subtests`, related config/UI/recovery tests pass `96
+  passed, 92 subtests`, and full `make check` passes `384 passed, 465 subtests`. Three independent
+  reviews report GO; push/PR runs `29259494746`/`29259495850` passed Python 3.10/3.13, all four
+  wheel steps, and zero annotations.
 
 ## ARA-053 - Remove unsafe-path collisions from UI health identity
 
@@ -679,6 +684,23 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Commit required: yes.
 - Dependencies: complete ARA-048 without folding this separate requires-relationship into its
   primary-mode mutual-exclusion fix.
+
+## ARA-058 - Validate the nested Ollama models response shape
+
+- Status: `TODO`
+- Priority: P2
+- Risk: low
+- Description: an object response whose `models` value is `null` or numeric still raises
+  `TypeError` while iterating instead of returning a structured unhealthy result.
+- Related files: `ui/app.py`, UI health tests
+- Acceptance criteria: malformed nested `models` values fail closed with fixed credential-safe
+  diagnostics; omitted/list-valued `models`, valid model records, request targets, and ARA-052
+  outer-shape behavior remain compatible.
+- Validation command: provider-free nested response-shape matrix plus UI/recovery tests, then
+  `make check`.
+- Commit required: yes.
+- Dependencies: preserve ARA-044, ARA-046, and ARA-052 health contracts without broad schema
+  migration.
 
 ## ARA-011 - Prevent failed rounds from replacing a trusted best output
 

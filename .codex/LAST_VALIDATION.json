@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-13T22:39:13+08:00",
+  "recorded_at": "2026-07-13T22:53:00+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "ab7d6fe06136d7099eb8cd60326f59b566e6f3b8",
-  "last_known_stable_commit": "ab7d6fe06136d7099eb8cd60326f59b566e6f3b8",
+  "head_commit": "2141b7ddaecfa82a6a0a63a5f9d3057dac0b516e",
+  "last_known_stable_commit": "2141b7ddaecfa82a6a0a63a5f9d3057dac0b516e",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "ab7d6fe06136d7099eb8cd60326f59b566e6f3b8",
+  "state_recorded_against_commit": "2141b7ddaecfa82a6a0a63a5f9d3057dac0b516e",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-13T22:37:56+08:00",
-    "commit": "ab7d6fe06136d7099eb8cd60326f59b566e6f3b8",
+    "verified_at": "2026-07-13T22:51:30+08:00",
+    "commit": "2141b7ddaecfa82a6a0a63a5f9d3057dac0b516e",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29258640040,
+        "run_id": 29259494746,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "ab7d6fe06136d7099eb8cd60326f59b566e6f3b8",
+        "head_sha": "2141b7ddaecfa82a6a0a63a5f9d3057dac0b516e",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29258641820,
+        "run_id": 29259495850,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "ab7d6fe06136d7099eb8cd60326f59b566e6f3b8",
+        "head_sha": "2141b7ddaecfa82a6a0a63a5f9d3057dac0b516e",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,121 @@
       }
     }
   },
-  "status": "ara051_complete_remote_verified",
+  "status": "ara052_complete_remote_verified",
   "commands": [
+    {
+      "command": "ARA-052 recovery-closeout make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_files": 60,
+        "pytest_passed": 384,
+        "pytest_subtests_passed": 465,
+        "tracked_files_scanned": 103,
+        "safety_findings": 0,
+        "duration_seconds": 16.21
+      }
+    },
+    {
+      "command": "ARA-052 push, exact remote equality, push/PR CI, annotations, and draft PR verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "implementation_commit": "2141b7ddaecfa82a6a0a63a5f9d3057dac0b516e",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "pull_request_head_equal": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29259494746,
+        "pull_request_run_id": 29259495850,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "wheel_smoke_steps_passed": 4,
+        "job_annotations": 0,
+        "draft_pr_13_open": true,
+        "draft_pr_13_draft": true,
+        "draft_pr_13_mergeable": true
+      }
+    },
+    {
+      "command": "ARA-052 final make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_files": 60,
+        "pytest_passed": 384,
+        "pytest_subtests_passed": 465,
+        "tracked_files_scanned": 103,
+        "safety_findings": 0,
+        "duration_seconds": 16.38
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_config.py tests/test_ui_helpers.py tests/test_recovery_state.py",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_passed": 96,
+        "pytest_subtests_passed": 92
+      }
+    },
+    {
+      "command": "ARA-052 focused health response and scoped snapshot matrix",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_passed": 3,
+        "pytest_subtests_passed": 14
+      }
+    },
+    {
+      "command": "ARA-052 pre-fix non-mapping JSON response matrix",
+      "exit_code": 1,
+      "result": "expected_failure",
+      "summary": {
+        "pytest_failed": 5,
+        "pytest_passed": 1,
+        "root_cause": "valid non-mapping JSON reached payload.get and raised AttributeError"
+      }
+    },
+    {
+      "command": "ARA-058 provider-free nested models shape probe",
+      "exit_code": 0,
+      "result": "follow_up_confirmed",
+      "summary": {
+        "models_null": "TypeError",
+        "models_number": "TypeError",
+        "queued_task": "ARA-058"
+      }
+    },
+    {
+      "command": "ARA-051 remote-verification closeout push, exact equality, CI, annotations, and final PR body verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "closeout_commit": "a346c617b8824d2c1ef87ba0559cadc41f7cb72d",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "pull_request_head_equal": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29258900953,
+        "pull_request_run_id": 29258904138,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "wheel_smoke_steps_passed": 4,
+        "job_annotations": 0,
+        "draft_pr_13_open": true,
+        "draft_pr_13_draft": true,
+        "draft_pr_13_mergeable": true,
+        "draft_pr_body_readback_normalized_exact": true
+      }
+    },
     {
       "command": "ARA-051 remote-closeout make check",
       "exit_code": 0,
@@ -3436,7 +3549,12 @@
     }
   ],
   "notes": [
-    "No task is active; ARA-052 is the next highest-priority TODO after live Git recovery verification.",
+    "A post-ARA-052 read-only stale-wording search accidentally allowed zsh to execute a backticked state token; it changed no file, and a literal-safe rerun plus JSON and recovery validation passed.",
+    "No task is active; ARA-057 is the highest-priority unblocked TODO after live Git recovery verification.",
+    "ARA-052 is complete and remote-verified at 2141b7d with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 29259494746 and 29259495850 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations.",
+    "ARA-052 rejects only top-level non-mapping JSON with a fixed credential-safe InvalidResponse while preserving mapping behavior, exact request targets and timeouts, endpoint redaction, and scoped health snapshots.",
+    "ARA-058 separately tracks confirmed null or numeric nested models values raising TypeError; ARA-052 does not broaden into nested schema migration.",
+    "ARA-051 is complete through remote-equal closeout a346c61; closeout push and pull-request runs 29258900953 and 29258904138 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations with exact final PR body readback.",
     "ARA-051 is complete and remote-verified at ab7d6fe with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 29258640040 and 29258641820 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations.",
     "ARA-051 excludes only non-identical duplicate profile IDs from cached pooling, recommendation, and fallback while preserving equivalent duplicates, unique healthy profiles, unprofiled alternatives, ARA-040, and ARA-043 behavior.",
     "ARA-051 focused tests pass 4 tests and 22 subtests, related tests pass 139 tests and 127 subtests, full make check passes 383 tests and 459 subtests, and three independent reviews report GO.",

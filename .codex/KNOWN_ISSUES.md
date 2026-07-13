@@ -443,3 +443,26 @@ Updated: 2026-07-12 (Asia/Shanghai)
   from cached pooling, recommendation, and fallback while retaining equivalent duplicates and
   other safe candidates. Both orders, all presets, full local gates, exact remote equality, and
   Python 3.10/3.13 push/PR CI are verified.
+
+## KI-052 - Non-object Ollama health JSON raises instead of reporting unhealthy
+
+- Status: fixed, pushed, and CI-verified through `2141b7d`
+- Severity: P2 UI reliability
+- Impact: a reachable `/api/tags` endpoint returning valid list, scalar, boolean, or null JSON can
+  raise `AttributeError`, interrupting the Streamlit health action instead of returning a stable
+  diagnostic.
+- Resolution: ARA-052 requires a top-level mapping and otherwise returns one fixed credential-safe
+  `InvalidResponse` result. Mapping compatibility, exact request targets/timeouts, endpoint
+  redaction, scoped snapshots, local full gates, exact remote equality, and Python 3.10/3.13
+  push/PR CI are verified.
+
+## KI-058 - Malformed nested Ollama models values still raise
+
+- Status: open; queued as ARA-058
+- Severity: P2 UI reliability
+- Evidence: provider-free responses shaped as `{"models": null}` and `{"models": 42}` both raise
+  `TypeError` during iteration after ARA-052 correctly accepts the outer mapping.
+- Impact: a reachable endpoint with a malformed nested field can still interrupt the UI health
+  action.
+- Boundary: omitted and list-valued `models`, valid records, exact requests, redaction, and ARA-052
+  behavior must remain compatible; no broader artifact or provider schema migration is implied.
