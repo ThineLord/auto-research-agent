@@ -46,15 +46,13 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-ARA-049 is active and locally validated. Its child-only environment transport, hidden name-only
-activation option, fail-closed parser boundary, fake-SDK credential competition, stale-unactivated
-transport, argv/metadata containment, and unchanged no-session precedence checks pass. Focused
-tests pass `4 passed, 10 subtests`, related tests pass `157 passed, 127 subtests`, and `make check`
-passes `376 passed, 426 subtests`; three reviews report GO. Resume by validating recovery state,
-reviewing/staging only named tracked paths, committing, pushing, and checking CI/PR equality. Do not
-call a provider or re-read ignored runtime. Use
-`a740344e306c3170eac46a5131f977bcfff6969f` as the conservative exact externally verified fallback
-until ARA-049 publication succeeds.
+No task is active. ARA-049 is complete and remote-verified at `d75fe11`; push/PR runs
+`29255525721`/`29255530241` passed Python 3.10/3.13, all four wheel-smoke steps, and zero annotations.
+Its child-only transport, name-only activation, fail-closed parser, fake-SDK competition,
+stale-unactivated transport, argv/metadata containment, and unchanged no-session precedence checks
+pass. Start ARA-050 only after resolving live Git state. Do not call a provider or re-read ignored
+runtime. Use `d75fe11089e89ec27ea08f40cbdb41c48fdc1ed8` as the conservative exact externally verified
+fallback until a later checkpoint is itself externally verified.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
 it imported the editable checkout and advanced ignored `projects/example` state after a missing
@@ -101,9 +99,9 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-ARA-049 is the sole `IN_PROGRESS` task; ARA-057 remains separate. ARA-018 requires an explicit
-owner license/distribution decision. Do not start ARA-019, ARA-026, ARA-006, or ARA-007 until their
-recorded dependencies are satisfied.
+There is no `IN_PROGRESS` task; ARA-050 is the next `TODO`, and ARA-057 remains separate. ARA-018
+requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026, ARA-006,
+or ARA-007 until their recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
 

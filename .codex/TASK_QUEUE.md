@@ -523,7 +523,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-049 - Make UI session credentials authoritative for the launched run
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P1
 - Risk: medium
 - Description: Streamlit health/discovery selects its password-box key over config, but the child
@@ -537,9 +537,11 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   regressions, then `make check`.
 - Commit required: yes.
 - Dependencies: preserve the ARA-045 effective-key and redaction contract.
-- Progress: implementation is locally validated (`4 passed, 10 subtests`; related `157 passed, 127
-  subtests`; full `376 passed, 426 subtests`) and three independent reviews report GO. Commit,
-  remote equality, CI, PR readback, and closeout remain.
+- Completion: implementation `d75fe11` is pushed with exact local/upstream/`ls-remote`/PR-head
+  equality. Focused tests pass `4 passed, 10 subtests`, related tests pass `157 passed, 127
+  subtests`, and full `make check` passes `376 passed, 426 subtests`. Three independent reviews
+  report GO; push/PR runs `29255525721`/`29255530241` passed Python 3.10/3.13, all four isolated
+  wheel steps, and zero annotations. Draft PR body readback is exact.
 
 ## ARA-050 - Preflight installed generation resources before writing
 

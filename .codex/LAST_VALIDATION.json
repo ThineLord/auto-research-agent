@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-13T21:50:44+08:00",
+  "recorded_at": "2026-07-13T21:57:14+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "a740344e306c3170eac46a5131f977bcfff6969f",
-  "last_known_stable_commit": "a740344e306c3170eac46a5131f977bcfff6969f",
+  "head_commit": "d75fe11089e89ec27ea08f40cbdb41c48fdc1ed8",
+  "last_known_stable_commit": "d75fe11089e89ec27ea08f40cbdb41c48fdc1ed8",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "a740344e306c3170eac46a5131f977bcfff6969f",
+  "state_recorded_against_commit": "d75fe11089e89ec27ea08f40cbdb41c48fdc1ed8",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-13T21:33:51+08:00",
-    "commit": "a740344e306c3170eac46a5131f977bcfff6969f",
+    "verified_at": "2026-07-13T21:55:23+08:00",
+    "commit": "d75fe11089e89ec27ea08f40cbdb41c48fdc1ed8",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29253912508,
+        "run_id": 29255525721,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "a740344e306c3170eac46a5131f977bcfff6969f",
+        "head_sha": "d75fe11089e89ec27ea08f40cbdb41c48fdc1ed8",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29253915360,
+        "run_id": 29255530241,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "a740344e306c3170eac46a5131f977bcfff6969f",
+        "head_sha": "d75fe11089e89ec27ea08f40cbdb41c48fdc1ed8",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,46 @@
       }
     }
   },
-  "status": "ara049_local_validated_pending_commit_push_ci",
+  "status": "ara049_complete_remote_verified",
   "commands": [
+    {
+      "command": "ARA-049 remote-closeout make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_files": 60,
+        "pytest_passed": 376,
+        "pytest_subtests_passed": 426,
+        "tracked_files_scanned": 103,
+        "safety_findings": 0,
+        "duration_seconds": 14.09
+      }
+    },
+    {
+      "command": "ARA-049 push, exact remote equality, push/PR CI, annotations, and draft PR verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "implementation_commit": "d75fe11089e89ec27ea08f40cbdb41c48fdc1ed8",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "pull_request_head_equal": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29255525721,
+        "pull_request_run_id": 29255530241,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "wheel_smoke_steps_passed": 4,
+        "job_annotations": 0,
+        "draft_pr_13_open": true,
+        "draft_pr_13_draft": true,
+        "draft_pr_13_mergeable": true,
+        "draft_pr_body_readback_normalized_exact": true
+      }
+    },
     {
       "command": "ARA-049 provider-free pre-fix credential-authority regressions",
       "exit_code": 1,
@@ -3145,6 +3183,8 @@
     }
   ],
   "notes": [
+    "ARA-049 is complete and remote-verified at d75fe11 with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 29255525721 and 29255530241 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations.",
+    "No task is active; ARA-050 is the next highest-priority TODO after live Git recovery verification.",
     "ARA-049 is locally complete and provider-free: a nonempty UI session key is the explicit child credential, empty sessions clear stale transport state without activation, and existing no-session precedence is unchanged.",
     "ARA-049 focused tests pass 4 tests and 10 subtests, related tests pass 157 tests and 127 subtests, full make check passes 376 tests and 426 subtests, and three independent reviews report GO; commit, push, CI, PR verification, and closeout remain.",
     "ARA-049 is the sole active task; its scope is UI child-run credential authority with no-session-key precedence and credential-redaction compatibility preserved.",

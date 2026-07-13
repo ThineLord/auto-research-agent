@@ -4,19 +4,20 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: complete ARA-049 by making a nonempty UI session credential authoritative for the
-  launched child run without changing no-session-key credential precedence.
+- Current goal: preserve the remote-verified ARA-049 UI credential boundary, then continue with the
+  highest-priority queued task ARA-050.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `a740344e306c3170eac46a5131f977bcfff6969f` (the exact
+- State recorded against commit: `d75fe11089e89ec27ea08f40cbdb41c48fdc1ed8` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `a740344e306c3170eac46a5131f977bcfff6969f` (exact local,
+- Last externally verified fallback: `d75fe11089e89ec27ea08f40cbdb41c48fdc1ed8` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: ARA-049. The provider-free implementation and local validation are
-  complete; commit, push, remote equality, GitHub CI, PR readback, and closeout remain.
+- Active task at this snapshot: none. ARA-049 is complete, independently reviewed GO, pushed with
+  exact local/upstream/`ls-remote`/PR-head equality, and passed push/PR CI on Python 3.10/3.13.
+  ARA-050 is the highest-priority `TODO`.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -652,10 +653,8 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Remaining Steps
 
-- Commit and push only the locally validated ARA-049 implementation, verify exact remote/PR equality
-  and Python 3.10/3.13 CI, update the draft PR, then record a separate remote closeout checkpoint.
-- Leave ARA-050 through ARA-057 and the owner-blocked/deferred tasks untouched until ARA-049 is
-  remotely closed.
+- Start only ARA-050 after resolving live Git state and confirming remote synchronization; leave
+  ARA-051 through ARA-057 and the owner-blocked/deferred tasks untouched.
 
 ## Test Status
 
@@ -665,6 +664,13 @@ Updated: 2026-07-13 (Asia/Shanghai)
 - ARA-049 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
   self/worktree/staged scans, and pytest (`376 passed, 426 subtests passed` in 14.27 seconds; 103
   tracked/index files and zero findings). Three independent reviews report GO.
+- ARA-049 implementation `d75fe11` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Push run `29255525721` and pull-request run `29255530241` passed Python 3.10/3.13, including all
+  four isolated-wheel steps; all four annotation sets are empty. Draft PR 13 remains open, draft,
+  mergeable, and its normalized body readback is exact.
+- ARA-049 remote-closeout `make check` again passes all gates (`376 passed, 426 subtests passed` in
+  14.09 seconds) after the queue, completion log, validation JSON, and resume instructions were
+  synchronized.
 - ARA-048 pre-fix conflict regression failed as expected (`93 failed, 1 passed`): 90 pair/order
   subtests plus direct, module, and copied-installed entrypoint boundaries all exposed the missing
   parser rejection. The post-fix focused layer passes `6 passed, 100 subtests`; related
@@ -1147,6 +1153,9 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- The first ARA-049 completion snapshot used the reserved finalization word `closeout` in a
+  remaining-step bullet while no task was active, so one recovery consistency assertion failed.
+  The instruction now asks only for live remote synchronization before starting ARA-050.
 - The first ARA-049 local-validation recovery snapshot used an unrecognized fallback label, so one
   recovery consistency assertion failed while the other five passed. The resume wording now uses
   the schema's explicit conservative externally verified fallback form.
@@ -1362,10 +1371,11 @@ Updated: 2026-07-13 (Asia/Shanghai)
 ## Next Command
 
 ```bash
-git diff --check
-.venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
-.venv/bin/python -m pytest -q tests/test_recovery_state.py
 git status --short --branch
+git rev-parse --verify HEAD
+git rev-list --left-right --count @{upstream}...HEAD
+git diff --check
+.venv/bin/python -m pytest -q tests/test_recovery_state.py
 ```
 
 ## Interruption Recovery
@@ -1379,6 +1389,9 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   ignored-runtime validation.
 - Keep ARA-049 provider-free and credential-value-safe: use synthetic secrets in patched child
   environments, never print or inspect actual key values, and preserve ARA-045 redaction behavior.
+- ARA-049 changes only Streamlit child-run credential transport and its internal CLI activation
+  path. It does not change no-session config/custom/Google/Gemini precedence or authorize real
+  provider validation.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

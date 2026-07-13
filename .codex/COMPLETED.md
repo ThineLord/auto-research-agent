@@ -807,3 +807,21 @@ Validation and implementation outcomes will be appended only after they are actu
   one Python 3.13 pre-checkout GitHub HTTP 503 action-download outage; all four final wheel steps
   passed and all four annotation sets are empty. Draft PR 13 was updated with exact normalized
   readback.
+
+## 2026-07-13 - Authoritative UI session credential for child runs
+
+- Reproduced Streamlit health/discovery selecting the password-box key while the launched child
+  selected an explicit config key or inherited `GOOGLE_API_KEY` instead.
+- Added a fixed child-only environment transport plus a hidden activation option carrying only its
+  environment variable name. Nonempty sessions now become the explicit key for preflight, cloud
+  helpers, and real client creation; empty sessions clear stale transport state without activation.
+- Preserved config/custom/Google/Gemini no-session precedence and ARA-045 provider-error redaction.
+  Synthetic provider-free tests prove the key is absent from argv and process metadata, activated
+  session values beat every competing source, and stale unactivated transport remains inert.
+- Focused tests passed `4 passed, 10 subtests`; related UI/CLI/LLM/cloud/recovery tests passed `157
+  passed, 127 subtests`; final `make check` passed `376 passed, 426 subtests` with 103 tracked/index
+  files and zero findings. Three independent reviews returned GO.
+- Committed as `d75fe11` and pushed with exact local/upstream/`ls-remote`/PR-head equality. Push run
+  `29255525721` and pull-request run `29255530241` passed Python 3.10/3.13, every isolated-wheel
+  step, and all four annotation sets are empty. Draft PR 13 remains open, draft, mergeable, and its
+  normalized body readback is exact.
