@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-13T23:32:33+08:00",
+  "recorded_at": "2026-07-13T23:48:00+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "98dffb554e12c9033ac3109c63bdbdee150aa0fb",
-  "last_known_stable_commit": "98dffb554e12c9033ac3109c63bdbdee150aa0fb",
+  "head_commit": "5cea1e205a1230d1a6929f35c11896225c53b28e",
+  "last_known_stable_commit": "5cea1e205a1230d1a6929f35c11896225c53b28e",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "98dffb554e12c9033ac3109c63bdbdee150aa0fb",
+  "state_recorded_against_commit": "5cea1e205a1230d1a6929f35c11896225c53b28e",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-13T23:30:25+08:00",
-    "commit": "98dffb554e12c9033ac3109c63bdbdee150aa0fb",
+    "verified_at": "2026-07-13T23:36:20+08:00",
+    "commit": "5cea1e205a1230d1a6929f35c11896225c53b28e",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29262351625,
+        "run_id": 29262706161,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "98dffb554e12c9033ac3109c63bdbdee150aa0fb",
+        "head_sha": "5cea1e205a1230d1a6929f35c11896225c53b28e",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29262353455,
+        "run_id": 29262718135,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "98dffb554e12c9033ac3109c63bdbdee150aa0fb",
+        "head_sha": "5cea1e205a1230d1a6929f35c11896225c53b28e",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,93 @@
       }
     }
   },
-  "status": "ara053_complete_remote_verified_no_active_task",
+  "status": "ara058_indexed_validation_passed_awaiting_commit_push_ci",
   "commands": [
+    {
+      "command": "ARA-058 indexed implementation make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_files": 61,
+        "pytest_passed": 393,
+        "pytest_subtests_passed": 581,
+        "tracked_files_scanned": 104,
+        "staged_files_scanned": 104,
+        "safety_findings": 0,
+        "duration_seconds": 18.49
+      }
+    },
+    {
+      "command": "ARA-058 three independent final reviews and recovery-delta re-review",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "security_review": "GO",
+        "test_review": "GO",
+        "code_minimality_review": "GO",
+        "recovery_delta_re_review": "GO",
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-058 local make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_files": 61,
+        "pytest_passed": 393,
+        "pytest_subtests_passed": 581,
+        "tracked_files_scanned": 104,
+        "safety_findings": 0,
+        "duration_seconds": 17.81
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest tests/test_ui_helpers.py tests/test_config.py tests/test_recovery_state.py -q",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_passed": 101,
+        "pytest_subtests_passed": 120,
+        "duration_seconds": 1.32
+      }
+    },
+    {
+      "command": "ARA-058 focused outer, nested, valid-list, request, and redaction matrix",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_passed": 3,
+        "pytest_subtests_passed": 18,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-053 remote-verification closeout push, exact equality, CI, annotations, and final PR body verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "closeout_commit": "5cea1e205a1230d1a6929f35c11896225c53b28e",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "pull_request_head_equal": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29262706161,
+        "pull_request_run_id": 29262718135,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "wheel_smoke_steps_passed": 4,
+        "job_annotations": 0,
+        "draft_pr_13_open": true,
+        "draft_pr_13_draft": true,
+        "draft_pr_13_mergeable": true,
+        "draft_pr_body_readback_normalized_exact": true,
+        "draft_pr_body_sha256": "af5c7ef5a9d798fedcdc1ab7e4194f47daa6535706902d9fab93c7da2c7a657d"
+      }
+    },
     {
       "command": "ARA-053 recovery-closeout make check",
       "exit_code": 0,
@@ -3443,6 +3528,54 @@
   ],
   "failures": [
     {
+      "command": "first ARA-058 locally-complete recovery consistency test",
+      "result": "corrected_before_commit",
+      "summary": {
+        "pytest_failed": 1,
+        "pytest_passed": 5,
+        "pytest_subtests_passed": 1,
+        "cause": "one finalization bullet referenced active ARA-058 plus untouched ARA-056",
+        "fix": "the ARA-056 prohibition is now a separate non-finalization bullet"
+      }
+    },
+    {
+      "command": "ARA-058 nested models container regression before implementation",
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "pytest_failed": 7,
+        "pytest_passed": 1,
+        "pytest_subtests_passed": 3,
+        "root_cause": "null and scalar containers were iterated without validation while string and mapping containers could be rescued into false healthy state by installed models",
+        "corrected_before_commit": true
+      }
+    },
+    {
+      "command": "ARA-059 provider-free non-string model-name probe",
+      "result": "confirmed_separate_finding",
+      "summary": {
+        "false_healthy_shapes": [
+          "null",
+          "boolean",
+          "integer",
+          "list",
+          "object"
+        ],
+        "queued_task": "ARA-059",
+        "changed_by_ara058": false
+      }
+    },
+    {
+      "command": "first ARA-058 activation-state recovery consistency test",
+      "result": "corrected_before_code_work",
+      "summary": {
+        "pytest_failed": 1,
+        "pytest_passed": 5,
+        "pytest_subtests_passed": 1,
+        "cause": "a generic TODO patch selected ARA-056 instead of the intended ARA-058 queue entry",
+        "fix": "both statuses were corrected with task-heading-specific context"
+      }
+    },
+    {
       "command": "first ARA-053 completion-state recovery consistency test",
       "result": "corrected_before_closeout_commit",
       "summary": {
@@ -3811,8 +3944,15 @@
     }
   ],
   "notes": [
+    "ARA-058 indexed implementation validation passes all make check gates with 393 tests, 581 subtests, 104 tracked/index files, and zero safety findings; commit, push, CI, and closeout remain.",
+    "Three independent ARA-058 final reviews report GO after CURRENT_STATE, RESUME_INSTRUCTIONS, and KI-058 were synchronized to the locally complete boundary.",
+    "ARA-058 locally requires the nested models container to be an actual list and reuses fixed InvalidResponse before installed fallback while preserving omitted and list-valued behavior.",
+    "ARA-058 focused tests pass 3 tests and 18 subtests, related UI/config/recovery tests pass 101 tests and 120 subtests, and full make check passes 393 tests and 581 subtests; final reviews, commit, push, CI, and closeout remain.",
+    "ARA-059 separately tracks confirmed non-string model names being coerced into false healthy matches in UI health and shared tags parsing; ARA-058 does not broaden beyond the models container.",
+    "ARA-058 is the sole active task; its scope is provider-free nested Ollama models response validation with ARA-044, ARA-046, ARA-052, and ARA-053 preserved.",
+    "ARA-053 is complete through remote-equal closeout 5cea1e2; closeout push and pull-request runs 29262706161 and 29262718135 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations with exact final PR body readback.",
     "ARA-053 is complete and remote-verified at 98dffb5; push and pull-request runs 29262351625 and 29262353455 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations.",
-    "No task is active; ARA-058 is the recommended next low-risk provider-free TODO after live recovery verification.",
+    "ARA-058 became active only after exact live verification of the ARA-053 closeout.",
     "ARA-053 explicit staged validation passed all make check gates with 392 tests, 569 subtests, 104 tracked/index files, and zero safety findings.",
     "ARA-053 is locally implemented and validated: private Ollama paths use a full process-local keyed HMAC identity over only normalized path; raw path, key, userinfo, query, fragment, and reversible forms are not stored.",
     "ARA-053 focused tests pass 4 tests and 14 subtests, related UI/recovery and package/wheel tests pass 104 tests and 110 subtests, full make check passes 392 tests and 569 subtests, and three independent reviews report GO.",

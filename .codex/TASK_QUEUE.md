@@ -699,7 +699,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-058 - Validate the nested Ollama models response shape
 
-- Status: `TODO`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: low
 - Description: an object response whose `models` value is `null` or numeric still raises
@@ -713,6 +713,25 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Commit required: yes.
 - Dependencies: preserve ARA-044, ARA-046, and ARA-052 health contracts without broad schema
   migration.
+- Local validation: exact list guard returns fixed `InvalidResponse` for all JSON non-list shapes
+  before installed fallback. Focused tests pass `3 passed, 18 subtests`, related tests pass `101
+  passed, 120 subtests`, and full `make check` passes `393 passed, 581 subtests`; three independent
+  final reviews report GO. Indexed validation also passes; commit, push, and CI remain.
+
+## ARA-059 - Reject non-string Ollama model names
+
+- Status: `TODO`
+- Priority: P2
+- Risk: low
+- Description: list-valued API responses coerce null, boolean, numeric, list, or object `name`
+  fields with `str(...)`, so a selected string such as `None` or `True` can be reported healthy.
+- Related files: `ui/app.py`, `src/config.py`, Ollama response/parser tests
+- Acceptance criteria: only nonblank string model names can enter UI health or normalized model
+  inventories; valid strings, invalid list records, exact requests, and redaction remain compatible.
+- Validation command: provider-free record-name type matrix across UI health and shared tags parser,
+  then related tests and `make check`.
+- Commit required: yes.
+- Dependencies: complete ARA-058 without folding record-field schema policy into its container guard.
 
 ## ARA-011 - Prevent failed rounds from replacing a trusted best output
 

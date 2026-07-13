@@ -48,6 +48,10 @@
 
 ### Fixed
 
+* Ollama health checks now reject a non-list nested `models` value with the same fixed,
+  credential-safe `InvalidResponse` result used for a malformed outer response. Missing and
+  list-valued fields, valid records, installed-model fallback, and exact request behavior remain
+  compatible.
 * Private Ollama endpoint paths now receive a process-local keyed opaque identity for target-scoped
   health snapshots instead of being reduced to segment lengths. Equal-length path changes evict
   stale results without retaining raw or reversible path material; allowlisted paths, normalized

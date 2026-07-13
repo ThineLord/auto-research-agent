@@ -604,3 +604,17 @@
 - Assurance boundary: a fixed digest cannot be mathematically injective over arbitrary-length
   paths. The full 256-bit keyed identifier removes the deterministic length collisions with
   negligible cryptographic collision risk while satisfying the no-raw/no-reversible-state rule.
+
+## 2026-07-13 - Require a list-valued nested Ollama models field
+
+- Decision: after decoding `/api/tags`, bind `models` to the existing empty-list default only when
+  the field is absent, then require an actual `list`. Null, boolean, numeric, string, and mapping
+  containers return the same fixed ARA-052 `InvalidResponse` result before installed-model fallback.
+- Security: never render the nested value, its type, or provider-controlled detail. Continue using
+  only the ARA-046 redacted endpoint plus the fixed error token with `api_ok=false` and
+  `model_ok=false`.
+- Compatibility: preserve outer non-mapping behavior, omitted/empty/list-valued fields, mixed lists
+  that ignore non-dict records, model-name trimming, installed-model union, exact request target,
+  timeout, message keys, and target-scoped health storage.
+- Boundary: record-field typing is not changed. Confirmed non-string `name` coercion is tracked as
+  ARA-059 rather than broadening this container-only guard or the shared parser contract.

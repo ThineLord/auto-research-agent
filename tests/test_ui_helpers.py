@@ -2884,6 +2884,87 @@ release_run_lock(handle)
         get.assert_called_once_with(f"{private_endpoint}api/tags", timeout=7)
         self.assertNotIn("private-token", repr(health))
 
+    def test_ollama_health_rejects_non_list_nested_models(self) -> None:
+        import ui.app as ui_app
+
+        expected = {
+            "ok": False,
+            "api_ok": False,
+            "model_ok": False,
+            "message": ("Ollama API is not healthy at https://localhost:11434: InvalidResponse"),
+            "message_key": "health_api_unhealthy",
+            "message_args": {
+                "base_url": "https://localhost:11434",
+                "error": "InvalidResponse",
+            },
+        }
+        invalid_models_values = (
+            None,
+            0,
+            42,
+            -3.5,
+            True,
+            False,
+            "provider-controlled-detail",
+            {"name": "qwen3:8b", "private": "provider-controlled-detail"},
+        )
+        private_endpoint = "https://fixture-user:private-token@localhost:11434/proxy/"
+
+        for models_value in invalid_models_values:
+            with self.subTest(models_value=models_value):
+                response = SimpleNamespace(
+                    raise_for_status=lambda: None,
+                    json=lambda models_value=models_value: {"models": models_value},
+                )
+                with patch.object(ui_app.requests, "get", return_value=response) as get:
+                    health = ui_app.check_ollama_model_health(
+                        base_url=private_endpoint,
+                        selected_model="qwen3:8b",
+                        installed_model_names=["qwen3:8b"],
+                        timeout_seconds=7,
+                    )
+
+                self.assertEqual(health, expected)
+                get.assert_called_once_with(f"{private_endpoint}api/tags", timeout=7)
+                self.assertNotIn("provider-controlled-detail", repr(health))
+                self.assertNotIn("private-token", repr(health))
+
+        list_controls = (
+            ({}, "missing:latest", [], "health_model_missing"),
+            ({"models": []}, "missing:latest", [], "health_model_missing"),
+            (
+                {
+                    "models": [
+                        None,
+                        "invalid-record",
+                        {"digest": "missing-name"},
+                        {"name": " qwen3:8b "},
+                    ]
+                },
+                "qwen3:8b",
+                [],
+                "health_model_ok",
+            ),
+            ({"models": []}, "qwen3:8b", ["qwen3:8b"], "health_model_ok"),
+        )
+        for payload, selected_model, installed_models, expected_message_key in list_controls:
+            with self.subTest(payload=payload, selected_model=selected_model):
+                response = SimpleNamespace(
+                    raise_for_status=lambda: None,
+                    json=lambda payload=payload: payload,
+                )
+                with patch.object(ui_app.requests, "get", return_value=response):
+                    health = ui_app.check_ollama_model_health(
+                        base_url="http://localhost:11434",
+                        selected_model=selected_model,
+                        installed_model_names=installed_models,
+                    )
+
+                self.assertTrue(health["api_ok"])
+                self.assertEqual(health["message_key"], expected_message_key)
+                self.assertEqual(health["ok"], expected_message_key == "health_model_ok")
+                self.assertEqual(health["model_ok"], expected_message_key == "health_model_ok")
+
     def test_ui_ollama_private_path_scope_avoids_equal_length_collisions(self) -> None:
         import ui.app as ui_app
 

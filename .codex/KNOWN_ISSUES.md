@@ -458,12 +458,12 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-058 - Malformed nested Ollama models values still raise
 
-- Status: open; queued as ARA-058
+- Status: active ARA-058; locally fixed and validated, remote verification pending
 - Severity: P2 UI reliability
 - Evidence: provider-free responses shaped as `{"models": null}` and `{"models": 42}` both raise
   `TypeError` during iteration after ARA-052 correctly accepts the outer mapping.
-- Impact: a reachable endpoint with a malformed nested field can still interrupt the UI health
-  action.
+- Impact: before the local fix, a reachable endpoint with a malformed nested field could interrupt
+  the UI health action or be rescued into false healthy state by installed-model fallback.
 - Boundary: omitted and list-valued `models`, valid records, exact requests, redaction, and ARA-052
   behavior must remain compatible; no broader artifact or provider schema migration is implied.
 
@@ -488,3 +488,15 @@ Updated: 2026-07-12 (Asia/Shanghai)
   credential values, query values, fragments, raw/reversible paths, and key material remain absent
   from session state. Collision/cache/privacy/compatibility tests, local gates, exact remote equality,
   and Python 3.10/3.13 push/PR CI are verified.
+
+## KI-059 - Non-string Ollama model names can become false healthy matches
+
+- Status: open; queued as ARA-059
+- Severity: P2 UI and discovery reliability
+- Evidence: provider-free list responses with null, boolean, numeric, list, or object `name` values
+  are converted with `str(...)`; selecting the resulting text returns `health_model_ok` for all five
+  shapes. The shared tags parser performs the same coercion.
+- Impact: malformed provider data can be displayed and cached as a real installed model rather than
+  being ignored or rejected.
+- Boundary: ARA-058 validates only the `models` container. Record-field type policy and compatibility
+  require separate UI/parser coverage before changing normalization.

@@ -4,18 +4,19 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: preserve the remote-verified ARA-053 fix and prepare the next provider-free task.
+- Current goal: complete ARA-058 by normalizing malformed nested Ollama `models` responses without
+  changing valid mapping/list health behavior.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `98dffb554e12c9033ac3109c63bdbdee150aa0fb` (the exact
+- State recorded against commit: `5cea1e205a1230d1a6929f35c11896225c53b28e` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `98dffb554e12c9033ac3109c63bdbdee150aa0fb` (exact local,
+- Last externally verified fallback: `5cea1e205a1230d1a6929f35c11896225c53b28e` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-053 is fixed, pushed, and remote-verified; ARA-058 is the
-  recommended next low-risk provider-free task after live recovery checks.
+- Active task at this snapshot: ARA-058. The nested list guard is implemented, reviewed, explicitly
+  staged, and validated; commit, push, and remote CI remain.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -726,13 +727,38 @@ Updated: 2026-07-13 (Asia/Shanghai)
   pass `20 passed, 41 subtests`; full `make check` passes `392 passed, 569 subtests`. Three independent
   final reviews report GO.
 
+## ARA-058 Nested Ollama Models Shape
+
+- Provider-free probes confirm null, boolean, integer, and float containers raise `TypeError`, while
+  string and object containers can silently report healthy when the installed-model fallback matches.
+- Keep this task limited to requiring an omitted/default or actual list container and reusing the
+  fixed ARA-052 `InvalidResponse` result. Per-record name typing is queued separately as ARA-059.
+- Added one raw-container binding and list guard before installed-model union. The fixed matrix
+  includes null, zero, other numbers, booleans, string, and mapping containers plus omitted, empty,
+  mixed-valid, whitespace-name, and installed-fallback list controls.
+- Focused tests pass `3 passed, 18 subtests`; UI/config/recovery tests pass `101 passed, 120 subtests`;
+  full `make check` passes `393 passed, 581 subtests`. Three independent final reviews report GO
+  after the recovery-wording correction.
+
 ## Remaining Steps
 
-- Verify the live HEAD/upstream/remote/PR state for this recovery snapshot, then activate ARA-058
-  as a separate task. Leave ARA-056 and owner-blocked/deferred tasks untouched.
+- Commit and push the reviewed ARA-058 paths, then verify exact remote/PR-head equality plus Python
+  3.10/3.13 CI.
+- Leave ARA-056 and deferred tasks untouched.
 
 ## Test Status
 
+- ARA-058 initial nested-container regression produced `7 failed, 1 passed, 3 subtests passed`:
+  five scalar/null cases raised `TypeError`, while string and object containers returned false
+  healthy state through the installed-model fallback. The expanded fixed matrix also covers zero.
+- ARA-058 focused outer/nested/valid/request/redaction coverage passes `3 passed, 18 subtests`;
+  related UI/config/recovery tests pass `101 passed, 120 subtests`.
+- ARA-058 local `make check` passes Ruff format/lint over 61 files, imports, repository-safety
+  self/worktree/staged scans, and pytest (`393 passed, 581 subtests passed` in 17.81 seconds; 104
+  tracked/index files and zero findings). Three independent final reviews report GO; commit, push,
+  and CI remain.
+- ARA-058 indexed `make check` again passes all gates (`393 passed, 581 subtests passed` in 18.49
+  seconds); both safety modes scan 104 tracked/index files with zero findings.
 - ARA-053 pre-fix collision/cache regression produced the expected `4 failed, 1 passed`: all three
   equal-shape path pairs shared an identity and `/bravo` loaded `/alpha` health evidence.
 - ARA-053 focused final coverage passes `4 passed, 14 subtests`; UI/recovery tests pass `84 passed,
@@ -749,6 +775,10 @@ Updated: 2026-07-13 (Asia/Shanghai)
   isolated-wheel steps, and zero annotations. Draft PR 13 remains open, draft, and mergeable.
 - ARA-053 recovery-closeout `make check` again passes all gates (`392 passed, 569 subtests passed`
   in 17.75 seconds) after queue, completion, known-issue, validation, and resume records were synced.
+- ARA-053 closeout `5cea1e2` is pushed with exact local/upstream/`ls-remote`/PR-head equality. Closeout
+  push/PR runs `29262706161`/`29262718135` passed Python 3.10/3.13, all four wheel steps, and zero
+  annotations; final PR body normalized readback is exact at SHA-256
+  `af5c7ef5a9d798fedcdc1ab7e4194f47daa6535706902d9fab93c7da2c7a657d`.
 - ARA-057 pre-fix provider-free matrix produced `79 failed, 3 passed, 6 subtests passed`: every
   dependency context parsed, direct/module entrypoints reached runtime layout, and temporary
   copied-installed mock mismatches completed ordinary writes.
@@ -1324,6 +1354,12 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- The first ARA-058 locally-complete remaining-step bullet mentioned both active ARA-058 and
+  untouched ARA-056 while requesting commit/push, so one recovery consistency assertion failed.
+  The unrelated-task prohibition is now a separate non-finalization bullet.
+- The first ARA-058 activation patch matched ARA-056's earlier generic `TODO` line, so one recovery
+  consistency test reported ARA-056 active while CURRENT_STATE named ARA-058. The queue statuses
+  were corrected explicitly by task heading before any code work.
 - The first ARA-053 completion snapshot used the reserved finalization word `checkpoint` in a
   remaining-step bullet while no task was active, so one recovery consistency assertion failed.
   The instruction now uses `snapshot`; the other five tests and one subtest had passed.
@@ -1575,9 +1611,9 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ```bash
 git status --short --branch
-git rev-parse HEAD
-git rev-list --left-right --count '@{upstream}'...HEAD
+git diff --check
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
+.venv/bin/python -m pytest -q tests/test_ui_helpers.py -k 'non_list_nested_models or non_mapping_json_responses or fast_model_health_check'
 ```
 
 ## Interruption Recovery
@@ -1605,6 +1641,8 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   must remain compatible; do not dispatch, call a provider, or touch ignored runtime during tests.
 - Keep ARA-053 confined to non-secret Ollama health identity. Do not retain raw private path,
   userinfo, query, fragments, credentials, or reversible encodings; same target must remain stable.
+- Keep ARA-058 confined to the nested `models` container shape. ARA-059 separately owns non-string
+  record names; do not broaden this fix into shared model-record normalization.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

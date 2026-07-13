@@ -688,7 +688,8 @@ def check_ollama_model_health(
             "message_args": {"base_url": display_endpoint, "error": error_type},
         }
 
-    if not isinstance(payload, Mapping):
+    raw_models = payload.get("models", []) if isinstance(payload, Mapping) else None
+    if not isinstance(payload, Mapping) or not isinstance(raw_models, list):
         error_type = "InvalidResponse"
         return {
             "ok": False,
@@ -700,9 +701,7 @@ def check_ollama_model_health(
         }
 
     api_models = [
-        str(model.get("name", "")).strip()
-        for model in payload.get("models", [])
-        if isinstance(model, dict)
+        str(model.get("name", "")).strip() for model in raw_models if isinstance(model, dict)
     ]
     available_models = {name for name in installed_model_names if name} | {
         name for name in api_models if name
