@@ -606,7 +606,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-053 - Remove unsafe-path collisions from UI health identity
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P2
 - Risk: low
 - Description: non-allowlisted Ollama paths are represented only by segment lengths, so equal-length
@@ -621,7 +621,10 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Local validation: deterministic length collisions and stale-cache reuse are fixed by a
   process-local keyed path identifier. Focused tests pass `4 passed, 14 subtests`, related tests pass
   `104 passed, 110 subtests`, and indexed full `make check` passes `392 passed, 569 subtests` with 104
-  files in both safety scans; three reviews report GO. Commit, push, and remote CI remain.
+  files in both safety scans; three reviews report GO.
+- Completion: implementation `98dffb5` is pushed with exact local/upstream/`ls-remote`/PR-head
+  equality. Push/PR runs `29262351625`/`29262353455` passed Python 3.10/3.13, all four isolated-wheel
+  steps, and zero annotations.
 
 ## ARA-054 - Reconcile resumable mid-round stops with partial output directories
 

@@ -892,3 +892,19 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed as `eabedff` and pushed with exact local/upstream/`ls-remote`/PR-head equality. Push run
   `29260853734` and pull-request run `29260855184` passed Python 3.10/3.13, every isolated-wheel
   step, and all four job annotation sets are empty.
+
+## 2026-07-13 - Private Ollama health path identity
+
+- Reproduced three equal-shape private-path pairs sharing the length-only health identity and a
+  valid `/alpha` health result being returned for `/bravo`.
+- Replaced private path shapes with a domain-separated full HMAC-SHA256 identifier keyed by random
+  process-local bytes held only in an imported helper module. Raw paths, key material, userinfo,
+  query values, fragments, and reversible encodings never enter session state or files.
+- Preserved safe allowlisted path identities, origin/default-port/trailing-slash normalization,
+  userinfo/query presence markers, fragment omission, exact request behavior, and same-target reuse.
+- The expected pre-fix layer produced `4 failed, 1 passed`; focused final tests pass `4 passed, 14
+  subtests`, related tests pass `104 passed, 110 subtests`, and indexed full `make check` passes `392
+  passed, 569 subtests`. Three independent final reviews returned GO.
+- Committed as `98dffb5` and pushed with exact local/upstream/`ls-remote`/PR-head equality. Push run
+  `29262351625` and pull-request run `29262353455` passed Python 3.10/3.13, every isolated-wheel
+  step, and all four job annotation sets are empty.

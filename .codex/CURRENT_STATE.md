@@ -4,19 +4,18 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: complete ARA-053 by eliminating equal-length private Ollama path collisions in
-  target-scoped health identity without storing path or credential material.
+- Current goal: preserve the remote-verified ARA-053 fix and prepare the next provider-free task.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `cc8519eb8ebe93d1e84d35609aedfcdd38a8bad4` (the exact
+- State recorded against commit: `98dffb554e12c9033ac3109c63bdbdee150aa0fb` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `cc8519eb8ebe93d1e84d35609aedfcdd38a8bad4` (exact local,
+- Last externally verified fallback: `98dffb554e12c9033ac3109c63bdbdee150aa0fb` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: ARA-053. The deterministic equal-length private-path collision is
-  fixed, explicitly staged, and locally validated; commit, push, remote CI, and closeout remain.
+- Active task at this snapshot: none. ARA-053 is fixed, pushed, and remote-verified; ARA-058 is the
+  recommended next low-risk provider-free task after live recovery checks.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -729,9 +728,8 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Remaining Steps
 
-- Review the explicit staged ARA-053 diff, commit, push, verify exact remote/PR-head equality plus
-  Python 3.10/3.13 CI, then record closeout.
-- Leave ARA-056, ARA-058, and owner-blocked/deferred tasks untouched.
+- Verify the live HEAD/upstream/remote/PR state for this recovery snapshot, then activate ARA-058
+  as a separate task. Leave ARA-056 and owner-blocked/deferred tasks untouched.
 
 ## Test Status
 
@@ -743,10 +741,14 @@ Updated: 2026-07-13 (Asia/Shanghai)
 - ARA-053 local `make check` passes Ruff format/lint over 61 files, imports, repository-safety
   self/worktree/staged scans, and pytest (`392 passed, 569 subtests passed` in 18.61 seconds; 103
   tracked/index files and zero findings before the new helper is staged). Three independent reviews
-  report GO; the indexed gate and Python 3.10/3.13 remote CI remain.
+  report GO; the later indexed and remote results are recorded below.
 - After explicit staging, ARA-053 `make check` again passes all gates (`392 passed, 569 subtests`
-  in 18.08 seconds); both safety modes scan 104 tracked/index files with zero findings. Python
-  3.10/3.13 remote CI remains.
+  in 18.08 seconds); both safety modes scan 104 tracked/index files with zero findings.
+- ARA-053 implementation `98dffb5` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Push run `29262351625` and pull-request run `29262353455` passed Python 3.10/3.13, all four
+  isolated-wheel steps, and zero annotations. Draft PR 13 remains open, draft, and mergeable.
+- ARA-053 recovery-closeout `make check` again passes all gates (`392 passed, 569 subtests passed`
+  in 17.75 seconds) after queue, completion, known-issue, validation, and resume records were synced.
 - ARA-057 pre-fix provider-free matrix produced `79 failed, 3 passed, 6 subtests passed`: every
   dependency context parsed, direct/module entrypoints reached runtime layout, and temporary
   copied-installed mock mismatches completed ordinary writes.
@@ -1322,6 +1324,9 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- The first ARA-053 completion snapshot used the reserved finalization word `checkpoint` in a
+  remaining-step bullet while no task was active, so one recovery consistency assertion failed.
+  The instruction now uses `snapshot`; the other five tests and one subtest had passed.
 - The initial ARA-053 regression produced the expected `4 failed, 1 passed`: length-only private
   path identities collided and reused stale health state. The same focused layer now passes.
 - Two initial test invocations used unavailable interpreters: unqualified `python` was absent and
@@ -1570,8 +1575,9 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ```bash
 git status --short --branch
-git diff --check
-.venv/bin/python -m pytest -q tests/test_ui_helpers.py tests/test_recovery_state.py
+git rev-parse HEAD
+git rev-list --left-right --count '@{upstream}'...HEAD
+.venv/bin/python -m pytest -q tests/test_recovery_state.py
 ```
 
 ## Interruption Recovery

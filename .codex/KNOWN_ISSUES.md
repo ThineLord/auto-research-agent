@@ -477,3 +477,14 @@ Updated: 2026-07-12 (Asia/Shanghai)
 - Resolution: ARA-057 enforces owner relationships at the post-parse boundary with fixed path-free
   status-2 diagnostics. Full order/mode/empty-value coverage, direct/module/copied-installed no-work
   controls, local gates, exact remote equality, and Python 3.10/3.13 push/PR CI are verified.
+
+## KI-053 - Equal-length private Ollama paths share health evidence
+
+- Status: fixed, pushed, and CI-verified through `98dffb5`
+- Severity: P2 UI reliability and privacy
+- Impact: non-allowlisted paths were stored only as segment lengths, so distinct equal-shape targets
+  could share one provider/model identity and display stale health evidence from another endpoint.
+- Resolution: normalized private paths now receive full process-local keyed opaque identifiers while
+  credential values, query values, fragments, raw/reversible paths, and key material remain absent
+  from session state. Collision/cache/privacy/compatibility tests, local gates, exact remote equality,
+  and Python 3.10/3.13 push/PR CI are verified.
