@@ -354,6 +354,21 @@ def build_candidate_pool(
     return sorted(candidates, key=lambda item: item.model_id.casefold())
 
 
+def _index_profiles(
+    profiles: Sequence[CloudModelProfile],
+) -> tuple[dict[str, CloudModelProfile], set[str]]:
+    """Index profiles while marking non-identical duplicate IDs as conflicting."""
+    profile_by_id: dict[str, CloudModelProfile] = {}
+    conflicting_ids: set[str] = set()
+    for profile in profiles:
+        existing = profile_by_id.get(profile.model_id)
+        if existing is None:
+            profile_by_id[profile.model_id] = profile
+        elif existing != profile:
+            conflicting_ids.add(profile.model_id)
+    return profile_by_id, conflicting_ids
+
+
 def build_cached_candidate_pool(
     *,
     discovered_models: Sequence[CloudModelInfo] = (),
@@ -386,10 +401,13 @@ def build_cached_candidate_pool(
     if not profiles:
         return candidates
 
+    _, conflicting_profile_ids = _index_profiles(profiles)
     profiled_id_list = [
         profile.model_id.strip()
         for profile in profiles
-        if profile.safe_text_generation and profile.model_id.strip()
+        if profile.safe_text_generation
+        and profile.model_id.strip()
+        and profile.model_id not in conflicting_profile_ids
     ]
     profiled_ids = set(profiled_id_list)
     candidate_ids = {candidate.model_id for candidate in candidates}
@@ -756,11 +774,15 @@ def recommend_free_cloud_model(
     profiles: Sequence[CloudModelProfile] = (),
     preset: str = FREE_RUNNER_AUTO,
 ) -> CloudModelRecommendation | None:
-    safe_candidates = [item for item in candidates if item.safe_text_generation]
+    profile_by_id, conflicting_profile_ids = _index_profiles(profiles)
+    safe_candidates = [
+        item
+        for item in candidates
+        if item.safe_text_generation and item.model_id not in conflicting_profile_ids
+    ]
     if not safe_candidates:
         return None
     by_id = {candidate.model_id: candidate for candidate in safe_candidates}
-    profile_by_id = {profile.model_id: profile for profile in profiles}
 
     if preset == FREE_RUNNER_MANUAL:
         return None
@@ -844,12 +866,13 @@ def choose_fallback_model(
         if not candidate.safe_text_generation or candidate.blocked_reason
     ]
     blocked_ids = {candidate.model_id for candidate in blocked}
-    profile_by_id = {profile.model_id: profile for profile in profiles}
+    profile_by_id, conflicting_profile_ids = _index_profiles(profiles)
     available = [
         candidate
         for candidate in candidates
         if candidate.safe_text_generation
         and candidate.model_id != current_model
+        and candidate.model_id not in conflicting_profile_ids
         and (
             (profile := profile_by_id.get(candidate.model_id)) is None
             or not _profile_blocks_recommendation(profile)

@@ -540,3 +540,19 @@
 - Residual boundary: the validator and later prompt/provenance consumers do not share an immutable
   byte snapshot, so hostile same-UID replacement after preflight remains outside this minimal fix.
   Source-layout marker fallback when canonical prompts are missing also remains a separate concern.
+
+## 2026-07-13 - Treat non-identical duplicate cloud profiles as conflicted
+
+- Decision: build one internal exact-ID profile index and a set of IDs whose parsed
+  `CloudModelProfile` values differ. Cached candidate reconciliation, automatic recommendation, and
+  runtime fallback explicitly exclude those IDs in every record order.
+- Compatibility: value-equivalent duplicate dataclass records remain accepted, including the
+  existing ARA-040 configured-source fallback. Unique healthy profiles, safe unprofiled
+  alternatives, ARA-040 cohort reconciliation, ARA-043 all-blocked behavior, raw artifact/session
+  lists, and exact legacy model-ID matching remain unchanged.
+- Reason: dropping a conflict only from the profile mapping would reinterpret it as an unprofiled
+  candidate and re-enable it. Explicit exclusion removes only the conflicted ID while retaining
+  other eligible candidates.
+- Boundary: CLI/UI retain their existing configured or manually selected model when automatic
+  recommendation returns none; changing that product behavior is outside the three ARA-051
+  selection surfaces. UI recent-429 display still reads the first matching profile diagnostically.

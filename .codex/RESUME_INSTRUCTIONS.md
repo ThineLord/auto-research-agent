@@ -46,13 +46,14 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-No task is active. ARA-050 is complete and remote-verified at `be3bc04`; push/PR runs
-`29257476266`/`29257478876` passed Python 3.10/3.13, all four wheel-smoke steps, and zero annotations.
-Its six-mode fail-before-write matrix, prompt-independent bypasses, valid hardlink package
-compatibility, default artifact hardlink rejection, isolated wheel, and full gate pass. Start
-ARA-051 only after resolving live Git state. Do not call a provider or re-read ignored runtime. Use
-`be3bc04acebc1a62656e38ac9ca153b95ab84f7a` as the conservative exact externally verified fallback
-until a later checkpoint is itself externally verified.
+ARA-051 is active. Resume with provider-free duplicate-profile regressions in both orders across
+cached candidate pooling, recommendation, and runtime fallback. Conflicting duplicates must not
+re-enable a blocked model; unique healthy profiles, unprofiled candidates, ARA-040 membership
+reconciliation, and ARA-043 all-blocked behavior must remain compatible. Do not call a provider or
+read ignored runtime. ARA-050 is complete through remote-equal closeout `45d17db`; closeout push/PR
+runs `29257853754`/`29257863381` passed Python 3.10/3.13, all four wheel-smoke steps, and zero
+annotations. Use `45d17db03c263c327da47842903211dd02919f05` as the conservative exact externally
+verified fallback.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
 it imported the editable checkout and advanced ignored `projects/example` state after a missing
@@ -99,9 +100,9 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-There is no `IN_PROGRESS` task; ARA-051 is the next `TODO`, and ARA-057 remains separate. ARA-018
-requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026, ARA-006,
-or ARA-007 until their recorded dependencies are satisfied.
+ARA-051 is the sole `IN_PROGRESS` task; ARA-057 remains separate. ARA-018 requires an explicit
+owner license/distribution decision. Do not start ARA-019, ARA-026, ARA-006, or ARA-007 until their
+recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
 

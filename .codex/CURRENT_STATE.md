@@ -4,20 +4,20 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: preserve the remote-verified ARA-050 generation-resource boundary, then continue
-  with the highest-priority queued task ARA-051.
+- Current goal: publish and remotely verify the locally green ARA-051 duplicate-profile
+  fail-closed fix without changing unique, equivalent-duplicate, or unprofiled candidate behavior.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `be3bc04acebc1a62656e38ac9ca153b95ab84f7a` (the exact
+- State recorded against commit: `45d17db03c263c327da47842903211dd02919f05` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `be3bc04acebc1a62656e38ac9ca153b95ab84f7a` (exact local,
+- Last externally verified fallback: `45d17db03c263c327da47842903211dd02919f05` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-050 is complete, independently reviewed GO, pushed with
-  exact local/upstream/`ls-remote`/PR-head equality, and passed push/PR CI on Python 3.10/3.13.
-  ARA-051 is the highest-priority `TODO`.
+- Active task at this snapshot: ARA-051. The shared conflict index, compatibility matrix, full
+  gate, and three independent reviews are locally green; commit, push, GitHub CI, and exact remote
+  verification remain.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -668,13 +668,36 @@ Updated: 2026-07-13 (Asia/Shanghai)
   pass `92 passed, 71 subtests`; isolated real-wheel smoke and full `make check` pass. Three
   independent final reviews report GO after the hardlink compatibility correction.
 
+## ARA-051 Conflicting Duplicate Cloud Profiles
+
+- Reproduced both duplicate orders across cached pooling, auto/quality/volume recommendation, and
+  fallback. The initial matrix failed `6` subtests: cached pooling retained the target in both
+  orders, while a healthy last record re-enabled recommendation and fallback.
+- Added one exact-ID profile index that preserves value-equivalent duplicates and marks any
+  non-identical parsed record pair as conflicted. All three selection surfaces explicitly exclude
+  only those IDs, so omission cannot reinterpret them as unprofiled candidates.
+- Added both-order controls proving a unique healthy cohort member survives cached reconciliation,
+  an unprofiled safe alternative remains recommendable/selectable, and two distinct but
+  value-equal duplicate instances retain historical behavior.
+- Focused tests pass `4 passed, 22 subtests`; cloud/CLI/UI/recovery tests pass `139 passed, 127
+  subtests`; full `make check` passes `383 passed, 459 subtests`. Three independent final reviews
+  report GO.
+
 ## Remaining Steps
 
-- Start only ARA-051 after resolving live Git state and confirming remote synchronization; leave
-  ARA-052 through ARA-057 and the owner-blocked/deferred tasks untouched.
+- Review and stage only ARA-051 code, tests, changelog, and recovery-state paths; commit, push,
+  verify exact remote equality and GitHub push/PR CI, then record remote-verified completion.
+- Leave ARA-052 through ARA-057 and the owner-blocked/deferred tasks untouched.
 
 ## Test Status
 
+- ARA-051 pre-fix duplicate-profile matrix produced `6 failed, 2 passed, 4 subtests passed`: both
+  cached orders retained the conflict, and healthy-last order re-enabled all presets plus fallback.
+- ARA-051 focused final coverage passes `4 passed, 22 subtests`; related cloud/CLI/UI/recovery
+  coverage passes `139 passed, 127 subtests`.
+- ARA-051 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
+  self/worktree/staged scans, and pytest (`383 passed, 459 subtests passed` in 16.27 seconds; 103
+  tracked/index files and zero findings). Three independent final reviews report GO.
 - ARA-050 pre-fix installed-layout coverage produced the expected `8 failed, 1 passed`: generation
   proceeded with a missing prompt and wrote incomplete provenance.
 - ARA-050 focused final coverage passes `5 passed, 23 subtests`; related package/CLI/storage/config/
@@ -691,6 +714,10 @@ Updated: 2026-07-13 (Asia/Shanghai)
 - ARA-050 remote-closeout `make check` again passes all gates (`381 passed, 449 subtests passed` in
   18.57 seconds) after the queue, completion log, validation JSON, and resume instructions were
   synchronized.
+- ARA-050 remote-verification closeout `45d17db` is pushed with exact local/upstream/`ls-remote`/
+  PR-head equality. Closeout push run `29257853754` and pull-request run `29257863381` passed Python
+  3.10/3.13, all four isolated-wheel steps, and zero annotations; final draft PR body normalized
+  readback is exact.
 - ARA-049 pre-fix focused regressions produced the expected `6 failed, 1 passed, 1 subtest passed`.
   After implementation and review strengthening, the focused layer passes `4 passed, 10 subtests`
   and the UI/CLI/LLM/cloud/recovery layer passes `157 passed, 127 subtests`.
@@ -1190,6 +1217,10 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- The initial ARA-051 regression produced the expected six subtest failures: cached pooling kept a
+  conflicted ID in both orders, and blocked-then-healthy ordering selected it in auto, quality,
+  volume, and fallback paths (`6 failed, 2 passed, 4 subtests passed`). The same strengthened matrix
+  now passes while retaining unique healthy and unprofiled alternatives.
 - The first ARA-050 related regression run failed five subprocess tests because their synthetic
   `RuntimeLayout` incorrectly used an empty workspace as a healthy resource root (`5 failed, 60
   passed, 67 subtests`). The fixtures now separate the temporary workspace/Git root from the real
@@ -1419,10 +1450,9 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ```bash
 git status --short --branch
-git rev-parse --verify HEAD
-git rev-list --left-right --count @{upstream}...HEAD
 git diff --check
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
+git diff -- CHANGELOG.md src/cloud_free.py tests/test_cloud_free.py .codex
 ```
 
 ## Interruption Recovery
@@ -1442,6 +1472,8 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - Keep ARA-050 confined to installed generation resource presence/readability/UTF-8/content
   preflight before writes. Do not validate ignored repository runtime or change prompt content,
   generation semantics, package data inventory, analysis/comparison behavior, or provider setup.
+- Keep ARA-051 confined to duplicate profile conflict handling. Preserve ARA-040 cached-membership
+  reconciliation, ARA-043 all-blocked behavior, unique healthy profiles, and unprofiled candidates.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

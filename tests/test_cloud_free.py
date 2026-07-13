@@ -531,6 +531,94 @@ class CloudFreePolicyTests(unittest.TestCase):
             candidate.model_id,
         )
 
+    def test_conflicting_duplicate_profiles_fail_closed_in_every_order(self) -> None:
+        candidate = classify_model(model_id="gemini-3.5-flash")
+        unprofiled = classify_model(model_id="gemini-2.5-flash-lite")
+        healthy = CloudModelProfile(
+            model_id=candidate.model_id,
+            reachable=True,
+            structured_output_works=True,
+            score_parsing_works=True,
+        )
+        blocked = CloudModelProfile(
+            model_id=candidate.model_id,
+            reachable=True,
+            structured_output_works=True,
+            daily_quota_exhausted=True,
+        )
+        alternate_profile = CloudModelProfile(
+            model_id=unprofiled.model_id,
+            reachable=True,
+            structured_output_works=True,
+        )
+
+        for order_name, profiles in (
+            ("blocked-then-healthy", [blocked, healthy]),
+            ("healthy-then-blocked", [healthy, blocked]),
+        ):
+            with self.subTest(order=order_name, surface="cached-pool"):
+                cached = build_cached_candidate_pool(
+                    discovered_models=[candidate, unprofiled],
+                    profiles=[*profiles, alternate_profile],
+                )
+                self.assertEqual([item.model_id for item in cached], [unprofiled.model_id])
+            for preset in (FREE_RUNNER_AUTO, FREE_RUNNER_QUALITY, FREE_RUNNER_VOLUME):
+                with self.subTest(order=order_name, surface="recommendation", preset=preset):
+                    recommendation = recommend_free_cloud_model(
+                        candidates=[candidate, unprofiled],
+                        profiles=profiles,
+                        preset=preset,
+                    )
+                    self.assertIsNotNone(recommendation)
+                    self.assertEqual(recommendation.model_id, unprofiled.model_id)
+            with self.subTest(order=order_name, surface="fallback"):
+                self.assertEqual(
+                    choose_fallback_model(
+                        current_model="different-current-model",
+                        candidates=[candidate, unprofiled],
+                        profiles=profiles,
+                    ),
+                    unprofiled.model_id,
+                )
+
+    def test_equivalent_duplicate_profiles_remain_compatible(self) -> None:
+        candidate = classify_model(model_id="gemini-3.5-flash")
+        healthy = CloudModelProfile(
+            model_id=candidate.model_id,
+            reachable=True,
+            structured_output_works=True,
+            score_parsing_works=True,
+        )
+        equivalent = CloudModelProfile(
+            model_id=candidate.model_id,
+            reachable=True,
+            structured_output_works=True,
+            score_parsing_works=True,
+        )
+        self.assertIsNot(healthy, equivalent)
+        self.assertEqual(healthy, equivalent)
+        profiles = [healthy, equivalent]
+
+        cached = build_cached_candidate_pool(
+            discovered_models=[candidate],
+            profiles=profiles,
+        )
+        self.assertEqual([item.model_id for item in cached], [candidate.model_id])
+        recommendation = recommend_free_cloud_model(
+            candidates=[candidate],
+            profiles=profiles,
+        )
+        self.assertIsNotNone(recommendation)
+        self.assertEqual(recommendation.model_id, candidate.model_id)
+        self.assertEqual(
+            choose_fallback_model(
+                current_model="different-current-model",
+                candidates=[candidate],
+                profiles=profiles,
+            ),
+            candidate.model_id,
+        )
+
     def test_cached_candidate_pool_excludes_stale_discovery_outside_profile_cohort(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_dir = Path(tmp)

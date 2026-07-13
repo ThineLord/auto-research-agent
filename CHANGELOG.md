@@ -48,6 +48,10 @@
 
 ### Fixed
 
+* Conflicting duplicate cloud-model profiles now fail closed by model ID in cached candidate
+  reconciliation, automatic recommendation, and runtime fallback regardless of record order.
+  Value-equivalent duplicates, unique healthy profiles, and safe unprofiled alternatives retain
+  their existing behavior.
 * Prompt-consuming CLI modes now verify that all four generation prompts are safe, readable,
   nonempty UTF-8 files before configuration, project seeding, provider startup, locks, or run
   artifacts can be touched. Installed mock runs can no longer succeed with incomplete prompt

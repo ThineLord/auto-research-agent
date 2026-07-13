@@ -432,3 +432,13 @@ Updated: 2026-07-12 (Asia/Shanghai)
   preserves prompt-independent CLI paths and regular hardlink installation compatibility, and
   passed focused, related, isolated-wheel, full-gate, independent review, exact remote-equality,
   and Python 3.10/3.13 push/PR CI validation.
+
+## KI-051 - Conflicting duplicate cloud profiles are ordering-sensitive
+
+- Status: fixed locally; remote verification pending
+- Severity: P2 selection consistency
+- Impact: last-record-wins dictionaries can let a healthy duplicate override a blocked profile and
+  re-enable that model for recommendation or fallback depending only on artifact order.
+- Current action: ARA-051 marks non-identical exact-ID duplicates conflicted and excludes only those
+  IDs from cached pooling, recommendation, and fallback while retaining equivalent duplicates and
+  other safe candidates.

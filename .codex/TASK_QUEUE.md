@@ -566,7 +566,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-051 - Fail closed on duplicate conflicting cloud profiles
 
-- Status: `TODO`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: low
 - Description: duplicate profile IDs are reduced by last-record-wins dictionaries, so ordering can
@@ -578,6 +578,8 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   cloud/UI regressions, then `make check`.
 - Commit required: yes.
 - Dependencies: preserve ARA-040/043 candidate-membership and all-blocked behavior.
+- Progress: local implementation, focused/related/full tests, and three independent reviews are
+  green; commit, push, exact remote equality, and GitHub CI remain.
 
 ## ARA-052 - Normalize malformed Ollama health response shapes
 
