@@ -46,14 +46,14 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-ARA-058 is implemented, reviewed, explicitly staged, and validated. Review the staged container-only
-diff, then commit and push; the indexed gate passes with 104 files in both safety scans. Non-list
-nested `models` now fail closed before installed fallback while omitted/list-valued fields, valid
-records, exact requests, and ARA-044/ARA-046/ARA-052 behavior remain compatible. Do not broaden into
-ARA-059 record-name typing, call a provider, or read ignored runtime. ARA-053 is complete through
-remote-equal closeout `5cea1e2`; closeout push/PR runs `29262706161`/`29262718135` passed Python
-3.10/3.13, all four wheel steps, and zero annotations. Use
-`5cea1e205a1230d1a6929f35c11896225c53b28e` as the conservative exact externally verified fallback.
+No task is active. ARA-058 is complete at implementation `0511a47`: non-list nested `models` fail
+closed before installed fallback while omitted/list-valued fields, valid records, exact requests,
+and ARA-044/ARA-046/ARA-052 behavior remain compatible. Push/PR runs
+`29263804804`/`29263808869` passed Python 3.10/3.13, all four wheel steps, and zero annotations with
+exact local/upstream/`ls-remote`/PR-head equality. ARA-059 separately owns record-name typing and is
+the preferred low-risk TODO after live recovery checks; ARA-056 remains independent. Do not call a
+provider or read ignored runtime. Use `0511a47739168af76d7163716d82c56e19bef9d7` as the conservative
+exact externally verified fallback.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
 it imported the editable checkout and advanced ignored `projects/example` state after a missing
@@ -100,7 +100,7 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-ARA-058 is the sole `IN_PROGRESS` task and ARA-056 remains separate. ARA-018 requires an
+No task is `IN_PROGRESS`; ARA-059 and ARA-056 are independent TODO tasks. ARA-018 requires an
 explicit owner license/distribution decision. Do not start ARA-019, ARA-026, ARA-006, or ARA-007
 until their recorded dependencies are satisfied.
 
@@ -116,8 +116,8 @@ until their recorded dependencies are satisfied.
 ```bash
 git status --short --branch
 git rev-parse --verify HEAD
-git diff --check
+git rev-parse '@{upstream}'
+git rev-list --left-right --count '@{upstream}'...HEAD
 .venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
-.venv/bin/python -m pytest -q tests/test_ui_helpers.py tests/test_recovery_state.py
 ```

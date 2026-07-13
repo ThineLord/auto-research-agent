@@ -458,14 +458,17 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-058 - Malformed nested Ollama models values still raise
 
-- Status: active ARA-058; locally fixed and validated, remote verification pending
+- Status: fixed, pushed, and CI-verified through `0511a47`
 - Severity: P2 UI reliability
-- Evidence: provider-free responses shaped as `{"models": null}` and `{"models": 42}` both raise
-  `TypeError` during iteration after ARA-052 correctly accepts the outer mapping.
+- Pre-fix evidence: provider-free responses shaped as `{"models": null}` and `{"models": 42}` both
+  raised `TypeError` during iteration after ARA-052 correctly accepted the outer mapping.
 - Impact: before the local fix, a reachable endpoint with a malformed nested field could interrupt
   the UI health action or be rescued into false healthy state by installed-model fallback.
-- Boundary: omitted and list-valued `models`, valid records, exact requests, redaction, and ARA-052
-  behavior must remain compatible; no broader artifact or provider schema migration is implied.
+- Resolution: ARA-058 requires an actual list before model iteration or installed-model fallback and
+  otherwise returns the existing fixed credential-safe `InvalidResponse`. Omitted and list-valued
+  `models`, valid records, exact requests, redaction, and ARA-052 behavior remain compatible; focused,
+  related, full local, exact-remote, Python 3.10/3.13 push/PR, wheel, and annotation checks passed.
+  No broader artifact or provider schema migration is implied.
 
 ## KI-057 - Orphan mode-specific outputs fall into unrelated work
 

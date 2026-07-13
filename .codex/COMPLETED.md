@@ -908,3 +908,19 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed as `98dffb5` and pushed with exact local/upstream/`ls-remote`/PR-head equality. Push run
   `29262351625` and pull-request run `29262353455` passed Python 3.10/3.13, every isolated-wheel
   step, and all four job annotation sets are empty.
+
+## 2026-07-13 - Nested Ollama models container validation
+
+- Reproduced null, zero, other numeric, and boolean nested `models` values raising `TypeError`, plus
+  string and mapping containers being rescued into false healthy state by installed-model fallback.
+- Required the decoded nested container to be an actual list before record iteration or fallback;
+  every other JSON shape now returns the existing fixed credential-safe `InvalidResponse` result.
+- Preserved omitted and list-valued containers, mixed invalid records, trimmed valid names, installed
+  model union, exact request URL/timeout, endpoint redaction, and ARA-044/046/052/053 behavior.
+- The expected pre-fix layer produced `7 failed, 1 passed, 3 subtests passed`; focused final tests
+  pass `3 passed, 18 subtests`, related tests pass `101 passed, 120 subtests`, and indexed full
+  `make check` passes `393 passed, 581 subtests`. Three independent final reviews returned GO.
+- Committed as `0511a47` and pushed with exact local/upstream/`ls-remote`/PR-head equality. Push run
+  `29263804804` and pull-request run `29263808869` passed Python 3.10/3.13, every isolated-wheel
+  step, and all four job annotation sets are empty. Non-string record names remain separately queued
+  as ARA-059.

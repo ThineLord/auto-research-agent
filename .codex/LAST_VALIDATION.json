@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-13T23:48:00+08:00",
+  "recorded_at": "2026-07-13T23:53:40+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "5cea1e205a1230d1a6929f35c11896225c53b28e",
-  "last_known_stable_commit": "5cea1e205a1230d1a6929f35c11896225c53b28e",
+  "head_commit": "0511a47739168af76d7163716d82c56e19bef9d7",
+  "last_known_stable_commit": "0511a47739168af76d7163716d82c56e19bef9d7",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "5cea1e205a1230d1a6929f35c11896225c53b28e",
+  "state_recorded_against_commit": "0511a47739168af76d7163716d82c56e19bef9d7",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-13T23:36:20+08:00",
-    "commit": "5cea1e205a1230d1a6929f35c11896225c53b28e",
+    "verified_at": "2026-07-13T23:51:36+08:00",
+    "commit": "0511a47739168af76d7163716d82c56e19bef9d7",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29262706161,
+        "run_id": 29263804804,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "5cea1e205a1230d1a6929f35c11896225c53b28e",
+        "head_sha": "0511a47739168af76d7163716d82c56e19bef9d7",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29262718135,
+        "run_id": 29263808869,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "5cea1e205a1230d1a6929f35c11896225c53b28e",
+        "head_sha": "0511a47739168af76d7163716d82c56e19bef9d7",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,46 @@
       }
     }
   },
-  "status": "ara058_indexed_validation_passed_awaiting_commit_push_ci",
+  "status": "ara058_complete_remote_verified_no_active_task",
   "commands": [
+    {
+      "command": "ARA-058 recovery-closeout make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_files": 61,
+        "pytest_passed": 393,
+        "pytest_subtests_passed": 581,
+        "tracked_files_scanned": 104,
+        "staged_files_scanned": 104,
+        "safety_findings": 0,
+        "duration_seconds": 18.05
+      }
+    },
+    {
+      "command": "ARA-058 implementation push, exact remote equality, CI, annotations, and draft PR verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "implementation_commit": "0511a47739168af76d7163716d82c56e19bef9d7",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "pull_request_head_equal": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29263804804,
+        "pull_request_run_id": 29263808869,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "wheel_smoke_steps_passed": 4,
+        "job_annotations": 0,
+        "draft_pr_13_open": true,
+        "draft_pr_13_draft": true,
+        "draft_pr_13_mergeable": true
+      }
+    },
     {
       "command": "ARA-058 indexed implementation make check",
       "exit_code": 0,
@@ -3944,12 +3982,12 @@
     }
   ],
   "notes": [
-    "ARA-058 indexed implementation validation passes all make check gates with 393 tests, 581 subtests, 104 tracked/index files, and zero safety findings; commit, push, CI, and closeout remain.",
+    "ARA-058 implementation 0511a47 is complete and remote-verified with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 29263804804 and 29263808869 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations.",
     "Three independent ARA-058 final reviews report GO after CURRENT_STATE, RESUME_INSTRUCTIONS, and KI-058 were synchronized to the locally complete boundary.",
     "ARA-058 locally requires the nested models container to be an actual list and reuses fixed InvalidResponse before installed fallback while preserving omitted and list-valued behavior.",
-    "ARA-058 focused tests pass 3 tests and 18 subtests, related UI/config/recovery tests pass 101 tests and 120 subtests, and full make check passes 393 tests and 581 subtests; final reviews, commit, push, CI, and closeout remain.",
+    "ARA-058 focused tests pass 3 tests and 18 subtests, related UI/config/recovery tests pass 101 tests and 120 subtests, indexed full make check passes 393 tests and 581 subtests, and three independent final reviews report GO.",
     "ARA-059 separately tracks confirmed non-string model names being coerced into false healthy matches in UI health and shared tags parsing; ARA-058 does not broaden beyond the models container.",
-    "ARA-058 is the sole active task; its scope is provider-free nested Ollama models response validation with ARA-044, ARA-046, ARA-052, and ARA-053 preserved.",
+    "No task is active; ARA-059 is the preferred low-risk TODO after live recovery checks, ARA-056 remains independent, and ARA-058 preserved ARA-044, ARA-046, ARA-052, and ARA-053.",
     "ARA-053 is complete through remote-equal closeout 5cea1e2; closeout push and pull-request runs 29262706161 and 29262718135 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations with exact final PR body readback.",
     "ARA-053 is complete and remote-verified at 98dffb5; push and pull-request runs 29262351625 and 29262353455 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations.",
     "ARA-058 became active only after exact live verification of the ARA-053 closeout.",

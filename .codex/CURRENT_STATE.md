@@ -4,19 +4,19 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: complete ARA-058 by normalizing malformed nested Ollama `models` responses without
-  changing valid mapping/list health behavior.
+- Current goal: preserve the remote-verified ARA-058 nested-container fix and activate the
+  provider-free ARA-059 model-name typing task after live recovery checks.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `5cea1e205a1230d1a6929f35c11896225c53b28e` (the exact
+- State recorded against commit: `0511a47739168af76d7163716d82c56e19bef9d7` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `5cea1e205a1230d1a6929f35c11896225c53b28e` (exact local,
+- Last externally verified fallback: `0511a47739168af76d7163716d82c56e19bef9d7` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: ARA-058. The nested list guard is implemented, reviewed, explicitly
-  staged, and validated; commit, push, and remote CI remain.
+- Active task at this snapshot: none. ARA-058 is implemented, reviewed, pushed, and remotely
+  verified; ARA-059 and ARA-056 remain independent TODO tasks.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -729,8 +729,9 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## ARA-058 Nested Ollama Models Shape
 
-- Provider-free probes confirm null, boolean, integer, and float containers raise `TypeError`, while
-  string and object containers can silently report healthy when the installed-model fallback matches.
+- Pre-fix provider-free probes confirmed null, boolean, integer, and float containers raised
+  `TypeError`, while string and object containers could silently report healthy when the
+  installed-model fallback matched.
 - Keep this task limited to requiring an omitted/default or actual list container and reusing the
   fixed ARA-052 `InvalidResponse` result. Per-record name typing is queued separately as ARA-059.
 - Added one raw-container binding and list guard before installed-model union. The fixed matrix
@@ -742,8 +743,10 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Remaining Steps
 
-- Commit and push the reviewed ARA-058 paths, then verify exact remote/PR-head equality plus Python
-  3.10/3.13 CI.
+- Reconfirm the live branch, worktree, upstream, `ls-remote`, and PR checks before activating the
+  highest-value provider-free TODO task.
+- Prefer ARA-059's low-risk shared model-name typing boundary before the larger ARA-056 interrupt
+  lifecycle work; mark exactly one selected task `IN_PROGRESS` before code changes.
 - Leave ARA-056 and deferred tasks untouched.
 
 ## Test Status
@@ -755,10 +758,14 @@ Updated: 2026-07-13 (Asia/Shanghai)
   related UI/config/recovery tests pass `101 passed, 120 subtests`.
 - ARA-058 local `make check` passes Ruff format/lint over 61 files, imports, repository-safety
   self/worktree/staged scans, and pytest (`393 passed, 581 subtests passed` in 17.81 seconds; 104
-  tracked/index files and zero findings). Three independent final reviews report GO; commit, push,
-  and CI remain.
+  tracked/index files and zero findings). Three independent final reviews report GO.
 - ARA-058 indexed `make check` again passes all gates (`393 passed, 581 subtests passed` in 18.49
   seconds); both safety modes scan 104 tracked/index files with zero findings.
+- ARA-058 implementation `0511a47` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Push run `29263804804` and pull-request run `29263808869` passed Python 3.10/3.13, all four
+  isolated-wheel steps, and zero annotations. Draft PR 13 remains open, draft, and mergeable.
+- ARA-058 recovery-closeout `make check` passes all gates again (`393 passed, 581 subtests passed`
+  in 18.05 seconds) after queue, completion, known-issue, validation, and resume records were synced.
 - ARA-053 pre-fix collision/cache regression produced the expected `4 failed, 1 passed`: all three
   equal-shape path pairs shared an identity and `/bravo` loaded `/alpha` health evidence.
 - ARA-053 focused final coverage passes `4 passed, 14 subtests`; UI/recovery tests pass `84 passed,
@@ -1611,9 +1618,10 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ```bash
 git status --short --branch
-git diff --check
+git rev-parse --verify HEAD
+git rev-parse '@{upstream}'
+git rev-list --left-right --count '@{upstream}'...HEAD
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
-.venv/bin/python -m pytest -q tests/test_ui_helpers.py -k 'non_list_nested_models or non_mapping_json_responses or fast_model_health_check'
 ```
 
 ## Interruption Recovery
