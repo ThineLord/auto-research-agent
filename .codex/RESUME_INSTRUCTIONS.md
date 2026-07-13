@@ -46,16 +46,14 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-ARA-048 is active with its minimal mutually-exclusive-parser implementation and provider-free
-regressions locally complete. Resume by reviewing/staging the recorded nine paths, committing and
-pushing ARA-048, then verifying push/PR CI and exact remote/PR-head equality before closeout.
-Rejection occurs during argument handling before layout, config, project, provider, or artifact
-access; every individual primary mode and compatible modifier remains accepted. ARA-057 separately
-owns orphan mode-specific output options and must not be folded into ARA-048. Do not call a
-provider or read ignored runtime. ARA-047 is complete through remote-equal closeout `be23031`;
-closeout push/PR runs `29251987247`/`29251990247` passed Python 3.10/3.13, all four wheel-smoke
-steps, and zero annotations. Use `be2303178e410360821148e4dd37f13344fcb2b7` as the conservative
-exact externally verified fallback if the semantic current `HEAD` has not yet been checked.
+No task is active. ARA-048 is complete and remote-verified at `1ab338a`; pull-request run
+`29253180079` passed Python 3.10/3.13, while push run `29253175885` reached final success on attempt
+2 after an initial pre-checkout GitHub HTTP 503 action-download outage. All four final wheel-smoke
+steps passed and all four annotation sets are empty. Start ARA-049, the highest-priority `TODO`, only
+after resolving live Git state. ARA-057 separately owns orphan mode-specific output options and
+must not be folded into ARA-049. Do not call a provider or read ignored runtime. Use
+`1ab338a158b8492404e007809ed557065a3ec3ea` as the conservative exact externally verified fallback
+if the semantic current `HEAD` has not yet been checked.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
 it imported the editable checkout and advanced ignored `projects/example` state after a missing
@@ -102,9 +100,9 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-ARA-048 is the sole `IN_PROGRESS` task; ARA-057 is a separate `TODO`. ARA-018 requires an explicit
-owner license/distribution decision. Do not start ARA-019, ARA-026, ARA-006, or ARA-007 until their
-recorded dependencies are satisfied.
+There is no `IN_PROGRESS` task; ARA-049 is the next `TODO`, and ARA-057 remains separate. ARA-018
+requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026, ARA-006,
+or ARA-007 until their recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
 
@@ -118,8 +116,8 @@ recorded dependencies are satisfied.
 ```bash
 git status --short --branch
 git rev-parse --verify HEAD
+git rev-list --left-right --count @{upstream}...HEAD
+git diff --check
 .venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
-git diff --check
-.venv/bin/python -m pytest -q tests/test_round_loop.py tests/test_cli_exit_codes.py tests/test_package_resources.py tests/test_run_compare.py
 ```

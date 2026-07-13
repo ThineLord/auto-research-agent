@@ -789,3 +789,21 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed as `d7708b3` and pushed with exact local/upstream/`ls-remote`/PR-head equality. Push run
   `29251545910` and pull-request run `29251548644` passed Python 3.10/3.13, every isolated-wheel
   step, and all four job annotation sets are empty.
+
+## 2026-07-13 - Conflicting primary CLI mode rejection
+
+- Reproduced all 45 pairs of ten primary selectors being accepted in both argument orders. Direct,
+  module, and copied-installed entrypoints also continued beyond parsing; a temporary
+  `--mock --resume` probe selected mock mode and replaced its temporary checkpoint.
+- Placed only the ten primary selectors in one optional `argparse` mutually exclusive group.
+  Normal mode, each selector alone, and ordinary output/runtime modifiers retain their prior
+  behavior; orphan mode-specific output options remain the separate ARA-057 task.
+- Added 90 pair/order subtests plus compatible-mode, direct/module pre-runtime, and copied-installed
+  no-write/package-hash controls. Focused tests passed `6 passed, 100 subtests`; related tests passed
+  `122 passed, 238 subtests`; final `make check` passed `373 passed, 416 subtests` with 103 tracked
+  files and zero safety findings. Three independent reviews returned GO.
+- Committed as `1ab338a` and pushed with exact local/upstream/`ls-remote`/PR-head equality. PR run
+  `29253180079` passed Python 3.10/3.13. Push run `29253175885` reached final success after retrying
+  one Python 3.13 pre-checkout GitHub HTTP 503 action-download outage; all four final wheel steps
+  passed and all four annotation sets are empty. Draft PR 13 was updated with exact normalized
+  readback.

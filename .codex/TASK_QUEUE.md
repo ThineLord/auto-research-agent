@@ -499,7 +499,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-048 - Reject conflicting primary CLI modes before any work
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P1
 - Risk: medium
 - Description: primary flags are not mutually exclusive; for example `--mock --resume` selects the
@@ -513,10 +513,13 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   no-write subprocess regressions, then `make check`.
 - Commit required: yes.
 - Dependencies: none; identify modifiers separately from primary modes before changing the parser.
-- Progress: all 45 primary-mode pairs in both orders now reject during parsing; individual modes,
+- Completion: all 45 primary-mode pairs in both orders now reject during parsing; individual modes,
   normal mode, and compatible modifiers pass. Focused tests pass `6 passed, 100 subtests`, related
   tests pass `122 passed, 238 subtests`, full `make check` passes `373 passed, 416 subtests`, and
-  three independent reviews returned GO. Commit/push/remote CI verification remain.
+  three independent reviews returned GO. Implementation `1ab338a` is pushed with exact remote/PR
+  equality; push/PR runs `29253175885`/`29253180079` are successful on Python 3.10/3.13 with all
+  four final wheel steps passing and zero annotations. The push run required one failed-job retry
+  after a pre-checkout GitHub HTTP 503 action-download outage.
 
 ## ARA-049 - Make UI session credentials authoritative for the launched run
 

@@ -4,20 +4,20 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: complete ARA-048 by rejecting conflicting primary CLI modes during argument
-  handling before layout, configuration, project, provider, or artifact access.
+- Current goal: preserve the remote-verified ARA-048 CLI-mode boundary, then continue with the
+  highest-priority queued task ARA-049.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `be2303178e410360821148e4dd37f13344fcb2b7` (the exact
+- State recorded against commit: `1ab338a158b8492404e007809ed557065a3ec3ea` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `be2303178e410360821148e4dd37f13344fcb2b7` (exact local,
+- Last externally verified fallback: `1ab338a158b8492404e007809ed557065a3ec3ea` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: ARA-048. The minimal parser-boundary fix and provider-free
-  regressions are complete and locally validated; the implementation still requires an explicit
-  commit, remote push, push/PR CI verification, and recovery closeout before the task is `DONE`.
+- Active task at this snapshot: none. ARA-048 is complete, independently reviewed GO, pushed with
+  exact local/upstream/`ls-remote`/PR-head equality, and passed push/PR CI on Python 3.10/3.13.
+  ARA-049 is the highest-priority `TODO`.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -638,10 +638,8 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Remaining Steps
 
-- Review and explicitly stage only the nine ARA-048 implementation, test, changelog, queue, and
-  recovery-state paths; create and push the verified ARA-048 implementation commit.
-- Verify ARA-048 push and pull-request CI on Python 3.10/3.13, all four isolated-wheel steps,
-  annotations, exact remote/PR-head equality, and draft PR body readback before its closeout.
+- Start only ARA-049 with provider-free child-environment and credential-precedence regressions;
+  leave ARA-050 through ARA-057 and the owner-blocked/deferred tasks untouched.
 
 ## Test Status
 
@@ -654,6 +652,11 @@ Updated: 2026-07-13 (Asia/Shanghai)
   format/lint over 60 files, imports, repository-safety self/worktree/staged scans, and pytest
   (`373 passed, 416 subtests passed` in 13.97 seconds; 103 tracked/index files and zero findings).
   Three independent reviews report GO with no P0/P1/P2/P3 finding.
+- ARA-048 implementation `1ab338a` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Pull-request run `29253180079` passed Python 3.10/3.13. Push run `29253175885` passed Python 3.10;
+  its first Python 3.13 setup attempt failed before checkout when GitHub could not download actions,
+  and the failed-job rerun then passed every step. All four final wheel-smoke steps passed, all four
+  final annotation sets are empty, and the draft PR body normalized readback is exact.
 - ARA-047 focused unsafe-history/CLI/compatibility tests pass `4 passed, 20 subtests`; related
   round-loop/CLI-exit/recovery tests pass `95 passed, 130 subtests`.
 - ARA-047 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
@@ -1119,6 +1122,10 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- ARA-048 push run `29253175885` initially failed only Python 3.13 during `Set up job`, before
+  checkout or any project step, after three GitHub HTTP 503 `Service Unavailable` responses while
+  resolving action downloads. The authorized failed-job rerun passed setup, wheel smoke, and the
+  full job; final run attempt 2 is successful with zero annotations.
 - The first ARA-048 conflict regression failed exactly the 90 primary-mode pair/order subtests and
   the direct, module, and copied-installed entrypoint guards (`93 failed, 1 passed`) because
   argparse accepted every conflicting combination and execution continued. This is expected
@@ -1319,8 +1326,10 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ```bash
 git status --short --branch
+git rev-parse --verify HEAD
+git rev-list --left-right --count @{upstream}...HEAD
 git diff --check
-.venv/bin/python -m pytest -q tests/test_round_loop.py tests/test_cli_exit_codes.py tests/test_package_resources.py tests/test_run_compare.py tests/test_recovery_state.py
+.venv/bin/python -m pytest -q tests/test_recovery_state.py
 ```
 
 ## Interruption Recovery
@@ -1329,9 +1338,9 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 
 ## Current Risks And Prohibitions
 
-- Keep ARA-048 parser/entrypoint-only and provider-free: validate only with parser guards and
-  temporary workspaces, never against ignored project runtime or canonical experiment artifacts.
-  ARA-057 owns orphan mode-specific output arguments and must remain a separate follow-up.
+- ARA-048 covers only conflicts between primary selectors. ARA-057 owns orphan mode-specific
+  output arguments and must remain a separate follow-up; neither task authorizes provider or
+  ignored-runtime validation.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.
