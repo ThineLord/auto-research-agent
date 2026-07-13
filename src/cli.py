@@ -64,6 +64,7 @@ from .package_resources import (
     PackageResourceError,
     resolve_runtime_layout,
     seed_default_mock_project,
+    validate_generation_resources,
 )
 from .project_input import ProjectInputError, load_project_input
 from .resume import run_resume_mode
@@ -453,6 +454,19 @@ def _run_analyze_cli(args: argparse.Namespace, console: Console, root: Path) -> 
     return analysis
 
 
+def _requires_generation_resources(args: argparse.Namespace) -> bool:
+    return not any(
+        getattr(args, mode, False)
+        for mode in (
+            "compare_runs",
+            "analyze_run",
+            "survey",
+            "cloud_free_discover",
+            "cloud_free_profile",
+        )
+    )
+
+
 def main() -> None:
     args = parse_args()
     configure_logging()
@@ -469,6 +483,12 @@ def main() -> None:
     if getattr(args, "analyze_run", None):
         _run_analyze_cli(args, console, root)
         return
+    if _requires_generation_resources(args):
+        try:
+            validate_generation_resources(layout)
+        except PackageResourceError as exc:
+            console.print(f"[red]Package resource error: {exc}[/red]")
+            raise SystemExit(_EXIT_STARTUP_ERROR) from None
 
     config_path = root / "config.yaml"
     try:

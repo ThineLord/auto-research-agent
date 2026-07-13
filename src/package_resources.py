@@ -12,6 +12,7 @@ from importlib.resources import files
 from pathlib import Path
 
 from .config import DEFAULT_PROJECT_NAME
+from .storage import read_regular_text
 
 _AT_FDCWD = -100
 _RENAME_NOREPLACE = 0x00000001
@@ -24,6 +25,7 @@ _SOURCE_RESOURCE_MARKERS = (
     Path("prompts/judge.md"),
     Path("projects/example/task.md"),
 )
+_GENERATION_PROMPT_NAMES = ("draft.md", "review.md", "revise.md", "judge.md")
 
 
 class PackageResourceError(RuntimeError):
@@ -97,6 +99,27 @@ def resolve_runtime_layout(
         git_root=None,
         source_layout=False,
     )
+
+
+def validate_generation_resources(layout: RuntimeLayout) -> None:
+    """Require complete, usable prompt resources before generation can write."""
+
+    for prompt_name in _GENERATION_PROMPT_NAMES:
+        prompt_path = layout.prompts_dir / prompt_name
+        message = (
+            f"Generation prompt {prompt_name} is unavailable or invalid; "
+            "reinstall the package and retry."
+        )
+        try:
+            prompt_text = read_regular_text(
+                prompt_path,
+                anchor=layout.resource_root,
+                require_single_link=False,
+            )
+        except (OSError, UnicodeError):
+            raise PackageResourceError(message) from None
+        if not prompt_text.strip():
+            raise PackageResourceError(message)
 
 
 def _remove_staging_paths(

@@ -545,7 +545,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-050 - Preflight installed generation resources before writing
 
-- Status: `TODO`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: medium
 - Description: an installed mock can complete successfully with a missing bundled prompt and write
@@ -558,6 +558,8 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   isolated wheel smoke, then `make check`.
 - Commit required: yes.
 - Dependencies: preserve ARA-004/030 resource inventory and never use repository ignored runtime.
+- Progress: local implementation, focused/related/full tests, isolated wheel smoke, and three
+  independent reviews are green; commit, push, remote equality, and GitHub CI remain.
 
 ## ARA-051 - Fail closed on duplicate conflicting cloud profiles
 

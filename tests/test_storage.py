@@ -257,6 +257,8 @@ class StorageTests(unittest.TestCase):
                 ensure_project_runtime_paths_safe(project)
             with self.assertRaises(OSError):
                 get_memory_for_prompt(project / "memory.md")
+            with self.assertRaises(OSError):
+                storage_module.read_regular_text(project / "memory.md", anchor=project)
             self.assertEqual(
                 external_memory.read_text(encoding="utf-8"),
                 "PRIVATE_MEMORY_SENTINEL\n",

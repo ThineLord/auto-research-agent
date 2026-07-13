@@ -186,6 +186,191 @@ main()
             self.assertEqual(list(workspace.iterdir()), [])
             self.assertEqual(_tree_hashes(package_parent), package_before)
 
+    def test_installed_generation_modes_reject_missing_prompt_before_workspace_writes(
+        self,
+    ) -> None:
+        modes = (
+            ("normal", []),
+            ("mock", ["--mock", "--max-rounds", "1"]),
+            ("continuous", ["--continuous"]),
+            ("diagnostic", ["--diagnostic"]),
+            ("session", ["--session"]),
+            ("resume", ["--resume"]),
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package_parent = self._copy_installed_package(root)
+            package_before = _tree_hashes(package_parent)
+            prompt_path = package_parent / "src" / "_bundled" / "prompts" / "judge.md"
+            prompt_bytes = prompt_path.read_bytes()
+            prompt_path.unlink()
+            package_without_prompt = _tree_hashes(package_parent)
+            try:
+                for mode_name, argv in modes:
+                    with self.subTest(mode=mode_name):
+                        workspace = root / f"workspace-{mode_name}"
+                        workspace.mkdir()
+                        result = self._run_installed(
+                            package_parent=package_parent,
+                            workspace=workspace,
+                            argv=argv,
+                        )
+                        combined = result.stdout + result.stderr
+
+                        self.assertEqual(result.returncode, 2, combined)
+                        self.assertIn("Package resource error", combined)
+                        self.assertNotIn("Config error", combined)
+                        self.assertNotIn("Traceback", combined)
+                        self.assertNotIn(str(package_parent), combined)
+                        self.assertEqual(list(workspace.iterdir()), [])
+                        self.assertEqual(_tree_hashes(package_parent), package_without_prompt)
+            finally:
+                prompt_path.write_bytes(prompt_bytes)
+
+            self.assertEqual(_tree_hashes(package_parent), package_before)
+
+    def test_installed_prompt_preflight_rejects_each_invalid_resource_kind(
+        self,
+    ) -> None:
+        cases = (
+            ("missing-draft", "draft.md", "missing"),
+            ("symlink-review", "review.md", "symlink"),
+            ("whitespace-revise", "revise.md", "whitespace"),
+            ("invalid-utf8-judge", "judge.md", "invalid_utf8"),
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package_parent = self._copy_installed_package(root)
+            package_before = _tree_hashes(package_parent)
+            prompts_dir = package_parent / "src" / "_bundled" / "prompts"
+
+            for case_name, prompt_name, mutation in cases:
+                with self.subTest(case=case_name):
+                    prompt_path = prompts_dir / prompt_name
+                    original_bytes = prompt_path.read_bytes()
+                    workspace = root / f"workspace-{case_name}"
+                    workspace.mkdir()
+                    try:
+                        if mutation == "missing":
+                            prompt_path.unlink()
+                        elif mutation == "symlink":
+                            prompt_path.unlink()
+                            prompt_path.symlink_to("draft.md")
+                        elif mutation == "whitespace":
+                            prompt_path.write_bytes(b" \t\n")
+                        elif mutation == "invalid_utf8":
+                            prompt_path.write_bytes(b"\xff\xfe")
+                        else:  # pragma: no cover - fixture contract.
+                            raise AssertionError(f"unsupported mutation: {mutation}")
+
+                        mutated_hashes = _tree_hashes(package_parent)
+                        mutated_is_symlink = prompt_path.is_symlink()
+                        result = self._run_installed(
+                            package_parent=package_parent,
+                            workspace=workspace,
+                            argv=["--mock", "--max-rounds", "1"],
+                        )
+                        combined = result.stdout + result.stderr
+
+                        self.assertEqual(result.returncode, 2, combined)
+                        self.assertIn("Package resource error", combined)
+                        self.assertNotIn("Traceback", combined)
+                        self.assertNotIn(str(package_parent), combined)
+                        self.assertEqual(list(workspace.iterdir()), [])
+                        self.assertEqual(prompt_path.is_symlink(), mutated_is_symlink)
+                        self.assertEqual(_tree_hashes(package_parent), mutated_hashes)
+                    finally:
+                        if prompt_path.is_symlink() or prompt_path.exists():
+                            prompt_path.unlink()
+                        prompt_path.write_bytes(original_bytes)
+
+            self.assertEqual(_tree_hashes(package_parent), package_before)
+
+    @unittest.skipUnless(hasattr(os, "link"), "hard links are unavailable")
+    def test_installed_prompt_preflight_accepts_regular_hardlinked_prompt(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package_parent = self._copy_installed_package(root)
+            package_before = _tree_hashes(package_parent)
+            prompt_path = package_parent / "src" / "_bundled" / "prompts" / "judge.md"
+            prompt_bytes = prompt_path.read_bytes()
+            hardlink_source = root / "hardlinked-judge.md"
+            workspace = root / "workspace"
+            workspace.mkdir()
+            prompt_path.unlink()
+            hardlink_source.write_bytes(prompt_bytes)
+            os.link(hardlink_source, prompt_path)
+            try:
+                self.assertGreater(prompt_path.stat().st_nlink, 1)
+                result = self._run_installed(
+                    package_parent=package_parent,
+                    workspace=workspace,
+                    argv=["--mock", "--max-rounds", "1"],
+                )
+                combined = result.stdout + result.stderr
+
+                self.assertEqual(result.returncode, 0, combined)
+                self.assertNotIn("Package resource error", combined)
+                self.assertNotIn("Traceback", combined)
+                self.assertTrue((workspace / "projects" / "example" / "task.md").is_file())
+                self.assertEqual(_tree_hashes(package_parent), package_before)
+            finally:
+                prompt_path.unlink()
+                hardlink_source.unlink()
+                prompt_path.write_bytes(prompt_bytes)
+
+            self.assertEqual(_tree_hashes(package_parent), package_before)
+
+    def test_installed_analysis_and_comparison_bypass_prompt_preflight(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package_parent = self._copy_installed_package(root)
+            package_before = _tree_hashes(package_parent)
+            prompt_path = package_parent / "src" / "_bundled" / "prompts" / "judge.md"
+            prompt_bytes = prompt_path.read_bytes()
+            prompt_path.unlink()
+            package_without_prompt = _tree_hashes(package_parent)
+            workspace = root / "workspace"
+            run_a = workspace / "run-a"
+            run_b = workspace / "run-b"
+            run_a.mkdir(parents=True)
+            run_b.mkdir()
+            workspace_before = sorted(
+                path.relative_to(workspace).as_posix() for path in workspace.rglob("*")
+            )
+            try:
+                commands = (
+                    ("analyze", ["--analyze-run", str(run_a)]),
+                    ("compare", ["--compare-runs", str(run_a), str(run_b)]),
+                )
+                for command_name, argv in commands:
+                    with self.subTest(command=command_name):
+                        result = self._run_installed(
+                            package_parent=package_parent,
+                            workspace=workspace,
+                            argv=argv,
+                        )
+                        combined = result.stdout + result.stderr
+
+                        self.assertEqual(result.returncode, 0, combined)
+                        self.assertNotIn("Package resource error", combined)
+                        self.assertNotIn("Traceback", combined)
+                        self.assertFalse((workspace / "projects").exists())
+                        self.assertEqual(
+                            sorted(
+                                path.relative_to(workspace).as_posix()
+                                for path in workspace.rglob("*")
+                            ),
+                            workspace_before,
+                        )
+                        self.assertEqual(_tree_hashes(package_parent), package_without_prompt)
+            finally:
+                prompt_path.write_bytes(prompt_bytes)
+
+            self.assertEqual(_tree_hashes(package_parent), package_before)
+
     def test_interrupted_seed_never_publishes_a_partial_project(self) -> None:
         class InterruptingWriter:
             def __init__(self, path: Path) -> None:

@@ -48,6 +48,11 @@
 
 ### Fixed
 
+* Prompt-consuming CLI modes now verify that all four generation prompts are safe, readable,
+  nonempty UTF-8 files before configuration, project seeding, provider startup, locks, or run
+  artifacts can be touched. Installed mock runs can no longer succeed with incomplete prompt
+  provenance; provider-free analysis/comparison and prompt-independent survey/cloud helpers retain
+  their existing startup paths.
 * A nonempty Gemini key entered in the Streamlit password box now remains the launched child
   run's authoritative credential even when configuration or inherited Google/Gemini variables
   contain competing keys. The value travels only through a child-only environment entry, never

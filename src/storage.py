@@ -155,8 +155,13 @@ def _unsafe_path_error(kind: str) -> UnsafeArtifactPathError:
     return UnsafeArtifactPathError(f"unsafe automatic artifact {kind}")
 
 
-def _validate_regular_metadata(metadata: os.stat_result, *, kind: str) -> None:
-    if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+def _validate_regular_metadata(
+    metadata: os.stat_result,
+    *,
+    kind: str,
+    require_single_link: bool = True,
+) -> None:
+    if not stat.S_ISREG(metadata.st_mode) or (require_single_link and metadata.st_nlink != 1):
         raise _unsafe_path_error(kind)
 
 
@@ -700,8 +705,9 @@ def read_regular_text(
     *,
     missing_ok: bool = False,
     anchor: Path | None = None,
+    require_single_link: bool = True,
 ) -> str:
-    """Read one regular, single-link UTF-8 leaf through an anchored parent descriptor."""
+    """Read a regular UTF-8 leaf through an anchored parent descriptor."""
     path = Path(path)
     parent_descriptor: int | None = None
     descriptor = -1
@@ -712,7 +718,11 @@ def read_regular_text(
             if missing_ok:
                 return ""
             raise FileNotFoundError(path.name)
-        _validate_regular_metadata(metadata, kind="read target")
+        _validate_regular_metadata(
+            metadata,
+            kind="read target",
+            require_single_link=require_single_link,
+        )
         flags = (
             os.O_RDONLY
             | getattr(os, "O_BINARY", 0)
@@ -725,7 +735,11 @@ def read_regular_text(
         else:
             descriptor = os.open(path, flags)
         opened_metadata = os.fstat(descriptor)
-        _validate_regular_metadata(opened_metadata, kind="read target")
+        _validate_regular_metadata(
+            opened_metadata,
+            kind="read target",
+            require_single_link=require_single_link,
+        )
         if (metadata.st_dev, metadata.st_ino) != (
             opened_metadata.st_dev,
             opened_metadata.st_ino,

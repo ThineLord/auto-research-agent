@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-13T21:57:14+08:00",
+  "recorded_at": "2026-07-13T22:17:44+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "d75fe11089e89ec27ea08f40cbdb41c48fdc1ed8",
-  "last_known_stable_commit": "d75fe11089e89ec27ea08f40cbdb41c48fdc1ed8",
+  "head_commit": "51212901503ac38713ba70efb4d0e7a90f9ab7fa",
+  "last_known_stable_commit": "51212901503ac38713ba70efb4d0e7a90f9ab7fa",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "d75fe11089e89ec27ea08f40cbdb41c48fdc1ed8",
+  "state_recorded_against_commit": "51212901503ac38713ba70efb4d0e7a90f9ab7fa",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-13T21:55:23+08:00",
-    "commit": "d75fe11089e89ec27ea08f40cbdb41c48fdc1ed8",
+    "verified_at": "2026-07-13T22:00:37+08:00",
+    "commit": "51212901503ac38713ba70efb4d0e7a90f9ab7fa",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29255525721,
+        "run_id": 29255910391,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "d75fe11089e89ec27ea08f40cbdb41c48fdc1ed8",
+        "head_sha": "51212901503ac38713ba70efb4d0e7a90f9ab7fa",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29255530241,
+        "run_id": 29255916384,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "d75fe11089e89ec27ea08f40cbdb41c48fdc1ed8",
+        "head_sha": "51212901503ac38713ba70efb4d0e7a90f9ab7fa",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,103 @@
       }
     }
   },
-  "status": "ara049_complete_remote_verified",
+  "status": "ara050_local_verified_pending_publish",
   "commands": [
+    {
+      "command": "ARA-050 pre-fix temporary installed-layout generation-resource matrix",
+      "exit_code": 1,
+      "result": "expected_failure",
+      "summary": {
+        "passed": 1,
+        "failed": 8,
+        "defect": "installed mock generation succeeded with a missing prompt and incomplete provenance",
+        "provider_calls": 0,
+        "ignored_runtime_access": false
+      }
+    },
+    {
+      "command": "ARA-050 focused generation-mode, invalid-resource, hardlink, and bypass regressions",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "passed": 5,
+        "subtests_passed": 23,
+        "generation_modes": 6,
+        "invalid_resource_kinds": 4,
+        "hardlink_install_compatible": true,
+        "analysis_comparison_bypass": true
+      }
+    },
+    {
+      "command": "ARA-050 related package, CLI, storage, config, mock, and recovery tests",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "passed": 92,
+        "subtests_passed": 71
+      }
+    },
+    {
+      "command": ".venv/bin/python scripts/check_wheel_install.py",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "source_excluded": true,
+        "exact_resource_and_record_inventory": true,
+        "healthy_installed_mock": true,
+        "provider_calls": 0,
+        "repository_runtime_writes": false
+      }
+    },
+    {
+      "command": "make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_files": 60,
+        "pytest_passed": 381,
+        "pytest_subtests_passed": 449,
+        "tracked_files_scanned": 103,
+        "safety_findings": 0,
+        "duration_seconds": 16.23
+      }
+    },
+    {
+      "command": "ARA-050 independent flow, test-quality, and package-boundary reviews",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "flow_compatibility": "GO_after_hardlink_correction",
+        "test_quality": "GO_after_hardlink_correction",
+        "package_boundary": "GO",
+        "remaining_blockers": 0
+      }
+    },
+    {
+      "command": "ARA-049 remote-verification closeout push, exact equality, CI, annotations, and final PR body verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "closeout_commit": "51212901503ac38713ba70efb4d0e7a90f9ab7fa",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "pull_request_head_equal": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29255910391,
+        "pull_request_run_id": 29255916384,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "wheel_smoke_steps_passed": 4,
+        "job_annotations": 0,
+        "draft_pr_13_open": true,
+        "draft_pr_13_draft": true,
+        "draft_pr_13_mergeable": true,
+        "draft_pr_body_readback_normalized_exact": true
+      }
+    },
     {
       "command": "ARA-049 remote-closeout make check",
       "exit_code": 0,
@@ -3183,6 +3278,11 @@
     }
   ],
   "notes": [
+    "ARA-050 is locally complete and remains IN_PROGRESS only for commit, push, exact remote equality, GitHub push/PR CI, and final recovery-state synchronization.",
+    "ARA-050 gates six prompt-consuming modes before generation-side writes, preserves prompt-independent analysis, comparison, survey, and cloud helper paths, and permits regular hardlinked package resources without weakening automatic-artifact single-link defaults.",
+    "ARA-050 focused tests pass 5 tests and 23 subtests, related tests pass 92 tests and 71 subtests, isolated real-wheel smoke and full make check pass, and three independent final reviews report GO.",
+    "ARA-050 is the sole active task; its scope is installed generation-resource fail-before-write validation with analysis/comparison early exits preserved and no provider or ignored-runtime access.",
+    "ARA-049 is complete through remote-equal closeout 5121290; closeout push and pull-request runs 29255910391 and 29255916384 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations with exact final PR body readback.",
     "ARA-049 is complete and remote-verified at d75fe11 with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 29255525721 and 29255530241 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations.",
     "No task is active; ARA-050 is the next highest-priority TODO after live Git recovery verification.",
     "ARA-049 is locally complete and provider-free: a nonempty UI session key is the explicit child credential, empty sessions clear stale transport state without activation, and existing no-session precedence is unchanged.",

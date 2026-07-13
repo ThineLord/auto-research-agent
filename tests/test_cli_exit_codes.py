@@ -48,6 +48,37 @@ class CliExitCodeTests(unittest.TestCase):
     def _reject_json_constant(value: str) -> None:
         raise ValueError(f"non-standard JSON constant: {value}")
 
+    def test_generation_resource_requirement_matches_cli_mode_contract(self) -> None:
+        cases = (
+            ("normal", [], True),
+            ("mock", ["--mock"], True),
+            ("continuous", ["--continuous"], True),
+            ("diagnostic", ["--diagnostic"], True),
+            ("session", ["--session"], True),
+            ("resume", ["--resume"], True),
+            ("survey", ["--survey"], False),
+            ("cloud-discover", ["--cloud-free-discover"], False),
+            ("cloud-profile", ["--cloud-free-profile"], False),
+            ("analyze", ["--analyze-run", "projects/selected/runs/run-1"], False),
+            (
+                "compare",
+                [
+                    "--compare-runs",
+                    "projects/selected/runs/run-1",
+                    "projects/selected/runs/run-2",
+                ],
+                False,
+            ),
+        )
+
+        for case_name, argv, expected in cases:
+            with self.subTest(case=case_name):
+                args = cli_module.parse_args(argv)
+                self.assertEqual(
+                    cli_module._requires_generation_resources(args),
+                    expected,
+                )
+
     def test_conflicting_primary_modes_exit_two_before_runtime_setup(self) -> None:
         with (
             patch.object(sys, "argv", ["auto-research-agent", "--mock", "--resume"]),
@@ -587,7 +618,7 @@ root = Path(temporary_root.name)
 project_dir = root / "projects" / "selected"
 project_dir.mkdir(parents=True)
 (project_dir / "task.md").write_text("# Survey interrupt test", encoding="utf-8")
-cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, root, root, True)
+cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, Path.cwd(), root, True)
 cli.load_app_config = lambda path: AppConfig()
 cli.run_literature_survey_mode = lambda **kwargs: (_ for _ in ()).throw(KeyboardInterrupt)
 sys.argv = ["auto-research-agent", "--survey", "--project", "selected"]
@@ -630,7 +661,7 @@ root = Path(temporary_root.name)
 project_dir = root / "projects" / "selected"
 project_dir.mkdir(parents=True)
 (project_dir / "task.md").write_text("# interrupt subprocess test\\n", encoding="utf-8")
-cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, root, root, True)
+cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, Path.cwd(), root, True)
 cli.load_app_config = lambda path: AppConfig()
 sys.argv = ["auto-research-agent", "--mock", "--project", "selected"]
 interrupting_agents = cli.build_mock_agents(topic_context="")
@@ -686,7 +717,7 @@ project_dir = root / "projects" / "selected"
 project_dir.mkdir(parents=True)
 (project_dir / "task.md").write_text("# safe stop subprocess test\\n", encoding="utf-8")
 (project_dir / "STOP_REQUESTED").write_text("STOP_REQUESTED\\n", encoding="utf-8")
-cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, root, root, True)
+cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, Path.cwd(), root, True)
 cli.load_app_config = lambda path: AppConfig()
 sys.argv = ["auto-research-agent", "--mock", "--project", "selected"]
 cli.main()
@@ -719,7 +750,7 @@ from src.package_resources import RuntimeLayout
 
 temporary_root = tempfile.TemporaryDirectory()
 root = Path(temporary_root.name)
-cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, root, root, True)
+cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, Path.cwd(), root, True)
 sys.argv = ["auto-research-agent"]
 cli.main()
 """
@@ -746,7 +777,7 @@ from src.package_resources import RuntimeLayout
 temporary_root = tempfile.TemporaryDirectory()
 root = Path(temporary_root.name)
 (root / "config.yaml").write_bytes(b"\\xff\\xfe")
-cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, root, root, True)
+cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, Path.cwd(), root, True)
 sys.argv = ["auto-research-agent"]
 cli.main()
 """
@@ -979,7 +1010,7 @@ root = Path(temporary_root.name)
 project_dir = root / "projects" / "bad-input"
 project_dir.mkdir(parents=True)
 (project_dir / "task.md").write_bytes(b"\\xff\\xfe")
-cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, root, root, True)
+cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, Path.cwd(), root, True)
 cli.load_app_config = lambda path: AppConfig()
 sys.argv = ["auto-research-agent", "--mock", "--project", "bad-input"]
 cli.main()
@@ -1013,7 +1044,7 @@ project_dir = root / "projects" / "selected"
 project_dir.mkdir(parents=True)
 (project_dir / "task.md").write_text("# Resume test", encoding="utf-8")
 (project_dir / "checkpoint.json").write_bytes(b"\\xff\\xfe")
-cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, root, root, True)
+cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, Path.cwd(), root, True)
 cli.load_app_config = lambda path: AppConfig()
 cli.list_installed_ollama_models = lambda: (["qwen3:8b"], None)
 cli.create_llm_client = lambda **kwargs: SimpleNamespace(timeout_seconds=1)
@@ -1069,7 +1100,7 @@ class UnexpectedAgents:
         agent_marker.write_text(name, encoding="utf-8")
         raise AssertionError(f"resume agent unexpectedly accessed: {name}")
 
-cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, root, root, True)
+cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, Path.cwd(), root, True)
 cli.load_app_config = lambda path: AppConfig()
 cli.list_installed_ollama_models = lambda: (["qwen3:8b"], None)
 cli.create_llm_client = lambda **kwargs: SimpleNamespace(timeout_seconds=1)

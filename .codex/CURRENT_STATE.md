@@ -4,20 +4,20 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: preserve the remote-verified ARA-049 UI credential boundary, then continue with the
-  highest-priority queued task ARA-050.
+- Current goal: publish and remotely verify the locally green ARA-050 generation-resource
+  preflight while preserving provider-free and prompt-independent CLI paths.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `d75fe11089e89ec27ea08f40cbdb41c48fdc1ed8` (the exact
+- State recorded against commit: `51212901503ac38713ba70efb4d0e7a90f9ab7fa` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `d75fe11089e89ec27ea08f40cbdb41c48fdc1ed8` (exact local,
+- Last externally verified fallback: `51212901503ac38713ba70efb4d0e7a90f9ab7fa` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-049 is complete, independently reviewed GO, pushed with
-  exact local/upstream/`ls-remote`/PR-head equality, and passed push/PR CI on Python 3.10/3.13.
-  ARA-050 is the highest-priority `TODO`.
+- Active task at this snapshot: ARA-050. The installed-layout prompt preflight, compatibility
+  matrix, wheel smoke, full gate, and three independent reviews are locally green; commit, push,
+  GitHub CI, and remote-equality verification remain.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -651,13 +651,40 @@ Updated: 2026-07-13 (Asia/Shanghai)
 - Focused, related, recovery, and full checks pass. Security, compatibility, and test-quality
   reviews all report GO after strengthening the argv and no-activation assertions.
 
+## ARA-050 Installed Generation Resource Preflight
+
+- Reproduced an installed deterministic mock succeeding after a generation prompt was removed,
+  then writing a run whose prompt provenance silently omitted that resource (`8 failed, 1 passed`
+  in the initial installed-layout matrix).
+- Added one fail-before-write validator for `draft.md`, `review.md`, `revise.md`, and `judge.md`.
+  It uses anchored no-follow reads, regular-file and open-identity checks, valid UTF-8, and nonblank
+  content before config, seeding, provider startup, locks, or artifacts.
+- Normal, mock, continuous, diagnostic, session, and resume require the prompts. Analysis,
+  comparison, survey, cloud discovery, and cloud profile retain their prompt-independent paths.
+- Preserved hardlink-based package installation compatibility with an explicit package-resource
+  exception; all automatic artifact reads keep the existing single-link default. Symlinks and
+  special nodes remain rejected.
+- Focused tests pass `5 passed, 23 subtests`; related package/CLI/storage/config/mock/recovery tests
+  pass `92 passed, 71 subtests`; isolated real-wheel smoke and full `make check` pass. Three
+  independent final reviews report GO after the hardlink compatibility correction.
+
 ## Remaining Steps
 
-- Start only ARA-050 after resolving live Git state and confirming remote synchronization; leave
-  ARA-051 through ARA-057 and the owner-blocked/deferred tasks untouched.
+- Review and stage only ARA-050 code, tests, changelog, and recovery-state paths; commit, push,
+  verify exact remote equality and GitHub push/PR CI, then record the remote-verified completion.
+- Leave ARA-051 through ARA-057 and the owner-blocked/deferred tasks untouched.
 
 ## Test Status
 
+- ARA-050 pre-fix installed-layout coverage produced the expected `8 failed, 1 passed`: generation
+  proceeded with a missing prompt and wrote incomplete provenance.
+- ARA-050 focused final coverage passes `5 passed, 23 subtests`; related package/CLI/storage/config/
+  mock/recovery coverage passes `92 passed, 71 subtests`.
+- The final isolated real-wheel install smoke passes with exact resource/RECORD checks, source-
+  excluded imports, console/module help, healthy installed mock, and prompt provenance validation.
+- ARA-050 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
+  self/worktree/staged scans, and pytest (`381 passed, 449 subtests passed` in 16.23 seconds; 103
+  tracked/index files and zero findings). Three independent final reviews report GO.
 - ARA-049 pre-fix focused regressions produced the expected `6 failed, 1 passed, 1 subtest passed`.
   After implementation and review strengthening, the focused layer passes `4 passed, 10 subtests`
   and the UI/CLI/LLM/cloud/recovery layer passes `157 passed, 127 subtests`.
@@ -671,6 +698,10 @@ Updated: 2026-07-13 (Asia/Shanghai)
 - ARA-049 remote-closeout `make check` again passes all gates (`376 passed, 426 subtests passed` in
   14.09 seconds) after the queue, completion log, validation JSON, and resume instructions were
   synchronized.
+- ARA-049 remote-verification closeout `5121290` is pushed with exact local/upstream/`ls-remote`/
+  PR-head equality. Closeout push run `29255910391` and pull-request run `29255916384` passed Python
+  3.10/3.13, all four isolated-wheel steps, and zero annotations; final draft PR body readback is
+  exact.
 - ARA-048 pre-fix conflict regression failed as expected (`93 failed, 1 passed`): 90 pair/order
   subtests plus direct, module, and copied-installed entrypoint boundaries all exposed the missing
   parser rejection. The post-fix focused layer passes `6 passed, 100 subtests`; related
@@ -1153,6 +1184,16 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- The first ARA-050 related regression run failed five subprocess tests because their synthetic
+  `RuntimeLayout` incorrectly used an empty workspace as a healthy resource root (`5 failed, 60
+  passed, 67 subtests`). The fixtures now separate the temporary workspace/Git root from the real
+  healthy test resource root; the expanded related layer passes `92 passed, 71 subtests`.
+- Independent ARA-050 review reproduced a valid hardlinked prompt being rejected by the initial
+  reuse of the automatic-artifact single-link reader. The reader now keeps single-link enforcement
+  by default and only package prompts opt out; hardlink-acceptance and default-rejection regressions
+  pass, and all three final re-reviews report GO.
+- One read-only state inspection ended with unavailable unqualified `python`; `.venv/bin/python`
+  remains the required interpreter and no file was changed by the failed command.
 - The first ARA-049 completion snapshot used the reserved finalization word `closeout` in a
   remaining-step bullet while no task was active, so one recovery consistency assertion failed.
   The instruction now asks only for live remote synchronization before starting ARA-050.
@@ -1372,10 +1413,9 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ```bash
 git status --short --branch
-git rev-parse --verify HEAD
-git rev-list --left-right --count @{upstream}...HEAD
 git diff --check
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
+git diff -- CHANGELOG.md src/cli.py src/package_resources.py src/storage.py tests/test_cli_exit_codes.py tests/test_package_resources.py tests/test_storage.py .codex
 ```
 
 ## Interruption Recovery
@@ -1392,6 +1432,9 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - ARA-049 changes only Streamlit child-run credential transport and its internal CLI activation
   path. It does not change no-session config/custom/Google/Gemini precedence or authorize real
   provider validation.
+- Keep ARA-050 confined to installed generation resource presence/readability/UTF-8/content
+  preflight before writes. Do not validate ignored repository runtime or change prompt content,
+  generation semantics, package data inventory, analysis/comparison behavior, or provider setup.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

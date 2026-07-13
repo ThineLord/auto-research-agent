@@ -525,3 +525,18 @@
   schema/error types, helper return shapes, actual request URL/timeout, config acceptance, and
   healthy parsing. The linked cause is intentionally a sanitized `RuntimeError` rather than the raw
   requests exception because exposing its type object also retained attacker/provider text.
+
+## 2026-07-13 - Preflight only prompt-consuming generation modes
+
+- Decision: validate the four fixed generation prompts after analysis/comparison early returns but
+  before config, seeding, provider startup, locks, or artifact writes. Normal, mock, continuous,
+  diagnostic, session, and resume are gated; survey and cloud discovery/profile remain independent.
+- Resource boundary: require an anchored no-follow regular file, stable opened identity, valid
+  UTF-8, and nonblank content. Package prompts explicitly allow regular hardlinks so cache- or
+  hardlink-based installations remain valid; the storage reader keeps single-link enforcement for
+  every existing automatic-artifact caller by default.
+- Compatibility: do not change prompt bytes, package inventory, generation semantics, provider
+  setup, installed workspace selection, or provider-free analysis/comparison behavior.
+- Residual boundary: the validator and later prompt/provenance consumers do not share an immutable
+  byte snapshot, so hostile same-UID replacement after preflight remains outside this minimal fix.
+  Source-layout marker fallback when canonical prompts are missing also remains a separate concern.
