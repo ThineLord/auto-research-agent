@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-14T00:21:29+08:00",
+  "recorded_at": "2026-07-14T00:27:37+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "1419d5eedba2da65a11c7299aad6f7c81d799749",
-  "last_known_stable_commit": "1419d5eedba2da65a11c7299aad6f7c81d799749",
+  "head_commit": "a7d00a668168c0ed7766ce2d579d8201f2a0a33b",
+  "last_known_stable_commit": "a7d00a668168c0ed7766ce2d579d8201f2a0a33b",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "1419d5eedba2da65a11c7299aad6f7c81d799749",
+  "state_recorded_against_commit": "a7d00a668168c0ed7766ce2d579d8201f2a0a33b",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-13T23:59:39+08:00",
-    "commit": "1419d5eedba2da65a11c7299aad6f7c81d799749",
+    "verified_at": "2026-07-14T00:24:46+08:00",
+    "commit": "a7d00a668168c0ed7766ce2d579d8201f2a0a33b",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29264305133,
+        "run_id": 29266119109,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "1419d5eedba2da65a11c7299aad6f7c81d799749",
+        "head_sha": "a7d00a668168c0ed7766ce2d579d8201f2a0a33b",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29264308515,
+        "run_id": 29266121277,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "1419d5eedba2da65a11c7299aad6f7c81d799749",
+        "head_sha": "a7d00a668168c0ed7766ce2d579d8201f2a0a33b",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,60 @@
       }
     }
   },
-  "status": "ara059_reviewed_indexed_full_passed_awaiting_commit_push_ci",
+  "status": "ara059_closeout_local_full_passed_awaiting_commit_push_ci",
   "commands": [
+    {
+      "command": "ARA-059 recovery-closeout make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_files": 61,
+        "pytest_passed": 395,
+        "pytest_subtests_passed": 618,
+        "tracked_files_scanned": 104,
+        "staged_files_scanned": 104,
+        "safety_findings": 0,
+        "duration_seconds": 17.76,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-059 first closeout recovery-state validation",
+      "exit_code": 1,
+      "result": "operator_state_heading_error",
+      "summary": {
+        "failed_tests": 1,
+        "passed_tests": 5,
+        "cause": "the exact tested resume section heading was renamed while the body was updated",
+        "files_changed_by_command": 0,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-059 implementation push, exact remote equality, CI, annotations, and draft PR verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "implementation_commit": "a7d00a668168c0ed7766ce2d579d8201f2a0a33b",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "pull_request_head_equal": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29266119109,
+        "pull_request_run_id": 29266121277,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "wheel_smoke_steps_passed": 4,
+        "job_annotations": 0,
+        "draft_pr_13_open": true,
+        "draft_pr_13_draft": true,
+        "draft_pr_13_mergeable": true,
+        "provider_calls": 0
+      }
+    },
     {
       "command": "ARA-059 explicit-index cached diff, staged safety, recovery, and make check",
       "exit_code": 0,
@@ -4183,6 +4235,9 @@
     }
   ],
   "notes": [
+    "ARA-059 recovery closeout state passes the full local gate and is ready for an explicit six-path state-only commit.",
+    "ARA-059 implementation a7d00a6 is pushed with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 29266119109 and 29266121277 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations.",
+    "No task is active after ARA-059; ARA-060 is the highest-priority TODO but repository safety approval is required before any test-configuration or dependency change.",
     "The explicit ten-path ARA-059 index passes cached diff, staged safety, recovery, and full make check; no unreviewed or ignored path was staged.",
     "Three independent ARA-059 review lines report GO after exact-falsey and installed-whitespace controls plus unambiguous historical validation wording were verified.",
     "The final ARA-059 controls distinguish the required empty list from every other falsey parser result and lock the verbatim installed-name whitespace boundary; mutation probes still trigger both parent assertions after subtest failures are swallowed.",
@@ -4197,7 +4252,7 @@
     "ARA-058 locally requires the nested models container to be an actual list and reuses fixed InvalidResponse before installed fallback while preserving omitted and list-valued behavior.",
     "ARA-058 focused tests pass 3 tests and 18 subtests, related UI/config/recovery tests pass 101 tests and 120 subtests, indexed full make check passes 393 tests and 581 subtests, and three independent final reviews report GO.",
     "ARA-059 separately tracks confirmed non-string model names being coerced into false healthy matches in UI health and shared tags parsing; ARA-058 does not broaden beyond the models container.",
-    "ARA-059 is the sole active task; it is limited to provider-free non-string Ollama model-name rejection across UI health and shared tags parsing while preserving ARA-058 and valid-string behavior.",
+    "At activation, ARA-059 was the sole active task and was limited to provider-free non-string Ollama model-name rejection across UI health and shared tags parsing while preserving ARA-058 and valid-string behavior.",
     "ARA-053 is complete through remote-equal closeout 5cea1e2; closeout push and pull-request runs 29262706161 and 29262718135 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations with exact final PR body readback.",
     "ARA-053 is complete and remote-verified at 98dffb5; push and pull-request runs 29262351625 and 29262353455 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations.",
     "ARA-058 became active only after exact live verification of the ARA-053 closeout.",

@@ -494,7 +494,7 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-059 - Non-string Ollama model names can become false healthy matches
 
-- Status: active ARA-059; locally fixed and independently reviewed, remote verification pending
+- Status: fixed, pushed, and CI-verified through `a7d00a6`
 - Severity: P2 UI and discovery reliability
 - Evidence: provider-free list responses with null, boolean, numeric, list, or object `name` values
   are converted with `str(...)`; selecting the resulting text returns `health_model_ok` for all five
@@ -505,7 +505,8 @@ Updated: 2026-07-12 (Asia/Shanghai)
   de-duplication or UI health matching. Literal strings that resemble coerced values remain valid;
   mixed records, metadata, request/redaction, list-container, and installed-fallback behavior remain
   compatible. Exact parent-level mutation probes, focused/related/full validation, and
-  three independent reviews are green; staged and remote verification remain before closure.
+  three independent reviews are green. Exact remote equality plus push/PR Python 3.10/3.13 CI,
+  every isolated-wheel step, and zero annotations are verified.
 - Boundary: ARA-058 validates only the `models` container. Older process-local UI cache strings are
   indistinguishable from genuine names and are naturally replaced on refresh or process restart;
   text blacklists are explicitly rejected.

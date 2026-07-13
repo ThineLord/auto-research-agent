@@ -924,3 +924,23 @@ Validation and implementation outcomes will be appended only after they are actu
   `29263804804` and pull-request run `29263808869` passed Python 3.10/3.13, every isolated-wheel
   step, and all four job annotation sets are empty. Non-string record names remain separately queued
   as ARA-059.
+
+## 2026-07-14 - String-only Ollama model-name normalization
+
+- Reproduced null, boolean, numeric, list, and object record names being coerced to text by both the
+  shared inventory parser and UI health check, allowing malformed provider data to report a false
+  healthy match.
+- Added one shared scalar normalizer that trims only actual strings. Provider API records with
+  non-string names are ignored while literal string lookalikes, valid siblings, first-record
+  metadata/de-duplication, exact requests, redaction, list-container validation, and the verbatim
+  installed-model fallback remain compatible.
+- Added parent-level aggregate regressions after pytest 9 exposed that subtest-only failures could
+  return zero. Exact mutation probes confirm falsey non-list parser output and installed-name
+  whitespace normalization are still caught even when subtest assertion errors are swallowed;
+  ARA-060 separately tracks the repository-wide test-gate gap.
+- Focused tests pass `2 passed, 37 subtests`; related UI/config/recovery tests pass `103 passed, 157
+  subtests`; indexed full `make check` passes `395 passed, 618 subtests` with 104 tracked/index files
+  and zero safety findings. Three independent final reviews returned GO.
+- Committed as `a7d00a6` and pushed with exact local/upstream/`ls-remote`/PR-head equality. Push run
+  `29266119109` and pull-request run `29266121277` passed Python 3.10/3.13, every isolated-wheel
+  step, and all four job annotation sets are empty.

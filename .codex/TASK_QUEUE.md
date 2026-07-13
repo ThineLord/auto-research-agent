@@ -722,7 +722,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-059 - Reject non-string Ollama model names
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P2
 - Risk: low
 - Description: list-valued API responses coerce null, boolean, numeric, list, or object `name`
@@ -742,7 +742,10 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   tracked/index files and zero safety findings. Parent-level mutation probes catch both falsey
   non-list parser output and installed-name whitespace normalization even when subtest assertions
   are swallowed. Three independent reviews and the indexed full gate (`395 passed, 618 subtests`)
-  are green; commit, push, and CI remain.
+  are green.
+- Completion: implementation `a7d00a6` is pushed with exact local/upstream/`ls-remote`/PR-head
+  equality. Push/PR runs `29266119109`/`29266121277` passed Python 3.10/3.13, all four isolated-wheel
+  steps, and zero annotations.
 
 ## ARA-060 - Make unittest subtest failures fail the pytest process
 

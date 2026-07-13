@@ -4,19 +4,20 @@ Updated: 2026-07-14 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: complete ARA-059 by rejecting non-string Ollama model names at the UI health and
-  shared normalized-inventory boundaries without changing valid-string behavior.
+- Current goal: preserve the remotely verified ARA-059 checkpoint and await repository-required
+  safety approval before any ARA-060 test-infrastructure change.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `1419d5eedba2da65a11c7299aad6f7c81d799749` (the exact
+- State recorded against commit: `a7d00a668168c0ed7766ce2d579d8201f2a0a33b` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `1419d5eedba2da65a11c7299aad6f7c81d799749` (exact local,
+- Last externally verified fallback: `a7d00a668168c0ed7766ce2d579d8201f2a0a33b` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: ARA-059. The shared name-type guard is locally implemented and the
-  indexed full gate and three independent reviews pass; commit, push, and remote CI remain.
+- Active task at this snapshot: none. ARA-059 is implementation-complete and remote-verified;
+  ARA-060 is the highest-priority TODO but requires safety approval before test configuration or
+  dependency work.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -769,11 +770,16 @@ Updated: 2026-07-14 (Asia/Shanghai)
   Both controls are now exact. Focused and related tests pass `2 passed, 37 subtests` and `103
   passed, 157 subtests`; `make check` passes `395 passed, 618 subtests` in 17.85 seconds. Mutation
   probes that swallow subtest assertion errors confirm both parent-level failure paths remain live.
+- Committed ARA-059 as `a7d00a6`, pushed it with exact local/upstream/`ls-remote`/PR-head equality,
+  and verified push/PR runs `29266119109`/`29266121277`: Python 3.10/3.13, all four isolated-wheel
+  steps, and every annotation set passed cleanly. Draft PR 13 remains open, draft, and mergeable.
 
 ## Remaining Steps
 
-- Commit and push the reviewed ARA-059 paths, then verify exact remote/PR-head equality and
-  Python 3.10/3.13 CI.
+- Obtain the repository-required safety approval before changing test configuration or dependencies
+  for ARA-060.
+- After approval, activate ARA-060 and first reproduce the subtest-only zero-exit behavior in an
+  isolated subprocess sentinel.
 - Leave ARA-056 and deferred tasks untouched.
 
 ## Test Status
@@ -818,6 +824,11 @@ Updated: 2026-07-14 (Asia/Shanghai)
 - The explicit ten-path index passes cached-diff validation, staged repository safety over 104
   files, recovery `6 passed, 1 subtest`, and full `make check` with `395 passed, 618 subtests` in
   17.68 seconds.
+- ARA-059 implementation `a7d00a6` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Push run `29266119109` and pull-request run `29266121277` passed Python 3.10/3.13, all four
+  isolated-wheel steps, and zero annotations.
+- ARA-059 recovery closeout `make check` passes Ruff format/lint, imports, repository-safety
+  self/worktree/staged scans, and pytest (`395 passed, 618 subtests` in 17.76 seconds).
 - ARA-053 pre-fix collision/cache regression produced the expected `4 failed, 1 passed`: all three
   equal-shape path pairs shared an identity and `/bravo` loaded `/alpha` health evidence.
 - ARA-053 focused final coverage passes `4 passed, 14 subtests`; UI/recovery tests pass `84 passed,
@@ -1413,6 +1424,9 @@ Updated: 2026-07-14 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- The first ARA-059 closeout recovery run failed one contract assertion because the resume section
+  heading was renamed while its exact historical text is a tested lookup key. The original heading
+  is restored; the body still states that no task is active.
 - The first ARA-059 pre-stage recovery gate rejected an unattributed commit/push bullet; because
   the checks were chained with `&&`, no staging occurred. The bullet now names the sole active task
   explicitly before the gate is rerun.

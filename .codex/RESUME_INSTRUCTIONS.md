@@ -46,21 +46,18 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-ARA-059 is active and locally implemented. One shared scalar helper now accepts and trims only
-string names before shared inventory de-duplication or UI health matching. The strengthened pre-fix
-matrix exited 1 with `18 failed`; focused tests pass `2 passed, 37 subtests`, related tests pass `103
-passed, 157 subtests`, and full `make check` passes `395 passed, 618 subtests` with zero safety
-findings. Mutation probes confirm the parent assertions catch falsey non-list parser output and
-installed-name whitespace normalization even if subtest errors are swallowed. Implementation/test
-and final state review are green across three independent review lines; stage only the ten reviewed
-ARA-059 paths if the index was lost. The current explicit index passed cached-diff validation,
-staged safety, recovery, and full `make check` (`395 passed, 618 subtests`); commit those exact paths
-next. Preserve literal string lookalikes, metadata, requests, redaction, list-container behavior,
-and installed fallback; do not call a provider, read ignored runtime, or broaden into
-provider/artifact schema migration.
+ARA-059 is complete through remote-equal implementation `a7d00a6`. One shared scalar helper accepts
+and trims only string names before shared inventory de-duplication or UI health matching. Focused
+tests pass `2 passed, 37 subtests`, related tests pass `103 passed, 157 subtests`, indexed full
+`make check` passes `395 passed, 618 subtests`, and three independent reviews are green. Push/PR
+runs `29266119109`/`29266121277` passed Python 3.10/3.13, all four isolated-wheel steps, and zero
+annotations. The recovery-closeout `make check` also passes `395 passed, 618 subtests`. Preserve
+literal string lookalikes, metadata, requests, redaction, list-container behavior, and installed
+fallback; do not call a provider, read ignored runtime, or broaden into provider/artifact schema
+migration.
 ARA-058 is complete through remote-equal closeout `1419d5e`; closeout push/PR runs
 `29264305133`/`29264308515` passed Python 3.10/3.13, all four wheel steps, and zero annotations with
-exact PR body readback. Use `1419d5eedba2da65a11c7299aad6f7c81d799749` as the conservative exact
+exact PR body readback. Use `a7d00a668168c0ed7766ce2d579d8201f2a0a33b` as the conservative exact
 externally verified fallback.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
@@ -108,9 +105,10 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-ARA-059 is the sole `IN_PROGRESS` task and ARA-056 remains separate. ARA-018 requires an explicit
-owner license/distribution decision. Do not start ARA-019, ARA-026, ARA-006, or ARA-007 until their
-recorded dependencies are satisfied.
+No task is `IN_PROGRESS`. ARA-060 is the highest-priority TODO, but its test-configuration or
+dependency decision requires repository safety approval before implementation. ARA-056 remains a
+separate P2 task. ARA-018 requires an explicit owner license/distribution decision. Do not start
+ARA-019, ARA-026, ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
 
