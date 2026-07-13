@@ -480,7 +480,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-047 - Reject unrepresentable resume-history scores without traceback
 
-- Status: `TODO`
+- Status: `IN_PROGRESS`
 - Priority: P1
 - Risk: low
 - Description: `_history_float()` directly converts numeric history values, so a valid 400-digit
@@ -489,10 +489,12 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Acceptance criteria: positive and negative unrepresentable history scores fail before writes or
   agent calls through the existing privacy-safe `ResumeHistoryError`/status-2 boundary; finite
   historical values remain unchanged.
-- Validation command: provider-free unsafe-history fault cases, related resume/runner/CLI tests,
-  then `make check`.
+- Validation command: provider-free unsafe-history and compatibility cases passed `4 passed, 20
+  subtests`; related resume/runner/CLI/recovery tests passed `95 passed, 130 subtests`; final `make
+  check` passed `368 passed, 316 subtests`.
 - Commit required: yes.
-- Dependencies: none.
+- Dependencies: local implementation and three independent reviews are complete with no P1/P2;
+  commit, push, and GitHub CI verification remain before changing status to `DONE`.
 
 ## ARA-048 - Reject conflicting primary CLI modes before any work
 

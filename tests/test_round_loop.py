@@ -2538,6 +2538,58 @@ class RoundLoopTests(unittest.TestCase):
             self.assertFalse((project_dir / "run.log").exists())
             self.assertEqual(list(outside_run.iterdir()), [])
 
+    def test_cli_resume_history_error_exits_two_and_releases_run_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "projects" / "selected"
+            project_dir.mkdir(parents=True)
+            args = parse_args(
+                [
+                    "--resume",
+                    "--provider",
+                    "ollama",
+                    "--model",
+                    "qwen3:8b",
+                    "--project",
+                    "selected",
+                ]
+            )
+            project_input = types.SimpleNamespace(
+                project_name="selected",
+                project_dir=project_dir,
+                task_path=project_dir / "task.md",
+                task_text="# Resume history safety test",
+                project_title="Resume history safety test",
+                source_kind="user_provided",
+                as_metadata=lambda: {"project_name": "selected"},
+            )
+
+            with (
+                patch.object(cli_module, "parse_args", return_value=args),
+                patch.object(cli_module, "load_app_config", return_value=AppConfig()),
+                patch.object(cli_module, "load_project_input", return_value=project_input),
+                patch.object(
+                    cli_module,
+                    "list_installed_ollama_models",
+                    return_value=(["qwen3:8b"], None),
+                ),
+                patch.object(
+                    cli_module,
+                    "create_llm_client",
+                    return_value=types.SimpleNamespace(timeout_seconds=1),
+                ),
+                patch.object(
+                    cli_module,
+                    "run_resume_mode",
+                    side_effect=ResumeHistoryError("unsafe history"),
+                ),
+            ):
+                with self.assertRaises(SystemExit) as raised:
+                    cli_module.main()
+
+            self.assertEqual(raised.exception.code, 2)
+            self.assertFalse((project_dir / "active_run.json").exists())
+            self.assertFalse((project_dir / "run.log").exists())
+
     def test_cli_model_constructor_failures_release_run_lock(self) -> None:
         for failure_stage in ("client", "agents"):
             with self.subTest(stage=failure_stage), tempfile.TemporaryDirectory() as tmp:
@@ -3461,6 +3513,8 @@ class RoundLoopTests(unittest.TestCase):
 
     def test_unsafe_resume_histories_fail_before_writing_any_artifact(self) -> None:
         valid_round_one = b'[{"round": 1, "score": 80}]'
+        huge_positive_score = b'[{"round": 1, "score": ' + b"9" * 400 + b"}]"
+        huge_negative_score = b'[{"round": 1, "score": -' + b"9" * 400 + b"}]"
         deeply_nested_value = b'{"nested":' * 150 + b"0" + b"}" * 150
         unsafe_histories = {
             "invalid_json": (b'{"not": "complete"', valid_round_one, 80.0),
@@ -3468,6 +3522,18 @@ class RoundLoopTests(unittest.TestCase):
             "huge_integer": (
                 b'[{"round": ' + b"9" * 5000 + b"}]",
                 valid_round_one,
+                80.0,
+            ),
+            "huge_positive_score": (huge_positive_score, huge_positive_score, 80.0),
+            "huge_negative_score": (huge_negative_score, huge_negative_score, 80.0),
+            "huge_positive_score_round_metrics_only": (
+                huge_positive_score,
+                None,
+                80.0,
+            ),
+            "huge_negative_score_round_metrics_only": (
+                huge_negative_score,
+                None,
                 80.0,
             ),
             "deep_json": (b"[" * 2000 + b"0" + b"]" * 2000, valid_round_one, 80.0),
@@ -3524,7 +3590,6 @@ class RoundLoopTests(unittest.TestCase):
                 memory_path.write_text("Manual memory.\n", encoding="utf-8")
                 artifact_contents = {
                     run_root / "round_metrics.json": round_metrics_content,
-                    project_dir / "score_history.json": score_history_content,
                     run_root / "run_config.json": b'{"run_id": "resume-run"}',
                     run_root / "run_summary.json": b'{"completed_rounds": 1}',
                     run_root / "run_manifest.json": b'{"legacy_field": "preserve"}',
@@ -3539,8 +3604,15 @@ class RoundLoopTests(unittest.TestCase):
                         }
                     ).encode(),
                 }
+                if score_history_content is not None:
+                    artifact_contents[project_dir / "score_history.json"] = score_history_content
                 for path, content in artifact_contents.items():
                     path.write_bytes(content)
+                before = {
+                    path.relative_to(project_dir): path.read_bytes()
+                    for path in project_dir.rglob("*")
+                    if path.is_file()
+                }
                 agents = RecordingAgents()
                 console = Console(record=True)
 
@@ -3558,7 +3630,13 @@ class RoundLoopTests(unittest.TestCase):
                         per_agent_timeout_seconds=300,
                     )
 
+                after = {
+                    path.relative_to(project_dir): path.read_bytes()
+                    for path in project_dir.rglob("*")
+                    if path.is_file()
+                }
                 self.assertEqual(agents.draft_rounds, [])
+                self.assertEqual(after, before)
                 self.assertFalse((run_root / "round_02").exists())
                 for path, content in artifact_contents.items():
                     self.assertEqual(path.read_bytes(), content)
@@ -3593,6 +3671,34 @@ class RoundLoopTests(unittest.TestCase):
                         )
 
             self.assertFalse(round_metrics_path.exists())
+
+    def test_legacy_unsuccessful_round_preserves_unrepresentable_score(self) -> None:
+        for sign in ("", "-"):
+            with self.subTest(sign=sign), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                round_metrics_path = root / "run" / "round_metrics.json"
+                round_metrics_path.parent.mkdir()
+                round_metrics_path.write_text(
+                    '[{"round": 1, "score": '
+                    + sign
+                    + "9" * 400
+                    + ', "successful_research_round": false}]',
+                    encoding="utf-8",
+                )
+
+                score_history, round_metrics, metadata = _load_resume_histories(
+                    score_history_path=root / "score_history.json",
+                    round_metrics_path=round_metrics_path,
+                    start_round=2,
+                    checkpoint_best_score=80.0,
+                )
+
+                self.assertEqual(score_history, round_metrics)
+                self.assertFalse(round_metrics[0]["successful_research_round"])
+                self.assertEqual(len(str(abs(round_metrics[0]["score"]))), 400)
+                self.assertEqual(round_metrics[0]["score"] < 0, sign == "-")
+                self.assertEqual(metadata["round_metrics_source"], "round_metrics")
+                self.assertEqual(metadata["score_history_source"], "round_metrics_fallback")
 
     def test_partial_history_without_best_metadata_preserves_existing_best(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

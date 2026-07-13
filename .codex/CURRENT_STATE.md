@@ -4,20 +4,20 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Repository State
 
-- Current goal: preserve the remote-verified ARA-046 endpoint-redaction result, then continue with
-  the highest-priority queued task ARA-047.
+- Current goal: publish and remotely verify the locally complete ARA-047 resume-history numeric
+  hardening without changing finite or explicit unsuccessful-history semantics.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `3f3826b6a357b50ebf944f74a6e953ea3f6727e9` (the exact
+- State recorded against commit: `70cec0b88f24d535bdc69f1f76acfe4da6333007` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `3f3826b6a357b50ebf944f74a6e953ea3f6727e9` (exact local,
+- Last externally verified fallback: `70cec0b88f24d535bdc69f1f76acfe4da6333007` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-046 is complete, independently reviewed GO, pushed with
-  exact local/upstream/`ls-remote`/PR-head equality, and passed push/PR CI on Python 3.10/3.13.
-  ARA-047 is the highest-priority `TODO`.
+- Active task at this snapshot: ARA-047 is locally complete and awaiting its implementation commit,
+  push, and GitHub CI verification. Positive and negative 400-digit scores now reach the existing
+  privacy-safe invalid-history boundary before any artifact write or agent call.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -606,13 +606,35 @@ Updated: 2026-07-13 (Asia/Shanghai)
   targets/timeouts, ordinary endpoint compatibility, and IDN/scoped/invalid endpoint labels.
 - Two independent final reviews report GO with no remaining P1/P2 blocker.
 
+## ARA-047 Unrepresentable Resume-History Scores
+
+- Reproduced positive and negative 400-digit JSON scores escaping dual-history resume as raw
+  `OverflowError`; the single `round_metrics.json` legacy path then exposed a second failure mode
+  where the same values were silently ignored and the run continued.
+- Numeric conversion now treats overflow as invalid, and history loading rejects explicit native
+  numeric scores that cannot become finite floats for any round not explicitly marked
+  unsuccessful. Missing scores, finite values, legacy numeric strings, bools, and explicitly
+  unsuccessful rounds keep their prior read behavior.
+- Provider-free regressions cover dual and `round_metrics.json`-only positive/negative values,
+  complete project-tree byte preservation, no agent or new-round activity, path-safe diagnostics,
+  CLI status 2 and lock release, plus explicit unsuccessful-round compatibility.
+- Three independent final reviews report GO with no P1/P2 blocker.
+
 ## Remaining Steps
 
-- Start only ARA-047 with a provider-free unrepresentable-score regression and leave the separately
-  queued CLI/UI/recovery candidates untouched.
+- Commit and push the reviewed ARA-047 implementation and recovery snapshot.
+- Verify exact local/upstream/`ls-remote` equality, push and pull-request CI, annotations, and draft
+  PR 13 before marking ARA-047 `DONE` and selecting another queued task.
 
 ## Test Status
 
+- ARA-047 focused unsafe-history/CLI/compatibility tests pass `4 passed, 20 subtests`; related
+  round-loop/CLI-exit/recovery tests pass `95 passed, 130 subtests`.
+- ARA-047 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
+  self/worktree/staged scans, and pytest (`368 passed, 316 subtests passed` in 13.62 seconds; 103
+  tracked/index files and zero findings). Three independent reviews report GO with no P1/P2.
+- ARA-047 remote verification is pending; the conservative externally verified fallback remains
+  ARA-046 closeout `70cec0b` until the new commit is pushed and its CI completes.
 - ARA-046 implementation `3f3826b` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
   Push run `29250140431` and pull-request run `29250143238` passed Python 3.10/3.13, including all
   four isolated-wheel steps, and all four job annotation sets are empty. Draft PR 13 remains open,
@@ -1066,6 +1088,16 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- The first ARA-047 recovery-state validation correctly rejected a remaining-step bullet that
+  named both active ARA-047 and inactive ARA-048 while requesting push finalization. The wording now
+  attributes the publish work only to ARA-047.
+- The first ARA-047 unsafe-history regression failed only the positive and negative 400-digit
+  dual-history cases because raw `OverflowError` escaped `_history_float()` (`2 failed, 14 subtests
+  passed`). After conversion handling was added, a new `round_metrics.json`-only regression failed
+  only its positive and negative cases because the invalid scores were silently ignored and resume
+  continued (`2 failed, 16 subtests passed`). Both are expected pre-fix evidence and now pass.
+- The first post-fix Ruff format check exited 1 only because the newly added test file required
+  mechanical formatting; Ruff formatted that file, and all subsequent lint/format/diff checks pass.
 - An initial ARA-046 queue-count command put backticked state labels inside a double-quoted shell
   pattern, causing harmless command-not-found/regex errors. A literal single-quoted `rg` rerun
   returned 40 DONE, 8 TODO, 6 DEFERRED, 1 BLOCKED, and no IN_PROGRESS; no file changed.
@@ -1252,7 +1284,9 @@ Updated: 2026-07-13 (Asia/Shanghai)
 
 ```bash
 git status --short --branch
-.venv/bin/python -m pytest -q tests/test_round_loop.py -k unsafe_resume_histories
+.venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
+.venv/bin/python -m pytest -q tests/test_recovery_state.py
+git diff --check
 ```
 
 ## Interruption Recovery
@@ -1261,8 +1295,8 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 
 ## Current Risks And Prohibitions
 
-- Keep ARA-046 provider-free and redaction-only: do not reject previously accepted Ollama endpoint
-  forms, change request targets, print fixture credentials, or contact a real Ollama service.
+- Keep ARA-047 provider-free and numeric-history-only: do not reinterpret finite scores, rewrite
+  canonical artifacts, call an agent/provider, or read ignored project runtime to validate it.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

@@ -144,11 +144,14 @@ def _history_float(value: Any) -> float | None:
     if isinstance(value, bool):
         return None
     if isinstance(value, (int, float)):
-        result = float(value)
+        try:
+            result = float(value)
+        except OverflowError:
+            return None
         return result if math.isfinite(result) else None
     try:
         result = float(str(value))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     return result if math.isfinite(result) else None
 
@@ -179,6 +182,16 @@ def _read_resume_history(path: Path, *, start_round: int) -> List[Dict[str, Any]
             raise ResumeHistoryError(
                 f"{path.name} already contains round {round_number}, which is not before "
                 f"resume round {start_round}"
+            )
+        score_value = entry.get("score")
+        if (
+            entry.get("successful_research_round") is not False
+            and isinstance(score_value, (int, float))
+            and not isinstance(score_value, bool)
+            and _history_float(score_value) is None
+        ):
+            raise ResumeHistoryError(
+                f"{path.name} contains an unrepresentable score for round {round_number}"
             )
         history.append(dict(entry))
         previous_round = round_number

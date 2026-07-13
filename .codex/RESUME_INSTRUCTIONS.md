@@ -46,16 +46,16 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-No task is active. ARA-046 is complete and remote-verified at `3f3826b`; push/PR runs
-`29250140431`/`29250143238` passed Python 3.10/3.13 with zero annotations. Start ARA-047, the
-highest-priority `TODO`, only after resolving live Git state; do not duplicate ARA-046. Its endpoint
-formatter and fixed failure classifiers must preserve actual
-request targets and accepted URL forms while preventing userinfo/path/query/provider text from
-reaching diagnostics or exception graphs. Do not call a real provider or read ignored runtime.
-ARA-030 remains complete. Resume from the semantic checkpoint in `CURRENT_STATE.md`; use
-`3f3826b6a357b50ebf944f74a6e953ea3f6727e9` as the conservative exact externally verified fallback
-if the semantic current `HEAD` has not yet been checked. Do not access ignored runtime or invoke a
-real provider merely to verify recovery.
+ARA-047 is locally complete and awaiting its implementation commit, push, and GitHub CI. Resume by
+validating the recovery files and diff, then explicitly stage only the six task-owned tracked files.
+The provider-free fix converts overflow to the existing invalid-history result and rejects explicit
+unrepresentable native numeric scores before writes or agent calls; finite values, legacy numeric
+strings, missing/bool scores, and explicitly unsuccessful rounds retain prior read behavior. Do not
+touch other queued CLI/UI/recovery tasks, call a provider, or read ignored runtime. ARA-046 is
+complete through remote-equal closeout `70cec0b`; closeout push/PR runs
+`29250470168`/`29250471823` passed Python 3.10/3.13 with zero annotations. Use
+`70cec0b88f24d535bdc69f1f76acfe4da6333007` as the conservative exact externally verified fallback
+until ARA-047 is pushed and its CI passes.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
 it imported the editable checkout and advanced ignored `projects/example` state after a missing
@@ -93,9 +93,9 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-There is no `IN_PROGRESS` task; ARA-047 is the next `TODO`. ARA-018 requires an explicit owner
-license/distribution decision. Do not start ARA-019,
-ARA-026, ARA-006, or ARA-007 until their recorded dependencies are satisfied.
+ARA-047 is the sole `IN_PROGRESS` task and must be remotely verified before ARA-048 starts. ARA-018
+requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026, ARA-006,
+or ARA-007 until their recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
 
@@ -111,6 +111,5 @@ git status --short --branch
 git rev-parse --verify HEAD
 .venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
-.venv/bin/python -m pytest -q tests/test_recovery_state.py
-.venv/bin/python -m pytest -q tests/test_round_loop.py -k unsafe_resume_histories
+git diff --check
 ```

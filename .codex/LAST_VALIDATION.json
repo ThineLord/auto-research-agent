@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-13T20:33:58+08:00",
+  "recorded_at": "2026-07-13T20:50:25+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "3f3826b6a357b50ebf944f74a6e953ea3f6727e9",
-  "last_known_stable_commit": "3f3826b6a357b50ebf944f74a6e953ea3f6727e9",
+  "head_commit": "70cec0b88f24d535bdc69f1f76acfe4da6333007",
+  "last_known_stable_commit": "70cec0b88f24d535bdc69f1f76acfe4da6333007",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "3f3826b6a357b50ebf944f74a6e953ea3f6727e9",
+  "state_recorded_against_commit": "70cec0b88f24d535bdc69f1f76acfe4da6333007",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-13T20:33:58+08:00",
-    "commit": "3f3826b6a357b50ebf944f74a6e953ea3f6727e9",
+    "verified_at": "2026-07-13T20:38:25+08:00",
+    "commit": "70cec0b88f24d535bdc69f1f76acfe4da6333007",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29250140431,
+        "run_id": 29250470168,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "3f3826b6a357b50ebf944f74a6e953ea3f6727e9",
+        "head_sha": "70cec0b88f24d535bdc69f1f76acfe4da6333007",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29250143238,
+        "run_id": 29250471823,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "3f3826b6a357b50ebf944f74a6e953ea3f6727e9",
+        "head_sha": "70cec0b88f24d535bdc69f1f76acfe4da6333007",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,110 @@
       }
     }
   },
-  "status": "ara046_complete_remote_verified",
+  "status": "ara047_locally_validated_pending_commit_and_remote_verification",
   "commands": [
+    {
+      "command": "make check after final ARA-047 single-history validation and compatibility coverage",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 60,
+        "ruff_check": "passed",
+        "import_check": "passed",
+        "repo_safety_self_test": "passed",
+        "repo_safety_worktree": "passed",
+        "repo_safety_staged": "passed",
+        "tracked_files_scanned": 103,
+        "safety_findings": 0,
+        "pytest_passed": 368,
+        "pytest_subtests_passed": 316,
+        "elapsed_seconds": 13.62
+      }
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_round_loop.py tests/test_cli_exit_codes.py tests/test_recovery_state.py",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_passed": 95,
+        "pytest_subtests_passed": 130,
+        "elapsed_seconds": 6.48
+      }
+    },
+    {
+      "command": "ARA-047 focused unsafe-history, CLI status, and unsuccessful-legacy compatibility regression",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_passed": 4,
+        "pytest_subtests_passed": 20,
+        "dual_history_positive_negative": "passed",
+        "round_metrics_only_positive_negative": "passed",
+        "complete_project_file_snapshot_unchanged": true,
+        "agent_calls": 0,
+        "cli_status_2": true,
+        "run_lock_released": true,
+        "explicit_unsuccessful_compatibility": "passed"
+      }
+    },
+    {
+      "command": "three independent ARA-047 correctness, scope, and legacy compatibility reviews",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "reviewers": 3,
+        "go": 3,
+        "p1_blockers": 0,
+        "p2_blockers": 0,
+        "provider_calls": 0,
+        "ignored_runtime_access": 0
+      }
+    },
+    {
+      "command": "ARA-047 dual-history positive and negative 400-digit score pre-fix regression",
+      "exit_code": 1,
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "pytest_failed": 2,
+        "pytest_subtests_passed": 14,
+        "cause": "OverflowError escaped numeric resume-history conversion"
+      }
+    },
+    {
+      "command": "ARA-047 round_metrics-only positive and negative 400-digit score pre-fix regression",
+      "exit_code": 1,
+      "result": "expected_pre_fix_failure",
+      "summary": {
+        "pytest_failed": 2,
+        "pytest_subtests_passed": 16,
+        "cause": "unrepresentable legacy scores were silently ignored and resume continued"
+      }
+    },
+    {
+      "command": "ARA-046 remote-verification closeout push, exact equality, CI, annotations, and PR head verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "closeout_commit": "70cec0b88f24d535bdc69f1f76acfe4da6333007",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "pull_request_head_equal": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29250470168,
+        "pull_request_run_id": 29250471823,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "wheel_smoke_steps_passed": 4,
+        "job_annotations": 0,
+        "draft_pr_13_open": true,
+        "draft_pr_13_draft": true,
+        "draft_pr_13_mergeable": true,
+        "draft_pr_body_readback_normalized_exact": true
+      }
+    },
     {
       "command": "ARA-046 push, exact remote equality, push/PR CI, annotation, and draft PR verification",
       "exit_code": 0,
@@ -2711,6 +2813,10 @@
   ],
   "not_run": [
     {
+      "check": "real provider smoke for ARA-047",
+      "reason": "Resume-history numeric parsing, fail-before-write behavior, CLI status mapping, and legacy compatibility are deterministic local artifact boundaries; temporary histories and fake agents cover them without credentials, network access, cost, or ignored runtime."
+    },
+    {
       "check": "real provider health requests for ARA-044",
       "reason": "Health snapshot scoping, source resolution, sanitization, and malformed eviction are deterministic UI/session boundaries; mocked request/client results cover them without credentials, network access, or cost."
     },
@@ -2772,9 +2878,11 @@
     }
   ],
   "notes": [
+    "ARA-047 is locally complete and pending its implementation commit, push, and GitHub CI; ARA-048 through ARA-056 remain separate and must not be folded into this numeric-history fix.",
+    "ARA-047 rejects positive and negative unrepresentable native numeric scores in dual and round_metrics-only resume histories before writes or agent calls, while preserving finite, numeric-string, missing, bool, and explicit unsuccessful legacy read behavior.",
+    "The conservative externally verified fallback remains ARA-046 closeout 70cec0b until the reviewed ARA-047 commit is pushed and its push/pull-request jobs pass.",
     "ARA-046 is complete and remote-verified at 3f3826b; push and pull-request runs 29250140431 and 29250143238 passed Python 3.10/3.13 with zero annotations.",
     "ARA-046 preserves endpoint acceptance and exact request targets while limiting diagnostics to an unambiguous origin or fixed placeholder; raw requests, urllib, and failed command output never enter events, public messages, or exception graphs.",
-    "ARA-047 is the next unblocked TODO. ARA-048 through ARA-056 record separate confirmed audit findings and must not be folded into ARA-046.",
     "ARA-030 is complete through remote-equal implementation 4cda430; push and pull-request runs 29232341316 and 29232344581 passed Python 3.10/3.13, all four real-wheel steps, and zero annotations.",
     "The wheel helper uses only explicit tracked packaging inputs, one external temporary wheel, a fresh venv, exact six-resource and RECORD verification, source-excluded import/help/mock checks, minimal pip/runtime/Git environments, fixed child diagnostics, and a shared 600-second deadline.",
     "ARA-030's runtime proxy guard plus deterministic mock/provider metadata supports a provider-free workflow but is not a syscall-level network sandbox; same-UID replacement of trusted checkout files also remains outside the helper's guarantee.",
