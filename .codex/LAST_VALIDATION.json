@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-13T22:35:02+08:00",
+  "recorded_at": "2026-07-13T22:39:13+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "45d17db03c263c327da47842903211dd02919f05",
-  "last_known_stable_commit": "45d17db03c263c327da47842903211dd02919f05",
+  "head_commit": "ab7d6fe06136d7099eb8cd60326f59b566e6f3b8",
+  "last_known_stable_commit": "ab7d6fe06136d7099eb8cd60326f59b566e6f3b8",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "45d17db03c263c327da47842903211dd02919f05",
+  "state_recorded_against_commit": "ab7d6fe06136d7099eb8cd60326f59b566e6f3b8",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-13T22:28:58+08:00",
-    "commit": "45d17db03c263c327da47842903211dd02919f05",
+    "verified_at": "2026-07-13T22:37:56+08:00",
+    "commit": "ab7d6fe06136d7099eb8cd60326f59b566e6f3b8",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29257853754,
+        "run_id": 29258640040,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "45d17db03c263c327da47842903211dd02919f05",
+        "head_sha": "ab7d6fe06136d7099eb8cd60326f59b566e6f3b8",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29257863381,
+        "run_id": 29258641820,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "45d17db03c263c327da47842903211dd02919f05",
+        "head_sha": "ab7d6fe06136d7099eb8cd60326f59b566e6f3b8",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,45 @@
       }
     }
   },
-  "status": "ara051_local_verified_pending_publish",
+  "status": "ara051_complete_remote_verified",
   "commands": [
+    {
+      "command": "ARA-051 remote-closeout make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_files": 60,
+        "pytest_passed": 383,
+        "pytest_subtests_passed": 459,
+        "tracked_files_scanned": 103,
+        "safety_findings": 0,
+        "duration_seconds": 16.05
+      }
+    },
+    {
+      "command": "ARA-051 push, exact remote equality, push/PR CI, annotations, and draft PR verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "implementation_commit": "ab7d6fe06136d7099eb8cd60326f59b566e6f3b8",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "pull_request_head_equal": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29258640040,
+        "pull_request_run_id": 29258641820,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "wheel_smoke_steps_passed": 4,
+        "job_annotations": 0,
+        "draft_pr_13_open": true,
+        "draft_pr_13_draft": true,
+        "draft_pr_13_mergeable": true
+      }
+    },
     {
       "command": "ARA-051 pre-fix duplicate-profile order and selection-surface regressions",
       "exit_code": 1,
@@ -3399,10 +3436,11 @@
     }
   ],
   "notes": [
-    "ARA-051 is locally complete and remains IN_PROGRESS only for commit, push, exact remote equality, GitHub push/PR CI, and final recovery-state synchronization.",
+    "No task is active; ARA-052 is the next highest-priority TODO after live Git recovery verification.",
+    "ARA-051 is complete and remote-verified at ab7d6fe with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 29258640040 and 29258641820 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations.",
     "ARA-051 excludes only non-identical duplicate profile IDs from cached pooling, recommendation, and fallback while preserving equivalent duplicates, unique healthy profiles, unprofiled alternatives, ARA-040, and ARA-043 behavior.",
     "ARA-051 focused tests pass 4 tests and 22 subtests, related tests pass 139 tests and 127 subtests, full make check passes 383 tests and 459 subtests, and three independent reviews report GO.",
-    "ARA-051 is the sole active task; its scope is duplicate conflicting cloud-profile fail-closed handling with no provider or ignored-runtime access.",
+    "ARA-051 is complete; its scope stayed within duplicate conflicting cloud-profile fail-closed handling with no provider or ignored-runtime access.",
     "ARA-050 is complete through remote-equal closeout 45d17db; closeout push and pull-request runs 29257853754 and 29257863381 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations with exact final PR body readback.",
     "No task is active; ARA-051 is the next highest-priority TODO after live Git recovery verification.",
     "ARA-050 is complete and remote-verified at be3bc04 with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 29257476266 and 29257478876 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations.",

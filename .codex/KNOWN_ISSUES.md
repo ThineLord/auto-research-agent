@@ -435,10 +435,11 @@ Updated: 2026-07-12 (Asia/Shanghai)
 
 ## KI-051 - Conflicting duplicate cloud profiles are ordering-sensitive
 
-- Status: fixed locally; remote verification pending
+- Status: fixed, pushed, and CI-verified through `ab7d6fe`
 - Severity: P2 selection consistency
 - Impact: last-record-wins dictionaries can let a healthy duplicate override a blocked profile and
   re-enable that model for recommendation or fallback depending only on artifact order.
-- Current action: ARA-051 marks non-identical exact-ID duplicates conflicted and excludes only those
-  IDs from cached pooling, recommendation, and fallback while retaining equivalent duplicates and
-  other safe candidates.
+- Resolution: ARA-051 marks non-identical exact-ID duplicates conflicted and excludes only those IDs
+  from cached pooling, recommendation, and fallback while retaining equivalent duplicates and
+  other safe candidates. Both orders, all presets, full local gates, exact remote equality, and
+  Python 3.10/3.13 push/PR CI are verified.

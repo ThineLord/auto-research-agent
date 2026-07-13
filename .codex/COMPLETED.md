@@ -841,3 +841,20 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed as `be3bc04` and pushed with exact local/upstream/`ls-remote`/PR-head equality. Push run
   `29257476266` and pull-request run `29257478876` passed Python 3.10/3.13, every isolated-wheel
   step, and all four job annotation sets are empty. Draft PR 13 remains open, draft, and mergeable.
+
+## 2026-07-13 - Conflicting duplicate cloud profile handling
+
+- Reproduced cached pooling retaining a duplicate-conflicted model in both orders and
+  blocked-then-healthy ordering re-enabling it across auto/quality/volume recommendation and
+  fallback.
+- Added one exact-ID profile index that marks non-identical parsed duplicate records conflicted and
+  explicitly excludes only those IDs from cached pooling, recommendation, and fallback.
+- Preserved different-instance value-equivalent duplicates, unique healthy cohort candidates,
+  unprofiled safe alternatives, exact legacy IDs, ARA-040 reconciliation, and ARA-043 all-blocked
+  behavior without changing artifacts or schemas.
+- Focused tests passed `4 passed, 22 subtests`; related cloud/CLI/UI/recovery tests passed `139
+  passed, 127 subtests`; final `make check` passed `383 passed, 459 subtests`. Three independent
+  final reviews returned GO.
+- Committed as `ab7d6fe` and pushed with exact local/upstream/`ls-remote`/PR-head equality. Push run
+  `29258640040` and pull-request run `29258641820` passed Python 3.10/3.13, every isolated-wheel
+  step, and all four job annotation sets are empty. Draft PR 13 remains open, draft, and mergeable.
