@@ -165,6 +165,27 @@ main()
             self.assertFalse(missing_cli_layout.source_layout)
             self.assertEqual(missing_cli_layout.workspace_root, workspace.resolve())
 
+    def test_installed_conflicting_primary_modes_fail_before_workspace_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package_parent = self._copy_installed_package(root)
+            package_before = _tree_hashes(package_parent)
+            workspace = root / "workspace"
+            workspace.mkdir()
+
+            result = self._run_installed(
+                package_parent=package_parent,
+                workspace=workspace,
+                argv=["--mock", "--resume"],
+            )
+            combined = result.stdout + result.stderr
+
+            self.assertEqual(result.returncode, 2, combined)
+            self.assertIn("not allowed with argument", result.stderr)
+            self.assertNotIn("Traceback", combined)
+            self.assertEqual(list(workspace.iterdir()), [])
+            self.assertEqual(_tree_hashes(package_parent), package_before)
+
     def test_interrupted_seed_never_publishes_a_partial_project(self) -> None:
         class InterruptingWriter:
             def __init__(self, path: Path) -> None:

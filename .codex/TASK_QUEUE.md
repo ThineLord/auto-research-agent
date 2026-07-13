@@ -499,7 +499,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-048 - Reject conflicting primary CLI modes before any work
 
-- Status: `TODO`
+- Status: `IN_PROGRESS`
 - Priority: P1
 - Risk: medium
 - Description: primary flags are not mutually exclusive; for example `--mock --resume` selects the
@@ -513,6 +513,10 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   no-write subprocess regressions, then `make check`.
 - Commit required: yes.
 - Dependencies: none; identify modifiers separately from primary modes before changing the parser.
+- Progress: all 45 primary-mode pairs in both orders now reject during parsing; individual modes,
+  normal mode, and compatible modifiers pass. Focused tests pass `6 passed, 100 subtests`, related
+  tests pass `122 passed, 238 subtests`, full `make check` passes `373 passed, 416 subtests`, and
+  three independent reviews returned GO. Commit/push/remote CI verification remain.
 
 ## ARA-049 - Make UI session credentials authoritative for the launched run
 
@@ -639,6 +643,24 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   `make check`.
 - Commit required: yes.
 - Dependencies: preserve ARA-023 status 130 and ARA-041 startup transaction ordering.
+
+## ARA-057 - Reject orphan mode-specific output options before work
+
+- Status: `TODO`
+- Priority: P1
+- Risk: low
+- Description: `--survey-output`, `--compare-output`, or `--analyze-output` without its matching
+  primary selector falls through to a normal/provider run, potentially performing paid or
+  artifact-writing work instead of reporting invalid arguments.
+- Related files: `src/cli.py`, parser and source/installed entrypoint tests
+- Acceptance criteria: each output option requires its matching primary mode and rejects any orphan
+  or mismatched-mode use during argument handling; correct mode/output pairs and output-free modes
+  remain compatible.
+- Validation command: parser dependency matrix plus source/module and temporary installed-layout
+  no-work subprocess regressions, then `make check`.
+- Commit required: yes.
+- Dependencies: complete ARA-048 without folding this separate requires-relationship into its
+  primary-mode mutual-exclusion fix.
 
 ## ARA-011 - Prevent failed rounds from replacing a trusted best output
 

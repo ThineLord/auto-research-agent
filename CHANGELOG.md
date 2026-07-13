@@ -48,6 +48,9 @@
 
 ### Fixed
 
+* The CLI now rejects any combination of two primary execution modes during argument parsing,
+  before runtime layout, configuration, project, provider, or artifact access. Normal mode, every
+  individual selector, and their existing output/runtime modifiers remain compatible.
 * Existing-run resume startup now journals `run_config.json` and `run_manifest.json` as one
   recoverable generation before replacing either file. Pre-commit I/O failures, interrupts, and
   interrupted rollback restore the exact prior pair; a surviving journal is recovered before

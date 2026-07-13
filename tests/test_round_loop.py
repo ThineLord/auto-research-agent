@@ -5,6 +5,7 @@ import tempfile
 import types
 import unittest
 from importlib.util import find_spec
+from itertools import combinations
 from pathlib import Path
 from unittest.mock import patch
 
@@ -444,23 +445,48 @@ class RoundLoopTests(unittest.TestCase):
                 self.assertFalse((project_dir / "runs").exists())
                 self.assertFalse((project_dir / "checkpoint.json").exists())
 
-    def test_parse_args_accepts_mode_and_model_flags(self) -> None:
+    def test_parse_args_accepts_each_primary_mode_with_compatible_modifiers(self) -> None:
+        mode_cases = {
+            "session": (["--session", "--project", "selected", "--max-rounds", "2"], True),
+            "diagnostic": (["--diagnostic", "--project", "selected"], True),
+            "continuous": (
+                ["--continuous", "--project", "selected", "--max-rounds", "2"],
+                True,
+            ),
+            "resume": (["--resume", "--project", "selected", "--max-rounds", "2"], True),
+            "survey": (
+                ["--survey", "--project", "selected", "--survey-output", "survey.md"],
+                True,
+            ),
+            "mock": (["--mock", "--project", "selected", "--max-rounds", "2"], True),
+            "compare_runs": (
+                ["--compare-runs", "run-a", "run-b", "--compare-output", "comparison.json"],
+                ["run-a", "run-b"],
+            ),
+            "analyze_run": (
+                ["--analyze-run", "run-a", "--analyze-output", "analysis.json"],
+                "run-a",
+            ),
+            "cloud_free_discover": (
+                ["--cloud-free-discover", "--project", "selected"],
+                True,
+            ),
+            "cloud_free_profile": (
+                ["--cloud-free-profile", "--project", "selected"],
+                True,
+            ),
+        }
+
+        for attribute, (argv, expected) in mode_cases.items():
+            with self.subTest(mode=attribute):
+                args = parse_args(argv)
+                self.assertEqual(getattr(args, attribute), expected)
+
+    def test_parse_args_accepts_normal_mode_and_general_modifiers(self) -> None:
         args = parse_args(
             [
-                "--diagnostic",
-                "--survey",
-                "--mock",
-                "--survey-output",
-                "custom_survey.md",
-                "--compare-runs",
-                "projects/example/runs/a",
-                "projects/example/runs/b",
-                "--compare-output",
-                "projects/example/run_comparison.json",
-                "--analyze-run",
-                "projects/example/runs/a",
-                "--analyze-output",
-                "projects/example/run_analysis.json",
+                "--project",
+                "selected",
                 "--model",
                 "llama3.1:8b",
                 "--benchmark-preset",
@@ -472,18 +498,51 @@ class RoundLoopTests(unittest.TestCase):
             ]
         )
 
-        self.assertTrue(args.diagnostic)
-        self.assertTrue(args.survey)
-        self.assertTrue(args.mock)
-        self.assertEqual(args.survey_output, "custom_survey.md")
-        self.assertEqual(args.compare_runs, ["projects/example/runs/a", "projects/example/runs/b"])
-        self.assertEqual(args.compare_output, "projects/example/run_comparison.json")
-        self.assertEqual(args.analyze_run, "projects/example/runs/a")
-        self.assertEqual(args.analyze_output, "projects/example/run_analysis.json")
+        self.assertFalse(
+            any(
+                (
+                    args.session,
+                    args.diagnostic,
+                    args.continuous,
+                    args.resume,
+                    args.survey,
+                    args.mock,
+                    args.compare_runs,
+                    args.analyze_run,
+                    args.cloud_free_discover,
+                    args.cloud_free_profile,
+                )
+            )
+        )
+        self.assertEqual(args.project, "selected")
         self.assertEqual(args.model, "llama3.1:8b")
         self.assertEqual(args.benchmark_preset, "free_eval")
         self.assertEqual(args.max_provider_quota_failures, 2)
         self.assertEqual(args.drafting_mode, "continue_from_previous_draft")
+
+    def test_parse_args_rejects_every_primary_mode_pair_in_either_order(self) -> None:
+        primary_modes = (
+            ("session", ["--session"]),
+            ("diagnostic", ["--diagnostic"]),
+            ("continuous", ["--continuous"]),
+            ("resume", ["--resume"]),
+            ("survey", ["--survey"]),
+            ("mock", ["--mock"]),
+            ("compare_runs", ["--compare-runs", "run-a", "run-b"]),
+            ("analyze_run", ["--analyze-run", "run-a"]),
+            ("cloud_free_discover", ["--cloud-free-discover"]),
+            ("cloud_free_profile", ["--cloud-free-profile"]),
+        )
+
+        for (left_name, left_argv), (right_name, right_argv) in combinations(primary_modes, 2):
+            for order, argv in (
+                ("forward", [*left_argv, *right_argv]),
+                ("reverse", [*right_argv, *left_argv]),
+            ):
+                with self.subTest(left=left_name, right=right_name, order=order):
+                    with self.assertRaises(SystemExit) as raised:
+                        parse_args(argv)
+                    self.assertEqual(raised.exception.code, 2)
 
     def test_round_loop_writes_outputs_and_keeps_best_score(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

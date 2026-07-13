@@ -39,6 +39,59 @@ class CliExitCodeTests(unittest.TestCase):
     def _reject_json_constant(value: str) -> None:
         raise ValueError(f"non-standard JSON constant: {value}")
 
+    def test_conflicting_primary_modes_exit_two_before_runtime_setup(self) -> None:
+        with (
+            patch.object(sys, "argv", ["auto-research-agent", "--mock", "--resume"]),
+            patch.object(cli_module, "configure_logging") as configure_logging,
+            patch.object(
+                cli_module,
+                "resolve_runtime_layout",
+                side_effect=AssertionError("runtime setup reached"),
+            ) as resolve_runtime_layout,
+            patch.object(cli_module, "load_app_config") as load_app_config,
+            patch.object(cli_module, "load_project_input") as load_project_input,
+            patch.object(cli_module, "seed_default_mock_project") as seed_default_mock_project,
+        ):
+            with self.assertRaises(SystemExit) as raised:
+                cli_module.main()
+
+        self.assertEqual(raised.exception.code, 2)
+        configure_logging.assert_not_called()
+        resolve_runtime_layout.assert_not_called()
+        load_app_config.assert_not_called()
+        load_project_input.assert_not_called()
+        seed_default_mock_project.assert_not_called()
+
+    def test_module_conflicting_primary_modes_exit_two_before_layout(self) -> None:
+        script = """
+import runpy
+import sys
+
+import src.cli as cli
+
+def forbidden_layout(**kwargs):
+    print("RUNTIME_LAYOUT_ACCESSED")
+    raise AssertionError("runtime layout must not be accessed")
+
+cli.resolve_runtime_layout = forbidden_layout
+sys.argv = ["auto-research-agent", "--mock", "--resume"]
+runpy.run_module("src.main", run_name="__main__")
+"""
+
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        combined = result.stdout + result.stderr
+
+        self.assertEqual(result.returncode, 2, combined)
+        self.assertIn("not allowed with argument", result.stderr)
+        self.assertNotIn("RUNTIME_LAYOUT_ACCESSED", combined)
+        self.assertNotIn("Traceback", combined)
+
     def test_project_preflight_os_errors_exit_two_before_runtime_setup(self) -> None:
         for error in (PermissionError("denied"), FileNotFoundError("missing")):
             with self.subTest(error=error.__class__.__name__), tempfile.TemporaryDirectory() as tmp:

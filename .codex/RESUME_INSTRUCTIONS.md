@@ -46,14 +46,16 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-No task is active. ARA-047 is complete and remote-verified at `d7708b3`; push/PR runs
-`29251545910`/`29251548644` passed Python 3.10/3.13, all four wheel-smoke steps, and zero
-annotations. Start ARA-048, the highest-priority `TODO`, only after resolving live Git state; do not
-duplicate ARA-047 or fold in the separately queued UI/cloud/recovery findings. The completed fix
-rejects explicit unrepresentable native numeric history scores before writes or agent calls while
-preserving finite values, legacy numeric strings, missing/bool scores, and explicit unsuccessful
-rounds. Use `d7708b3854476b7a54a9751ef5e150bc30ad179d` as the conservative exact externally verified
-fallback if the semantic current `HEAD` has not yet been checked.
+ARA-048 is active with its minimal mutually-exclusive-parser implementation and provider-free
+regressions locally complete. Resume by reviewing/staging the recorded nine paths, committing and
+pushing ARA-048, then verifying push/PR CI and exact remote/PR-head equality before closeout.
+Rejection occurs during argument handling before layout, config, project, provider, or artifact
+access; every individual primary mode and compatible modifier remains accepted. ARA-057 separately
+owns orphan mode-specific output options and must not be folded into ARA-048. Do not call a
+provider or read ignored runtime. ARA-047 is complete through remote-equal closeout `be23031`;
+closeout push/PR runs `29251987247`/`29251990247` passed Python 3.10/3.13, all four wheel-smoke
+steps, and zero annotations. Use `be2303178e410360821148e4dd37f13344fcb2b7` as the conservative
+exact externally verified fallback if the semantic current `HEAD` has not yet been checked.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
 it imported the editable checkout and advanced ignored `projects/example` state after a missing
@@ -69,6 +71,11 @@ The last successful local full validation command was:
 ```bash
 make check
 ```
+
+ARA-048's final local result is Ruff/import/safety success and `373 passed, 416 subtests passed`;
+its focused conflict/compatibility/entrypoint layer passes `6 passed, 100 subtests`, related tests
+pass `122 passed, 238 subtests`, and three independent reviews returned GO. The expected pre-fix
+focused result was `93 failed, 1 passed`; no provider or ignored runtime was used.
 
 ARA-047's final local result is Ruff/import/safety success and `368 passed, 316 subtests passed`;
 its focused unsafe-history/CLI/compatibility layer passes `4 passed, 20 subtests`, and related tests
@@ -95,8 +102,8 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-There is no `IN_PROGRESS` task; ARA-048 is the next `TODO`. ARA-018 requires an explicit owner
-license/distribution decision. Do not start ARA-019, ARA-026, ARA-006, or ARA-007 until their
+ARA-048 is the sole `IN_PROGRESS` task; ARA-057 is a separate `TODO`. ARA-018 requires an explicit
+owner license/distribution decision. Do not start ARA-019, ARA-026, ARA-006, or ARA-007 until their
 recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
@@ -114,4 +121,5 @@ git rev-parse --verify HEAD
 .venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
 git diff --check
+.venv/bin/python -m pytest -q tests/test_round_loop.py tests/test_cli_exit_codes.py tests/test_package_resources.py tests/test_run_compare.py
 ```

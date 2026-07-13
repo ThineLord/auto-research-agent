@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-13T20:55:37+08:00",
+  "recorded_at": "2026-07-13T21:14:19+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "d7708b3854476b7a54a9751ef5e150bc30ad179d",
-  "last_known_stable_commit": "d7708b3854476b7a54a9751ef5e150bc30ad179d",
+  "head_commit": "be2303178e410360821148e4dd37f13344fcb2b7",
+  "last_known_stable_commit": "be2303178e410360821148e4dd37f13344fcb2b7",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "d7708b3854476b7a54a9751ef5e150bc30ad179d",
+  "state_recorded_against_commit": "be2303178e410360821148e4dd37f13344fcb2b7",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-13T20:55:37+08:00",
-    "commit": "d7708b3854476b7a54a9751ef5e150bc30ad179d",
+    "verified_at": "2026-07-13T21:03:20+08:00",
+    "commit": "be2303178e410360821148e4dd37f13344fcb2b7",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29251545910,
+        "run_id": 29251987247,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "d7708b3854476b7a54a9751ef5e150bc30ad179d",
+        "head_sha": "be2303178e410360821148e4dd37f13344fcb2b7",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29251548644,
+        "run_id": 29251990247,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "d7708b3854476b7a54a9751ef5e150bc30ad179d",
+        "head_sha": "be2303178e410360821148e4dd37f13344fcb2b7",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,127 @@
       }
     }
   },
-  "status": "ara047_complete_remote_verified",
+  "status": "ara048_locally_validated_pending_publish",
   "commands": [
+    {
+      "command": "make check after final ARA-048 parser, entrypoint, installed-layout, and recovery-state validation",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_format_files": 60,
+        "ruff_check": "passed",
+        "import_check": "passed",
+        "repository_safety_self_test": "passed",
+        "repository_safety_worktree": "passed",
+        "repository_safety_staged": "passed",
+        "tracked_files_scanned": 103,
+        "pytest_tests": 373,
+        "pytest_subtests": 416,
+        "duration_seconds": 13.97,
+        "provider_calls": 0,
+        "ignored_runtime_accessed": false
+      }
+    },
+    {
+      "command": "ARA-048 related parser, CLI exit, package-resource, run-compare, and recovery-state regression",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "tests": 122,
+        "subtests": 238,
+        "duration_seconds": 7.62
+      }
+    },
+    {
+      "command": "ARA-048 focused conflict matrix, compatible-mode, direct/module, and copied-installed entrypoint regression",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "tests": 6,
+        "subtests": 100,
+        "primary_modes": 10,
+        "mode_pairs": 45,
+        "pair_orders": 90,
+        "conflict_exit_code": 2,
+        "workspace_writes": 0,
+        "installed_package_tree_changed": false
+      }
+    },
+    {
+      "command": "ARA-048 source module and editable console help/conflict smoke",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "module_help_exit_code": 0,
+        "console_help_exit_code": 0,
+        "module_conflict_exit_code": 2,
+        "console_conflict_exit_code": 2,
+        "conflict_tracebacks": 0
+      }
+    },
+    {
+      "command": "ARA-048 expected pre-fix conflict regression before production change",
+      "exit_code": 1,
+      "result": "expected_failure",
+      "summary": {
+        "failed_tests_and_subtests": 93,
+        "passed_tests": 1,
+        "pair_order_failures": 90,
+        "entrypoint_boundary_failures": 3,
+        "provider_calls": 0,
+        "repository_runtime_accessed": false
+      }
+    },
+    {
+      "command": "ARA-048 clean-start baseline make check at be2303178e410360821148e4dd37f13344fcb2b7",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "pytest_tests": 368,
+        "pytest_subtests": 316,
+        "tracked_files_scanned": 103,
+        "repository_safety_findings": 0
+      }
+    },
+    {
+      "command": "ARA-048 independent parser, entrypoint-boundary, and scope/recovery reviews",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "reviewers": 3,
+        "blocking_findings": 0,
+        "p0_findings": 0,
+        "p1_findings": 0,
+        "p2_findings": 0,
+        "p3_findings": 0,
+        "scope_review_state_sync_completed": true
+      }
+    },
+    {
+      "command": "ARA-047 remote-verification closeout push, exact equality, CI, annotations, and PR body verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "closeout_commit": "be2303178e410360821148e4dd37f13344fcb2b7",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "pull_request_head_equal": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 29251987247,
+        "pull_request_run_id": 29251990247,
+        "python_3_10_push": "passed",
+        "python_3_13_push": "passed",
+        "python_3_10_pull_request": "passed",
+        "python_3_13_pull_request": "passed",
+        "wheel_smoke_steps_passed": 4,
+        "job_annotations": 0,
+        "draft_pr_13_open": true,
+        "draft_pr_13_draft": true,
+        "draft_pr_13_mergeable": true,
+        "draft_pr_body_readback_normalized_exact": true
+      }
+    },
     {
       "command": "ARA-047 push, exact remote equality, push/PR CI, annotations, and draft PR verification",
       "exit_code": 0,
@@ -2902,9 +3021,12 @@
     }
   ],
   "notes": [
+    "ARA-048 is the sole active task; its minimal mutually exclusive parser group, regressions, and local validation are complete, while commit, push, remote CI, exact equality, PR readback, and closeout remain.",
+    "ARA-048 rejects every pair of ten primary selectors during argument parsing before logging/layout/config/project/provider/artifact work while preserving normal mode, each individual selector, and ordinary modifiers.",
+    "ARA-057 separately owns orphan survey, compare, and analyze output options; ARA-049 through ARA-057 remain separate confirmed findings and must not be folded into ARA-048.",
+    "ARA-047 is complete through remote-equal closeout be23031; closeout push and pull-request runs 29251987247 and 29251990247 passed Python 3.10/3.13, all four wheel-smoke steps, and zero annotations with exact normalized PR body readback.",
     "ARA-047 is complete and remote-verified at d7708b3; push and pull-request runs 29251545910 and 29251548644 passed Python 3.10/3.13, all four wheel-smoke steps, and zero annotations.",
     "ARA-047 rejects positive and negative unrepresentable native numeric scores in dual and round_metrics-only resume histories before writes or agent calls, while preserving finite, numeric-string, missing, bool, and explicit unsuccessful legacy read behavior.",
-    "ARA-048 is the next unblocked TODO. ARA-049 through ARA-056 remain separate confirmed findings and must not be folded into ARA-047.",
     "ARA-046 is complete and remote-verified at 3f3826b; push and pull-request runs 29250140431 and 29250143238 passed Python 3.10/3.13 with zero annotations.",
     "ARA-046 preserves endpoint acceptance and exact request targets while limiting diagnostics to an unambiguous origin or fixed placeholder; raw requests, urllib, and failed command output never enter events, public messages, or exception graphs.",
     "ARA-030 is complete through remote-equal implementation 4cda430; push and pull-request runs 29232341316 and 29232344581 passed Python 3.10/3.13, all four real-wheel steps, and zero annotations.",

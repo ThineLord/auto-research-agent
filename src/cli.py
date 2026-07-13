@@ -96,32 +96,33 @@ def _positive_round_count(value: str) -> int:
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Local iterative research agent")
-    parser.add_argument(
+    primary_modes = parser.add_mutually_exclusive_group()
+    primary_modes.add_argument(
         "--session",
         action="store_true",
         help="Run focused nightly research session workflow.",
     )
-    parser.add_argument(
+    primary_modes.add_argument(
         "--diagnostic",
         action="store_true",
         help="Run lightweight one-round diagnostic workflow.",
     )
-    parser.add_argument(
+    primary_modes.add_argument(
         "--continuous",
         action="store_true",
         help="Run continuous round-by-round mode with safe stop support.",
     )
-    parser.add_argument(
+    primary_modes.add_argument(
         "--resume",
         action="store_true",
         help="Resume from projects/<project>/checkpoint.json.",
     )
-    parser.add_argument(
+    primary_modes.add_argument(
         "--survey",
         action="store_true",
         help="Run local Literature Survey Mode without provider calls.",
     )
-    parser.add_argument(
+    primary_modes.add_argument(
         "--mock",
         action="store_true",
         help=(
@@ -135,7 +136,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         default=None,
         help="Override survey report path. Relative paths resolve under the selected project.",
     )
-    parser.add_argument(
+    primary_modes.add_argument(
         "--compare-runs",
         nargs="+",
         default=None,
@@ -148,7 +149,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         default=None,
         help="Optional JSON output path for --compare-runs. Relative paths resolve from repo root.",
     )
-    parser.add_argument(
+    primary_modes.add_argument(
         "--analyze-run",
         type=str,
         default=None,
@@ -185,12 +186,12 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         default=None,
         help="Override project folder name under projects/.",
     )
-    parser.add_argument(
+    primary_modes.add_argument(
         "--cloud-free-discover",
         action="store_true",
         help="Discover safe free-run Gemini/Gemma text models and save an ignored artifact.",
     )
-    parser.add_argument(
+    primary_modes.add_argument(
         "--cloud-free-profile",
         action="store_true",
         help="Profile safe free-run Gemini/Gemma candidates and save an ignored artifact.",
