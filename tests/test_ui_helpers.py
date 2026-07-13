@@ -2814,6 +2814,76 @@ release_run_lock(handle)
         self.assertNotIn("private-token", repr(health))
         self.assertIn("https://localhost:11434", health["message"])
 
+    def test_ollama_health_rejects_non_mapping_json_responses(self) -> None:
+        import ui.app as ui_app
+
+        expected = {
+            "ok": False,
+            "api_ok": False,
+            "model_ok": False,
+            "message": ("Ollama API is not healthy at https://localhost:11434: InvalidResponse"),
+            "message_key": "health_api_unhealthy",
+            "message_args": {
+                "base_url": "https://localhost:11434",
+                "error": "InvalidResponse",
+            },
+        }
+        response_shapes = (
+            [],
+            "provider-controlled-detail",
+            42,
+            True,
+            False,
+            None,
+        )
+        private_endpoint = "https://fixture-user:private-token@localhost:11434/proxy/"
+
+        for payload in response_shapes:
+            with self.subTest(payload=payload):
+                response = SimpleNamespace(
+                    raise_for_status=lambda: None,
+                    json=lambda payload=payload: payload,
+                )
+                with patch.object(ui_app.requests, "get", return_value=response) as get:
+                    health = ui_app.check_ollama_model_health(
+                        base_url=private_endpoint,
+                        selected_model="qwen3:8b",
+                        installed_model_names=[],
+                        timeout_seconds=7,
+                    )
+
+                self.assertEqual(health, expected)
+                get.assert_called_once_with(
+                    f"{private_endpoint}api/tags",
+                    timeout=7,
+                )
+                self.assertNotIn("provider-controlled-detail", repr(health))
+                self.assertNotIn("private-token", repr(health))
+
+        empty_object_response = SimpleNamespace(
+            raise_for_status=lambda: None,
+            json=lambda: {},
+        )
+        with patch.object(
+            ui_app.requests,
+            "get",
+            return_value=empty_object_response,
+        ) as get:
+            health = ui_app.check_ollama_model_health(
+                base_url=private_endpoint,
+                selected_model="qwen3:8b",
+                installed_model_names=[],
+                timeout_seconds=7,
+            )
+
+        self.assertFalse(health["ok"])
+        self.assertTrue(health["api_ok"])
+        self.assertFalse(health["model_ok"])
+        self.assertEqual(health["message_key"], "health_model_missing")
+        self.assertEqual(health["message_args"], {"model": "qwen3:8b"})
+        get.assert_called_once_with(f"{private_endpoint}api/tags", timeout=7)
+        self.assertNotIn("private-token", repr(health))
+
     def test_ui_health_session_result_is_scoped_to_checked_target(self) -> None:
         import ui.app as ui_app
 

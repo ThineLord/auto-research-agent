@@ -687,6 +687,17 @@ def check_ollama_model_health(
             "message_args": {"base_url": display_endpoint, "error": error_type},
         }
 
+    if not isinstance(payload, Mapping):
+        error_type = "InvalidResponse"
+        return {
+            "ok": False,
+            "api_ok": False,
+            "model_ok": False,
+            "message": f"Ollama API is not healthy at {display_endpoint}: {error_type}",
+            "message_key": "health_api_unhealthy",
+            "message_args": {"base_url": display_endpoint, "error": error_type},
+        }
+
     api_models = [
         str(model.get("name", "")).strip()
         for model in payload.get("models", [])

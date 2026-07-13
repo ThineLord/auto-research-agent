@@ -48,6 +48,10 @@
 
 ### Fixed
 
+* Ollama health checks now reject valid non-object JSON responses with one fixed, credential-safe
+  unhealthy result instead of raising `AttributeError`. Mapping responses, exact `/api/tags`
+  request targets and timeouts, endpoint redaction, and target-scoped health snapshots retain their
+  existing behavior.
 * Conflicting duplicate cloud-model profiles now fail closed by model ID in cached candidate
   reconciliation, automatic recommendation, and runtime fallback regardless of record order.
   Value-equivalent duplicates, unique healthy profiles, and safe unprofiled alternatives retain
