@@ -4,20 +4,19 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: complete approved ARA-056 by making pre-agent interrupts leave a coherent,
-  recoverable run state while preserving status 130 and existing startup transaction ordering.
+- Current goal: preserve the remotely verified ARA-056 checkpoint; no unblocked TODO remains, so
+  await an owner decision on blocked/deferred scope before further implementation.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `66d8a4f8736ff3f56c05d741d1e5396baa3ff3da` (the exact
+- State recorded against commit: `795665d4209502985530f6cba1076933244ffa43` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `66d8a4f8736ff3f56c05d741d1e5396baa3ff3da` (exact local,
+- Last externally verified fallback: `795665d4209502985530f6cba1076933244ffa43` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: ARA-056. The owner explicitly approved the greater-than-30-minute,
-  medium-risk interrupt lifecycle work on 2026-07-23; baseline is green and fault-matrix audit is
-  next.
+- Active task at this snapshot: none. ARA-056 is complete and remote-verified; the queue now has no
+  unblocked TODO, while ARA-018 is owner-blocked and six tasks are dependency-deferred.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -817,14 +816,15 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
   runner/CLI/session/storage/recovery coverage passes `135 passed, 339 subtests`.
 - Indexed `make check` passes Ruff, imports, both repository-safety scans, and pytest with `399
   passed, 621 subtests` in 19.85 seconds.
+- Committed ARA-056 as `795665d`, pushed it with exact local/upstream/`ls-remote`/PR-head equality,
+  and verified push/PR runs `30004044807`/`30004047971`: Python 3.10/3.13, all four isolated-wheel
+  steps, and every annotation set passed cleanly. PR 13 remains open, draft, and mergeable.
 
 ## Remaining Steps
 
-- Finish complete diff, recovery-state, compatibility, and sensitive-pattern review; correct any
-  scope or evidence mismatch before staging.
-- Run indexed validation, commit and push the ARA-056 implementation, then verify exact remote
-  equality and Python 3.10/3.13 push/PR CI.
-- Leave deferred tasks untouched.
+- Do not activate ARA-018 without an owner license/distribution decision.
+- Do not activate the six deferred tasks until their recorded dependencies or design approvals are
+  satisfied.
 
 ## Test Status
 
@@ -899,6 +899,12 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
   subtests`.
 - ARA-056 indexed `make check` passes `399 passed, 621 subtests` in 19.85 seconds with 62
   formatted files, 105 tracked files, and zero safety findings.
+- ARA-056 implementation `795665d` is remote-equal; push/PR runs
+  `30004044807`/`30004047971` passed Python 3.10/3.13, all four isolated-wheel steps, and zero
+  annotations.
+- ARA-056 indexed recovery closeout `make check` passes Ruff format/lint, imports,
+  repository-safety self/worktree/staged scans, and pytest (`399 passed, 621 subtests` in 20.74
+  seconds).
 - ARA-053 pre-fix collision/cache regression produced the expected `4 failed, 1 passed`: all three
   equal-shape path pairs shared an identity and `/bravo` loaded `/alpha` health evidence.
 - ARA-053 focused final coverage passes `4 passed, 14 subtests`; UI/recovery tests pass `84 passed,
@@ -1494,6 +1500,9 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Recent Failed Command
 
+- The first ARA-056 closeout recovery check required the exact no-TODO sentinel sentence
+  `There is no unblocked implementation task`; equivalent prose was replaced with the tested phrase
+  before staging.
 - The first ARA-056 post-implementation recovery check found CURRENT/RESUME still naming the older
   `b064a93` fallback after LAST_VALIDATION advanced to remote-verified activation `66d8a4f`; the
   named fallback fields were synchronized before staging.
@@ -1822,10 +1831,10 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - ARA-060 is complete through remote-equal implementation `0a0036f`. Preserve the working
   pytest/unittest behavior and isolated contract sentinel; the historically reported zero belonged
   to the outer command wrapper, not pytest.
-- ARA-056 owns only interrupts after a round begins and before the protected agent phase. Preserve
-  ARA-023 status 130, ARA-041 startup transaction ordering, cooperative status-0 stops, schemas,
-  normal failures, and legacy resume compatibility; do not broaden into ARA-054/055 transaction
-  design.
+- ARA-056 is complete through remote-equal implementation `795665d`. Preserve its shared
+  pre-agent/agent manual-interrupt marker, status 130, reusable empty pending rounds, ARA-041 startup
+  ordering, cooperative status-0 stops, schemas, ordinary exception behavior, and legacy resume
+  compatibility; do not broaden into ARA-054/055 transaction design.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

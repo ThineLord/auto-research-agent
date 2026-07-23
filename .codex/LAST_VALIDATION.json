@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-23T19:40:06+08:00",
+  "recorded_at": "2026-07-23T19:46:40+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "66d8a4f8736ff3f56c05d741d1e5396baa3ff3da",
-  "last_known_stable_commit": "66d8a4f8736ff3f56c05d741d1e5396baa3ff3da",
+  "head_commit": "795665d4209502985530f6cba1076933244ffa43",
+  "last_known_stable_commit": "795665d4209502985530f6cba1076933244ffa43",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "66d8a4f8736ff3f56c05d741d1e5396baa3ff3da",
+  "state_recorded_against_commit": "795665d4209502985530f6cba1076933244ffa43",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-23T19:36:32+08:00",
-    "commit": "66d8a4f8736ff3f56c05d741d1e5396baa3ff3da",
+    "verified_at": "2026-07-23T19:43:22+08:00",
+    "commit": "795665d4209502985530f6cba1076933244ffa43",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 30003426104,
+        "run_id": 30004044807,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "66d8a4f8736ff3f56c05d741d1e5396baa3ff3da",
+        "head_sha": "795665d4209502985530f6cba1076933244ffa43",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 30003428837,
+        "run_id": 30004047971,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "66d8a4f8736ff3f56c05d741d1e5396baa3ff3da",
+        "head_sha": "795665d4209502985530f6cba1076933244ffa43",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,56 @@
       }
     }
   },
-  "status": "ara056_indexed_full_passed_awaiting_commit_push_ci",
+  "status": "ara056_closeout_indexed_full_passed_awaiting_commit_push_ci",
   "commands": [
+    {
+      "command": "ARA-056 indexed recovery-closeout make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_files": 62,
+        "pytest_passed": 399,
+        "pytest_subtests_passed": 621,
+        "tracked_files_scanned": 105,
+        "staged_files_scanned": 105,
+        "safety_findings": 0,
+        "duration_seconds": 20.74,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-056 implementation remote equality and GitHub Actions verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "commit": "795665d4209502985530f6cba1076933244ffa43",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "pull_request_head_equal": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 30004044807,
+        "pull_request_run_id": 30004047971,
+        "python_310": "success",
+        "python_313": "success",
+        "isolated_wheel_steps": 4,
+        "annotations": 0,
+        "draft_pr_13_open": true,
+        "draft_pr_13_draft": true,
+        "draft_pr_13_mergeable": true,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-056 first recovery-closeout consistency check",
+      "exit_code": 1,
+      "result": "state_contract_error",
+      "summary": {
+        "failure": "no-TODO recovery state omitted the exact tested no-unblocked-task sentinel",
+        "correction": "restored the exact sentinel sentence before staging",
+        "provider_calls": 0
+      }
+    },
     {
       "command": "ARA-056 indexed make check after pre-agent interrupt fix",
       "exit_code": 0,
@@ -4509,6 +4557,7 @@
     }
   ],
   "notes": [
+    "ARA-056 implementation 795665d is pushed with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 30004044807 and 30004047971 passed Python 3.10 and 3.13, all four isolated-wheel steps, and zero annotations.",
     "ARA-056 local fix covers round-directory creation, round-entry logging, console setup, memory loading and truncation, and the pre-agent cooperative-stop check with one shared manual-interrupt marker; ordinary exceptions retain their prior behavior.",
     "ARA-056 pre-fix evidence is 3 failed subtests with missing checkpoint.json; focused final coverage passes 2 tests and 3 subtests, CLI status and lock coverage passes 3 tests, related coverage passes 135 tests and 339 subtests, and indexed make check passes 399 tests and 621 subtests.",
     "ARA-056 activation checkpoint 66d8a4f is remote-equal; push and pull-request runs 30003426104 and 30003428837 passed Python 3.10 and 3.13, all four isolated-wheel steps, and zero annotations.",

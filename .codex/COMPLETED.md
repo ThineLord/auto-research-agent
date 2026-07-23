@@ -958,3 +958,21 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed as `0a0036f` and pushed with exact local/upstream/`ls-remote`/PR-head equality. Push run
   `30002348583` and pull-request run `30002350589` passed Python 3.10/3.13, every isolated-wheel
   step, and all four job annotation sets are empty.
+
+## 2026-07-23 - Pre-agent manual-interrupt finalization
+
+- Reproduced interrupts immediately after pending round-directory creation, round-entry logging,
+  and project-memory loading. All three propagated before standard finalization and left no
+  checkpoint, producing the expected `3 failed`.
+- Extended only the existing manual-interrupt boundary over pre-agent round setup and routed both
+  boundaries through one marker. Standard checkpoint, summary, config, and interrupted-report
+  finalization now records zero completed rounds and leaves the empty pending round reusable.
+- Preserved CLI status 130, lock release, traceback suppression, ARA-041 startup ordering,
+  cooperative status-0 stops, artifact schemas, ordinary exception propagation, provider behavior,
+  and successful/resume behavior.
+- Focused tests pass `2 passed, 3 subtests`; CLI status/lock tests pass `3 passed`; related tests
+  pass `135 passed, 339 subtests`; indexed `make check` passes `399 passed, 621 subtests` with 105
+  tracked files and zero safety findings.
+- Committed as `795665d` and pushed with exact local/upstream/`ls-remote`/PR-head equality. Push run
+  `30004044807` and pull-request run `30004047971` passed Python 3.10/3.13, every isolated-wheel
+  step, and all four job annotation sets are empty.

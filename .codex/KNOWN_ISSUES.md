@@ -535,7 +535,7 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## KI-056 - Pre-agent interrupts can leave an incoherent running round
 
-- Status: active ARA-056; local fix and full validation passed, remote validation pending
+- Status: resolved by ARA-056 implementation `795665d`
 - Severity: P2 recovery reliability
 - Evidence: runner inspection previously identified round-directory creation, round logging, and
   memory loading before the protected agent-phase `try`; a `KeyboardInterrupt` at those boundaries
@@ -548,4 +548,5 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 - Resolution: round creation, round-entry logging, console setup, memory loading/truncation, and the
   pre-agent cooperative-stop check now share a manual-interrupt boundary. The standard finalization
   writes coherent resumable artifacts, leaves the empty pending round reusable, and re-raises for
-  CLI status 130. Ordinary exceptions retain their prior propagation behavior.
+  CLI status 130. Ordinary exceptions retain their prior propagation behavior; focused, related,
+  full local, exact-remote, Python 3.10/3.13 push/PR, wheel, and annotation checks pass.

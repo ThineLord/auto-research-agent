@@ -52,8 +52,8 @@ parallel script that rendered nested output without propagating nested exit code
 isolated subprocess sentinel now verifies failure returns 1 and passing subtests return 0 with no
 plugin autoload, inherited pytest injection, or unbounded child process. Focused tests pass `2
 passed`; the 14-file existing subtest cohort passes `321 passed, 618 subtests`, and indexed full
-`make check` passes `397 passed, 618 subtests`. Push/PR runs
-implementation runs `30002348583`/`30002350589` and closeout runs
+`make check` passes `397 passed, 618 subtests`. Implementation runs
+`30002348583`/`30002350589` and closeout runs
 `30002850097`/`30002852693` passed Python 3.10/3.13, all isolated-wheel steps, and zero annotations.
 Do not change pytest configuration or dependencies, bulk rewrite the 102 call sites, change
 production behavior, call a provider, or read ignored runtime.
@@ -64,7 +64,7 @@ annotations. Preserve its literal string lookalikes, metadata, request/redaction
 and installed-fallback behavior.
 ARA-058 is complete through remote-equal closeout `1419d5e`; closeout push/PR runs
 `29264305133`/`29264308515` passed Python 3.10/3.13, all four wheel steps, and zero annotations with
-exact PR body readback. Use `66d8a4f8736ff3f56c05d741d1e5396baa3ff3da` as the conservative exact
+exact PR body readback. Use `795665d4209502985530f6cba1076933244ffa43` as the conservative exact
 externally verified fallback.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
@@ -112,15 +112,17 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-ARA-056 is the sole `IN_PROGRESS` task after explicit owner approval on 2026-07-23. The pre-fix
+ARA-056 is complete through remote-equal implementation `795665d`. The pre-fix
 round-directory, round-log, and memory-load matrix produced `3 failed`; the local fix now routes
 those points through standard manual-interrupt finalization, leaves the empty pending round
 reusable, and re-raises for CLI status 130. Focused tests pass `2 passed, 3 subtests`, related tests
-pass `135 passed, 339 subtests`, and indexed `make check` passes `399 passed, 621 subtests`. Review,
-indexed validation, commit, push, and remote CI remain. Preserve ARA-041 startup transaction
-ordering, cooperative status-0 stops, schemas, and ordinary exception behavior. ARA-018 requires an
-explicit owner license/distribution decision. Do not start ARA-019, ARA-026, ARA-006, or ARA-007
-until their recorded dependencies are satisfied.
+pass `135 passed, 339 subtests`, and indexed `make check` passes `399 passed, 621 subtests`.
+Push/PR runs `30004044807`/`30004047971` passed Python 3.10/3.13, all four isolated-wheel steps,
+and zero annotations. Preserve ARA-041 startup transaction ordering, cooperative status-0 stops,
+schemas, and ordinary exception behavior. No task is `IN_PROGRESS` and no unblocked TODO remains.
+There is no unblocked implementation task.
+ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
+ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
 

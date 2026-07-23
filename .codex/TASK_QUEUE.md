@@ -661,7 +661,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P2
 - Risk: medium
 - Description: an interrupt after round directory creation but before the agent-stage `try` can
@@ -674,11 +674,13 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Commit required: yes.
 - Dependencies: preserve ARA-023 status 130 and ARA-041 startup transaction ordering.
 - Approval: owner explicitly approved the greater-than-30-minute, medium-risk work on 2026-07-23.
-- Local validation: the expected pre-fix fault matrix produced `3 failed`; focused final coverage
+- Completion: the expected pre-fix fault matrix produced `3 failed`; focused final coverage
   passes `2 passed, 3 subtests`, the CLI status/lock layer passes `3 passed`, related runner/CLI/
   session/storage/recovery coverage passes `135 passed, 339 subtests`, and indexed `make check` passes
-  `399 passed, 621 subtests` with 105 tracked files and zero safety findings. Review, indexed
-  validation, commit, push, and remote CI remain.
+  `399 passed, 621 subtests` with 105 tracked files and zero safety findings. Implementation
+  `795665d` is pushed with exact local/upstream/`ls-remote`/PR-head equality; push/PR runs
+  `30004044807`/`30004047971` passed Python 3.10/3.13, all four isolated-wheel steps, and zero
+  annotations.
 
 ## ARA-057 - Reject orphan mode-specific output options before work
 
