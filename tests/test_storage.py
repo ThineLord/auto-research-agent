@@ -31,6 +31,83 @@ from src.storage import (
 
 
 class StorageTests(unittest.TestCase):
+    def test_bounded_regular_read_enforces_byte_limit_and_utf8(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "bounded.txt"
+            target.write_bytes("é".encode("utf-8"))
+
+            self.assertEqual(
+                storage_module.read_regular_text_bounded(
+                    target,
+                    max_bytes=2,
+                    anchor=root,
+                ),
+                "é",
+            )
+            with self.assertRaisesRegex(ValueError, "byte limit"):
+                storage_module.read_regular_text_bounded(
+                    target,
+                    max_bytes=1,
+                    anchor=root,
+                )
+
+            target.write_bytes(b"\xff")
+            with self.assertRaises(UnicodeDecodeError):
+                storage_module.read_regular_text_bounded(
+                    target,
+                    max_bytes=1,
+                    anchor=root,
+                )
+
+    def test_bounded_regular_read_rejects_hardlinks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source.txt"
+            target = root / "target.txt"
+            source.write_text("shared", encoding="utf-8")
+            os.link(source, target)
+
+            with self.assertRaises(OSError):
+                storage_module.read_regular_text_bounded(
+                    target,
+                    max_bytes=64,
+                    anchor=root,
+                )
+
+    def test_conditional_unlink_requires_exact_single_link_content(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "transaction.json"
+            target.write_text("expected", encoding="utf-8")
+
+            with self.assertRaises(OSError):
+                storage_module.unlink_artifact_file_if_matches(
+                    target,
+                    "different",
+                    anchor=root,
+                )
+            self.assertEqual(target.read_text(encoding="utf-8"), "expected")
+
+            storage_module.unlink_artifact_file_if_matches(
+                target,
+                "expected",
+                anchor=root,
+            )
+            self.assertFalse(target.exists())
+
+            source = root / "source.json"
+            hardlink = root / "hardlink.json"
+            source.write_text("shared", encoding="utf-8")
+            os.link(source, hardlink)
+            with self.assertRaises(OSError):
+                storage_module.unlink_artifact_file_if_matches(
+                    hardlink,
+                    "shared",
+                    anchor=root,
+                )
+            self.assertTrue(hardlink.exists())
+
     @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
     def test_recursive_artifact_listing_is_sorted_and_skips_linked_directories(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

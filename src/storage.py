@@ -53,6 +53,8 @@ PROJECT_RUNTIME_FILE_NAMES = (
     "ui_run_process.json",
     "ui_model_job_process.json",
     "provider_events.jsonl",
+    ".round_commit_transaction.json",
+    ".run_finalize_transaction.json",
 )
 PROJECT_RUNTIME_DIRECTORY_NAMES = ("artifacts", "outputs", "logs", "cache", "survey")
 PROJECT_RUNTIME_NESTED_FILE_PATHS = (
@@ -789,6 +791,64 @@ def read_regular_text(
             os.close(parent_descriptor)
 
 
+def read_regular_text_bounded(
+    path: Path,
+    *,
+    max_bytes: int,
+    anchor: Path | None = None,
+) -> str:
+    """Read one regular UTF-8 leaf without allocating beyond a fixed byte ceiling."""
+    if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes < 0:
+        raise ValueError("max_bytes must be a non-negative integer")
+    path = Path(path)
+    parent_descriptor: int | None = None
+    descriptor = -1
+    try:
+        parent_descriptor = _open_parent_directory(path, create=False, anchor=anchor)
+        metadata = _entry_metadata(path, parent_descriptor)
+        if metadata is None:
+            raise FileNotFoundError(path.name)
+        _validate_regular_metadata(
+            metadata,
+            kind="bounded read target",
+            require_single_link=True,
+        )
+        if metadata.st_size > max_bytes:
+            raise ValueError("automatic artifact exceeds byte limit")
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_BINARY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        open_target: str | Path = path.name if parent_descriptor is not None else path
+        open_kwargs = {"dir_fd": parent_descriptor} if parent_descriptor is not None else {}
+        descriptor = os.open(open_target, flags, **open_kwargs)
+        opened_metadata = os.fstat(descriptor)
+        _validate_regular_metadata(
+            opened_metadata,
+            kind="bounded read target",
+            require_single_link=True,
+        )
+        if (metadata.st_dev, metadata.st_ino) != (
+            opened_metadata.st_dev,
+            opened_metadata.st_ino,
+        ):
+            raise _unsafe_path_error("changed bounded read target")
+        with os.fdopen(descriptor, "rb") as file:
+            descriptor = -1
+            content = file.read(max_bytes + 1)
+        if len(content) > max_bytes:
+            raise ValueError("automatic artifact exceeds byte limit")
+        return content.decode("utf-8", errors="strict")
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+
+
 def read_text(path: Path, *, anchor: Path | None = None) -> str:
     return read_regular_text(path, missing_ok=True, anchor=anchor).strip()
 
@@ -1436,6 +1496,80 @@ def unlink_artifact_file(
         else:
             path.unlink()
     finally:
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+
+
+def unlink_artifact_file_if_matches(
+    path: Path,
+    expected_content: str,
+    *,
+    anchor: Path | None = None,
+) -> None:
+    """Unlink a regular artifact only while its exact bytes and identity still match."""
+    try:
+        expected_bytes = expected_content.encode("utf-8")
+    except UnicodeError as exc:
+        raise ValueError("expected_content must be valid UTF-8") from exc
+    path = Path(path)
+    parent_descriptor: int | None = None
+    descriptor = -1
+    try:
+        parent_descriptor = _open_parent_directory(path, create=False, anchor=anchor)
+        metadata = _entry_metadata(path, parent_descriptor)
+        if metadata is None:
+            raise FileNotFoundError(path.name)
+        _validate_regular_metadata(
+            metadata,
+            kind="conditional unlink target",
+            require_single_link=True,
+        )
+        if metadata.st_size != len(expected_bytes):
+            raise _unsafe_path_error("changed conditional unlink target")
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_BINARY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        open_target: str | Path = path.name if parent_descriptor is not None else path
+        open_kwargs = {"dir_fd": parent_descriptor} if parent_descriptor is not None else {}
+        descriptor = os.open(open_target, flags, **open_kwargs)
+        opened_metadata = os.fstat(descriptor)
+        _validate_regular_metadata(
+            opened_metadata,
+            kind="conditional unlink target",
+            require_single_link=True,
+        )
+        if (metadata.st_dev, metadata.st_ino) != (
+            opened_metadata.st_dev,
+            opened_metadata.st_ino,
+        ):
+            raise _unsafe_path_error("changed conditional unlink target")
+        with os.fdopen(descriptor, "rb") as file:
+            descriptor = -1
+            current_bytes = file.read(len(expected_bytes) + 1)
+        if current_bytes != expected_bytes:
+            raise _unsafe_path_error("changed conditional unlink target")
+        current_metadata = _entry_metadata(path, parent_descriptor)
+        if current_metadata is None or (
+            current_metadata.st_dev,
+            current_metadata.st_ino,
+            current_metadata.st_size,
+        ) != (
+            metadata.st_dev,
+            metadata.st_ino,
+            metadata.st_size,
+        ):
+            raise _unsafe_path_error("changed conditional unlink target")
+        if parent_descriptor is not None:
+            os.unlink(path.name, dir_fd=parent_descriptor)
+        else:
+            path.unlink()
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
         if parent_descriptor is not None:
             os.close(parent_descriptor)
 
