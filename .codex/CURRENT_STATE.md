@@ -4,20 +4,20 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: preserve the remotely verified ARA-060 checkpoint and await the required safety
-  approval before starting the medium-risk ARA-056 interrupt-lifecycle task.
+- Current goal: complete approved ARA-056 by making pre-agent interrupts leave a coherent,
+  recoverable run state while preserving status 130 and existing startup transaction ordering.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `0a0036f5b2cf5171ec7c6ff5ad712fa1c4a4bfa3` (the exact
+- State recorded against commit: `b064a93c0e74610c961b5604d5e5700fcf4420d2` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `0a0036f5b2cf5171ec7c6ff5ad712fa1c4a4bfa3` (exact local,
+- Last externally verified fallback: `b064a93c0e74610c961b5604d5e5700fcf4420d2` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-060 is complete and remote-verified; ARA-056 is the
-  highest-priority TODO but its estimated greater-than-30-minute, medium-risk interrupt lifecycle
-  work requires the repository safety checkpoint before implementation.
+- Active task at this snapshot: ARA-056. The owner explicitly approved the greater-than-30-minute,
+  medium-risk interrupt lifecycle work on 2026-07-23; baseline is green and fault-matrix audit is
+  next.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -795,10 +795,22 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 - Committed ARA-060 as `0a0036f`, pushed it with exact local/upstream/`ls-remote`/PR-head equality,
   and verified push/PR runs `30002348583`/`30002350589`: Python 3.10/3.13, all four isolated-wheel
   steps, and every annotation set passed cleanly. Draft PR 13 remains open, draft, and mergeable.
+- Re-verified ARA-060 closeout `b064a93` before ARA-056: local/upstream/`ls-remote`/PR-head equality
+  is exact, closeout runs `30002850097`/`30002852693` remain successful, and PR 13 remains open,
+  draft, and mergeable.
+- Received explicit owner approval for ARA-056 on 2026-07-23 and activated it as the sole
+  `IN_PROGRESS` task.
+- Ran the ARA-056 baseline `make check`: Ruff, imports, repository-safety self/worktree/staged
+  scans, and pytest pass with `397 passed, 618 subtests` in 25.76 seconds.
 
 ## Remaining Steps
 
-- Obtain the required long-task safety approval before activating ARA-056.
+- Build a provider-free fault matrix for interrupts during round-directory creation, logging, and
+  memory loading before the protected agent phase.
+- Implement the smallest lifecycle correction that preserves ARA-023 status 130, ARA-041 startup
+  transaction ordering, artifact schemas, and ordinary success/failure behavior.
+- Run focused, related, full, recovery, safety, and remote CI validation before marking ARA-056
+  complete.
 - Leave deferred tasks untouched.
 
 ## Test Status
@@ -865,6 +877,8 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 - ARA-060 indexed recovery closeout `make check` passes Ruff format/lint, imports,
   repository-safety self/worktree/staged scans, and pytest (`397 passed, 618 subtests` in 22.80
   seconds).
+- ARA-056 baseline `make check` passes all gates with `397 passed, 618 subtests` in 25.76 seconds;
+  both safety modes scan 105 tracked files with zero findings.
 - ARA-053 pre-fix collision/cache regression produced the expected `4 failed, 1 passed`: all three
   equal-shape path pairs shared an identity and `/bravo` loaded `/alpha` health evidence.
 - ARA-053 focused final coverage passes `4 passed, 14 subtests`; UI/recovery tests pass `84 passed,
@@ -1745,7 +1759,7 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 ```bash
 git status --short --branch
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
-git diff --check
+rg -n "KeyboardInterrupt|round_dir|memory" src/runner.py tests
 ```
 
 ## Interruption Recovery
@@ -1781,6 +1795,10 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - ARA-060 is complete through remote-equal implementation `0a0036f`. Preserve the working
   pytest/unittest behavior and isolated contract sentinel; the historically reported zero belonged
   to the outer command wrapper, not pytest.
+- ARA-056 owns only interrupts after a round begins and before the protected agent phase. Preserve
+  ARA-023 status 130, ARA-041 startup transaction ordering, cooperative status-0 stops, schemas,
+  normal failures, and legacy resume compatibility; do not broaden into ARA-054/055 transaction
+  design.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

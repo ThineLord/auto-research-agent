@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-23T19:20:40+08:00",
+  "recorded_at": "2026-07-23T19:29:11+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "0a0036f5b2cf5171ec7c6ff5ad712fa1c4a4bfa3",
-  "last_known_stable_commit": "0a0036f5b2cf5171ec7c6ff5ad712fa1c4a4bfa3",
+  "head_commit": "b064a93c0e74610c961b5604d5e5700fcf4420d2",
+  "last_known_stable_commit": "b064a93c0e74610c961b5604d5e5700fcf4420d2",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "0a0036f5b2cf5171ec7c6ff5ad712fa1c4a4bfa3",
+  "state_recorded_against_commit": "b064a93c0e74610c961b5604d5e5700fcf4420d2",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-23T19:16:22+08:00",
-    "commit": "0a0036f5b2cf5171ec7c6ff5ad712fa1c4a4bfa3",
+    "verified_at": "2026-07-23T19:29:11+08:00",
+    "commit": "b064a93c0e74610c961b5604d5e5700fcf4420d2",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 30002348583,
+        "run_id": 30002850097,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "0a0036f5b2cf5171ec7c6ff5ad712fa1c4a4bfa3",
+        "head_sha": "b064a93c0e74610c961b5604d5e5700fcf4420d2",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 30002350589,
+        "run_id": 30002852693,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "0a0036f5b2cf5171ec7c6ff5ad712fa1c4a4bfa3",
+        "head_sha": "b064a93c0e74610c961b5604d5e5700fcf4420d2",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,32 @@
       }
     }
   },
-  "status": "ara060_closeout_indexed_full_passed_awaiting_commit_push_ci",
+  "status": "ara056_approved_baseline_passed_fault_matrix_pending",
   "commands": [
+    {
+      "command": "ARA-056 startup recovery, ARA-060 closeout re-verification, and baseline make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "stable_commit": "b064a93c0e74610c961b5604d5e5700fcf4420d2",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "pull_request_head_equal": true,
+        "ahead": 0,
+        "behind": 0,
+        "closeout_push_run_id": 30002850097,
+        "closeout_pull_request_run_id": 30002852693,
+        "closeout_ci": "success",
+        "ruff_files": 62,
+        "pytest_passed": 397,
+        "pytest_subtests_passed": 618,
+        "tracked_files_scanned": 105,
+        "safety_findings": 0,
+        "duration_seconds": 25.76,
+        "ara056_owner_approval_date": "2026-07-23",
+        "provider_calls": 0
+      }
+    },
     {
       "command": "ARA-060 indexed recovery-closeout make check",
       "exit_code": 0,
@@ -4386,6 +4410,8 @@
     }
   ],
   "notes": [
+    "ARA-056 is the sole active task after explicit owner approval on 2026-07-23; baseline make check passes 397 tests and 618 subtests with 105 tracked files and zero safety findings.",
+    "ARA-060 closeout b064a93 was re-verified with exact local, upstream, ls-remote, and PR-head equality; closeout push and pull-request runs 30002850097 and 30002852693 remain successful.",
     "ARA-060 implementation 0a0036f is pushed with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 30002348583 and 30002350589 passed Python 3.10 and 3.13, all four isolated-wheel steps, and zero annotations.",
     "ARA-060 indexed make check passes 397 tests and 618 subtests with 62 formatted files and zero repository-safety findings across 105 tracked files; commit, push, and remote CI remain.",
     "ARA-060 direct pytest 9.0.3 probes prove subtest-only failures already return 1; the historical zero was an outer orchestration status that did not propagate nested command exit codes.",

@@ -661,7 +661,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 
-- Status: `TODO`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: medium
 - Description: an interrupt after round directory creation but before the agent-stage `try` can
@@ -673,6 +673,9 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   `make check`.
 - Commit required: yes.
 - Dependencies: preserve ARA-023 status 130 and ARA-041 startup transaction ordering.
+- Approval: owner explicitly approved the greater-than-30-minute, medium-risk work on 2026-07-23.
+- Baseline: `make check` passes `397 passed, 618 subtests` with 105 tracked files and zero safety
+  findings; fault-matrix reproduction is next.
 
 ## ARA-057 - Reject orphan mode-specific output options before work
 

@@ -532,3 +532,16 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
   approval rule before changing test configuration or dependencies. Configuration approval is now
   satisfied, but evidence shows no configuration change is needed; adding a dependency remains
   disallowed without separate evidence.
+
+## KI-056 - Pre-agent interrupts can leave an incoherent running round
+
+- Status: active ARA-056; fault-matrix audit pending
+- Severity: P2 recovery reliability
+- Evidence: runner inspection previously identified round-directory creation, round logging, and
+  memory loading before the protected agent-phase `try`; a `KeyboardInterrupt` at those boundaries
+  can bypass the standard interrupted checkpoint/summary/report finalization.
+- Impact: a manual interrupt can leave `status=running`, an empty or partial round directory, and
+  no coherent resume evidence even though the CLI correctly returns status 130.
+- Acceptance boundary: either roll back unpublished pre-agent state or finalize the standard
+  interrupt artifacts without changing schemas, successful behavior, cooperative stop semantics,
+  ARA-023 status 130, or ARA-041 startup transaction ordering.

@@ -653,3 +653,16 @@
 - Resolution: do not change pytest configuration or add a dependency. Add an isolated subprocess
   contract test with third-party plugin autoload disabled, inherited pytest injection options
   removed, and a fixed timeout; retain ARA-059's parent aggregates as local defense in depth.
+
+## 2026-07-23 - Approve ARA-056 pre-agent interrupt hardening
+
+- Approval: the owner explicitly approved ARA-056 after receiving the greater-than-30-minute,
+  medium-risk assessment and checkpoint plan.
+- Decision order: reproduce interrupts at each pre-agent boundary before changing lifecycle code,
+  then prefer one shared finalization/rollback path over per-call ad hoc handlers.
+- Compatibility: preserve ARA-023 manual-interrupt status 130, cooperative status-0 stops, ARA-041
+  config/manifest startup transaction ordering, existing artifact schemas, successful rounds,
+  ordinary exception behavior, and legacy resume interpretation.
+- Boundary: do not redesign cross-file transactions, absorb ARA-054/055, change provider/prompt/
+  scoring behavior, access ignored runtime, add dependencies, or rewrite stable runner structure
+  without fault-matrix evidence.
