@@ -889,3 +889,20 @@
 - Boundary: package 3 does not recover a pending journal at runner entry and does not route
   preview/UI/report/diagnostic readers, finalization, or migration. Package 4 requires separate
   approval.
+
+## 2026-07-24 - Approve ARA-055 implementation package 4 only
+
+- Approval: after package 3 closeout recommended package 4, the owner said `批准，继续`.
+- Authorized scope: under the existing project lock, classify and recover an exact valid pending
+  round journal before new runner/provider work; expose non-mutating recovery-required and conflict
+  states to preview/UI/report/analytics consumers; reject mixed-generation reads.
+- Compatibility requirement: completed and historical journal-less artifacts retain their current
+  interpretation, configured external storage remains supported, public schemas stay additive or
+  unchanged, and read-only consumers never perform recovery.
+- Failure policy: unknown, malformed, moved, or conflicting journal state fails closed with
+  path-safe diagnostics and preserves all evidence. Recovery is provider-free and idempotent.
+- Excluded scope: no finalization journal or finalization reader behavior, diagnostic integration,
+  legacy migration, dependency/config changes, provider calls, ignored-runtime access, or packages
+  5-7.
+- Checkpoint requirement: push this activation state before implementation, then keep package 4
+  implementation and recovery closeout as separately validated stable phases.

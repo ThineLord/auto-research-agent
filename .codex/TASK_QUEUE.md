@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `BLOCKED`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -781,8 +781,27 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   subtests`; full `make check` `453 passed, 791 subtests`; staged safety 114 files clean.
 - Package 3 remote verification: exact local/upstream/`ls-remote`/PR-head equality; push/PR runs
   `30030145901`/`30030150062` pass Python 3.10/3.13 and every workflow step. Draft PR 13 is updated.
-- Current blocker: package 4 recovery-required runner-entry and reader integration changes separate
-  runtime/UX surfaces and requires explicit owner approval. Packages 5-7 remain unapproved.
+- Package 4 approval: after package 3 closeout explicitly recommended the recovery-entry/read-only
+  consumer package, the owner said `批准，继续` on 2026-07-24.
+- Package 4 authorized scope: recover an exact valid pending round journal under the existing
+  project lock before new runner/provider work; expose read-only recovery-required and conflict
+  classifications to preview/UI/report/analytics consumers; reject mixed-generation reads without
+  mutation or path disclosure.
+- Package 4 acceptance: valid pending entry recovery is provider-free and idempotent; conflict and
+  malformed journals fail before provider construction or artifact mutation; read-only consumers
+  do not recover or rewrite; configured external storage and historical journal-less artifacts
+  retain compatible behavior; focused/related tests, `make check`, staged safety, push, and Python
+  3.10/3.13 CI pass.
+- Package 4 validation command: `.venv/bin/python -m pytest -q
+  tests/test_round_commit_entry.py tests/test_resume.py tests/test_ui.py
+  tests/test_run_analytics.py`, followed by related runner/recovery/report tests and `make check`.
+- Package 4 commit required: yes, with activation, implementation, and recovery closeout kept as
+  separately understandable stable phases.
+- Package 4 exclusions: no finalization journal or finalization reader behavior, diagnostic
+  integration, legacy migration, dependency/config changes, provider calls, ignored-runtime
+  access, or packages 5-7.
+- Current work: write and publish the package 4 activation state, then audit exact runner lock and
+  consumer boundaries before adding the focused failing tests.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

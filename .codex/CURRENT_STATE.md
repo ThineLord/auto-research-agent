@@ -4,20 +4,21 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: ARA-055 package 3 is complete and externally verified; preserve its runner
-  transaction boundary while awaiting separate approval for package 4.
+- Current goal: implement the explicitly approved ARA-055 package 4 recovery entry and read-only
+  consumer boundary without widening into finalization, diagnostics, or migration.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `54c223bb920c07abe23c019ef44c7761f8a98102` (the exact
-  externally verified package-3 implementation retained by the additive recovery schema; resolve
-  current `HEAD` live).
-- Last externally verified fallback: `54c223bb920c07abe23c019ef44c7761f8a98102` (exact local,
-  remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
-  passed)
-- Active task at this snapshot: none. ARA-055 package 4 is the recommended next step but remains
-  separately approval-blocked; packages 4-7, runner-entry recovery, preview/UI/analytics/report/
-  diagnostic routing, finalization journaling, migration, dependency/config changes, provider
+- State recorded against commit: `9457a25b4b4310c0220662447d10413808478a21` (the exact
+  externally verified package-3 closeout retained by the additive recovery schema; resolve current
+  `HEAD` live).
+- Last externally verified fallback: `9457a25b4b4310c0220662447d10413808478a21` (exact local,
+  remote-tracking, `ls-remote`, GitHub branch, and PR-head equality plus all Python 3.10/3.13
+  push/PR jobs passed)
+- Active task at this snapshot: ARA-055 package 4. Authorized scope is recovery under the existing
+  project lock before new runner work, read-only recovery-required/conflict classification in
+  preview/UI/report/analytics consumers, and fail-closed mixed-generation handling. Packages 5-7,
+  finalization journaling, diagnostic routing, migration, dependency/config changes, provider
   calls, and ignored runtime remain excluded.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
@@ -148,6 +149,25 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   `.venv/bin/python -m pytest -q tests/test_round_commit_runner.py
   tests/test_round_commit_recovery.py tests/test_round_loop.py`. Do not start package 4 without
   explicit approval.
+
+## ARA-055 Package 4 Activation
+
+- Owner approval: `批准，继续` on 2026-07-24 after package 4 was explicitly recommended.
+- Stable fallback: `9457a25b4b4310c0220662447d10413808478a21`, exact local/upstream/
+  `ls-remote`/PR-head equal with successful closeout push/PR runs `30030747254`/`30030751034`.
+- Authorized implementation: classify the fixed round journal without mutation in preview/UI/
+  report/analytics paths; fail closed on conflict or mixed generations; and recover a valid pending
+  journal under the existing project lock before a runner entry starts new round/provider work.
+- Compatibility requirement: preserve public artifact schemas, completed and journal-less legacy
+  artifacts, configured external storage, provider ordering, experiment semantics, and package 3's
+  checkpoint-last transaction order.
+- Explicit exclusions: no finalization journal, finalization reader behavior, diagnostic command,
+  legacy migration, dependency/config change, provider call, ignored-runtime access, or packages
+  5-7.
+- Next command after this ARA-055 activation checkpoint is committed and pushed:
+  `.venv/bin/python -m pytest -q tests/test_round_commit_entry.py`.
+- Interruption recovery: verify the activation commit and CI, then inspect the runner lock
+  lifecycle and the existing preview/UI/report/analytics readers before adding tests or routing.
 
 ## Completed Steps
 
@@ -1003,9 +1023,13 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Remaining Steps
 
-- Keep ARA-055 package 4 blocked until separate owner approval. Its candidate scope is
-  recovery-required runner entry plus preview/UI/report reader integration; it must not be inferred
-  from package-3 approval.
+- Audit the ARA-055 package 4 runner lock lifecycle and read-only consumers before choosing the
+  smallest shared classification boundary.
+- Add ARA-055 package 4 provider-free failing tests for pending, conflict, and mixed-generation
+  states before implementation.
+- Implement and validate only the approved ARA-055 package 4 entry/reader routing.
+- Create the ARA-055 package 4 implementation and recovery closeout only after its focused,
+  related, full, safety, remote, and CI evidence is complete.
 - Preserve package 3's established transaction ordering for new and fully evidenced histories.
 - Preserve the legacy incomplete-history compatibility path; do not synthesize a missing
   before-generation or silently migrate journal-less evidence.
@@ -1017,6 +1041,9 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Test Status
 
+- ARA-055 package-3 closeout `9457a25` is exact local/upstream/`ls-remote`/PR-head equal.
+  Closeout push/PR runs `30030747254`/`30030751034` passed Python 3.10/3.13 and every workflow
+  step.
 - ARA-055 package-3 focused/related validation passes `142 passed, 382 subtests`; the final runner
   layer passes `67 passed, 220 subtests`; full `make check` passes formatting, lint, imports,
   repository safety, and `453 passed, 791 subtests` over 114 staged files.
@@ -2060,10 +2087,10 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   continuation. Existing canonical partial rounds remain fail-closed and require a separately
   approved explicit migration; do not infer stage truth from placeholders or
   `last_successful_agent`.
-- ARA-055 package 3 is complete at `54c223b`. Preserve journal-before-ready and checkpoint-last
-  ordering, configured external storage, exact metric semantics, and the explicit legacy
-  incomplete-history compatibility path. Package 4 runner-entry/reader integration, package 5
-  finalization, diagnostic integration, and migration remain separately approval-gated.
+- ARA-055 package 4 is active. Preserve package 3's journal-before-ready and checkpoint-last
+  ordering, configured external storage, exact metric semantics, and legacy incomplete-history
+  compatibility. Do not widen this entry/reader package into finalization, diagnostic integration,
+  migration, dependency changes, providers, ignored runtime, or packages 5-7.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

@@ -64,7 +64,7 @@ annotations. Preserve its literal string lookalikes, metadata, request/redaction
 and installed-fallback behavior.
 ARA-058 is complete through remote-equal closeout `1419d5e`; closeout push/PR runs
 `29264305133`/`29264308515` passed Python 3.10/3.13, all four wheel steps, and zero annotations with
-exact PR body readback. Use `54c223bb920c07abe23c019ef44c7761f8a98102` as the conservative exact
+exact PR body readback. Use `9457a25b4b4310c0220662447d10413808478a21` as the conservative exact
 externally verified fallback.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
@@ -129,18 +129,18 @@ pass; full pytest reports `417 passed, 633 subtests`. Push/PR runs
 attempts, whole-round retry, shared classifier eligibility, bounded disk/attempt use, no-replace
 publication, and nonempty legacy canonical fail-closed behavior.
 
-ARA-055 packages 1-3 are complete. Package 3 implementation `54c223b` is exact local/upstream/
-`ls-remote`/PR-head equal; push/PR runs `30030145901`/`30030150062` pass Python 3.10/3.13 and
-every workflow step. It routes new and fully evidenced histories through prepare/recover before
-publication, keeps checkpoint last, and preserves incomplete legacy histories without inventing a
-before-generation. Focused/related tests pass `142 passed, 382 subtests`; runner tests pass `67
-passed, 220 subtests`; full `make check` passes `453 passed, 791 subtests`.
-There is no unblocked implementation task. Package 4 runner-entry recovery and preview/UI/report
-reader integration is recommended but requires separate owner approval. Do not start it from
-package-3 approval. Do not
-add finalization journaling, diagnostic routing, migration, dependency/config changes, providers,
-ignored-runtime access, or packages 5-7. To revalidate package 3, run `.venv/bin/python -m pytest -q
-tests/test_round_commit_runner.py tests/test_round_commit_recovery.py tests/test_round_loop.py`.
+ARA-055 package 4 is the sole active task after the owner said `批准，继续` on 2026-07-24.
+Package 3 closeout `9457a25` is the conservative exact externally verified fallback; closeout
+push/PR runs `30030747254`/`30030751034` pass Python 3.10/3.13 and every workflow step.
+Package 4 may recover an exact valid pending round journal under the existing project lock before
+new runner/provider work, and may expose non-mutating recovery-required/conflict state to
+preview/UI/report/analytics consumers while rejecting mixed-generation reads. It must preserve
+configured external storage, historical journal-less artifacts, public schemas, and package 3's
+checkpoint-last ordering. Do not add finalization journaling or finalization reader behavior,
+diagnostic routing, migration, dependency/config changes, providers, ignored-runtime access, or
+packages 5-7. After verifying the ARA-055 activation checkpoint and its CI, inspect the lock
+lifecycle and reader boundaries, then run `.venv/bin/python -m pytest -q
+tests/test_round_commit_entry.py`.
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 
