@@ -64,7 +64,7 @@ annotations. Preserve its literal string lookalikes, metadata, request/redaction
 and installed-fallback behavior.
 ARA-058 is complete through remote-equal closeout `1419d5e`; closeout push/PR runs
 `29264305133`/`29264308515` passed Python 3.10/3.13, all four wheel steps, and zero annotations with
-exact PR body readback. Use `946f40f3190b9dd2ca2f99233d7ced32c4826f7d` as the conservative exact
+exact PR body readback. Use `ab1466b49173911253d95e61a4fde5cf7e775cf8` as the conservative exact
 externally verified fallback.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
@@ -121,8 +121,8 @@ Push/PR runs `30004044807`/`30004047971` passed Python 3.10/3.13, all four isola
 and zero annotations. Preserve ARA-041 startup transaction ordering, cooperative status-0 stops,
 schemas, and ordinary exception behavior.
 
-ARA-054's owner-approved design stage is complete, and the owner subsequently approved
-implementation package 1 by saying `继续`. The eight-case
+ARA-054's owner-approved design stage is complete at remote-equal closeout `ab1466b`, and the owner
+subsequently approved implementation package 1 by saying `继续`. The eight-case
 provider-free matrix confirms that every post-stage interrupt/quota checkpoint claims resumability
 while preview and actual resume reject the canonical four-file directory. Read
 `docs/ARA_054_PARTIAL_ROUND_RECOVERY_DESIGN.md` before any follow-up. It selects append-only attempt

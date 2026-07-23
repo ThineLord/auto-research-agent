@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-23T20:34:10+08:00",
+  "recorded_at": "2026-07-23T21:34:02+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "946f40f3190b9dd2ca2f99233d7ced32c4826f7d",
-  "last_known_stable_commit": "946f40f3190b9dd2ca2f99233d7ced32c4826f7d",
+  "head_commit": "ab1466b49173911253d95e61a4fde5cf7e775cf8",
+  "last_known_stable_commit": "ab1466b49173911253d95e61a4fde5cf7e775cf8",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "946f40f3190b9dd2ca2f99233d7ced32c4826f7d",
+  "state_recorded_against_commit": "ab1466b49173911253d95e61a4fde5cf7e775cf8",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-23T20:31:48+08:00",
-    "commit": "946f40f3190b9dd2ca2f99233d7ced32c4826f7d",
+    "verified_at": "2026-07-23T20:36:14+08:00",
+    "commit": "ab1466b49173911253d95e61a4fde5cf7e775cf8",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 30007167214,
+        "run_id": 30007547159,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "946f40f3190b9dd2ca2f99233d7ced32c4826f7d",
+        "head_sha": "ab1466b49173911253d95e61a4fde5cf7e775cf8",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 30007170465,
+        "run_id": 30007550054,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "946f40f3190b9dd2ca2f99233d7ced32c4826f7d",
+        "head_sha": "ab1466b49173911253d95e61a4fde5cf7e775cf8",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,7 +54,7 @@
       }
     }
   },
-  "status": "ara054_design_closeout_indexed_full_passed_awaiting_commit_push_ci",
+  "status": "ara054_storage_package_active",
   "commands": [
     {
       "command": "ARA-054 indexed recovery-closeout make check",
@@ -72,18 +72,18 @@
       }
     },
     {
-      "command": "ARA-054 design commit remote equality and GitHub Actions verification",
+      "command": "ARA-054 design closeout remote equality and GitHub Actions verification",
       "exit_code": 0,
       "result": "passed",
       "summary": {
-        "commit": "946f40f3190b9dd2ca2f99233d7ced32c4826f7d",
+        "commit": "ab1466b49173911253d95e61a4fde5cf7e775cf8",
         "local_equals_upstream": true,
         "local_equals_ls_remote": true,
         "pull_request_head_equal": true,
         "ahead": 0,
         "behind": 0,
-        "push_run_id": 30007167214,
-        "pull_request_run_id": 30007170465,
+        "push_run_id": 30007547159,
+        "pull_request_run_id": 30007550054,
         "python_310": "success",
         "python_313": "success",
         "isolated_wheel_steps": 4,
@@ -4695,8 +4695,8 @@
     }
   ],
   "notes": [
-    "ARA-054 design commit 946f40f is pushed with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 30007167214 and 30007170465 passed Python 3.10 and 3.13 plus all four isolated-wheel steps.",
-    "ARA-054 selects append-only attempt staging with whole-round retry, immutable stopped evidence, create-only stage outputs, shared eligibility classification, bounded attempts, and fail-closed legacy partials; implementation and migration remain unauthorized.",
+    "ARA-054 design closeout ab1466b is pushed with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 30007547159 and 30007550054 passed Python 3.10 and 3.13 plus all four isolated-wheel steps.",
+    "ARA-054 selects append-only attempt staging with whole-round retry, immutable stopped evidence, create-only stage outputs, shared eligibility classification, bounded attempts, and fail-closed legacy partials; implementation package 1 is active while runtime integration and migration remain unauthorized.",
     "ARA-054 provider-free characterization confirmed eight of eight post-persistence interrupt/quota cases had checkpoint can_resume true but preview and actual resume false with complete_uncheckpointed status, while every checkpoint and round byte remained unchanged.",
     "ARA-054 indexed design validation passes 399 tests and 621 subtests over 106 tracked and staged files with zero safety findings and zero provider calls.",
     "ARA-056 implementation 795665d is pushed with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 30004044807 and 30004047971 passed Python 3.10 and 3.13, all four isolated-wheel steps, and zero annotations.",
