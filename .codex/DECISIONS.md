@@ -789,3 +789,19 @@
   artifact migration, or packages 2-7.
 - Checkpoint requirement: commit and push the activation state before implementation, then keep the
   implementation and final recovery closeout as separately validated commits.
+
+## 2026-07-23 - Keep ARA-055 package 1 filesystem-free and byte-compatible
+
+- Decision: package 1 exposes immutable metadata plus exact serialized after-images but performs no
+  journal or artifact I/O. Existing storage writers delegate only to pure builders whose bytes are
+  regression-tested against the prior implementation.
+- Schema decision: use closed round-artifact names and exact envelope/record keys, including
+  configured-storage and optional stable stat identity. Reject unknown or ambiguous input rather
+  than normalizing it.
+- Bound decision: reject journals larger than 2 MiB, JSON deeper than 128 levels, duplicate keys,
+  non-finite values, invalid UTF-8, unsafe identifiers, and mismatched embedded content digests.
+- Serialization decision: impose fixed ordering on the journal envelope and artifact records while
+  preserving embedded after-value insertion order because the existing artifact byte hash depends
+  on that order.
+- Deferral: runtime create-only journal storage, trusted path revalidation, prepare/apply/recovery,
+  fault injection, and runner integration remain package 2 or later and require separate approval.

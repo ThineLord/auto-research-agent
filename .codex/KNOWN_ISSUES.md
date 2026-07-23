@@ -573,7 +573,7 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## KI-055 - Published rounds can split history and finalization generations
 
-- Status: confirmed; design complete; runtime implementation deferred
+- Status: confirmed; design and package-1 codec/builders complete; runtime recovery deferred
 - Severity: P2 recovery and provenance consistency, high-risk compatibility surface
 - Evidence: 40 provider-free temporary cases covered ten post-publication write boundaries,
   `OSError`/`KeyboardInterrupt`, and internal/configured-external run storage. Failure before the
@@ -587,6 +587,9 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
   project-local journal with bounded deltas/after-images, exact before/after hashes, idempotent
   roll-forward across filesystems, checkpoint-last visibility, and a separate finalization
   transaction.
+- Package-1 result: commit `4cd4bf4` adds filesystem-free exact after-image builders and a strict
+  bounded journal codec with provider-free regression coverage. No runtime caller creates, reads,
+  or applies the journal yet, so this issue remains open.
 - Boundary: no runtime journal, artifact-schema change, reader integration, diagnostic integration,
   or legacy migration is approved. Historical journal-less `published_uncommitted` evidence and
   manually edited third generations remain preserved and fail closed.

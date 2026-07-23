@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `IN_PROGRESS`
+- Status: `DEFERRED`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -723,6 +723,17 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Package 1 baseline: exact local/upstream/`ls-remote`/PR-head equality at `ccdfcf4`; push/PR runs
   `30018740608`/`30018744223` pass Python 3.10/3.13 and every isolated-wheel/check step. Local
   provider-free `make check` passes `417 passed, 633 subtests` over 109 tracked files in 33.66s.
+- Package 1 result: implementation commit `4cd4bf4` adds byte-compatible pure history, memory, and
+  research-state extraction plus deterministic checkpoint/summary/config after-images and a strict
+  bounded in-memory round-journal codec. It performs no filesystem I/O and has no runtime caller.
+- Package 1 verification: focused tests pass `14 passed, 55 subtests`; related regression passes
+  `111 passed, 277 subtests`; final `make check` passes `431 passed, 688 subtests`; staged safety
+  scans 111 files clean. Exact local/upstream/`ls-remote`/PR-head equality holds at `4cd4bf4`;
+  push/PR runs `30020697130`/`30020701903` pass Python 3.10/3.13 and every isolated-wheel/check
+  step.
+- Deferral boundary: package 1 is complete. Package 2 (runtime round prepare/recovery engine and
+  cross-filesystem fault matrix) is the recommended next task but requires explicit owner approval.
+  Packages 3-7, migration, dependencies, providers, and ignored runtime remain unapproved.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

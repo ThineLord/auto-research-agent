@@ -1042,3 +1042,21 @@ Validation and implementation outcomes will be appended only after they are actu
 - Design commit `09aeda6` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
   Push/PR runs `30018465335`/`30018466172` passed Python 3.10/3.13, every isolated-wheel/check
   step, and PR 13 remains open, draft, and mergeable.
+
+## 2026-07-23 - ARA-055 package-1 journal foundations
+
+- Extracted byte-compatible pure builders for score history, project memory, and research state;
+  existing writers delegate without changing public artifact bytes. Added deterministic exact
+  after-images for checkpoint, run summary, and run config.
+- Added one filesystem-free round-journal codec with a closed artifact enum, exact top-level and
+  record schemas, fixed envelope ordering, run-root identity checks, and content-addressed embedded
+  after-images.
+- Rejects duplicate keys, non-finite values, invalid UTF-8, unknown fields/artifacts, invalid
+  rounds/IDs/digests, inconsistent before-generation metadata, journals over 2 MiB, and JSON deeper
+  than 128 levels.
+- Focused tests pass `14 passed, 55 subtests`; related regression passes `111 passed, 277
+  subtests`; final `make check` passes `431 passed, 688 subtests`, and staged safety scans 111 files
+  clean. No provider or ignored runtime was accessed.
+- Implementation commit `4cd4bf4` is exact local/upstream/`ls-remote`/PR-head equal. Push/PR runs
+  `30020697130`/`30020701903` passed Python 3.10/3.13 and every isolated-wheel/check step.
+  Runtime journal I/O/routing and packages 2-7 remain separately approval-gated.

@@ -4,19 +4,19 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: implement only ARA-055 package 1: pure deterministic after-image builders and a
-  strict bounded in-memory journal codec, with no runtime journal routing.
+- Current goal: preserve the completed ARA-055 package-1 foundation and wait for explicit approval
+  before any runtime transaction package.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `ccdfcf425175d3213c9468274edc652bf4e18367` (the exact
+- State recorded against commit: `4cd4bf4fde5051edc3f50cb19983ddeba23c2113` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `ccdfcf425175d3213c9468274edc652bf4e18367` (exact local,
+- Last externally verified fallback: `4cd4bf4fde5051edc3f50cb19983ddeba23c2113` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: `ARA-055` implementation package 1. Packages 2-7, runtime journal
-  I/O/routing, migration, dependency changes, provider calls, and ignored runtime remain excluded.
+- Active task at this snapshot: none. ARA-055 packages 2-7, runtime journal I/O/routing, migration,
+  dependency changes, provider calls, and ignored runtime remain approval-gated.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -25,6 +25,27 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 - This committed snapshot does not assert a static dirty-file list. Resolve the exact live state
   with `git status --short --branch`; a clean checkout of the commit containing this file has no
   task-owned worktree changes.
+
+## ARA-055 Package 1 Closeout
+
+- Stable implementation commit: `4cd4bf4fde5051edc3f50cb19983ddeba23c2113`; exact local,
+  upstream, `ls-remote`, and PR-head equality was verified before this recovery closeout.
+- Added pure storage builders, deterministic after-image wrappers, a fixed round-artifact enum, and
+  a strict in-memory codec with exact schema and run-root identity validation.
+- The codec rejects duplicate keys, non-finite values, invalid UTF-8, unknown fields/artifacts,
+  invalid IDs/digests, journals over 2 MiB, and JSON deeper than 128 levels. Embedded after-images
+  are content-addressed and preserve the existing artifact byte format.
+- Focused validation passes `14 passed, 55 subtests`; related storage/round-loop/run-config
+  regression passes `111 passed, 277 subtests`; final `make check` passes `431 passed, 688
+  subtests`; staged safety scans 111 files with no findings.
+- Push/PR runs `30020697130`/`30020701903` passed Python 3.10/3.13 and every isolated-wheel/check
+  step. Provider calls and ignored-runtime access were zero.
+- No runtime journal file, path registration, recovery/apply engine, runner/preview/UI/diagnostic
+  routing, dependency, migration, provider, canonical artifact, or experiment behavior changed.
+- Next command after owner approval of package 2:
+  `.venv/bin/python -m pytest -q tests/test_round_commit.py`.
+- Interruption recovery: read `docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md`, this section,
+  and `.codex/TASK_QUEUE.md`; do not infer approval for packages 2-7.
 
 ## Completed Steps
 
@@ -880,12 +901,8 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Remaining Steps
 
-- Define failing codec/builder tests for exact schemas, size/depth/ID/digest bounds, fixed artifact
-  enums, deterministic JSON, and byte-compatible current artifact builders.
-- Implement one isolated package-1 module and minimal storage/config builder extraction without
-  journal filesystem I/O or runtime routing.
-- Run focused, related, full, staged-safety, remote, and CI validation; then return ARA-055 to
-  deferred with packages 2-7 still approval-gated.
+- Do not begin ARA-055 package 2 until the owner explicitly approves its round prepare/recovery
+  engine and fault matrix.
 - Keep legacy nonempty canonical partials immutable and fail-closed; an explicit migration remains
   outside ARA-054 authorization.
 - Preserve the confirmed ARA-055 boundary: current ARA-054 does not make canonical publication,
@@ -894,13 +911,12 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Test Status
 
-- ARA-055 design characterization covers 40 provider-free cases across ten current write
-  boundaries, `OSError`/`KeyboardInterrupt`, and internal/configured-external storage. Recovery
-  state passes `6 passed, 1 subtest`; full validation passes `417 passed, 633 subtests`, 109-file
-  staged safety scanning is clean, and runtime-code/provider changes are zero.
-- ARA-055 design commit `09aeda6` is exact local/upstream/`ls-remote`/PR-head equal. Push/PR runs
-  `30018465335`/`30018466172` passed Python 3.10/3.13, every isolated-wheel step, formatting, lint,
-  imports, safety scans, and tests. PR 13 remains open, draft, and mergeable.
+- ARA-055 package-1 focused tests pass `14 passed, 55 subtests`; related regression passes `111
+  passed, 277 subtests`; final `make check` passes formatting, lint, imports, safety scans, and
+  `431 passed, 688 subtests` over 111 staged files.
+- ARA-055 package-1 commit `4cd4bf4` is exact local/upstream/`ls-remote`/PR-head equal. Push/PR runs
+  `30020697130`/`30020701903` passed Python 3.10/3.13 and every isolated-wheel/check step. PR 13
+  remains open, draft, and mergeable.
 - ARA-054 runtime publication/integration focused coverage passes `232 passed, 468 subtests`.
   Provider-free full pytest passes `417 passed, 633 subtests`; `make check` passes formatting,
   lint, imports, both repository-safety scans, and the same full suite over 108 tracked files.
