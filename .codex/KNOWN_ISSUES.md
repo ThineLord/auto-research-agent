@@ -570,3 +570,23 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
   canonical partial rounds remain fail-closed because placeholders, `last_successful_agent`, and
   file presence do not reliably identify a resumable agent boundary. ARA-055 separately owns the
   multi-artifact round-commit transaction.
+
+## KI-055 - Published rounds can split history and finalization generations
+
+- Status: confirmed; design complete; runtime implementation deferred
+- Severity: P2 recovery and provenance consistency, high-risk compatibility surface
+- Evidence: 40 provider-free temporary cases covered ten post-publication write boundaries,
+  `OSError`/`KeyboardInterrupt`, and internal/configured-external run storage. Failure before the
+  run-local history write leaves canonical round 2 and a verified `published` attempt, project
+  history `[1,2]`, run history `[1]`, and checkpoint round 1.
+- Impact: resume correctly refuses to create a duplicate round as `published_uncommitted`, but no
+  current automatic path can finish the history/project-state commit. Failures after the per-round
+  checkpoint can separately leave stale run summary/config data visible to analytics or
+  provenance readers.
+- Design result: `docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md` selects an immutable
+  project-local journal with bounded deltas/after-images, exact before/after hashes, idempotent
+  roll-forward across filesystems, checkpoint-last visibility, and a separate finalization
+  transaction.
+- Boundary: no runtime journal, artifact-schema change, reader integration, diagnostic integration,
+  or legacy migration is approved. Historical journal-less `published_uncommitted` evidence and
+  manually edited third generations remain preserved and fail closed.

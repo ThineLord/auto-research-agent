@@ -751,3 +751,26 @@
   changes, provider calls, ignored runtime access, or mutation of canonical/experimental data.
 - Acceptance boundary: the design must not claim cross-filesystem atomic rename and must specify a
   deterministic fail-closed recovery path with bounded journal state and no duplicate rounds.
+
+## 2026-07-23 - Select an immutable roll-forward journal for ARA-055
+
+- Evidence: 40 provider-free temporary cases covered ten post-publication write boundaries,
+  `OSError`/`KeyboardInterrupt`, and internal/configured-external run storage. All four variants at
+  each boundary produced the same generation state.
+- Confirmed failure: before the second history write, canonical round 2 and its `published`
+  attempt exist, project history is `[1,2]`, run history is `[1]`, and checkpoint remains at 1.
+  Preview correctly blocks a duplicate as `published_uncommitted`, but no current recovery payload
+  can finish the commit.
+- Decision: prepare one immutable project-local journal before an attempt becomes publishable;
+  accept each fixed artifact only at its recorded before or after hash; roll forward missing
+  after-images; advance checkpoint last; remove the journal only after complete verification.
+- Finalization decision: use a separate project-local transaction for exact run summary, finalized
+  run config, and final checkpoint, applying the final checkpoint last.
+- Rejected: reversing history order, cross-filesystem directory rename, canonical rollback,
+  history inference from Markdown, an undiscoverable run-only journal, full-history journal copies,
+  and a broad database/event-store migration.
+- Compatibility: canonical and public artifact formats remain unchanged. Journal-less historical
+  `published_uncommitted`, manually edited third generations, moved pending storage, and unknown
+  schemas stay preserved and fail closed.
+- Authorization: this is a design decision only. All runtime packages in
+  `docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md` require separate approval.

@@ -1022,3 +1022,20 @@ Validation and implementation outcomes will be appended only after they are actu
 - Publication commit `87f37d3` and runtime commit `75f3d9a` are pushed. Exact branch/PR equality
   holds at `75f3d9a`; push/PR runs `30016026758`/`30016026741` passed Python 3.10/3.13 and every
   isolated-wheel step.
+
+## 2026-07-23 - ARA-055 cross-filesystem round-commit design
+
+- Mapped canonical publication, both histories, best output, memory, research state, checkpoint,
+  run summary, and run config to their writers, readers, authority, and filesystem.
+- Ran 40 provider-free temporary failure cases: ten current post-publication boundaries across
+  `OSError`/`KeyboardInterrupt` and internal/configured-external run storage. The four variants at
+  every boundary produced the same state; no ignored runtime or provider was accessed.
+- Confirmed the split-history defect: canonical round 2 and a `published` attempt coexist with
+  score history `[1,2]`, round metrics `[1]`, and checkpoint round 1. Resume fails closed as
+  `published_uncommitted`, but current code cannot finish the transaction.
+- Selected an immutable project-local write-ahead journal, one-metric history deltas,
+  before/after-hash roll-forward, checkpoint-last visibility, and a separate finalization
+  transaction. Unknown generations and journal-less legacy evidence remain fail-closed.
+- Added `docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md`. Runtime implementation, schemas,
+  migration, providers, experiments, and canonical artifacts were not changed and remain
+  separately approval-gated.

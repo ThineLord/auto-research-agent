@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `IN_PROGRESS`
+- Status: `DEFERRED`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -703,6 +703,13 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Design baseline: exact local/upstream/`ls-remote`/PR-head equality at `a7eacfe`; push/PR runs
   `30016446806`/`30016453110` pass Python 3.10/3.13 and isolated-wheel validation. Provider-free
   `make check` passes `417 passed, 633 subtests` over 108 tracked files in 34.21 seconds.
+- Design result: `docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md` records the writer/reader
+  map, 40-case fault matrix, selected immutable project-local write-ahead journal, idempotent
+  before/after-hash roll-forward, checkpoint-last commit point, separate finalization transaction,
+  compatibility rules, security bounds, and implementation packages.
+- Remaining approval boundary: runtime packages remain unapproved. Do not add journals, reroute
+  runtime readers/writers, integrate diagnostic mode, change artifact schemas, or migrate
+  historical `published_uncommitted` evidence without separate owner approval.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

@@ -4,19 +4,20 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: complete the owner-approved ARA-055 design stage for recoverable round publication
-  across project-global and run-local filesystems.
+- Current goal: close out the owner-approved ARA-055 design stage while preserving a separate
+  approval boundary for runtime implementation.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `a7eacfea2a450d4ec5ba2f33e64b07c5ed1ab752` (the exact
+- State recorded against commit: `fc5f4c7514ff20b3cd8aa626a58f04c101529f10` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `a7eacfea2a450d4ec5ba2f33e64b07c5ed1ab752` (exact local,
+- Last externally verified fallback: `fc5f4c7514ff20b3cd8aa626a58f04c101529f10` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: `ARA-055` design stage. Runtime transaction implementation,
-  artifact migration, dependency changes, provider calls, and ignored runtime remain excluded.
+- Active task at this snapshot: none after design validation. ARA-055 runtime transaction
+  implementation, artifact migration, dependency changes, provider calls, and ignored runtime
+  remain excluded and deferred.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -880,18 +881,13 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Remaining Steps
 
-- Map ARA-055's exact write/read order across canonical publication, score history, round metrics,
-  memory, research state, checkpoint, run summary, and run config.
-- Reproduce ARA-055 two-write and interruption failures in temporary provider-free workspaces,
-  including configured external run storage.
-- Compare transaction/journal designs without assuming cross-filesystem atomic rename, then record
-  the selected recovery protocol and implementation checkpoints.
-- Complete ARA-055 design validation, commit the design checkpoint, and push it without adding
-  runtime transaction code.
+- There is no unblocked implementation task. ARA-055 runtime packages stay deferred until the
+  owner separately approves one or more packages from
+  `docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md`.
 - Keep legacy nonempty canonical partials immutable and fail-closed; an explicit migration remains
   outside ARA-054 authorization.
-- Preserve the ARA-055 boundary: ARA-054 does not make canonical publication, both histories,
-  memory, best output, and recovery metadata one atomic transaction.
+- Preserve the confirmed ARA-055 boundary: current ARA-054 does not make canonical publication,
+  both histories, memory, best output, and recovery metadata one atomic transaction.
 - Do not activate ARA-018 without an owner license/distribution decision.
 
 ## Test Status
