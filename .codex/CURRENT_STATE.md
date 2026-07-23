@@ -4,20 +4,20 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: complete approved ARA-060 by locking pytest's already-correct subtest exit contract
-  and correcting the historical wrapper-status record without configuration or dependency changes.
+- Current goal: preserve the remotely verified ARA-060 checkpoint and await the required safety
+  approval before starting the medium-risk ARA-056 interrupt-lifecycle task.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `b196af970948ecb5c20c5c524f111079afa7b9d5` (the exact
+- State recorded against commit: `0a0036f5b2cf5171ec7c6ff5ad712fa1c4a4bfa3` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `b196af970948ecb5c20c5c524f111079afa7b9d5` (exact local,
+- Last externally verified fallback: `0a0036f5b2cf5171ec7c6ff5ad712fa1c4a4bfa3` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: ARA-060. The owner approved scoped test-configuration work on
-  2026-07-23; the no-dependency sentinel and local validation are complete, while review, commit,
-  push, and remote CI verification remain.
+- Active task at this snapshot: none. ARA-060 is complete and remote-verified; ARA-056 is the
+  highest-priority TODO but its estimated greater-than-30-minute, medium-risk interrupt lifecycle
+  work requires the repository safety checkpoint before implementation.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -792,14 +792,14 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 - Indexed ARA-060 `make check` passes Ruff format/lint over 62 files, imports, repository-safety
   self/worktree/staged scans over 105 tracked files, and pytest (`397 passed, 618 subtests` in
   21.54 seconds).
+- Committed ARA-060 as `0a0036f`, pushed it with exact local/upstream/`ls-remote`/PR-head equality,
+  and verified push/PR runs `30002348583`/`30002350589`: Python 3.10/3.13, all four isolated-wheel
+  steps, and every annotation set passed cleanly. Draft PR 13 remains open, draft, and mergeable.
 
 ## Remaining Steps
 
-- Finish complete diff, recovery-state, and sensitive-pattern review; correct any evidence or scope
-  mismatch before staging.
-- Commit and push the reviewed ARA-060 sentinel/state correction, then verify exact remote equality
-  and Python 3.10/3.13 push/PR CI.
-- Leave ARA-056 and deferred tasks untouched.
+- Obtain the required long-task safety approval before activating ARA-056.
+- Leave deferred tasks untouched.
 
 ## Test Status
 
@@ -859,6 +859,12 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
   102 call sites across those same 14 files.
 - ARA-060 indexed `make check` passes all gates with `397 passed, 618 subtests` in 21.54 seconds;
   Ruff covers 62 files and both repository-safety modes scan 105 tracked files with zero findings.
+- ARA-060 implementation `0a0036f` is remote-equal; push/PR runs
+  `30002348583`/`30002350589` passed Python 3.10/3.13, all four isolated-wheel steps, and zero
+  annotations.
+- ARA-060 indexed recovery closeout `make check` passes Ruff format/lint, imports,
+  repository-safety self/worktree/staged scans, and pytest (`397 passed, 618 subtests` in 22.80
+  seconds).
 - ARA-053 pre-fix collision/cache regression produced the expected `4 failed, 1 passed`: all three
   equal-shape path pairs shared an identity and `/bravo` loaded `/alpha` health evidence.
 - ARA-053 focused final coverage passes `4 passed, 14 subtests`; UI/recovery tests pass `84 passed,
@@ -1454,6 +1460,8 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Recent Failed Command
 
+- The first ARA-060 closeout recovery check rejected a recursive Remaining Steps bullet that asked
+  to finalize a task already marked `DONE`; the invalid bullet was removed before staging.
 - The first ARA-060 focused command passed both sentinel tests, then stopped at Ruff's import-order
   check with `I001`; imports were reordered and the complete focused command passed.
 - The first representative-cohort invocation ran through an outer orchestration call that yielded
@@ -1737,7 +1745,7 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 ```bash
 git status --short --branch
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
-git diff --cached --check
+git diff --check
 ```
 
 ## Interruption Recovery
@@ -1770,9 +1778,9 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - Keep ARA-059 confined to raw Ollama model-name typing. Preserve literal string lookalikes,
   metadata coercion, case-sensitive de-duplication/sorting, installed fallback, exact requests, and
   endpoint redaction; do not blacklist name text or reinterpret legacy artifacts.
-- ARA-060 audits the historically reported pytest subtest exit-status gap. Direct reproduction
-  disproved the gap; preserve the working pytest/unittest behavior, add only the isolated contract
-  sentinel, and do not fold the historical evidence correction into ARA-059.
+- ARA-060 is complete through remote-equal implementation `0a0036f`. Preserve the working
+  pytest/unittest behavior and isolated contract sentinel; the historically reported zero belonged
+  to the outer command wrapper, not pytest.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

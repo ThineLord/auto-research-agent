@@ -749,7 +749,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-060 - Verify unittest subtest failures fail the pytest process
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P2 (downgraded after direct reproduction disproved the P1 finding)
 - Risk: low
 - Description: ARA-059 recorded pytest 9 returning zero after 16 `SUBFAILED` reports, raising a P1
@@ -766,12 +766,14 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Dependencies: repository-required test-configuration safety approval received from the owner on
   2026-07-23. Prefer a no-dependency hook; any new dependency still requires separate evidence and
   must not be added merely to simplify implementation.
-- Local validation: isolated direct pytest probes return status 1 for one and 16 subtest-only
+- Completion: isolated direct pytest probes return status 1 for one and 16 subtest-only
   failures, while passing subtests return 0. Added a no-plugin-autoload, timeout-bounded subprocess
   sentinel without changing configuration or dependencies; focused tests pass `2 passed`, and the
-  existing 14-file subtest cohort passes `321 passed, 618 subtests`. Full `make check` passes `397
-  passed, 618 subtests` with 62 formatted files and zero safety findings; review, commit, push, and
-  remote CI remain.
+  existing 14-file subtest cohort passes `321 passed, 618 subtests`. Indexed `make check` passes
+  `397 passed, 618 subtests` with 62 formatted files and zero safety findings. Implementation
+  `0a0036f` is pushed with exact local/upstream/`ls-remote`/PR-head equality; push/PR runs
+  `30002348583`/`30002350589` passed Python 3.10/3.13, all four isolated-wheel steps, and zero
+  annotations.
 
 ## ARA-011 - Prevent failed rounds from replacing a trusted best output
 

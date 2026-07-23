@@ -513,7 +513,7 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## KI-060 - Historical subtest zero-exit finding used the wrapper status
 
-- Status: active ARA-060; historical false positive corrected locally, remote validation pending
+- Status: resolved by ARA-060 implementation `0a0036f`
 - Severity: P2 test assurance and historical evidence accuracy
 - Evidence: the first ARA-059 pre-fix matrix reported 16 `SUBFAILED` cases and its outer orchestration
   call returned 0. Archived command evidence shows that wrapper printed each nested command's
@@ -525,7 +525,8 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 - Resolution: add an isolated subprocess sentinel proving subtest-only failure returns 1 and passing
   subtests return 0. Disable third-party plugin autoload, remove inherited pytest injection options,
   and bound the child process without changing the canonical pytest configuration or dependencies.
-  Focused, representative-cohort, recovery, and full local validation now pass.
+  Focused, representative-cohort, recovery, full local validation, and Python 3.10/3.13 push/PR CI
+  pass; all four CI annotation sets are empty.
 - Boundary: ARA-059 adds parent-level aggregate assertions only to its two new tests. A repository-wide
   correction must preserve Python 3.10/3.13, avoid masking ordinary failures, and follow the safety
   approval rule before changing test configuration or dependencies. Configuration approval is now

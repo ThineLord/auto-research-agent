@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-23T19:13:23+08:00",
+  "recorded_at": "2026-07-23T19:20:40+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "b196af970948ecb5c20c5c524f111079afa7b9d5",
-  "last_known_stable_commit": "b196af970948ecb5c20c5c524f111079afa7b9d5",
+  "head_commit": "0a0036f5b2cf5171ec7c6ff5ad712fa1c4a4bfa3",
+  "last_known_stable_commit": "0a0036f5b2cf5171ec7c6ff5ad712fa1c4a4bfa3",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "b196af970948ecb5c20c5c524f111079afa7b9d5",
+  "state_recorded_against_commit": "0a0036f5b2cf5171ec7c6ff5ad712fa1c4a4bfa3",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-23T18:55:26+08:00",
-    "commit": "b196af970948ecb5c20c5c524f111079afa7b9d5",
+    "verified_at": "2026-07-23T19:16:22+08:00",
+    "commit": "0a0036f5b2cf5171ec7c6ff5ad712fa1c4a4bfa3",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 29266539401,
+        "run_id": 30002348583,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "b196af970948ecb5c20c5c524f111079afa7b9d5",
+        "head_sha": "0a0036f5b2cf5171ec7c6ff5ad712fa1c4a4bfa3",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 29266544263,
+        "run_id": 30002350589,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "b196af970948ecb5c20c5c524f111079afa7b9d5",
+        "head_sha": "0a0036f5b2cf5171ec7c6ff5ad712fa1c4a4bfa3",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,56 @@
       }
     }
   },
-  "status": "ara060_indexed_full_passed_awaiting_commit_push_ci",
+  "status": "ara060_closeout_indexed_full_passed_awaiting_commit_push_ci",
   "commands": [
+    {
+      "command": "ARA-060 indexed recovery-closeout make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_files": 62,
+        "pytest_passed": 397,
+        "pytest_subtests_passed": 618,
+        "tracked_files_scanned": 105,
+        "staged_files_scanned": 105,
+        "safety_findings": 0,
+        "duration_seconds": 22.8,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-060 implementation remote equality and GitHub Actions verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "commit": "0a0036f5b2cf5171ec7c6ff5ad712fa1c4a4bfa3",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "pull_request_head_equal": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 30002348583,
+        "pull_request_run_id": 30002350589,
+        "python_310": "success",
+        "python_313": "success",
+        "isolated_wheel_steps": 4,
+        "annotations": 0,
+        "draft_pr_13_open": true,
+        "draft_pr_13_draft": true,
+        "draft_pr_13_mergeable": true,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-060 first recovery-closeout consistency check",
+      "exit_code": 1,
+      "result": "state_contract_error",
+      "summary": {
+        "failure": "Remaining Steps requested recursive finalization after ARA-060 was already DONE",
+        "correction": "removed the invalid finalization bullet before staging",
+        "provider_calls": 0
+      }
+    },
     {
       "command": "ARA-060 indexed make check",
       "exit_code": 0,
@@ -4338,14 +4386,15 @@
     }
   ],
   "notes": [
+    "ARA-060 implementation 0a0036f is pushed with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 30002348583 and 30002350589 passed Python 3.10 and 3.13, all four isolated-wheel steps, and zero annotations.",
     "ARA-060 indexed make check passes 397 tests and 618 subtests with 62 formatted files and zero repository-safety findings across 105 tracked files; commit, push, and remote CI remain.",
     "ARA-060 direct pytest 9.0.3 probes prove subtest-only failures already return 1; the historical zero was an outer orchestration status that did not propagate nested command exit codes.",
     "ARA-060 adds only a no-plugin-autoload, timeout-bounded subprocess contract sentinel; focused tests pass 2 tests and the existing 14-file subtest cohort passes 321 tests and 618 subtests with no dependency, pytest configuration, production, provider, or ignored-runtime change.",
-    "ARA-060 is the sole active task after explicit owner approval on 2026-07-23; scope is a no-new-dependency pytest subtest exit-status correction with isolated failing and passing sentinel coverage.",
+    "ARA-060 became the sole active task after explicit owner approval on 2026-07-23; its scope was a no-new-dependency pytest subtest exit-status correction with isolated failing and passing sentinel coverage.",
     "ARA-059 closeout b196af9 was re-verified live on 2026-07-23 with exact local, upstream, ls-remote, and PR-head equality; closeout push and pull-request runs 29266539401 and 29266544263 remain successful.",
     "ARA-059 recovery closeout state passes the full local gate and is ready for an explicit six-path state-only commit.",
     "ARA-059 implementation a7d00a6 is pushed with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 29266119109 and 29266121277 passed Python 3.10 and 3.13, all four wheel-smoke steps, and zero annotations.",
-    "No task is active after ARA-059; ARA-060 is the highest-priority TODO but repository safety approval is required before any test-configuration or dependency change.",
+    "After ARA-059 no task was active; ARA-060 was then the highest-priority TODO and required repository safety approval before any test-configuration or dependency change.",
     "The explicit ten-path ARA-059 index passes cached diff, staged safety, recovery, and full make check; no unreviewed or ignored path was staged.",
     "Three independent ARA-059 review lines report GO after exact-falsey and installed-whitespace controls plus unambiguous historical validation wording were verified.",
     "The final ARA-059 controls distinguish the required empty list from every other falsey parser result and lock the verbatim installed-name whitespace boundary; mutation probes still trigger both parent assertions after subtest failures are swallowed.",

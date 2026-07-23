@@ -934,13 +934,27 @@ Validation and implementation outcomes will be appended only after they are actu
   non-string names are ignored while literal string lookalikes, valid siblings, first-record
   metadata/de-duplication, exact requests, redaction, list-container validation, and the verbatim
   installed-model fallback remain compatible.
-- Added parent-level aggregate regressions after pytest 9 exposed that subtest-only failures could
-  return zero. Exact mutation probes confirm falsey non-list parser output and installed-name
-  whitespace normalization are still caught even when subtest assertion errors are swallowed;
-  ARA-060 separately tracks the repository-wide test-gate gap.
+- Added parent-level aggregate regressions after an orchestration wrapper appeared to report zero
+  for nested subtest failures. ARA-060 later proved direct pytest already returns 1 and the wrapper
+  had not propagated nested exit codes; the aggregate mutation probes remain defense in depth.
 - Focused tests pass `2 passed, 37 subtests`; related UI/config/recovery tests pass `103 passed, 157
   subtests`; indexed full `make check` passes `395 passed, 618 subtests` with 104 tracked/index files
   and zero safety findings. Three independent final reviews returned GO.
 - Committed as `a7d00a6` and pushed with exact local/upstream/`ls-remote`/PR-head equality. Push run
   `29266119109` and pull-request run `29266121277` passed Python 3.10/3.13, every isolated-wheel
+  step, and all four job annotation sets are empty.
+
+## 2026-07-23 - Pytest unittest subtest exit-contract verification
+
+- Reproduced one and 16 subtest-only failures directly under pytest 9.0.3; both returned status 1.
+  Archived evidence showed the historical apparent zero was the successful outer orchestration
+  status, which printed nested output without checking or propagating nested exit codes.
+- Added a no-new-dependency subprocess sentinel that verifies subtest-only failure returns 1 and
+  passing subtests return 0. The child run uses a temporary root, disables third-party plugin
+  autoload, removes inherited pytest injection options, and has a 30-second timeout.
+- Focused sentinel tests pass `2 passed`; the existing 14-file cohort passes `321 passed, 618
+  subtests`; indexed `make check` passes `397 passed, 618 subtests` with 105 tracked files and zero
+  safety findings.
+- Committed as `0a0036f` and pushed with exact local/upstream/`ls-remote`/PR-head equality. Push run
+  `30002348583` and pull-request run `30002350589` passed Python 3.10/3.13, every isolated-wheel
   step, and all four job annotation sets are empty.
