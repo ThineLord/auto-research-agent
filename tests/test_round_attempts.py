@@ -20,6 +20,7 @@ from src.round_attempts import (
     mark_attempt_ready_to_publish,
     mark_attempt_stopped,
     persist_attempt_stage,
+    publish_attempt,
     write_attempt_stage_output,
 )
 from src.storage import write_json_file
@@ -28,6 +29,149 @@ CONFIG_DIGEST = "a" * 64
 
 
 class RoundAttemptStorageTests(unittest.TestCase):
+    def _ready_attempt(
+        self,
+        run_root: Path,
+        *,
+        round_index: int = 1,
+        attempt_id: str = "12345678abcdef00",
+    ) -> Path:
+        attempt_dir = create_round_attempt(
+            run_root=run_root,
+            round_index=round_index,
+            run_config_sha256=CONFIG_DIGEST,
+            attempt_id=attempt_id,
+        )
+        for stage in ("draft", "review", "revise", "judge"):
+            persist_attempt_stage(attempt_dir, stage, f"{stage} result")
+        mark_attempt_ready_to_publish(attempt_dir)
+        return attempt_dir
+
+    def test_ready_attempt_atomically_publishes_without_replacement(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "run-id"
+            run_root.mkdir()
+            attempt_dir = self._ready_attempt(run_root)
+            expected = {path.name: path.read_bytes() for path in (attempt_dir / "output").iterdir()}
+
+            canonical = publish_attempt(attempt_dir)
+
+            self.assertEqual(canonical, run_root / "round_01")
+            self.assertFalse((attempt_dir / "output").exists())
+            self.assertEqual(
+                {path.name: path.read_bytes() for path in canonical.iterdir()},
+                expected,
+            )
+            manifest = json.loads((attempt_dir / "attempt.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["state"], "published")
+            self.assertEqual(manifest["publication_mode"], "atomic_rename")
+            classification = classify_round_recovery(run_root, 1)
+            self.assertEqual(classification.status, "published_uncommitted")
+            self.assertFalse(classification.can_create_attempt)
+
+    def test_empty_canonical_handoff_is_create_only_and_recoverable(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "run-id"
+            canonical = run_root / "round_01"
+            canonical.mkdir(parents=True)
+            attempt_dir = self._ready_attempt(run_root)
+            manifest = json.loads((attempt_dir / "attempt.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["canonical_handoff"], "reserved_empty")
+            original_write = storage_module.write_file_text_create_only
+            writes = 0
+
+            def interrupt_after_first_write(path: Path, content: str, **kwargs: object) -> None:
+                nonlocal writes
+                original_write(path, content, **kwargs)
+                writes += 1
+                if writes == 1:
+                    raise KeyboardInterrupt
+
+            with (
+                patch(
+                    "src.round_attempts.write_file_text_create_only",
+                    side_effect=interrupt_after_first_write,
+                ),
+                self.assertRaises(KeyboardInterrupt),
+            ):
+                publish_attempt(attempt_dir)
+
+            self.assertEqual([path.name for path in canonical.iterdir()], ["01_draft.md"])
+            self.assertEqual(
+                json.loads((attempt_dir / "attempt.json").read_text(encoding="utf-8"))["state"],
+                "ready_to_publish",
+            )
+            pending = classify_round_recovery(run_root, 1)
+            self.assertEqual(pending.status, "publication_pending")
+
+            publish_attempt(attempt_dir)
+
+            self.assertEqual(
+                sorted(path.name for path in canonical.iterdir()),
+                ["01_draft.md", "02_review.md", "03_revised.md", "04_judge.md"],
+            )
+            self.assertTrue((attempt_dir / "output").is_dir())
+            published = json.loads((attempt_dir / "attempt.json").read_text(encoding="utf-8"))
+            self.assertEqual(published["state"], "published")
+            self.assertEqual(published["publication_mode"], "retained_copy")
+
+    def test_publication_collision_preserves_both_trees(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "run-id"
+            run_root.mkdir()
+            attempt_dir = self._ready_attempt(run_root)
+            attempt_before = {
+                path.name: path.read_bytes() for path in (attempt_dir / "output").iterdir()
+            }
+            canonical = run_root / "round_01"
+            canonical.mkdir()
+            sentinel = canonical / "user.txt"
+            sentinel.write_text("preserve\n", encoding="utf-8")
+
+            with self.assertRaises((FileExistsError, RoundAttemptBlockedError)):
+                publish_attempt(attempt_dir)
+
+            self.assertEqual(sentinel.read_bytes(), b"preserve\n")
+            self.assertEqual(
+                {path.name: path.read_bytes() for path in (attempt_dir / "output").iterdir()},
+                attempt_before,
+            )
+            self.assertEqual(
+                json.loads((attempt_dir / "attempt.json").read_text(encoding="utf-8"))["state"],
+                "ready_to_publish",
+            )
+
+    def test_atomic_publication_manifest_failure_reconciles_without_republishing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "run-id"
+            run_root.mkdir()
+            attempt_dir = self._ready_attempt(run_root)
+
+            with (
+                patch(
+                    "src.round_attempts.write_json_file",
+                    side_effect=OSError("injected publication manifest failure"),
+                ),
+                self.assertRaisesRegex(OSError, "injected publication manifest failure"),
+            ):
+                publish_attempt(attempt_dir)
+
+            canonical = run_root / "round_01"
+            self.assertTrue(canonical.is_dir())
+            self.assertFalse((attempt_dir / "output").exists())
+            self.assertEqual(
+                json.loads((attempt_dir / "attempt.json").read_text(encoding="utf-8"))["state"],
+                "ready_to_publish",
+            )
+            pending = classify_round_recovery(run_root, 1)
+            self.assertEqual(pending.status, "publication_pending")
+
+            self.assertEqual(publish_attempt(attempt_dir), canonical)
+            self.assertEqual(
+                json.loads((attempt_dir / "attempt.json").read_text(encoding="utf-8"))["state"],
+                "published",
+            )
+
     def test_manifest_transitions_record_each_stage_and_stop_immutably(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             run_root = Path(tmp) / "run-id"

@@ -802,6 +802,11 @@ def write_text_create_only(path: Path, content: str, *, anchor: Path | None = No
     _create_text_exclusive(path, content.strip() + "\n", anchor=anchor)
 
 
+def write_file_text_create_only(path: Path, content: str, *, anchor: Path | None = None) -> None:
+    """Write exact text once without replacing an existing filesystem entry."""
+    _create_text_exclusive(path, content, anchor=anchor)
+
+
 def read_file_text(path: Path, *, anchor: Path | None = None) -> str:
     """Read a text file exactly as stored, returning an empty string if missing."""
     try:

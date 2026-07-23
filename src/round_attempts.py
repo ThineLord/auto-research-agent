@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import ctypes
+import errno
 import hashlib
 import json
+import os
 import re
 import shutil
+import sys
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -18,6 +22,7 @@ from .storage import (
     list_artifact_regular_files,
     make_round_attempt_dir,
     read_regular_text,
+    write_file_text_create_only,
     write_json_file,
     write_json_file_create_only,
     write_text_create_only,
@@ -39,6 +44,11 @@ STAGE_OUTPUT_FILES = {
 }
 STAGE_ORDER = tuple(STAGE_OUTPUT_FILES)
 ATTEMPT_STATES = {"active", "stopped", "ready_to_publish", "published", "unverifiable"}
+CANONICAL_HANDOFFS = {"atomic_rename", "reserved_empty"}
+PUBLICATION_MODES = {"atomic_rename", "retained_copy"}
+_AT_FDCWD = -100
+_RENAME_NOREPLACE = 0x00000001
+_RENAME_EXCL = 0x00000004
 
 
 class RoundAttemptBlockedError(RuntimeError):
@@ -53,6 +63,8 @@ class AttemptInspection:
     verified: bool
     reason: str | None = None
     created_at: str = ""
+    canonical_handoff: str = ""
+    publication_mode: str | None = None
 
 
 @dataclass(frozen=True)
@@ -139,6 +151,16 @@ def create_round_attempt(
         reason = classification.blocked_reason or classification.status
         raise RoundAttemptBlockedError(reason)
 
+    canonical = run_root / f"round_{round_index:02d}"
+    try:
+        canonical_names = list_artifact_entry_names(canonical, missing_ok=True)
+        canonical_exists = artifact_path_exists(canonical, allow_directory=True)
+    except OSError:
+        raise RoundAttemptBlockedError("unsafe_round_state") from None
+    if canonical_exists and canonical_names:
+        raise RoundAttemptBlockedError("canonical_round_exists")
+    canonical_handoff = "reserved_empty" if canonical_exists else "atomic_rename"
+
     selected_id = _validate_attempt_id(attempt_id or uuid.uuid4().hex)
     attempt_dir = make_round_attempt_dir(run_root, round_index, selected_id)
     manifest = {
@@ -154,6 +176,7 @@ def create_round_attempt(
         "created_at": timestamp,
         "updated_at": timestamp,
         "run_config_sha256": run_config_sha256,
+        "canonical_handoff": canonical_handoff,
         "outputs": {},
     }
     write_json_file_create_only(
@@ -342,6 +365,218 @@ def mark_attempt_ready_to_publish(
     )
 
 
+def _raise_rename_error(result: int, target: Path) -> None:
+    if result == 0:
+        return
+    error_number = ctypes.get_errno()
+    if error_number in {errno.EEXIST, errno.ENOTEMPTY}:
+        raise FileExistsError(error_number, os.strerror(error_number), target)
+    raise OSError(error_number, os.strerror(error_number), target)
+
+
+def _rename_directory_noreplace(source: Path, target: Path) -> None:
+    """Atomically rename a staged directory without replacing a canonical round."""
+    if sys.platform == "win32":
+        os.rename(source, target)
+        return
+
+    libc = ctypes.CDLL(None, use_errno=True)
+    source_bytes = os.fsencode(source)
+    target_bytes = os.fsencode(target)
+    if sys.platform == "darwin":
+        rename_exclusive = getattr(libc, "renamex_np", None)
+        if rename_exclusive is None:
+            raise RoundAttemptBlockedError("atomic_noreplace_rename_unavailable")
+        rename_exclusive.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+        rename_exclusive.restype = ctypes.c_int
+        _raise_rename_error(
+            rename_exclusive(source_bytes, target_bytes, _RENAME_EXCL),
+            target,
+        )
+        return
+    if sys.platform.startswith("linux"):
+        rename_exclusive = getattr(libc, "renameat2", None)
+        if rename_exclusive is None:
+            raise RoundAttemptBlockedError("atomic_noreplace_rename_unavailable")
+        rename_exclusive.argtypes = [
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_uint,
+        ]
+        rename_exclusive.restype = ctypes.c_int
+        _raise_rename_error(
+            rename_exclusive(
+                _AT_FDCWD,
+                source_bytes,
+                _AT_FDCWD,
+                target_bytes,
+                _RENAME_NOREPLACE,
+            ),
+            target,
+        )
+        return
+    raise RoundAttemptBlockedError("atomic_noreplace_rename_unavailable")
+
+
+def _expected_output_names(completed_stages: tuple[str, ...]) -> list[str]:
+    return [STAGE_OUTPUT_FILES[stage] for stage in completed_stages]
+
+
+def _verify_file_metadata(
+    path: Path,
+    metadata: object,
+) -> str | None:
+    if not isinstance(metadata, dict):
+        return "invalid_output_metadata"
+    expected_size = metadata.get("size")
+    expected_digest = metadata.get("sha256")
+    if (
+        isinstance(expected_size, bool)
+        or not isinstance(expected_size, int)
+        or expected_size < 0
+        or not isinstance(expected_digest, str)
+        or SHA256_PATTERN.fullmatch(expected_digest) is None
+    ):
+        return "invalid_output_metadata"
+    try:
+        content = read_regular_text(path).encode("utf-8")
+    except (OSError, UnicodeError):
+        return "unsafe_output"
+    if len(content) != expected_size or hashlib.sha256(content).hexdigest() != expected_digest:
+        return "output_hash_mismatch"
+    return None
+
+
+def _verify_output_tree(
+    root: Path,
+    expected_names: list[str],
+    outputs: dict[str, Any],
+) -> str | None:
+    try:
+        output_names = list_artifact_entry_names(root)
+    except (OSError, UnicodeError, ValueError):
+        return "unsafe_output"
+    if output_names != sorted(expected_names):
+        return "output_manifest_mismatch"
+    for output_name in expected_names:
+        reason = _verify_file_metadata(root / output_name, outputs.get(output_name))
+        if reason is not None:
+            return reason
+    return None
+
+
+def _verify_canonical_tree(
+    canonical: Path,
+    expected_names: list[str],
+    outputs: dict[str, Any],
+    *,
+    allow_prefix: bool,
+) -> tuple[str | None, int]:
+    try:
+        if not artifact_path_exists(canonical, allow_directory=True):
+            return "canonical_round_missing", 0
+        canonical_names = list_artifact_entry_names(canonical)
+    except (OSError, UnicodeError, ValueError):
+        return "unsafe_canonical_round", 0
+    expected_prefix = expected_names[: len(canonical_names)]
+    if (
+        len(canonical_names) > len(expected_names)
+        or canonical_names != sorted(expected_prefix)
+        or (not allow_prefix and len(canonical_names) != len(expected_names))
+    ):
+        return "canonical_output_mismatch", len(canonical_names)
+    for output_name in canonical_names:
+        reason = _verify_file_metadata(canonical / output_name, outputs.get(output_name))
+        if reason is not None:
+            return f"canonical_{reason}", len(canonical_names)
+    return None, len(canonical_names)
+
+
+def publish_attempt(
+    attempt_dir: Path,
+    *,
+    updated_at: str | None = None,
+) -> Path:
+    """Publish a ready attempt without replacing canonical or staged evidence."""
+    run_root, round_index, inspection, manifest = _transition_manifest(attempt_dir)
+    canonical = run_root / f"round_{round_index:02d}"
+    if inspection.state == "published":
+        return canonical
+    if inspection.state != "ready_to_publish":
+        raise RoundAttemptBlockedError(f"attempt state {inspection.state} cannot be published")
+    transition_time = _transition_timestamp(
+        updated_at,
+        not_before=str(manifest["updated_at"]),
+    )
+    expected_names = _expected_output_names(inspection.completed_stages)
+    outputs = manifest["outputs"]
+    handoff = inspection.canonical_handoff
+
+    if handoff == "atomic_rename":
+        output_dir = Path(attempt_dir) / "output"
+        output_exists = artifact_path_exists(output_dir, allow_directory=True)
+        canonical_exists = artifact_path_exists(canonical, allow_directory=True)
+        if output_exists and not canonical_exists:
+            _rename_directory_noreplace(output_dir, canonical)
+        elif output_exists or not canonical_exists:
+            raise RoundAttemptBlockedError("canonical_publication_conflict")
+        reason, _ = _verify_canonical_tree(
+            canonical,
+            expected_names,
+            outputs,
+            allow_prefix=False,
+        )
+        if reason is not None:
+            raise RoundAttemptBlockedError(reason)
+        publication_mode = "atomic_rename"
+    elif handoff == "reserved_empty":
+        reason, present_count = _verify_canonical_tree(
+            canonical,
+            expected_names,
+            outputs,
+            allow_prefix=True,
+        )
+        if reason is not None:
+            raise RoundAttemptBlockedError(reason)
+        output_dir = Path(attempt_dir) / "output"
+        for output_name in expected_names[present_count:]:
+            content = read_regular_text(output_dir / output_name)
+            write_file_text_create_only(
+                canonical / output_name,
+                content,
+                anchor=run_root,
+            )
+        reason, _ = _verify_canonical_tree(
+            canonical,
+            expected_names,
+            outputs,
+            allow_prefix=False,
+        )
+        if reason is not None:
+            raise RoundAttemptBlockedError(reason)
+        publication_mode = "retained_copy"
+    else:
+        raise RoundAttemptBlockedError("unsupported_canonical_handoff")
+
+    manifest.update(
+        {
+            "state": "published",
+            "publication_mode": publication_mode,
+            "canonical_round": canonical.name,
+            "updated_at": transition_time,
+        }
+    )
+    _write_transition_manifest(
+        attempt_dir,
+        run_root=run_root,
+        round_index=round_index,
+        manifest=manifest,
+    )
+    return canonical
+
+
 def _invalid_attempt(attempt_id: str, reason: str) -> AttemptInspection:
     return AttemptInspection(
         attempt_id=attempt_id,
@@ -361,7 +596,9 @@ def _inspect_attempt(
 ) -> AttemptInspection:
     try:
         entry_names = list_artifact_entry_names(attempt_dir)
-        if entry_names != ["attempt.json", "output"]:
+        if "attempt.json" not in entry_names or any(
+            name not in {"attempt.json", "output"} for name in entry_names
+        ):
             return _invalid_attempt(attempt_id, "unexpected_attempt_entries")
         manifest_text = read_regular_text(
             attempt_dir / "attempt.json",
@@ -369,7 +606,6 @@ def _inspect_attempt(
         manifest = json.loads(manifest_text)
         if not isinstance(manifest, dict):
             return _invalid_attempt(attempt_id, "invalid_manifest")
-        output_names = list_artifact_entry_names(attempt_dir / "output")
     except (OSError, UnicodeError, ValueError, RecursionError):
         return _invalid_attempt(attempt_id, "unsafe_or_invalid_attempt")
 
@@ -408,40 +644,106 @@ def _inspect_attempt(
     if state == "stopped":
         if not isinstance(stop_reason, str) or STOP_REASON_PATTERN.fullmatch(stop_reason) is None:
             return _invalid_attempt(attempt_id, "invalid_stop_reason")
-    elif state == "active" and stop_reason is not None:
-        return _invalid_attempt(attempt_id, "active_attempt_has_stop_reason")
+    elif stop_reason is not None:
+        return _invalid_attempt(attempt_id, "non_stopped_attempt_has_stop_reason")
 
     outputs = manifest.get("outputs")
     if not isinstance(outputs, dict):
         return _invalid_attempt(attempt_id, "invalid_outputs")
-    expected_output_names = [STAGE_OUTPUT_FILES[stage] for stage in completed_stages]
-    if sorted(outputs) != sorted(expected_output_names) or output_names != sorted(
-        expected_output_names
-    ):
+    expected_output_names = _expected_output_names(completed_stages)
+    if sorted(outputs) != sorted(expected_output_names):
         return _invalid_attempt(attempt_id, "output_manifest_mismatch")
+    if state in {"ready_to_publish", "published"} and completed_stages != STAGE_ORDER:
+        return _invalid_attempt(attempt_id, "publication_requires_all_stages")
 
-    for output_name in expected_output_names:
-        metadata = outputs.get(output_name)
-        if not isinstance(metadata, dict):
-            return _invalid_attempt(attempt_id, "invalid_output_metadata")
-        expected_size = metadata.get("size")
-        expected_digest = metadata.get("sha256")
-        if (
-            isinstance(expected_size, bool)
-            or not isinstance(expected_size, int)
-            or expected_size < 0
-            or not isinstance(expected_digest, str)
-            or SHA256_PATTERN.fullmatch(expected_digest) is None
+    canonical_handoff = manifest.get("canonical_handoff", "atomic_rename")
+    if not isinstance(canonical_handoff, str) or canonical_handoff not in CANONICAL_HANDOFFS:
+        return _invalid_attempt(attempt_id, "invalid_canonical_handoff")
+    publication_mode = manifest.get("publication_mode")
+    if publication_mode is not None and (
+        not isinstance(publication_mode, str) or publication_mode not in PUBLICATION_MODES
+    ):
+        return _invalid_attempt(attempt_id, "invalid_publication_mode")
+
+    output_present = entry_names == ["attempt.json", "output"]
+    canonical = run_root / f"round_{round_index:02d}"
+    if state in {"active", "stopped"}:
+        if not output_present:
+            return _invalid_attempt(attempt_id, "attempt_output_missing")
+        reason = _verify_output_tree(
+            attempt_dir / "output",
+            expected_output_names,
+            outputs,
+        )
+    elif state == "ready_to_publish" and canonical_handoff == "atomic_rename":
+        if output_present:
+            reason = _verify_output_tree(
+                attempt_dir / "output",
+                expected_output_names,
+                outputs,
+            )
+            if reason is None and artifact_path_exists(canonical, allow_directory=True):
+                reason = "canonical_publication_conflict"
+        else:
+            reason, _ = _verify_canonical_tree(
+                canonical,
+                expected_output_names,
+                outputs,
+                allow_prefix=False,
+            )
+    elif state == "ready_to_publish":
+        if not output_present:
+            return _invalid_attempt(attempt_id, "attempt_output_missing")
+        reason = _verify_output_tree(
+            attempt_dir / "output",
+            expected_output_names,
+            outputs,
+        )
+        if reason is None:
+            reason, _ = _verify_canonical_tree(
+                canonical,
+                expected_output_names,
+                outputs,
+                allow_prefix=True,
+            )
+    elif publication_mode == "atomic_rename":
+        if output_present:
+            return _invalid_attempt(attempt_id, "published_output_not_moved")
+        reason, _ = _verify_canonical_tree(
+            canonical,
+            expected_output_names,
+            outputs,
+            allow_prefix=False,
+        )
+    elif publication_mode == "retained_copy":
+        if not output_present:
+            return _invalid_attempt(attempt_id, "published_output_missing")
+        reason = _verify_output_tree(
+            attempt_dir / "output",
+            expected_output_names,
+            outputs,
+        )
+        if reason is None:
+            reason, _ = _verify_canonical_tree(
+                canonical,
+                expected_output_names,
+                outputs,
+                allow_prefix=False,
+            )
+    else:
+        return _invalid_attempt(attempt_id, "published_attempt_missing_mode")
+    if reason is not None:
+        return _invalid_attempt(attempt_id, reason)
+
+    if state == "published":
+        if manifest.get("canonical_round") != canonical.name:
+            return _invalid_attempt(attempt_id, "canonical_round_mismatch")
+        if (canonical_handoff == "atomic_rename" and publication_mode != "atomic_rename") or (
+            canonical_handoff == "reserved_empty" and publication_mode != "retained_copy"
         ):
-            return _invalid_attempt(attempt_id, "invalid_output_metadata")
-        try:
-            content = read_regular_text(
-                attempt_dir / "output" / output_name,
-            ).encode("utf-8")
-        except (OSError, UnicodeError):
-            return _invalid_attempt(attempt_id, "unsafe_output")
-        if len(content) != expected_size or hashlib.sha256(content).hexdigest() != expected_digest:
-            return _invalid_attempt(attempt_id, "output_hash_mismatch")
+            return _invalid_attempt(attempt_id, "publication_handoff_mismatch")
+    elif publication_mode is not None or manifest.get("canonical_round") is not None:
+        return _invalid_attempt(attempt_id, "premature_publication_metadata")
 
     return AttemptInspection(
         attempt_id=attempt_id,
@@ -449,6 +751,8 @@ def _inspect_attempt(
         completed_stages=completed_stages,
         verified=True,
         created_at=manifest["created_at"],
+        canonical_handoff=canonical_handoff,
+        publication_mode=publication_mode,
     )
 
 
@@ -578,10 +882,6 @@ def classify_round_recovery(
             allow_directory=True,
         )
         attempt_names = list_artifact_entry_names(attempts_root, missing_ok=True)
-        attempts_root_exists = artifact_path_exists(
-            attempts_root,
-            allow_directory=True,
-        )
     except OSError:
         return _classification(
             status="unsafe_round_state",
@@ -590,24 +890,6 @@ def classify_round_recovery(
             blocked_reason="unsafe_round_state",
         )
 
-    if canonical_exists and attempts_root_exists and attempt_names:
-        return _classification(
-            status="canonical_attempt_conflict",
-            can_create=False,
-            action="preserve_conflicting_evidence",
-            blocked_reason="canonical_attempt_conflict",
-        )
-    if canonical_exists:
-        return _classification(
-            status="legacy_empty_canonical" if not canonical_names else "legacy_partial",
-            can_create=False,
-            action=(
-                "preserve_existing_empty_canonical"
-                if not canonical_names
-                else "explicit_migration_required"
-            ),
-            blocked_reason="canonical_round_exists",
-        )
     if len(attempt_names) >= max_attempts:
         return _classification(
             status="attempt_limit_reached",
@@ -616,11 +898,22 @@ def classify_round_recovery(
             blocked_reason="attempt_limit_reached",
         )
     if not attempt_names:
+        if canonical_exists and canonical_names:
+            return _classification(
+                status="legacy_partial",
+                can_create=False,
+                action="explicit_migration_required",
+                blocked_reason="canonical_round_exists",
+            )
         return _eligible_classification(
             run_root=run_root,
             round_index=round_index,
-            status="new_round",
-            action="create_new_attempt",
+            status="legacy_empty_canonical" if canonical_exists else "new_round",
+            action=(
+                "create_attempt_preserve_empty_canonical"
+                if canonical_exists
+                else "create_new_attempt"
+            ),
             attempts=(),
             min_free_bytes=min_free_bytes,
             max_retained_bytes=max_retained_bytes,
@@ -664,6 +957,30 @@ def classify_round_recovery(
             attempts=attempts,
             blocked_reason="unverifiable_attempt",
         )
+    if any(attempt.state == "published" for attempt in attempts):
+        return _classification(
+            status="published_uncommitted",
+            can_create=False,
+            action="defer_to_cross_file_recovery",
+            attempts=attempts,
+            blocked_reason="published_uncommitted",
+        )
+    if any(attempt.state == "ready_to_publish" for attempt in attempts):
+        return _classification(
+            status="publication_pending",
+            can_create=False,
+            action="reconcile_publication_before_retry",
+            attempts=attempts,
+            blocked_reason="publication_pending",
+        )
+    if canonical_exists and canonical_names:
+        return _classification(
+            status="canonical_attempt_conflict",
+            can_create=False,
+            action="preserve_conflicting_evidence",
+            attempts=attempts,
+            blocked_reason="canonical_attempt_conflict",
+        )
     if any(attempt.state == "active" for attempt in attempts):
         return _classification(
             status="attempt_in_progress",
@@ -671,14 +988,6 @@ def classify_round_recovery(
             action="verify_run_lock_before_retry",
             attempts=attempts,
             blocked_reason="active_attempt_exists",
-        )
-    if any(attempt.state in {"ready_to_publish", "published"} for attempt in attempts):
-        return _classification(
-            status="publication_pending",
-            can_create=False,
-            action="reconcile_publication_before_retry",
-            attempts=attempts,
-            blocked_reason="publication_pending",
         )
     return _eligible_classification(
         run_root=run_root,
