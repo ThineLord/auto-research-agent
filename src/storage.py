@@ -700,6 +700,40 @@ def _atomic_write_text(path: Path, content: str, *, anchor: Path | None = None) 
             os.close(parent_descriptor)
 
 
+def _create_text_exclusive(path: Path, content: str, *, anchor: Path | None = None) -> None:
+    """Durably create a text file once, preserving any partial evidence after failure."""
+    path = Path(path)
+    parent_descriptor: int | None = None
+    descriptor = -1
+    try:
+        parent_descriptor = _open_parent_directory(path, create=True, anchor=anchor)
+        flags = (
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_BINARY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        open_target: str | Path = path.name if parent_descriptor is not None else path
+        open_kwargs = {"dir_fd": parent_descriptor} if parent_descriptor is not None else {}
+        descriptor = os.open(open_target, flags, 0o600, **open_kwargs)
+        opened_metadata = os.fstat(descriptor)
+        _validate_regular_metadata(opened_metadata, kind="create-only target")
+        with os.fdopen(descriptor, "w", encoding="utf-8") as file:
+            descriptor = -1
+            file.write(content)
+            file.flush()
+            os.fsync(file.fileno())
+        if parent_descriptor is not None:
+            os.fsync(parent_descriptor)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+
+
 def read_regular_text(
     path: Path,
     *,
@@ -761,6 +795,11 @@ def read_text(path: Path, *, anchor: Path | None = None) -> str:
 
 def write_text(path: Path, content: str, *, anchor: Path | None = None) -> None:
     _atomic_write_text(path, content.strip() + "\n", anchor=anchor)
+
+
+def write_text_create_only(path: Path, content: str, *, anchor: Path | None = None) -> None:
+    """Write normalized text exactly once without replacing an existing filesystem entry."""
+    _create_text_exclusive(path, content.strip() + "\n", anchor=anchor)
 
 
 def read_file_text(path: Path, *, anchor: Path | None = None) -> str:
@@ -889,6 +928,59 @@ def make_round_dir(
         allow_existing=allow_existing,
         anchor=selected_anchor,
     )
+
+
+def make_round_attempt_dir(
+    run_root: Path,
+    round_index: int,
+    attempt_id: str,
+    *,
+    anchor: Path | None = None,
+) -> Path:
+    """Exclusively allocate one restricted append-only round-attempt directory."""
+    if (
+        isinstance(round_index, bool)
+        or not isinstance(round_index, int)
+        or not 1 <= round_index <= 999999
+    ):
+        raise ValueError("round_index must be an integer between 1 and 999999")
+    if re.fullmatch(r"[a-z0-9][a-z0-9_-]{7,63}", attempt_id) is None:
+        raise ValueError("attempt_id must use 8-64 lowercase ASCII identifier characters")
+
+    run_root = _lexical_absolute(run_root)
+    selected_anchor = anchor or _registered_artifact_anchor(run_root / ".attempt-probe")
+    if selected_anchor is None:
+        descriptor = _open_directory_from_anchor(run_root, anchor=run_root, create=False)
+        if descriptor is not None:
+            os.close(descriptor)
+        _register_artifact_boundary(run_root, run_root)
+        selected_anchor = run_root
+
+    partial_root = _make_directory_child(
+        run_root,
+        "partial_rounds",
+        allow_existing=True,
+        anchor=selected_anchor,
+    )
+    round_root = _make_directory_child(
+        partial_root,
+        f"round_{round_index:02d}",
+        allow_existing=True,
+        anchor=selected_anchor,
+    )
+    attempt_dir = _make_directory_child(
+        round_root,
+        f"attempt_{attempt_id}",
+        allow_existing=False,
+        anchor=selected_anchor,
+    )
+    _make_directory_child(
+        attempt_dir,
+        "output",
+        allow_existing=False,
+        anchor=selected_anchor,
+    )
+    return attempt_dir
 
 
 def save_round_outputs(
@@ -1210,6 +1302,16 @@ def write_json_file(
     anchor: Path | None = None,
 ) -> None:
     _atomic_write_text(path, json.dumps(data, indent=2), anchor=anchor)
+
+
+def write_json_file_create_only(
+    path: Path,
+    data: Dict[str, Any],
+    *,
+    anchor: Path | None = None,
+) -> None:
+    """Serialize a JSON object once without replacing an existing filesystem entry."""
+    _create_text_exclusive(path, json.dumps(data, indent=2), anchor=anchor)
 
 
 def open_append_text_file(path: Path, *, anchor: Path | None = None) -> TextIO:
