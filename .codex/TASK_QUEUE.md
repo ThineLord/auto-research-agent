@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -809,9 +809,14 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Package 4 local validation: focused `9 passed`; related `256 passed, 540 subtests`; recovery
   matrix `16 passed, 99 subtests`; full `make check` `462 passed, 791 subtests`; provider and
   ignored-runtime access zero.
-- Current work: explicitly stage the ARA-055 package 4 implementation, run indexed safety and diff
-  checks, create the semantic implementation commit, push, and verify Python 3.10/3.13 CI before
-  recovery closeout.
+- Package 4 completion: implementation `efcad88` is exact local/upstream/`ls-remote`/PR-head
+  equal. Push/PR runs `30034539432`/`30034542276` pass Python 3.10/3.13 and every workflow step;
+  draft PR 13 is open and cleanly mergeable, and comment `5062099962` records the result.
+- Final result: new and fully evidenced rounds have a recoverable checkpoint-last transaction;
+  normal, continuous, session, resume, and mock entries recover a valid pending round under the
+  existing lock before provider/client/agent work; preview/UI/analytics/comparison/report readers
+  expose or reject pending/conflicting generations without mutation. Finalization remains the
+  separately approval-gated package 5.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

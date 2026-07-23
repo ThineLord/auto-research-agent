@@ -1095,3 +1095,19 @@ Validation and implementation outcomes will be appended only after they are actu
 - Implementation `54c223b` is exact local/upstream/`ls-remote`/PR-head equal. Push/PR runs
   `30030145901`/`30030150062` passed Python 3.10/3.13 and every workflow step; PR 13 comment
   `5061533413` records the result and exclusions.
+
+## 2026-07-24 - ARA-055 package-4 recovery entry and reader guards
+
+- Added lock-held, provider-free recovery before provider preflight, client construction, or agent
+  work for normal, continuous, session, resume, and mock entries.
+- Added non-mutating recovery-required/conflict preview and UI states. Analytics, comparison,
+  benchmark reports, and transaction-sensitive UI readers refuse pending or conflicting round
+  generations without rewriting evidence.
+- Preserved journal-less legacy behavior, configured external run storage, public schemas,
+  package-3 checkpoint-last ordering, and finalization-only handling outside this package.
+- Focused tests pass `9 passed`; related tests pass `256 passed, 540 subtests`; the recovery matrix
+  passes `16 passed, 99 subtests`; full `make check` passes `462 passed, 791 subtests`; staged
+  safety scanned 115 files with zero findings.
+- Implementation `efcad88` is exact local/upstream/`ls-remote`/PR-head equal. Push/PR runs
+  `30034539432`/`30034542276` passed Python 3.10/3.13 and every workflow step; PR 13 comment
+  `5062099962` records the result and exclusions.
