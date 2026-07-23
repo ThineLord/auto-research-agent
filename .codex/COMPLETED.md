@@ -1078,3 +1078,20 @@ Validation and implementation outcomes will be appended only after they are actu
   updated and cleanly mergeable.
 - The engine is intentionally dormant. Package 3 runner integration remains separately
   approval-gated, so KI-055's current runner exposure is not claimed resolved.
+
+## 2026-07-24 - ARA-055 package-3 runner integration
+
+- Routed new and fully evidenced iterative histories through the immutable round journal before
+  canonical publication; recovery applies best output, both histories, memory, research state, and
+  checkpoint in fixed checkpoint-last order.
+- Preserved incomplete legacy histories on their existing compatibility path rather than inventing
+  a missing before-generation; a complete paired history transitions the next round to the
+  transaction path.
+- Added internal/configured-external runner faults for `OSError` and `KeyboardInterrupt`, retry
+  idempotency, no-duplicate history, journal-before-ready ordering, legacy transition, and safe
+  checkpoint alias coverage.
+- Focused/related tests pass `142 passed, 382 subtests`; runner re-audit passes `67 passed, 220
+  subtests`; full `make check` passes `453 passed, 791 subtests`; staged safety scans 114 files clean.
+- Implementation `54c223b` is exact local/upstream/`ls-remote`/PR-head equal. Push/PR runs
+  `30030145901`/`30030150062` passed Python 3.10/3.13 and every workflow step; PR 13 comment
+  `5061533413` records the result and exclusions.

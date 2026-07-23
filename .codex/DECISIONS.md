@@ -873,3 +873,19 @@
   provider calls; ignored runtime data.
 - Checkpoint requirement: commit and push this activation state before editing the runner, then keep
   implementation and recovery closeout in separately validated commits.
+
+## 2026-07-24 - Complete ARA-055 implementation package 3
+
+- Result: implementation `54c223b` routes new and fully evidenced iterative histories through the
+  package-2 prepare/recover engine, with journal creation before ready and checkpoint applied last.
+- Compatibility decision: incomplete or one-sided legacy histories retain the pre-transaction
+  writer because their missing before-generation cannot be reconstructed without an unapproved
+  migration. A complete integer-round pair switches the following round to the transaction path.
+- Path decision: checkpoint roots may use a safety-validated equivalent spelling of the same
+  configured run root; arbitrary, cross-project, moved, or unsafe roots remain rejected.
+- Verification: focused/related `142 passed, 382 subtests`; runner `67 passed, 220 subtests`; full
+  `make check` `453 passed, 791 subtests`; staged safety 114 files clean; push/PR CI
+  `30030145901`/`30030150062` passed Python 3.10/3.13 and every workflow step.
+- Boundary: package 3 does not recover a pending journal at runner entry and does not route
+  preview/UI/report/diagnostic readers, finalization, or migration. Package 4 requires separate
+  approval.

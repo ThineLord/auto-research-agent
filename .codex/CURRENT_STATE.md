@@ -4,20 +4,21 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: implement only ARA-055 package 3 by routing successful iterative rounds through
-  the prepared round-commit engine while preserving existing outputs and control flow.
+- Current goal: ARA-055 package 3 is complete and externally verified; preserve its runner
+  transaction boundary while awaiting separate approval for package 4.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `9d04f46f3f8b173e8d2b3045870ea212ce9a08b6` (the exact
-  externally verified package-2 closeout retained by the additive recovery schema; resolve current
-  `HEAD` live).
-- Last externally verified fallback: `9d04f46f3f8b173e8d2b3045870ea212ce9a08b6` (exact local,
+- State recorded against commit: `54c223bb920c07abe23c019ef44c7761f8a98102` (the exact
+  externally verified package-3 implementation retained by the additive recovery schema; resolve
+  current `HEAD` live).
+- Last externally verified fallback: `54c223bb920c07abe23c019ef44c7761f8a98102` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: ARA-055 package 3 runner integration. Packages 4-7,
-  resume-preview/UI/analytics/report/diagnostic routing, finalization journaling, migration,
-  dependency/config changes, provider calls, and ignored runtime remain excluded.
+- Active task at this snapshot: none. ARA-055 package 4 is the recommended next step but remains
+  separately approval-blocked; packages 4-7, runner-entry recovery, preview/UI/analytics/report/
+  diagnostic routing, finalization journaling, migration, dependency/config changes, provider
+  calls, and ignored runtime remain excluded.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -120,6 +121,33 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 - Interruption recovery: verify the activation commit and CI, then read the package-3 focused tests,
   `src/runner.py`, and the package-2 engine before continuing. Do not widen recovery to runner entry
   or finalization.
+
+## ARA-055 Package 3 Closeout
+
+- Activation commit `6c33d27300a0569167a1dfec87f67647e6fe98ff` is exact remote-equal;
+  push/PR runs `30028438750`/`30028441516` passed Python 3.10/3.13 and every workflow step.
+- Implementation commit `54c223bb920c07abe23c019ef44c7761f8a98102` is exact local/upstream/
+  `ls-remote`/PR-head equal. Push/PR runs `30030145901`/`30030150062` passed Python 3.10/3.13,
+  isolated-wheel validation, formatting, lint, imports, safety, and all tests.
+- New and fully evidenced iterative histories now prepare the immutable project-local journal
+  before the ready transition and recover publication plus best output, both histories, memory,
+  research state, and checkpoint in fixed checkpoint-last order.
+- Legacy resumes without a complete paired history retain the prior compatibility path because
+  their missing before-generation cannot be reconstructed safely. Once that path produces a
+  complete integer-round pair, the next round switches to the transaction engine.
+- Safety-validated equivalent checkpoint root spellings, including configured external-storage
+  aliases and macOS canonical aliases, remain compatible without accepting an external run.
+- Focused/related validation passes `142 passed, 382 subtests`; runner re-audit passes `67 passed,
+  220 subtests`; full `make check` passes all gates with `453 passed, 791 subtests` in 271.12
+  seconds. Staged safety scans 114 tracked/index files with zero findings.
+- Draft PR 13 is open, cleanly mergeable, and updated with comment `5061533413`. Provider calls and
+  ignored-runtime access were zero.
+- Package 3 is complete. Package 4 recovery-required preview/entry/read integration is recommended
+  next but requires separate owner approval; packages 5-7 remain unapproved.
+- If interrupted, verify `54c223b` and its CI, then rerun
+  `.venv/bin/python -m pytest -q tests/test_round_commit_runner.py
+  tests/test_round_commit_recovery.py tests/test_round_loop.py`. Do not start package 4 without
+  explicit approval.
 
 ## Completed Steps
 
@@ -975,20 +1003,25 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Remaining Steps
 
-- Add failing package-2 tests for trusted create-only journal I/O, dry-run classification,
-  ARA-054 publication reconciliation, idempotent apply/recovery, conflict fail-closed behavior,
-  and internal/configured-external fault boundaries.
-- Implement the isolated package-2 engine without adding a runner or preview caller.
-- Run focused, ARA-054/storage/resume regression, fault-matrix, full, staged-safety, remote, and CI
-  validation; then return ARA-055 to deferred with packages 3-7 approval-gated.
+- Keep ARA-055 package 4 blocked until separate owner approval. Its candidate scope is
+  recovery-required runner entry plus preview/UI/report reader integration; it must not be inferred
+  from package-3 approval.
+- Preserve package 3's established transaction ordering for new and fully evidenced histories.
+- Preserve the legacy incomplete-history compatibility path; do not synthesize a missing
+  before-generation or silently migrate journal-less evidence.
+- Keep finalization journaling, diagnostic integration, and legacy migration in separately approved
+  packages 5-7.
 - Keep legacy nonempty canonical partials immutable and fail-closed; an explicit migration remains
   outside ARA-054 authorization.
-- Preserve the confirmed ARA-055 boundary: current ARA-054 does not make canonical publication,
-  both histories, memory, best output, and recovery metadata one atomic transaction.
 - Do not activate ARA-018 without an owner license/distribution decision.
 
 ## Test Status
 
+- ARA-055 package-3 focused/related validation passes `142 passed, 382 subtests`; the final runner
+  layer passes `67 passed, 220 subtests`; full `make check` passes formatting, lint, imports,
+  repository safety, and `453 passed, 791 subtests` over 114 staged files.
+- ARA-055 package-3 implementation `54c223b` is exact local/upstream/`ls-remote`/PR-head equal.
+  Push/PR runs `30030145901`/`30030150062` passed Python 3.10/3.13 and every workflow step.
 - ARA-055 package-2 baseline `make check` passes formatting, lint, imports, safety scans, and `431
   passed, 688 subtests` over 111 tracked files in 33.38 seconds. Exact local/upstream/
   `ls-remote`/PR-head equality holds at `064f5bd`; push/PR runs
@@ -1979,7 +2012,7 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 ```bash
 git status --short --branch
 git rev-parse HEAD
-git log --oneline --decorate -n 10
+.venv/bin/python -m pytest -q tests/test_round_commit_runner.py
 ```
 
 ## Interruption Recovery
@@ -2027,6 +2060,10 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   continuation. Existing canonical partial rounds remain fail-closed and require a separately
   approved explicit migration; do not infer stage truth from placeholders or
   `last_successful_agent`.
+- ARA-055 package 3 is complete at `54c223b`. Preserve journal-before-ready and checkpoint-last
+  ordering, configured external storage, exact metric semantics, and the explicit legacy
+  incomplete-history compatibility path. Package 4 runner-entry/reader integration, package 5
+  finalization, diagnostic integration, and migration remain separately approval-gated.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

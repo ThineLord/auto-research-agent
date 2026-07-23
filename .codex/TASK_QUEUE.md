@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `IN_PROGRESS`
+- Status: `BLOCKED`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -773,6 +773,16 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   `30027550772`/`30027556705` pass Python 3.10/3.13 and every workflow step.
 - Current work: activation checkpoint before runner edits. The next focused command is
   `.venv/bin/python -m pytest -q tests/test_round_commit_runner.py`.
+- Package 3 result: implementation `54c223b` routes new and fully evidenced histories through
+  prepare/recover before publication, keeps checkpoint last, accepts only safety-validated
+  equivalent checkpoint roots, and preserves incomplete legacy histories without fabricated
+  migration.
+- Package 3 validation: focused/related `142 passed, 382 subtests`; runner layer `67 passed, 220
+  subtests`; full `make check` `453 passed, 791 subtests`; staged safety 114 files clean.
+- Package 3 remote verification: exact local/upstream/`ls-remote`/PR-head equality; push/PR runs
+  `30030145901`/`30030150062` pass Python 3.10/3.13 and every workflow step. Draft PR 13 is updated.
+- Current blocker: package 4 recovery-required runner-entry and reader integration changes separate
+  runtime/UX surfaces and requires explicit owner approval. Packages 5-7 remain unapproved.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

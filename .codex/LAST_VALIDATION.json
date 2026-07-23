@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-    "recorded_at": "2026-07-24T01:20:00+08:00",
+    "recorded_at": "2026-07-24T01:42:46+08:00",
   "branch": "codex/sol-autonomous-hardening",
-    "head_commit": "9d04f46f3f8b173e8d2b3045870ea212ce9a08b6",
-    "last_known_stable_commit": "9d04f46f3f8b173e8d2b3045870ea212ce9a08b6",
+    "head_commit": "54c223bb920c07abe23c019ef44c7761f8a98102",
+    "last_known_stable_commit": "54c223bb920c07abe23c019ef44c7761f8a98102",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-    "state_recorded_against_commit": "9d04f46f3f8b173e8d2b3045870ea212ce9a08b6",
+    "state_recorded_against_commit": "54c223bb920c07abe23c019ef44c7761f8a98102",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-        "verified_at": "2026-07-24T01:20:00+08:00",
-        "commit": "9d04f46f3f8b173e8d2b3045870ea212ce9a08b6",
+        "verified_at": "2026-07-24T01:42:46+08:00",
+        "commit": "54c223bb920c07abe23c019ef44c7761f8a98102",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-                "run_id": 30027550772,
+                "run_id": 30030145901,
         "event": "push",
         "workflow": "CI",
-                "head_sha": "9d04f46f3f8b173e8d2b3045870ea212ce9a08b6",
+                "head_sha": "54c223bb920c07abe23c019ef44c7761f8a98102",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-                "run_id": 30027556705,
+                "run_id": 30030150062,
         "event": "pull_request",
         "workflow": "CI",
-                "head_sha": "9d04f46f3f8b173e8d2b3045870ea212ce9a08b6",
+                "head_sha": "54c223bb920c07abe23c019ef44c7761f8a98102",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,34 @@
       }
     }
   },
-    "status": "ara055_package3_active",
+    "status": "ara055_package3_complete",
     "commands": [
+        {
+            "command": "ARA-055 package 3 implementation and remote verification",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "implementation_commit": "54c223bb920c07abe23c019ef44c7761f8a98102",
+                "remote_equal": true,
+                "pull_request": 13,
+                "pull_request_state": "open_draft_mergeable",
+                "pull_request_comment_id": 5061533413,
+                "focused_related_pytest_passed": 142,
+                "focused_related_pytest_subtests_passed": 382,
+                "runner_pytest_passed": 67,
+                "runner_pytest_subtests_passed": 220,
+                "full_pytest_passed": 453,
+                "full_pytest_subtests_passed": 791,
+                "tracked_files_scanned": 114,
+                "safety_findings": 0,
+                "push_run_id": 30030145901,
+                "pull_request_run_id": 30030150062,
+                "python_310": "success",
+                "python_313": "success",
+                "provider_calls": 0,
+                "ignored_runtime_access": 0
+            }
+        },
         {
             "command": "ARA-055 package 3 activation baseline and remote verification",
             "exit_code": 0,
