@@ -673,3 +673,18 @@
   route both boundaries through one marker. Standard finalization records zero completed rounds and
   a reusable next round, then re-raises `KeyboardInterrupt`; ordinary exceptions remain outside this
   catch and keep their prior behavior.
+
+## 2026-07-23 - Approve ARA-054 design stage only
+
+- Approval: the owner explicitly approved the ARA-054 design stage on 2026-07-23.
+- Authorization: inspect tracked code and tests, run provider-free characterization in temporary
+  workspaces, and update recovery/design documentation. Runtime implementation, schema changes, and
+  artifact migration require separate approval.
+- Evidence boundary: preserve every partial-output byte. Do not move, delete, truncate, replace, or
+  overwrite partial evidence during characterization or as an implicit recovery mechanism.
+- Design order: establish the per-stage interrupt/quota state matrix first; map all writers,
+  readers, identity checks, and transaction boundaries second; then compare staging/quarantine,
+  partial-round compatibility, and rollback approaches.
+- Acceptance boundary: the selected design must specify deterministic discovery, ownership,
+  retry, compatibility, crash recovery, and migration behavior, and must keep ARA-055's
+  cross-filesystem history transaction problem explicit rather than silently absorbing it.

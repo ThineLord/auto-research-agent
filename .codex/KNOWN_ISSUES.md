@@ -550,3 +550,17 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
   writes coherent resumable artifacts, leaves the empty pending round reusable, and re-raises for
   CLI status 130. Ordinary exceptions retain their prior propagation behavior; focused, related,
   full local, exact-remote, Python 3.10/3.13 push/PR, wheel, and annotation checks pass.
+
+## KI-054 - Resumable mid-round stops leave an ineligible partial round
+
+- Status: active design only; implementation not yet approved
+- Severity: P2 recovery consistency, high-risk compatibility surface
+- Evidence: the runner persists partial next-round outputs after agent stages and can finalize an
+  interrupt or quota stop with `can_resume=true`, while resume validation rejects a nonempty pending
+  round as uncheckpointed. The exact per-stage state matrix is being re-characterized in isolated
+  provider-free workspaces.
+- Impact: the persisted checkpoint can claim resumability even though immediate preview refuses the
+  same run, requiring unsafe manual intervention to continue.
+- Design boundary: preserve completed rounds and all partial-output bytes; do not silently delete,
+  move, truncate, replace, or overwrite evidence. Runtime behavior, schemas, and migration remain
+  unchanged until a separately approved implementation.

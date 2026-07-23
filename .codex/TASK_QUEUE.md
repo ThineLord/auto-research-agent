@@ -628,7 +628,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-054 - Reconcile resumable mid-round stops with partial output directories
 
-- Status: `DEFERRED`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: high
 - Description: interrupts or quota stops after review/revise/Judge persist a partial next-round
@@ -642,6 +642,10 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Commit required: yes after scoped design approval.
 - Dependencies: requires an explicit staging/quarantine or partial-round compatibility design;
   estimated greater than 30 minutes and must not silently delete partial outputs.
+- Approval: owner approved the design stage on 2026-07-23. Runtime implementation, schema changes,
+  and any move/delete/overwrite of partial evidence remain unauthorized pending separate approval.
+- Design baseline: `make check` passes `399 passed, 621 subtests` over 105 tracked files in 20.90
+  seconds with zero provider calls. Provider-free stage characterization is next.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 

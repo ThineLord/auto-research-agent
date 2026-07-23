@@ -4,19 +4,21 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: preserve the remotely verified ARA-056 checkpoint; no unblocked TODO remains, so
-  await an owner decision on blocked/deferred scope before further implementation.
+- Current goal: complete the owner-approved ARA-054 design stage: characterize the mismatch between
+  partial next-round outputs and resume eligibility, then specify a byte-preserving recovery
+  contract without changing runtime behavior.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `795665d4209502985530f6cba1076933244ffa43` (the exact
+- State recorded against commit: `d60a7a1b5226d6ddd6dff2fb82456ecd12fb18c1` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `795665d4209502985530f6cba1076933244ffa43` (exact local,
+- Last externally verified fallback: `d60a7a1b5226d6ddd6dff2fb82456ecd12fb18c1` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-056 is complete and remote-verified; the queue now has no
-  unblocked TODO, while ARA-018 is owner-blocked and six tasks are dependency-deferred.
+- Active task at this snapshot: ARA-054 design stage only, approved by the owner on 2026-07-23.
+  Runtime implementation, schema changes, and moving, deleting, or overwriting partial evidence
+  remain unauthorized pending a separate implementation approval.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -819,12 +821,25 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 - Committed ARA-056 as `795665d`, pushed it with exact local/upstream/`ls-remote`/PR-head equality,
   and verified push/PR runs `30004044807`/`30004047971`: Python 3.10/3.13, all four isolated-wheel
   steps, and every annotation set passed cleanly. PR 13 remains open, draft, and mergeable.
+- Reverified the ARA-056 closeout `d60a7a1` with exact local/upstream/`ls-remote`/PR-head equality;
+  closeout push/PR runs `30004494316`/`30004498366` passed Python 3.10/3.13.
+- Received explicit owner approval for the ARA-054 design stage on 2026-07-23. This authorization
+  covers provider-free characterization in temporary workspaces and durable design/recovery
+  documentation only.
+- Ran the ARA-054 design baseline `make check`: Ruff, imports, both repository-safety scans, and
+  pytest pass with `399 passed, 621 subtests` over 105 tracked files in 20.90 seconds.
 
 ## Remaining Steps
 
+- Characterize ARA-054 draft/review/revise/Judge interrupt and quota stops using provider-free temporary
+  workspaces, recording partial-output bytes, checkpoint identity, preview classification, and
+  retry behavior.
+- Map writer, reader, schema, filesystem, security, and ARA-055 transaction boundaries.
+- Compare staging/quarantine, partial-round compatibility, and rollback designs; reject any design
+  that silently deletes, moves, or overwrites partial evidence.
+- Produce and validate the ARA-054 design document. Do not implement its runtime behavior without a
+  separate owner approval.
 - Do not activate ARA-018 without an owner license/distribution decision.
-- Do not activate the six deferred tasks until their recorded dependencies or design approvals are
-  satisfied.
 
 ## Test Status
 
@@ -1793,9 +1808,7 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 ## Next Command
 
 ```bash
-git status --short --branch
-.venv/bin/python -m pytest -q tests/test_recovery_state.py
-git diff --check
+rg -n "round_partial_saved|can_resume|uncheckpointed|next_round" src tests
 ```
 
 ## Interruption Recovery
@@ -1835,6 +1848,9 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   pre-agent/agent manual-interrupt marker, status 130, reusable empty pending rounds, ARA-041 startup
   ordering, cooperative status-0 stops, schemas, ordinary exception behavior, and legacy resume
   compatibility; do not broaden into ARA-054/055 transaction design.
+- ARA-054 is authorized for design only. Do not change runner/resume/storage runtime behavior,
+  artifact schemas, or compatibility loaders, and do not move, delete, truncate, replace, or
+  overwrite partial-round evidence. Use only synthetic provider-free temporary workspaces.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

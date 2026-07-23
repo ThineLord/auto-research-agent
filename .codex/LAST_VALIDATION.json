@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-23T19:46:40+08:00",
+  "recorded_at": "2026-07-23T20:16:59+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "795665d4209502985530f6cba1076933244ffa43",
-  "last_known_stable_commit": "795665d4209502985530f6cba1076933244ffa43",
+  "head_commit": "d60a7a1b5226d6ddd6dff2fb82456ecd12fb18c1",
+  "last_known_stable_commit": "d60a7a1b5226d6ddd6dff2fb82456ecd12fb18c1",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "795665d4209502985530f6cba1076933244ffa43",
+  "state_recorded_against_commit": "d60a7a1b5226d6ddd6dff2fb82456ecd12fb18c1",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-23T19:43:22+08:00",
-    "commit": "795665d4209502985530f6cba1076933244ffa43",
+    "verified_at": "2026-07-23T20:02:28+08:00",
+    "commit": "d60a7a1b5226d6ddd6dff2fb82456ecd12fb18c1",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 30004044807,
+        "run_id": 30004494316,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "795665d4209502985530f6cba1076933244ffa43",
+        "head_sha": "d60a7a1b5226d6ddd6dff2fb82456ecd12fb18c1",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 30004047971,
+        "run_id": 30004498366,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "795665d4209502985530f6cba1076933244ffa43",
+        "head_sha": "d60a7a1b5226d6ddd6dff2fb82456ecd12fb18c1",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,33 @@
       }
     }
   },
-  "status": "ara056_closeout_indexed_full_passed_awaiting_commit_push_ci",
+  "status": "ara054_design_approved_baseline_passed_characterization_pending",
   "commands": [
+    {
+      "command": "ARA-054 design startup recovery verification and baseline make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "owner_approval": "design_stage_only",
+        "commit": "d60a7a1b5226d6ddd6dff2fb82456ecd12fb18c1",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "pull_request_head_equal": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 30004494316,
+        "pull_request_run_id": 30004498366,
+        "python_310": "success",
+        "python_313": "success",
+        "pytest_passed": 399,
+        "pytest_subtests_passed": 621,
+        "tracked_files_scanned": 105,
+        "staged_files_scanned": 105,
+        "safety_findings": 0,
+        "duration_seconds": 20.9,
+        "provider_calls": 0
+      }
+    },
     {
       "command": "ARA-056 indexed recovery-closeout make check",
       "exit_code": 0,
