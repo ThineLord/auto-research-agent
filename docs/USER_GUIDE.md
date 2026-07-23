@@ -346,6 +346,11 @@ CLI `--resume` 会先打印 resume preview，包括 run id/root、last completed
 stop reason、是否可 resume、下一轮目录状态和安全动作。UI 的 Resume 区域也显示同样信息，
 并会提示缺失、stale、路径不安全的 checkpoint 或 partial next-round directory；这些检查失败时
 Resume 按钮会禁用。
+如果 preview 显示 `round_commit_recovery_required`，它只是在只读地报告成功轮次的跨文件提交
+尚未完成，不会在 UI 内修改 artifact。下一次 normal/continuous/session/resume/mock CLI 入口会
+先取得项目锁，在 provider 预检和 Agent 构造前进行无网络、可重复的 roll-forward，然后用推进后的
+checkpoint 重新生成 resume preview。若显示 `round_commit_recovery_conflict`，请保留 journal 和
+所有 artifact 供人工检查；analytics、benchmark report 和 UI 的相关读取会继续 fail closed。
 checkpoint 若显式提供 `run_id`，必须与 canonical run 目录名一致；省略时会安全推导。resume
 会保留旧 `run_manifest.json` 的创建期 provenance 和未知扩展字段；若 manifest 无法无损读取或
 合并，会在写入任何新 artifact 前停止。

@@ -13,6 +13,10 @@ from statistics import mean
 from typing import Any
 
 from . import constants as stop_constants
+from .round_commit_recovery import (
+    ensure_round_commit_readable,
+    infer_round_commit_project_dir,
+)
 from .storage import display_path, parse_score, read_file_text, write_text
 
 _KNOWN_STOP_REASONS = frozenset(
@@ -210,7 +214,14 @@ def _read_round_text(path: Path) -> str:
     return read_file_text(path).strip()
 
 
-def analyze_benchmark_run(run_root: Path) -> BenchmarkReportAnalysis:
+def analyze_benchmark_run(
+    run_root: Path,
+    *,
+    project_dir: Path | None = None,
+) -> BenchmarkReportAnalysis:
+    selected_project = project_dir or infer_round_commit_project_dir(run_root)
+    if selected_project is not None:
+        ensure_round_commit_readable(selected_project)
     round_dirs = sorted(
         [path for path in run_root.glob("round_*") if path.is_dir()],
         key=_round_index,
@@ -302,8 +313,13 @@ def analyze_benchmark_run(run_root: Path) -> BenchmarkReportAnalysis:
     )
 
 
-def write_benchmark_report(*, run_root: Path, output_path: Path) -> BenchmarkReportAnalysis:
-    analysis = analyze_benchmark_run(run_root)
+def write_benchmark_report(
+    *,
+    run_root: Path,
+    output_path: Path,
+    project_dir: Path | None = None,
+) -> BenchmarkReportAnalysis:
+    analysis = analyze_benchmark_run(run_root, project_dir=project_dir)
     lines = [
         "# Auto Research Agent Benchmark Report",
         "",

@@ -7,6 +7,7 @@ import math
 from pathlib import Path
 from typing import Any
 
+from .round_commit_recovery import infer_round_commit_project_dir
 from .run_compare import load_run_summary
 from .storage import read_regular_text, write_json_file
 
@@ -80,10 +81,20 @@ def _score_trend(round_metrics: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def analyze_run(run_root: Path, *, safe_artifacts: bool = False) -> dict[str, Any]:
+def analyze_run(
+    run_root: Path,
+    *,
+    safe_artifacts: bool = False,
+    project_dir: Path | None = None,
+) -> dict[str, Any]:
     """Summarize one run without provider calls or scoring reinterpretation."""
     run_root = Path(run_root)
-    summary = load_run_summary(run_root, safe_artifacts=safe_artifacts)
+    selected_project = project_dir or infer_round_commit_project_dir(run_root)
+    summary = load_run_summary(
+        run_root,
+        safe_artifacts=safe_artifacts,
+        project_dir=selected_project,
+    )
     round_metrics = _read_json_list(
         run_root / "round_metrics.json",
         safe_artifacts=safe_artifacts,
@@ -149,8 +160,13 @@ def analyze_run(run_root: Path, *, safe_artifacts: bool = False) -> dict[str, An
     }
 
 
-def write_run_analysis(run_root: Path, output_path: Path) -> dict[str, Any]:
-    analysis = analyze_run(run_root)
+def write_run_analysis(
+    run_root: Path,
+    output_path: Path,
+    *,
+    project_dir: Path | None = None,
+) -> dict[str, Any]:
+    analysis = analyze_run(run_root, project_dir=project_dir)
     authorized_output_path = output_path.parent.resolve(strict=False) / output_path.name
     write_json_file(authorized_output_path, analysis)
     return analysis

@@ -67,6 +67,14 @@ class RoundCommitRecoveryIOError(OSError):
         super().__init__(code)
 
 
+class RoundCommitReadError(RuntimeError):
+    """A fixed, path-redacted blocker for mixed-generation readers."""
+
+    def __init__(self, code: str):
+        self.code = code
+        super().__init__(code)
+
+
 @dataclass(frozen=True)
 class RoundCommitRecoveryInspection:
     status: str
@@ -606,10 +614,10 @@ def _load_round_commit_context(project_dir: Path) -> _RoundCommitContext | None:
     project_dir, _ = _project_context(project_dir)
     journal_path = project_dir / ROUND_COMMIT_JOURNAL_NAME
     finalization_path = project_dir / RUN_FINALIZE_JOURNAL_NAME
-    if _journal_exists(finalization_path, anchor=project_dir):
-        raise _blocked("finalization_journal_present")
     if not _journal_exists(journal_path, anchor=project_dir):
         return None
+    if _journal_exists(finalization_path, anchor=project_dir):
+        raise _blocked("finalization_journal_present")
     try:
         journal_text = read_regular_text_bounded(
             journal_path,
@@ -743,6 +751,16 @@ def classify_round_commit_recovery(
 ) -> RoundCommitRecoveryInspection:
     """Inspect one fixed journal without mutating publication or artifact state."""
     try:
+        candidate_project = Path(project_dir).expanduser().absolute()
+        if not _journal_exists(
+            candidate_project / ROUND_COMMIT_JOURNAL_NAME,
+            anchor=candidate_project,
+        ):
+            return RoundCommitRecoveryInspection(
+                status="absent",
+                can_recover=False,
+                journal_present=False,
+            )
         context = _load_round_commit_context(project_dir)
         if context is None:
             return RoundCommitRecoveryInspection(
@@ -768,6 +786,39 @@ def classify_round_commit_recovery(
             journal_present=True,
             blocked_reason=exc.code,
         )
+
+
+def infer_round_commit_project_dir(run_root: Path) -> Path | None:
+    """Infer the project only from the supported lexical ``project/runs/run`` form."""
+    run_root = Path(run_root).expanduser()
+    if run_root.parent.name != "runs":
+        return None
+    return run_root.parent.parent
+
+
+def round_commit_read_blocker(
+    project_dir: Path,
+) -> tuple[str | None, RoundCommitRecoveryInspection]:
+    """Return a fixed blocker without changing journal or artifact state."""
+    inspection = classify_round_commit_recovery(project_dir)
+    if inspection.status == "absent":
+        return None, inspection
+    blocker = (
+        "round_commit_recovery_required"
+        if inspection.can_recover
+        else "round_commit_recovery_conflict"
+    )
+    return blocker, inspection
+
+
+def ensure_round_commit_readable(
+    project_dir: Path,
+) -> RoundCommitRecoveryInspection:
+    """Fail before a reader can combine artifacts from different generations."""
+    blocker, inspection = round_commit_read_blocker(project_dir)
+    if blocker is not None:
+        raise RoundCommitReadError(blocker)
+    return inspection
 
 
 def _history_after_text(

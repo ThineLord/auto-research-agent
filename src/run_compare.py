@@ -8,6 +8,10 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from .metrics import JUDGE_RUBRIC_KEYS, summarize_round_metrics
+from .round_commit_recovery import (
+    ensure_round_commit_readable,
+    infer_round_commit_project_dir,
+)
 from .run_config import read_run_config
 from .storage import read_regular_text, write_json_file
 
@@ -100,8 +104,16 @@ def _error_rounds(summary: dict[str, Any], round_metrics: Sequence[dict[str, Any
     return [entry.get("round") for entry in round_metrics if entry.get("errors")]
 
 
-def load_run_summary(run_root: Path, *, safe_artifacts: bool = False) -> dict[str, Any]:
+def load_run_summary(
+    run_root: Path,
+    *,
+    safe_artifacts: bool = False,
+    project_dir: Path | None = None,
+) -> dict[str, Any]:
     run_root = Path(run_root)
+    selected_project = project_dir or infer_round_commit_project_dir(run_root)
+    if selected_project is not None:
+        ensure_round_commit_readable(selected_project)
     run_summary_path = run_root / "run_summary.json"
     run_config_path = run_root / "run_config.json"
     round_metrics_path = run_root / "round_metrics.json"

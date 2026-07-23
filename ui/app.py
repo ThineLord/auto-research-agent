@@ -61,6 +61,10 @@ from src.resume_safety import (
     validate_project_run_root,
     validate_resume_round_dir,
 )
+from src.round_commit_recovery import (
+    infer_round_commit_project_dir,
+    round_commit_read_blocker,
+)
 from src.run_analytics import analyze_run
 from src.run_compare import compare_runs
 from src.runtime import (
@@ -890,6 +894,27 @@ def describe_resume_state(
     selected_model: str,
 ) -> dict[str, Any]:
     if not checkpoint:
+        preview = build_resume_preview(
+            project_dir=project_dir,
+            checkpoint=checkpoint,
+            repo_root=ROOT,
+        )
+        if preview.get("blocked_reason") in {
+            "round_commit_recovery_required",
+            "round_commit_recovery_conflict",
+        }:
+            return {
+                "can_resume": False,
+                "level": "warning",
+                "message": str(preview["message"]),
+                "message_key": str(preview["blocked_reason"]),
+                "message_args": {},
+                "details": {
+                    "run_id": preview.get("run_id") or "N/A",
+                    "next_round": preview.get("next_round"),
+                    "round_commit_status": preview.get("round_commit_status"),
+                },
+            }
         return {
             "can_resume": False,
             "level": "info",
@@ -924,6 +949,25 @@ def describe_resume_state(
         checkpoint=checkpoint,
         repo_root=ROOT,
     )
+    if preview.get("blocked_reason") in {
+        "round_commit_recovery_required",
+        "round_commit_recovery_conflict",
+    }:
+        return {
+            "can_resume": False,
+            "level": "warning",
+            "message": str(preview["message"]),
+            "message_key": str(preview["blocked_reason"]),
+            "message_args": {},
+            "model_mismatch": model_mismatch,
+            "checkpoint_model": checkpoint_model,
+            "selected_model": selected_model,
+            "details": {
+                "run_id": preview.get("run_id") or "N/A",
+                "next_round": preview.get("next_round"),
+                "round_commit_status": preview.get("round_commit_status"),
+            },
+        }
     run_id = str(preview.get("run_id") or checkpoint.get("run_id") or "N/A")
     last_completed_round = _safe_int(preview.get("last_completed_round"))
     next_round = _safe_int(preview.get("next_round"), last_completed_round + 1)
@@ -1099,6 +1143,9 @@ def _short_commit(value: Any) -> str:
 
 
 def build_run_metadata_rows(project_dir: Path, checkpoint: dict[str, Any]) -> list[dict[str, str]]:
+    recovery_blocker, _ = round_commit_read_blocker(project_dir)
+    if recovery_blocker is not None:
+        return []
     paths = resolve_run_artifact_paths(project_dir, checkpoint)
     run_config = (
         read_json_file(paths["run_config"])
@@ -1238,10 +1285,19 @@ def _artifact_path_display(value: Any) -> str:
     return output_display_path(Path(text))
 
 
-def build_run_comparison_rows(run_roots: Sequence[Path]) -> list[dict[str, Any]]:
+def build_run_comparison_rows(
+    run_roots: Sequence[Path],
+    *,
+    project_dir: Path | None = None,
+) -> list[dict[str, Any]]:
     safe_run_roots = []
     for run_root_value in run_roots:
         run_root = Path(run_root_value)
+        selected_project = project_dir or infer_round_commit_project_dir(run_root)
+        if selected_project is not None:
+            blocker, _ = round_commit_read_blocker(selected_project)
+            if blocker is not None:
+                continue
         try:
             root_metadata = run_root.lstat()
         except OSError:
@@ -1302,6 +1358,20 @@ def _has_run_artifacts(run_root: Path) -> bool:
 
 
 def build_run_analytics_dashboard(project_dir: Path, checkpoint: dict[str, Any]) -> dict[str, Any]:
+    recovery_blocker, recovery = round_commit_read_blocker(project_dir)
+    if recovery_blocker is not None:
+        return {
+            "available": False,
+            "blocked_reason": recovery_blocker,
+            "round_commit_status": recovery.status,
+            "cards": [],
+            "score_rows": [],
+            "rubric_rows": [],
+            "similarity_rows": [],
+            "agent_timing_rows": [],
+            "token_rows": [],
+            "sources": [],
+        }
     paths = resolve_run_artifact_paths(project_dir, checkpoint)
     run_root = paths["run_root"]
     run_summary = (
@@ -1332,7 +1402,11 @@ def build_run_analytics_dashboard(project_dir: Path, checkpoint: dict[str, Any])
         and run_root.exists()
         and _has_run_artifacts(run_root)
     ):
-        analysis = analyze_run(run_root, safe_artifacts=True)
+        analysis = analyze_run(
+            run_root,
+            safe_artifacts=True,
+            project_dir=project_dir,
+        )
     rounds = analysis.get("rounds") if isinstance(analysis.get("rounds"), dict) else {}
     score = analysis.get("score") if isinstance(analysis.get("score"), dict) else {}
     robustness = analysis.get("robustness") if isinstance(analysis.get("robustness"), dict) else {}
@@ -1543,7 +1617,10 @@ def render_run_analytics_dashboard(project_dir: Path, checkpoint: dict[str, Any]
     dashboard = build_run_analytics_dashboard(project_dir, checkpoint)
     st.subheader(t("run_analytics_dashboard"))
     if not dashboard["available"]:
-        st.info(t("run_analytics_empty"))
+        if dashboard.get("blocked_reason"):
+            st.warning(t(str(dashboard["blocked_reason"])))
+        else:
+            st.info(t("run_analytics_empty"))
         return
 
     metric_columns = st.columns(len(dashboard["cards"]))
@@ -1618,6 +1695,7 @@ def _render_dashboard_table_chart(
 
 
 def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[dict[str, Any]]:
+    recovery_blocker, _ = round_commit_read_blocker(project_dir)
     paths = resolve_run_artifact_paths(project_dir, checkpoint)
     run_root = (
         paths["run_root"] if paths["run_scope_valid"] and paths["run_root"] != project_dir else None
@@ -1729,6 +1807,19 @@ def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[
 
     resolved_catalog = []
     for item in catalog:
+        if recovery_blocker is not None and item["label"] in {
+            "Best output",
+            "Checkpoint",
+            "Round metrics",
+            "Score history",
+            "Latest round draft",
+            "Latest round review",
+            "Latest round revised",
+            "Latest round judge",
+        }:
+            item["path"] = None
+            item["path_safe"] = False
+            item["missing_key"] = recovery_blocker
         path = item["path"]
         path_safe = bool(item.get("path_safe", True)) and (
             path is None or artifact_path_is_safe(path, allow_missing=True)
@@ -1749,7 +1840,15 @@ def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[
     return resolved_catalog
 
 
-def load_score_history_rows(score_history_path: Path) -> list[dict[str, Any]]:
+def load_score_history_rows(
+    score_history_path: Path,
+    *,
+    project_dir: Path | None = None,
+) -> list[dict[str, Any]]:
+    if project_dir is not None:
+        blocker, _ = round_commit_read_blocker(project_dir)
+        if blocker is not None:
+            return []
     try:
         content = read_file_text(score_history_path)
         if not content:
@@ -2675,7 +2774,10 @@ def main() -> None:
 
     render_run_analytics_dashboard(proj_path, checkpoint)
 
-    score_rows = load_score_history_rows(proj_path / "score_history.json")
+    score_rows = load_score_history_rows(
+        proj_path / "score_history.json",
+        project_dir=proj_path,
+    )
     st.subheader(t("score_history_table"))
     if score_rows:
         st.dataframe(score_rows, width="stretch")
@@ -2702,7 +2804,10 @@ def main() -> None:
         if len(selected_run_roots) < 2:
             st.info(t("run_comparison_select_two"))
         else:
-            comparison_rows = build_run_comparison_rows(selected_run_roots)
+            comparison_rows = build_run_comparison_rows(
+                selected_run_roots,
+                project_dir=proj_path,
+            )
             st.dataframe(comparison_rows, width="stretch", hide_index=True)
             chart_rows = [
                 {

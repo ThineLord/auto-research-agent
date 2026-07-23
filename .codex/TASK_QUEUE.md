@@ -800,8 +800,18 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Package 4 exclusions: no finalization journal or finalization reader behavior, diagnostic
   integration, legacy migration, dependency/config changes, provider calls, ignored-runtime
   access, or packages 5-7.
-- Current work: write and publish the package 4 activation state, then audit exact runner lock and
-  consumer boundaries before adding the focused failing tests.
+- Package 4 activation verification: `c2a7af5` is exact local/upstream/`ls-remote`/PR-head equal;
+  push/PR runs `30031800668`/`30031802489` pass Python 3.10/3.13 and every workflow step.
+- Package 4 local result: entry recovery runs under the existing lock before provider/client/agent
+  work for every approved iterative mode; read-only preview/UI/analytics/compare/report paths
+  expose or reject pending/conflicting round generations without mutation. Finalization-only and
+  diagnostic behavior remain excluded.
+- Package 4 local validation: focused `9 passed`; related `256 passed, 540 subtests`; recovery
+  matrix `16 passed, 99 subtests`; full `make check` `462 passed, 791 subtests`; provider and
+  ignored-runtime access zero.
+- Current work: explicitly stage the ARA-055 package 4 implementation, run indexed safety and diff
+  checks, create the semantic implementation commit, push, and verify Python 3.10/3.13 CI before
+  recovery closeout.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

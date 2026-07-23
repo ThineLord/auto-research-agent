@@ -4,6 +4,11 @@
 
 ### Fixed
 
+* A pending round transaction is now recovered under the project run lock before provider
+  preflight, client construction, or new runner work. Resume preview and UI expose recoverable and
+  conflicting states without mutating artifacts; analytics, benchmark reports, comparison rows,
+  score history, metadata, and transaction-sensitive output browsing refuse mixed generations
+  until recovery completes. Unknown or edited generations remain preserved and fail closed.
 * New iterative rounds with complete history evidence now prepare one immutable project-local
   transaction before canonical publication, then recover best output, both history files, memory,
   research state, and checkpoint in a fixed checkpoint-last order. Interrupted writes can be

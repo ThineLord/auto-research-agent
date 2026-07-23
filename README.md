@@ -79,6 +79,11 @@ Mock mode 会复用正常 round runner，写入 `run_config.json`、`round_metri
 - 新运行会把未完成轮次写入 `partial_rounds/` 的只增 attempt；中断或免费层配额暂停后，
   resume 会保留旧 attempt 并从 draft 重试该轮。没有可信 attempt manifest 的旧式非空
   `round_NN` 仍会 fail-safe 阻塞，避免覆盖 partial/uncheckpointed 输出。
+- 如果成功轮次在跨文件 history/state 提交中断，项目目录会保留固定的 round transaction
+  journal。下一次 normal/continuous/session/resume/mock 入口会先取得项目锁并在 provider
+  预检前完成无网络恢复；preview/UI 只报告状态，不会自行写入。恢复完成前，analytics、
+  benchmark report 和 UI 中依赖该代 artifact 的视图会拒绝混合读取；若检测到人工编辑或未知
+  代际则保留全部证据并 fail closed。
 - resume 会保留并追加同一 run 的既有 metrics/score history、best-round 和上一轮上下文；如果既有
   history 无法安全解析、互相冲突或包含重复/未来轮次，会在写入任何 run artifact 前 fail-safe
   阻塞，并让 CLI 返回非零状态。

@@ -9,10 +9,10 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `9457a25b4b4310c0220662447d10413808478a21` (the exact
-  externally verified package-3 closeout retained by the additive recovery schema; resolve current
-  `HEAD` live).
-- Last externally verified fallback: `9457a25b4b4310c0220662447d10413808478a21` (exact local,
+- State recorded against commit: `c2a7af598fabaadf16b0dc1363a1615b365d5aa0` (the exact
+  externally verified package-4 activation retained by the additive recovery schema; resolve
+  current `HEAD` live).
+- Last externally verified fallback: `c2a7af598fabaadf16b0dc1363a1615b365d5aa0` (exact local,
   remote-tracking, `ls-remote`, GitHub branch, and PR-head equality plus all Python 3.10/3.13
   push/PR jobs passed)
 - Active task at this snapshot: ARA-055 package 4. Authorized scope is recovery under the existing
@@ -168,6 +168,29 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   `.venv/bin/python -m pytest -q tests/test_round_commit_entry.py`.
 - Interruption recovery: verify the activation commit and CI, then inspect the runner lock
   lifecycle and the existing preview/UI/report/analytics readers before adding tests or routing.
+
+## ARA-055 Package 4 Local Validation
+
+- Activation commit `c2a7af598fabaadf16b0dc1363a1615b365d5aa0` is exact local/upstream/
+  `ls-remote`/PR-head equal. Push/PR runs `30031800668`/`30031802489` passed Python 3.10/3.13,
+  isolated-wheel validation, formatting, lint, imports, safety, and all tests.
+- Normal, continuous, session, resume, and mock entry now recover a valid pending round commit
+  under the existing project lock before provider preflight, client construction, or agent work.
+  Diagnostic and finalization behavior remain outside this package.
+- Preview/UI expose fixed recovery-required or conflict states without mutation. Single-run
+  analytics, comparison, benchmark reports, UI metadata/history/analytics/comparison, and
+  transaction-sensitive output browsing fail closed while the round journal is present.
+- The reader guard first checks only the fixed round-journal leaf. Projects with no round journal
+  retain prior handling of unrelated unsafe legacy metadata; a finalization-only file remains
+  outside package-4 routing.
+- Pre-fix focused evidence was `5 failed`; final package coverage passes `9 passed`. The first
+  related regression found one no-journal metadata-symlink false conflict; the root cause was fixed
+  and the exact regression plus package suite passed.
+- Final related validation passes `256 passed, 540 subtests`; the cross-filesystem recovery matrix
+  passes `16 passed, 99 subtests`; final `make check` passes all gates with `462 passed, 791
+  subtests` in 293.46 seconds. No provider or ignored-runtime access occurred.
+- ARA-055 package 4 implementation is locally stable and ready for explicit staging, safety
+  scanning, semantic commit, push, and remote CI verification.
 
 ## Completed Steps
 
@@ -1041,6 +1064,11 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Test Status
 
+- ARA-055 package-4 focused coverage passes `9 passed`; related coverage passes `256 passed, 540
+  subtests`; the full recovery matrix passes `16 passed, 99 subtests`; final `make check` passes
+  formatting, lint, imports, both safety modes, and `462 passed, 791 subtests`.
+- ARA-055 package-4 activation `c2a7af5` is exact local/upstream/`ls-remote`/PR-head equal.
+  Push/PR runs `30031800668`/`30031802489` passed Python 3.10/3.13 and every workflow step.
 - ARA-055 package-3 closeout `9457a25` is exact local/upstream/`ls-remote`/PR-head equal.
   Closeout push/PR runs `30030747254`/`30030751034` passed Python 3.10/3.13 and every workflow
   step.
@@ -1736,6 +1764,10 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Recent Failed Command
 
+- The first ARA-055 package-4 related regression reported one failure: a project with no round
+  journal but an unrelated unsafe checkpoint symlink was mislabeled as a round-commit conflict.
+  The reader guard now checks the fixed round-journal leaf first; the exact benchmark regression,
+  focused suite, related suite, and two full `make check` runs pass.
 - A read-only queue search used a backticked status token in a double-quoted shell command, so zsh
   attempted to execute that token and printed `command not found`. It changed no file; the search
   was rerun with a literal-safe single-quoted pattern.

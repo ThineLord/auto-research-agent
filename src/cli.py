@@ -68,6 +68,12 @@ from .package_resources import (
 )
 from .project_input import ProjectInputError, load_project_input
 from .resume import run_resume_mode
+from .round_commit_recovery import (
+    RoundCommitReadError,
+    RoundCommitRecoveryInspection,
+    classify_round_commit_recovery,
+    recover_round_commit,
+)
 from .run_analytics import analyze_run
 from .run_compare import compare_runs
 from .runner import ResumeHistoryError, run_iterative_rounds
@@ -366,6 +372,33 @@ def _print_run_lock_recovery_hint(console: Console, root: Path, project_dir: Pat
     )
 
 
+def _recover_pending_round_commit(
+    *,
+    console: Console,
+    project_dir: Path,
+) -> RoundCommitRecoveryInspection:
+    """Recover one valid journal after the caller acquires the project lock."""
+    inspection = classify_round_commit_recovery(project_dir)
+    if inspection.status == "absent":
+        return inspection
+    if not inspection.can_recover:
+        console.print(
+            "[red]Round commit recovery is blocked; preserved artifacts require inspection.[/red]"
+        )
+        raise SystemExit(_EXIT_STARTUP_ERROR)
+    try:
+        recovered = recover_round_commit(project_dir)
+    except (OSError, RuntimeError):
+        console.print(
+            "[red]Round commit recovery failed; preserved artifacts require inspection.[/red]"
+        )
+        raise SystemExit(_EXIT_STARTUP_ERROR) from None
+    console.print(
+        "[yellow]Recovered pending round commit before starting new runner work.[/yellow]"
+    )
+    return recovered
+
+
 def _unsafe_lock_path_message(project_dir: Path) -> str | None:
     """Preserve actionable lock diagnostics when project-wide preflight fails first."""
     try:
@@ -424,7 +457,11 @@ def _run_compare_cli(args: argparse.Namespace, console: Console, root: Path) -> 
         _resolve_repo_relative_path(root, run_root)
         for run_root in (getattr(args, "compare_runs", None) or [])
     ]
-    comparison = _privacy_safe_comparison(compare_runs(run_roots), root)
+    try:
+        comparison = _privacy_safe_comparison(compare_runs(run_roots), root)
+    except RoundCommitReadError as exc:
+        console.print(f"[red]Run comparison blocked: {exc.code}.[/red]")
+        raise SystemExit(_EXIT_STARTUP_ERROR) from None
     output_arg = getattr(args, "compare_output", None)
     if output_arg:
         try:
@@ -445,7 +482,11 @@ def _run_compare_cli(args: argparse.Namespace, console: Console, root: Path) -> 
 
 def _run_analyze_cli(args: argparse.Namespace, console: Console, root: Path) -> dict[str, object]:
     run_root = _resolve_repo_relative_path(root, str(getattr(args, "analyze_run", "")))
-    analysis = _privacy_safe_run_analysis(analyze_run(run_root), root)
+    try:
+        analysis = _privacy_safe_run_analysis(analyze_run(run_root), root)
+    except RoundCommitReadError as exc:
+        console.print(f"[red]Run analysis blocked: {exc.code}.[/red]")
+        raise SystemExit(_EXIT_STARTUP_ERROR) from None
     output_arg = getattr(args, "analyze_output", None)
     if output_arg:
         try:
@@ -473,6 +514,43 @@ def _requires_generation_resources(args: argparse.Namespace) -> bool:
             "cloud_free_profile",
         )
     )
+
+
+def _validate_model_provider_startup(
+    *,
+    args: argparse.Namespace,
+    console: Console,
+    provider: str,
+    model_name: str,
+    gemini_api_key_env: str,
+    effective_gemini_api_key: str,
+) -> None:
+    if provider == MODEL_PROVIDER_OLLAMA:
+        installed_models, ollama_error = list_installed_ollama_models()
+        if ollama_error:
+            console.print(f"[red]{ollama_error}[/red]")
+            console.print("[yellow]Start Ollama service, then retry.[/yellow]")
+            raise SystemExit(_EXIT_STARTUP_ERROR)
+        if model_name not in installed_models:
+            console.print(
+                f"[red]Model {model_name} is not installed. Run: ollama pull {model_name}[/red]"
+            )
+            if args.model is None and "llama3.1:8b" in installed_models:
+                console.print("[yellow]Suggestion: fallback available -> llama3.1:8b[/yellow]")
+            raise SystemExit(_EXIT_STARTUP_ERROR)
+    elif provider == MODEL_PROVIDER_GEMINI:
+        if not _has_gemini_api_key_source(
+            api_key_env=gemini_api_key_env,
+            config_api_key=effective_gemini_api_key,
+        ):
+            console.print(
+                "[red]Gemini API key is missing. Set the configured environment variable, "
+                "GEMINI_API_KEY, or GOOGLE_API_KEY, then retry.[/red]"
+            )
+            raise SystemExit(_EXIT_STARTUP_ERROR)
+    else:
+        console.print(f"[red]Unsupported model provider: {provider}[/red]")
+        raise SystemExit(_EXIT_STARTUP_ERROR)
 
 
 def main() -> None:
@@ -716,6 +794,10 @@ def main() -> None:
                 console.print(f"[red]{lock_error}[/red]")
                 _print_run_lock_recovery_hint(console, root, project_dir)
                 raise SystemExit(_EXIT_STARTUP_ERROR)
+            _recover_pending_round_commit(
+                console=console,
+                project_dir=project_dir,
+            )
             agents = build_mock_agents(topic_context=topic_context)
             run_iterative_rounds(
                 console=console,
@@ -749,32 +831,15 @@ def main() -> None:
             release_run_lock(run_lock_path)
         return
 
-    if provider == MODEL_PROVIDER_OLLAMA:
-        installed_models, ollama_error = list_installed_ollama_models()
-        if ollama_error:
-            console.print(f"[red]{ollama_error}[/red]")
-            console.print("[yellow]Start Ollama service, then retry.[/yellow]")
-            raise SystemExit(_EXIT_STARTUP_ERROR)
-        if model_name not in installed_models:
-            console.print(
-                f"[red]Model {model_name} is not installed. Run: ollama pull {model_name}[/red]"
-            )
-            if args.model is None and "llama3.1:8b" in installed_models:
-                console.print("[yellow]Suggestion: fallback available -> llama3.1:8b[/yellow]")
-            raise SystemExit(_EXIT_STARTUP_ERROR)
-    elif provider == MODEL_PROVIDER_GEMINI:
-        if not _has_gemini_api_key_source(
-            api_key_env=gemini_api_key_env,
-            config_api_key=effective_gemini_api_key,
-        ):
-            console.print(
-                "[red]Gemini API key is missing. Set the configured environment variable, "
-                "GEMINI_API_KEY, or GOOGLE_API_KEY, then retry.[/red]"
-            )
-            raise SystemExit(_EXIT_STARTUP_ERROR)
-    else:
-        console.print(f"[red]Unsupported model provider: {provider}[/red]")
-        raise SystemExit(_EXIT_STARTUP_ERROR)
+    if args.cloud_free_discover or args.cloud_free_profile:
+        _validate_model_provider_startup(
+            args=args,
+            console=console,
+            provider=provider,
+            model_name=model_name,
+            gemini_api_key_env=gemini_api_key_env,
+            effective_gemini_api_key=effective_gemini_api_key,
+        )
 
     if args.cloud_free_discover:
         discovered, error = discover_free_cloud_models(
@@ -925,6 +990,19 @@ def main() -> None:
             console.print(f"[red]{lock_error}[/red]")
             _print_run_lock_recovery_hint(console, root, project_dir)
             raise SystemExit(_EXIT_STARTUP_ERROR)
+        if requested_mode != "diagnostic":
+            _recover_pending_round_commit(
+                console=console,
+                project_dir=project_dir,
+            )
+        _validate_model_provider_startup(
+            args=args,
+            console=console,
+            provider=provider,
+            model_name=model_name,
+            gemini_api_key_env=gemini_api_key_env,
+            effective_gemini_api_key=effective_gemini_api_key,
+        )
         llm = create_llm_client(
             provider=provider,
             model_name=model_name,

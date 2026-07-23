@@ -20,6 +20,7 @@ from .resume_safety import (
     validate_resume_run_root,
 )
 from .round_attempts import classify_round_recovery
+from .round_commit_recovery import round_commit_read_blocker
 from .run_config import INHERIT_GIT_ROOT, GitRootSetting
 from .runner import ResumeHistoryError, run_iterative_rounds
 from .storage import (
@@ -198,6 +199,29 @@ def build_resume_preview(
 ) -> dict[str, Any]:
     ensure_project_runtime_paths_safe(project_dir)
     checkpoint_path = project_dir / "checkpoint.json"
+    recovery_blocker, recovery = round_commit_read_blocker(project_dir)
+    if recovery_blocker is not None:
+        return {
+            "can_resume": False,
+            "blocked_reason": recovery_blocker,
+            "message": (
+                "a pending round commit must be recovered under the project lock before resume"
+                if recovery.can_recover
+                else "round commit recovery is blocked; preserve the artifacts and inspect them"
+            ),
+            "checkpoint_path": str(checkpoint_path),
+            "checkpoint_display_path": _display_path(checkpoint_path, repo_root),
+            "run_id": recovery.run_id or "",
+            "last_completed_round": (
+                recovery.round_index - 1
+                if recovery.round_index is not None and recovery.round_index > 0
+                else 0
+            ),
+            "next_round": recovery.round_index,
+            "round_commit_status": recovery.status,
+            "round_commit_can_recover": recovery.can_recover,
+            "round_commit_journal_present": recovery.journal_present,
+        }
     if not checkpoint:
         return {
             "can_resume": False,

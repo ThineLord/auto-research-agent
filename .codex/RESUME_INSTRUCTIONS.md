@@ -64,7 +64,7 @@ annotations. Preserve its literal string lookalikes, metadata, request/redaction
 and installed-fallback behavior.
 ARA-058 is complete through remote-equal closeout `1419d5e`; closeout push/PR runs
 `29264305133`/`29264308515` passed Python 3.10/3.13, all four wheel steps, and zero annotations with
-exact PR body readback. Use `9457a25b4b4310c0220662447d10413808478a21` as the conservative exact
+exact PR body readback. Use `c2a7af598fabaadf16b0dc1363a1615b365d5aa0` as the conservative exact
 externally verified fallback.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
@@ -130,17 +130,15 @@ attempts, whole-round retry, shared classifier eligibility, bounded disk/attempt
 publication, and nonempty legacy canonical fail-closed behavior.
 
 ARA-055 package 4 is the sole active task after the owner said `批准，继续` on 2026-07-24.
-Package 3 closeout `9457a25` is the conservative exact externally verified fallback; closeout
-push/PR runs `30030747254`/`30030751034` pass Python 3.10/3.13 and every workflow step.
-Package 4 may recover an exact valid pending round journal under the existing project lock before
-new runner/provider work, and may expose non-mutating recovery-required/conflict state to
-preview/UI/report/analytics consumers while rejecting mixed-generation reads. It must preserve
-configured external storage, historical journal-less artifacts, public schemas, and package 3's
-checkpoint-last ordering. Do not add finalization journaling or finalization reader behavior,
-diagnostic routing, migration, dependency/config changes, providers, ignored-runtime access, or
-packages 5-7. After verifying the ARA-055 activation checkpoint and its CI, inspect the lock
-lifecycle and reader boundaries, then run `.venv/bin/python -m pytest -q
-tests/test_round_commit_entry.py`.
+Activation `c2a7af5` is the conservative exact externally verified fallback; push/PR runs
+`30031800668`/`30031802489` pass Python 3.10/3.13 and every workflow step. The implementation is
+locally complete: focused `9 passed`, related `256 passed, 540 subtests`, recovery matrix `16
+passed, 99 subtests`, and full `make check` `462 passed, 791 subtests`. It recovers under the
+existing lock before provider/client/agent work and blocks read-only mixed-generation consumers
+without mutation. Do not add finalization journaling or finalization reader behavior, diagnostic
+routing, migration, dependency/config changes, providers, ignored-runtime access, or packages
+5-7. Resume by reviewing `git diff`, explicitly staging the ARA-055 package 4 paths, running the
+staged safety scan, committing the implementation, pushing it, and verifying Python 3.10/3.13 CI.
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 

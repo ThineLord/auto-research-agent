@@ -282,6 +282,12 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "No analytics artifacts yet. Complete a run to generate score history, round metrics, "
             "or run summary data."
         ),
+        "round_commit_recovery_required": (
+            "A pending round commit must be recovered before these artifacts can be read safely."
+        ),
+        "round_commit_recovery_conflict": (
+            "Round commit recovery is blocked. Preserve the artifacts and inspect the conflict."
+        ),
         "analytics_best_score": "Best score",
         "analytics_completed_rounds": "Completed rounds",
         "analytics_timeout_errors": "Timeouts / errors",
@@ -584,6 +590,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "run_metadata_empty": "还没有运行元数据。启动一次运行后会生成 run_config.json 和 run_summary.json。",
         "run_analytics_dashboard": "运行分析看板",
         "run_analytics_empty": "暂无分析 artifact。完成一次运行后会生成评分历史、轮次指标或运行摘要。",
+        "round_commit_recovery_required": "存在待恢复的轮次提交；恢复完成前不能安全读取这些 artifact。",
+        "round_commit_recovery_conflict": "轮次提交恢复被冲突阻止。请保留 artifact 并检查冲突。",
         "analytics_best_score": "最佳分数",
         "analytics_completed_rounds": "已完成轮数",
         "analytics_timeout_errors": "超时 / 错误",

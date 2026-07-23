@@ -906,3 +906,19 @@
   5-7.
 - Checkpoint requirement: push this activation state before implementation, then keep package 4
   implementation and recovery closeout as separately validated stable phases.
+
+## 2026-07-24 - Keep ARA-055 package 4 round-specific and read-only outside the lock
+
+- Entry decision: normal, continuous, session, resume, and mock recover an exact valid round
+  journal only after acquiring the existing project lock and before provider preflight, client
+  construction, or agent work. Diagnostic remains unchanged for its separately approved package.
+- Reader decision: preview and UI classification never call recovery. Analytics, comparison,
+  benchmark reports, UI metadata/history/analytics/comparison, and transaction-sensitive output
+  browsing refuse a project while its round journal is pending or conflicting.
+- Compatibility decision: first test only the fixed round-journal leaf. An absent round journal
+  preserves existing handling of unrelated metadata, including legacy unsafe leaves; a
+  finalization-only journal remains outside this package.
+- Failure decision: unknown or edited generations produce fixed recovery-conflict diagnostics,
+  disclose no filesystem path, preserve all bytes, and prevent provider/client/agent work.
+- Validation: focused `9 passed`; related `256 passed, 540 subtests`; cross-filesystem recovery
+  `16 passed, 99 subtests`; full `make check` `462 passed, 791 subtests`.

@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-    "recorded_at": "2026-07-24T01:58:58+08:00",
+    "recorded_at": "2026-07-24T02:35:39+08:00",
   "branch": "codex/sol-autonomous-hardening",
-    "head_commit": "9457a25b4b4310c0220662447d10413808478a21",
-    "last_known_stable_commit": "9457a25b4b4310c0220662447d10413808478a21",
+    "head_commit": "c2a7af598fabaadf16b0dc1363a1615b365d5aa0",
+    "last_known_stable_commit": "c2a7af598fabaadf16b0dc1363a1615b365d5aa0",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-    "state_recorded_against_commit": "9457a25b4b4310c0220662447d10413808478a21",
+    "state_recorded_against_commit": "c2a7af598fabaadf16b0dc1363a1615b365d5aa0",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-        "verified_at": "2026-07-24T01:58:58+08:00",
-        "commit": "9457a25b4b4310c0220662447d10413808478a21",
+        "verified_at": "2026-07-24T02:35:39+08:00",
+        "commit": "c2a7af598fabaadf16b0dc1363a1615b365d5aa0",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-                "run_id": 30030747254,
+                "run_id": 30031800668,
         "event": "push",
         "workflow": "CI",
-                "head_sha": "9457a25b4b4310c0220662447d10413808478a21",
+                "head_sha": "c2a7af598fabaadf16b0dc1363a1615b365d5aa0",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-                "run_id": 30030751034,
+                "run_id": 30031802489,
         "event": "pull_request",
         "workflow": "CI",
-                "head_sha": "9457a25b4b4310c0220662447d10413808478a21",
+                "head_sha": "c2a7af598fabaadf16b0dc1363a1615b365d5aa0",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,29 @@
       }
     }
   },
-    "status": "ara055_package4_activation",
+    "status": "ara055_package4_local_validated",
     "commands": [
+        {
+            "command": "ARA-055 package 4 local implementation validation",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "expected_pre_fix_pytest_failed": 5,
+                "focused_pytest_passed": 9,
+                "related_pytest_passed": 256,
+                "related_pytest_subtests_passed": 540,
+                "recovery_pytest_passed": 16,
+                "recovery_pytest_subtests_passed": 99,
+                "full_pytest_passed": 462,
+                "full_pytest_subtests_passed": 791,
+                "ruff_files": 70,
+                "tracked_files_scanned": 114,
+                "safety_findings": 0,
+                "full_duration_seconds": 293.46,
+                "provider_calls": 0,
+                "ignored_runtime_access": 0
+            }
+        },
         {
             "command": "ARA-055 package 4 activation baseline and remote verification",
             "exit_code": 0,
@@ -5068,7 +5089,7 @@
   "notes": [
     "ARA-055 package 2 is complete and remote-verified at faf1791e; push and pull-request runs 30026934582 and 30026936443 passed Python 3.10 and 3.13 plus every workflow step.",
     "ARA-055 package 2 focused and related coverage passes 75 tests and 162 subtests; full make check passes 449 tests and 787 subtests; staged safety scans 113 tracked and indexed files with zero findings.",
-    "ARA-055 package 4 is the sole active task after explicit owner approval on 2026-07-24; it is limited to pending round recovery under the existing lock plus non-mutating preview, UI, report, and analytics classification.",
+    "ARA-055 package 4 is locally validated with lock-held pre-provider recovery and non-mutating preview, UI, analytics, comparison, and report guards; implementation commit, push, CI, and recovery closeout remain.",
     "ARA-054 storage and classifier foundation e4e784e is pushed with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 30012047804 and 30012050777 passed Python 3.10 and 3.13 plus all isolated-wheel steps.",
     "ARA-054 focused coverage passes 9 tests and 4 subtests; indexed make check passes 408 tests and 625 subtests over 108 tracked and staged files with zero safety findings and zero provider calls.",
     "ARA-054 runtime recovery is complete at 75f3d9a with manifest transitions, shared runner and preview classification, bounded storage, and safe publication; legacy migration and ARA-055 remain deferred.",
