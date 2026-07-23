@@ -4,20 +4,19 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: implement the owner-approved ARA-054 runtime recovery package: manifest
-  transitions, empty-canonical handoff, disk-budget protection, and shared runner/preview staging.
+- Current goal: ARA-054 runtime recovery is complete; retain a safe approval boundary before the
+  separately deferred ARA-055 cross-file transaction design.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `816b035c766c0f3caf57ea7ff708ff0278e3a2ae` (the exact
+- State recorded against commit: `75f3d9a8446db87ad2030e361f8147762263d8c4` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `816b035c766c0f3caf57ea7ff708ff0278e3a2ae` (exact local,
+- Last externally verified fallback: `75f3d9a8446db87ad2030e361f8147762263d8c4` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: `ARA-054` runtime package. Manifest transitions,
-  empty-canonical handoff, disk-budget protection, staged runner writes, publication, and shared
-  preview/runner classification are authorized. Legacy migration and ARA-055 remain excluded.
+- Active task at this snapshot: none. ARA-054 is complete; legacy migration and ARA-055 remain
+  excluded and deferred.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -857,19 +856,45 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 - Committed the foundation as `e4e784e`, pushed it with exact local/upstream/`ls-remote`/PR-head
   equality, and verified push/PR runs `30012047804`/`30012050777`: Python 3.10/3.13, every
   isolated-wheel step, and all CI jobs passed. Draft PR 13 remains open and mergeable.
+- Added strict manifest stage/stop/ready/published transitions, retained-byte and free-space
+  budgets, no-replace atomic publication, and interruption-safe create-only publication into a
+  preserved historical empty canonical directory.
+- Switched the runner to create append-only attempts, persist each completed or skipped stage once,
+  stop active attempts on manual interrupt, cloud quota, cooperative stop, or exception, and publish
+  only a verified four-stage attempt before scoring or history updates.
+- Routed preview, final checkpoint eligibility, and resume preflight through the shared classifier;
+  additive diagnostics report preserved-attempt count, latest verified stage, safety action, and
+  budget state without persisting arbitrary attempt paths.
+- Verified the four-stage by two-fault interrupt/quota matrix, publication collision and both crash
+  windows, legacy partial fail-closed behavior, immediate retry, CLI status 130, and unchanged
+  completed-round semantics. Related coverage passes `232 passed, 468 subtests`; full pytest passes
+  `417 passed, 633 subtests`.
+- Committed publication as `87f37d3` and runtime integration as `75f3d9a`; both are pushed.
+  Exact local/upstream/`ls-remote`/PR-head equality holds at `75f3d9a`. Push/PR runs
+  `30016026758`/`30016026741` passed Python 3.10/3.13 and every isolated-wheel step.
+- Harmless command corrections during this package: bare `python` was unavailable and was replaced
+  with `.venv/bin/python`; an initially named nonexistent `tests/test_recovery.py` was corrected to
+  `tests/test_recovery_state.py`; two read-only searches used backticks inside double quotes and
+  caused zsh `command not found` messages. None changed files or Git state, and literal-safe
+  validation reruns passed.
 
 ## Remaining Steps
 
-- Do not route the runner or resume preview through staged attempts without a new scoped approval.
-- If runtime integration is approved, first define the empty-canonical handoff and disk-budget
-  policy, then add manifest transition helpers and the full interrupt/quota matrix. Do not start
-  with a broad runner rewrite or legacy artifact mutation.
-- Keep ARA-055 separately deferred. ARA-054 does not make canonical publication, both histories,
+- There is no unblocked implementation task. ARA-055 remains deferred and requires a separate
+  greater-than-30-minute architecture/design approval before work begins.
+- Keep legacy nonempty canonical partials immutable and fail-closed; an explicit migration remains
+  outside ARA-054 authorization.
+- Preserve the ARA-055 boundary: ARA-054 does not make canonical publication, both histories,
   memory, best output, and recovery metadata one atomic transaction.
 - Do not activate ARA-018 without an owner license/distribution decision.
 
 ## Test Status
 
+- ARA-054 runtime publication/integration focused coverage passes `232 passed, 468 subtests`.
+  Provider-free full pytest passes `417 passed, 633 subtests`; `make check` passes formatting,
+  lint, imports, both repository-safety scans, and the same full suite over 108 tracked files.
+- ARA-054 runtime commit `75f3d9a` is exact local/upstream/`ls-remote`/PR-head equal. Push/PR runs
+  `30016026758`/`30016026741` passed Python 3.10/3.13 and every isolated-wheel step.
 - ARA-058 initial nested-container regression produced `7 failed, 1 passed, 3 subtests passed`:
   five scalar/null cases raised `TypeError`, while string and object containers returned false
   healthy state through the installed-model fallback. The expanded fixed matrix also covers zero.
@@ -1877,10 +1902,10 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   pre-agent/agent manual-interrupt marker, status 130, reusable empty pending rounds, ARA-041 startup
   ordering, cooperative status-0 stops, schemas, ordinary exception behavior, and legacy resume
   compatibility; do not broaden into ARA-054/055 transaction design.
-- ARA-054's storage/classifier foundation is complete at `e4e784e`. It is not wired into
-  runner/resume behavior, does not fix KI-054 by itself, and does not authorize manifest
-  transitions, publication, disk-budget policy, UI/CLI changes, or migration. Do not move, delete,
-  truncate, replace, or overwrite partial-round evidence.
+- ARA-054 is complete through runtime integration `75f3d9a`. Preserve append-only stopped attempts,
+  strict disk/attempt budgets, shared preview/runner classification, no-replace publication, and
+  legacy nonempty canonical fail-closed behavior. Do not move, delete, truncate, replace, or
+  overwrite partial-round evidence.
 - The selected ARA-054 design is append-only attempt staging with whole-round retry, not mid-stage
   continuation. Existing canonical partial rounds remain fail-closed and require a separately
   approved explicit migration; do not infer stage truth from placeholders or

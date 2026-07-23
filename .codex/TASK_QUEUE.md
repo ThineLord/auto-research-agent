@@ -628,7 +628,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-054 - Reconcile resumable mid-round stops with partial output directories
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P2
 - Risk: high
 - Description: interrupts or quota stops after review/revise/Judge persist a partial next-round
@@ -661,9 +661,9 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   `408 passed, 625 subtests` over 108 files.
 - Foundation verification: exact local/upstream/`ls-remote`/PR-head equality; push/PR runs
   `30012047804`/`30012050777` passed Python 3.10/3.13 and isolated-wheel validation.
-- Remaining dependency: separate owner approval for manifest transitions, runtime writer/preview
-  integration, empty-canonical handling, disk-budget policy, publication, and any explicit legacy
-  migration. ARA-055 remains a separate transaction design.
+- Foundation dependency at that checkpoint: manifest transitions, runtime writer/preview
+  integration, empty-canonical handling, disk-budget policy, and publication required the later
+  runtime-package approval recorded below. Explicit legacy migration and ARA-055 remain separate.
 - Runtime-package approval: after receiving the exact recommended next task, the owner said
   `继续` on 2026-07-23. This authorizes manifest transitions, empty-canonical handoff,
   disk-budget protection, staged runner writes, canonical publication, and shared resume-preview
@@ -671,6 +671,14 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Runtime-package baseline: exact local/upstream/`ls-remote`/PR-head equality at `816b035`; push/PR
   runs `30012529719`/`30012529172` pass. Provider-free `make check` passes `408 passed, 625
   subtests` over 108 files in 22.65 seconds.
+- Runtime completion: commits `87f37d3` and `75f3d9a` add verified state transitions, bounded
+  storage, atomic no-replace and retained-copy publication, staged runner writes, shared
+  preview/resume eligibility, and additive checkpoint diagnostics. The four-stage manual
+  interrupt/cloud-quota matrix is resumable without changing canonical completed-round bytes.
+- Final validation: related tests pass `232 passed, 468 subtests`; full pytest passes `417 passed,
+  633 subtests`; `make check` passes all formatting, lint, import, safety, and test gates over 108
+  tracked files. Exact local/upstream/`ls-remote`/PR-head equality holds at `75f3d9a`; push/PR runs
+  `30016026758`/`30016026741` passed Python 3.10/3.13 and isolated-wheel validation.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 

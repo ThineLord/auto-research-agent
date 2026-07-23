@@ -64,7 +64,7 @@ annotations. Preserve its literal string lookalikes, metadata, request/redaction
 and installed-fallback behavior.
 ARA-058 is complete through remote-equal closeout `1419d5e`; closeout push/PR runs
 `29264305133`/`29264308515` passed Python 3.10/3.13, all four wheel steps, and zero annotations with
-exact PR body readback. Use `816b035c766c0f3caf57ea7ff708ff0278e3a2ae` as the conservative exact
+exact PR body readback. Use `75f3d9a8446db87ad2030e361f8147762263d8c4` as the conservative exact
 externally verified fallback.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
@@ -121,16 +121,17 @@ Push/PR runs `30004044807`/`30004047971` passed Python 3.10/3.13, all four isola
 and zero annotations. Preserve ARA-041 startup transaction ordering, cooperative status-0 stops,
 schemas, and ordinary exception behavior.
 
-ARA-054's storage/classifier foundation is complete and the owner has now approved the runtime
-recovery package. The eight-case
-provider-free matrix confirms that every post-stage interrupt/quota checkpoint claims resumability
-while preview and actual resume reject the canonical four-file directory. Read
-`docs/ARA_054_PARTIAL_ROUND_RECOVERY_DESIGN.md` before any follow-up. It selects append-only attempt
-staging and whole-round retry, rejects mid-stage continuation and rollback, keeps legacy canonical
-partials fail-closed, and leaves ARA-055 separate. `ARA-054` is the sole `IN_PROGRESS` task.
-Implement manifest transitions, empty-canonical handoff, disk-budget protection, staged runner
-writes, canonical publication, and shared runner/preview diagnostics with provider-free tests.
-Do not migrate legacy artifacts, absorb ARA-055, or mutate existing canonical/partial evidence.
+ARA-054 is complete through runtime commit `75f3d9a8446db87ad2030e361f8147762263d8c4`.
+Provider-free publication/crash coverage and the four-stage manual-interrupt/cloud-quota matrix
+pass; full pytest reports `417 passed, 633 subtests`. Push/PR runs
+`30016026758`/`30016026741` passed Python 3.10/3.13 and isolated-wheel validation. Read
+`docs/ARA_054_PARTIAL_ROUND_RECOVERY_DESIGN.md` before any follow-up. Preserve append-only stopped
+attempts, whole-round retry, shared classifier eligibility, bounded disk/attempt use, no-replace
+publication, and nonempty legacy canonical fail-closed behavior.
+
+There is no unblocked implementation task. ARA-055 remains separately deferred and requires a new
+greater-than-30-minute architecture/design approval. Do not migrate legacy artifacts, absorb
+ARA-055, or mutate existing canonical/partial evidence without that approval.
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 

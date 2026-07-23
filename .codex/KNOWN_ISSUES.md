@@ -547,24 +547,25 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
   ARA-023 status 130, or ARA-041 startup transaction ordering.
 - Resolution: round creation, round-entry logging, console setup, memory loading/truncation, and the
   pre-agent cooperative-stop check now share a manual-interrupt boundary. The standard finalization
-  writes coherent resumable artifacts, leaves the empty pending round reusable, and re-raises for
-  CLI status 130. Ordinary exceptions retain their prior propagation behavior; focused, related,
-  full local, exact-remote, Python 3.10/3.13 push/PR, wheel, and annotation checks pass.
+  writes coherent resumable artifacts and re-raises for CLI status 130. ARA-054 subsequently moved
+  the empty pending state into an immutable stopped attempt that resume preserves before retry.
+  Focused, related, full local, exact-remote, Python 3.10/3.13 push/PR, wheel, and annotation checks
+  pass.
 
 ## KI-054 - Resumable mid-round stops leave an ineligible partial round
 
-- Status: storage/classifier foundation complete in `e4e784e`; the owner-approved runtime
-  integration package is active, while legacy migration remains deferred
+- Status: resolved by ARA-054 runtime implementation `75f3d9a`; legacy migration remains deferred
 - Severity: P2 recovery consistency, high-risk compatibility surface
-- Evidence: the runner persists partial next-round outputs after agent stages and can finalize an
+- Pre-fix evidence: the runner persisted partial next-round outputs after agent stages and could finalize an
   interrupt or quota stop with `can_resume=true`, while resume validation rejects a nonempty pending
   round as uncheckpointed. The exact per-stage state matrix is being re-characterized in isolated
   provider-free workspaces.
-- Impact: the persisted checkpoint can claim resumability even though immediate preview refuses the
+- Pre-fix impact: the persisted checkpoint could claim resumability even though immediate preview refused the
   same run, requiring unsafe manual intervention to continue.
-- Design boundary: preserve completed rounds and all partial-output bytes; do not silently delete,
-  move, truncate, replace, or overwrite evidence. Package 1 may add append-only attempt paths and
-  classifier code, but runtime behavior, canonical publication, and migration remain unchanged.
+- Resolution: new rounds use append-only staged attempts, stopped evidence is immutable, and retry
+  starts from draft. Preview, runner preflight, and checkpoint eligibility share one bounded
+  classifier. A complete attempt publishes with no-replace semantics or a recoverable create-only
+  handoff into a preserved empty canonical directory.
 - Design result: use append-only attempt staging and retry the whole round from draft. Existing
   canonical partial rounds remain fail-closed because placeholders, `last_successful_agent`, and
   file presence do not reliably identify a resumable agent boundary. ARA-055 separately owns the

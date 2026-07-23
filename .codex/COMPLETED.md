@@ -1007,3 +1007,18 @@ Validation and implementation outcomes will be appended only after they are actu
   subtests` over 108 tracked/index files with zero safety findings.
 - Foundation commit `e4e784e` is remote-equal; push/PR runs
   `30012047804`/`30012050777` passed Python 3.10/3.13 and every isolated-wheel step.
+
+## 2026-07-23 - ARA-054 runtime recovery
+
+- Added verified manifest transitions, free-space and retained-byte budgets, atomic no-replace
+  publication, and recoverable create-only handoff for preserved empty canonical directories.
+- Switched new rounds to append-only staging. Manual interrupt, cloud quota, cooperative stop, and
+  exception paths freeze active attempts; resume preserves them and retries from draft.
+- Shared one classifier across preview, runner preflight, and final checkpoint eligibility.
+  Nonempty legacy canonical partials and publication conflicts remain immutable and fail-closed.
+- Provider-free publication/crash tests plus the four-stage by two-fault interrupt/quota matrix
+  pass. Related coverage is `232 passed, 468 subtests`; full pytest is `417 passed, 633 subtests`,
+  and all `make check` gates pass over 108 tracked files.
+- Publication commit `87f37d3` and runtime commit `75f3d9a` are pushed. Exact branch/PR equality
+  holds at `75f3d9a`; push/PR runs `30016026758`/`30016026741` passed Python 3.10/3.13 and every
+  isolated-wheel step.

@@ -723,3 +723,17 @@
 - Interruption boundary: every independently safe phase must be committed and pushed. If
   publication cannot be separated safely from ARA-055, stop at the last verified staging
   checkpoint rather than weakening recovery guarantees.
+
+## 2026-07-23 - Complete ARA-054 runtime recovery
+
+- Resolution: use append-only attempts for every new runner round, persist only the current stage,
+  and publish a verified four-stage tree before scoring or history mutation.
+- Publication: an absent canonical directory uses a platform no-replace atomic rename. A preserved
+  historical empty canonical directory uses create-only files in stage order, retains the attempt
+  output, and reconciles only an exact verified prefix after interruption.
+- Eligibility: preview, runner preflight, and final checkpoint use the same classifier and bounded
+  attempt/disk policy. Stopped attempts are immutable; retry always starts from draft.
+- Compatibility: existing completed canonical bytes, provider order, prompts, scores, metrics, and
+  experiment interpretation are unchanged. Nonempty legacy canonical partials remain fail-closed.
+- Boundary: `published_uncommitted` still belongs to ARA-055; no legacy migration or cross-file
+  transaction was added.
