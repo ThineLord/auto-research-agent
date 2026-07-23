@@ -737,3 +737,17 @@
   experiment interpretation are unchanged. Nonempty legacy canonical partials remain fail-closed.
 - Boundary: `published_uncommitted` still belongs to ARA-055; no legacy migration or cross-file
   transaction was added.
+
+## 2026-07-23 - Approve ARA-055 design stage only
+
+- Approval: after ARA-054 closeout recommended ARA-055 design as the next task, the owner said
+  `批准`.
+- Authorized scope: inspect tracked code and history, characterize failures only in temporary
+  provider-free workspaces, and write the transaction/recovery design plus durable state.
+- Required analysis: cover canonical publication, both history locations, checkpoint/summary/config,
+  memory/research-state side effects, configured external run storage, interruption at every write
+  boundary, idempotency, stale journal handling, and legacy compatibility.
+- Excluded scope: no runtime transaction implementation, automatic artifact migration, dependency
+  changes, provider calls, ignored runtime access, or mutation of canonical/experimental data.
+- Acceptance boundary: the design must not claim cross-filesystem atomic rename and must specify a
+  deterministic fail-closed recovery path with bounded journal state and no duplicate rounds.

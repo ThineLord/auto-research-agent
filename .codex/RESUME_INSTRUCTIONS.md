@@ -64,7 +64,7 @@ annotations. Preserve its literal string lookalikes, metadata, request/redaction
 and installed-fallback behavior.
 ARA-058 is complete through remote-equal closeout `1419d5e`; closeout push/PR runs
 `29264305133`/`29264308515` passed Python 3.10/3.13, all four wheel steps, and zero annotations with
-exact PR body readback. Use `75f3d9a8446db87ad2030e361f8147762263d8c4` as the conservative exact
+exact PR body readback. Use `a7eacfea2a450d4ec5ba2f33e64b07c5ed1ab752` as the conservative exact
 externally verified fallback.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
@@ -129,9 +129,10 @@ pass; full pytest reports `417 passed, 633 subtests`. Push/PR runs
 attempts, whole-round retry, shared classifier eligibility, bounded disk/attempt use, no-replace
 publication, and nonempty legacy canonical fail-closed behavior.
 
-There is no unblocked implementation task. ARA-055 remains separately deferred and requires a new
-greater-than-30-minute architecture/design approval. Do not migrate legacy artifacts, absorb
-ARA-055, or mutate existing canonical/partial evidence without that approval.
+ARA-055 is the sole `IN_PROGRESS` task and only its design stage is approved. Resume by mapping the
+runner's post-publication writes and consumers, then run provider-free temporary fault
+characterization for internal and configured external run storage. Do not implement the runtime
+transaction, migrate artifacts, add dependencies, call providers, or inspect ignored runtime.
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 

@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `DEFERRED`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -695,6 +695,14 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   then `make check`.
 - Commit required: yes after architecture approval.
 - Dependencies: cross-file/cross-filesystem transaction design; estimated greater than 30 minutes.
+- Approval: after ARA-054 closeout recommended ARA-055 design as the next high-value task, the
+  owner explicitly said `批准` on 2026-07-23. This authorizes tracked-code inspection,
+  provider-free temporary fault characterization, and design/recovery documentation only.
+  Runtime transaction implementation, artifact migration, dependency changes, and ignored runtime
+  access remain outside scope.
+- Design baseline: exact local/upstream/`ls-remote`/PR-head equality at `a7eacfe`; push/PR runs
+  `30016446806`/`30016453110` pass Python 3.10/3.13 and isolated-wheel validation. Provider-free
+  `make check` passes `417 passed, 633 subtests` over 108 tracked files in 34.21 seconds.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 
