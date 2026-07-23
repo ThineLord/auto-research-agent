@@ -64,7 +64,7 @@ annotations. Preserve its literal string lookalikes, metadata, request/redaction
 and installed-fallback behavior.
 ARA-058 is complete through remote-equal closeout `1419d5e`; closeout push/PR runs
 `29264305133`/`29264308515` passed Python 3.10/3.13, all four wheel steps, and zero annotations with
-exact PR body readback. Use `b064a93c0e74610c961b5604d5e5700fcf4420d2` as the conservative exact
+exact PR body readback. Use `66d8a4f8736ff3f56c05d741d1e5396baa3ff3da` as the conservative exact
 externally verified fallback.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
@@ -112,11 +112,15 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-ARA-056 is the sole `IN_PROGRESS` task after explicit owner approval on 2026-07-23. Reproduce
-round-directory, logging, and memory-load interrupts before implementation; preserve ARA-023 status
-130, ARA-041 startup transaction ordering, cooperative status-0 stops, schemas, and ordinary
-failure behavior. ARA-018 requires an explicit owner license/distribution decision. Do not start
-ARA-019, ARA-026, ARA-006, or ARA-007 until their recorded dependencies are satisfied.
+ARA-056 is the sole `IN_PROGRESS` task after explicit owner approval on 2026-07-23. The pre-fix
+round-directory, round-log, and memory-load matrix produced `3 failed`; the local fix now routes
+those points through standard manual-interrupt finalization, leaves the empty pending round
+reusable, and re-raises for CLI status 130. Focused tests pass `2 passed, 3 subtests`, related tests
+pass `135 passed, 339 subtests`, and indexed `make check` passes `399 passed, 621 subtests`. Review,
+indexed validation, commit, push, and remote CI remain. Preserve ARA-041 startup transaction
+ordering, cooperative status-0 stops, schemas, and ordinary exception behavior. ARA-018 requires an
+explicit owner license/distribution decision. Do not start ARA-019, ARA-026, ARA-006, or ARA-007
+until their recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
 
@@ -132,5 +136,5 @@ git status --short --branch
 git rev-parse --verify HEAD
 .venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
-rg -n "KeyboardInterrupt|round_dir|memory" src/runner.py tests
+git diff --check
 ```

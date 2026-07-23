@@ -4,6 +4,7 @@ import json
 import tempfile
 import types
 import unittest
+from contextlib import ExitStack
 from importlib.util import find_spec
 from itertools import combinations
 from pathlib import Path
@@ -1075,6 +1076,113 @@ class RoundLoopTests(unittest.TestCase):
             self.assertEqual(run_summary["completed_rounds"], 0)
             self.assertEqual(run_config["completed_rounds"], 0)
             self.assertTrue((project_dir / "interrupted_report.md").is_file())
+
+    def test_pre_agent_interrupts_finalize_and_resume_the_pending_round(self) -> None:
+        for stage in ("round_dir", "round_log", "memory_load"):
+            with self.subTest(stage=stage), tempfile.TemporaryDirectory() as tmp:
+                project_dir = Path(tmp) / "project"
+                project_dir.mkdir()
+                memory_path = project_dir / "memory.md"
+                memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                agents = RecordingAgents()
+                original_make_round_dir = runner_module.make_round_dir
+                original_log = runner_module._log
+                original_get_memory = runner_module.get_memory_for_prompt
+
+                def interrupt_after_round_dir(*args: object, **kwargs: object) -> Path:
+                    original_make_round_dir(*args, **kwargs)
+                    raise KeyboardInterrupt
+
+                def interrupt_after_round_log(
+                    console: Console,
+                    log_path: Path,
+                    mode: str,
+                    message: str,
+                ) -> None:
+                    original_log(console, log_path, mode, message)
+                    if message.startswith("round_enter "):
+                        raise KeyboardInterrupt
+
+                def interrupt_after_memory_load(path: Path) -> str:
+                    original_get_memory(path)
+                    raise KeyboardInterrupt
+
+                with ExitStack() as stack:
+                    if stage == "round_dir":
+                        stack.enter_context(
+                            patch.object(
+                                runner_module,
+                                "make_round_dir",
+                                side_effect=interrupt_after_round_dir,
+                            )
+                        )
+                    elif stage == "round_log":
+                        stack.enter_context(
+                            patch.object(
+                                runner_module,
+                                "_log",
+                                side_effect=interrupt_after_round_log,
+                            )
+                        )
+                    else:
+                        stack.enter_context(
+                            patch.object(
+                                runner_module,
+                                "get_memory_for_prompt",
+                                side_effect=interrupt_after_memory_load,
+                            )
+                        )
+
+                    with self.assertRaises(KeyboardInterrupt):
+                        run_iterative_rounds(
+                            console=Console(),
+                            agents=agents,
+                            task_text="Design a privacy-aware memory adapter.",
+                            project_dir=project_dir,
+                            memory_path=memory_path,
+                            mode="test",
+                            model_name="fake-model",
+                            max_rounds=1,
+                            stop_if_no_improvement_rounds=10,
+                            global_max_runtime_seconds=60,
+                            per_agent_timeout_seconds=300,
+                        )
+
+                self.assertEqual(agents.draft_rounds, [])
+                checkpoint = json.loads(
+                    (project_dir / "checkpoint.json").read_text(encoding="utf-8")
+                )
+                run_root = Path(checkpoint["run_root"])
+                run_summary = json.loads(
+                    (run_root / "run_summary.json").read_text(encoding="utf-8")
+                )
+                run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+                for artifact in (checkpoint, run_summary, run_config):
+                    self.assertEqual(artifact["stop_reason"], STOP_MANUAL_INTERRUPT)
+                    self.assertTrue(artifact["can_resume"])
+                self.assertEqual(checkpoint["last_completed_round"], 0)
+                self.assertEqual(checkpoint["resume_metadata"]["next_round"], 1)
+                self.assertEqual(list((run_root / "round_01").iterdir()), [])
+                self.assertTrue((project_dir / "interrupted_report.md").is_file())
+
+                resumed = run_iterative_rounds(
+                    console=Console(),
+                    agents=FakeAgents([90]),
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    mode="resume",
+                    model_name="fake-model",
+                    max_rounds=1,
+                    start_round=1,
+                    run_root_override=run_root,
+                    initial_best_score=checkpoint["best_score"],
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                )
+                self.assertEqual(resumed["completed_rounds"], 1)
+                self.assertEqual(resumed["stop_reason"], STOP_MAX_ROUNDS)
 
     def test_stop_after_requested_rounds_keeps_exact_completed_count(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

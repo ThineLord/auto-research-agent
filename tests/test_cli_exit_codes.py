@@ -894,6 +894,64 @@ with patch.object(cli, "build_mock_agents", return_value=interrupting_agents):
         self.assertIn("lock_exists=False", result.stdout)
         self.assertNotIn("Traceback", result.stderr)
 
+    def test_module_entrypoint_pre_agent_interrupt_exits_130_with_resumable_state(self) -> None:
+        script = """
+import json
+import runpy
+import sys
+import tempfile
+from pathlib import Path
+
+import src.cli as cli
+import src.runner as runner
+from src.config import AppConfig
+from src.constants import RUN_LOCK_FILENAME
+from src.package_resources import RuntimeLayout
+
+temporary_root = tempfile.TemporaryDirectory()
+root = Path(temporary_root.name)
+project_dir = root / "projects" / "selected"
+project_dir.mkdir(parents=True)
+(project_dir / "task.md").write_text("# pre-agent interrupt subprocess test\\n", encoding="utf-8")
+cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, Path.cwd(), root, True)
+cli.load_app_config = lambda path: AppConfig()
+runner.get_memory_for_prompt = lambda path: (_ for _ in ()).throw(KeyboardInterrupt)
+sys.argv = ["auto-research-agent", "--mock", "--project", "selected"]
+try:
+    runpy.run_module("src.main", run_name="__main__")
+except SystemExit:
+    checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
+    run_root = Path(checkpoint["run_root"])
+    run_summary = json.loads((run_root / "run_summary.json").read_text(encoding="utf-8"))
+    run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+    print(f"artifact_reasons={checkpoint['stop_reason']},{run_summary['stop_reason']},{run_config['stop_reason']}")
+    print(f"can_resume={checkpoint['can_resume']},{run_summary['can_resume']},{run_config['can_resume']}")
+    print(f"round_entries={sorted(path.name for path in (run_root / 'round_01').iterdir())}")
+    print(f"interrupted_report_exists={(project_dir / 'interrupted_report.md').is_file()}")
+    print(f"lock_exists={(project_dir / RUN_LOCK_FILENAME).exists()}")
+    raise
+"""
+
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 130, result.stdout + result.stderr)
+        self.assertIn("Stop reason: MANUAL_INTERRUPT", result.stdout)
+        self.assertIn(
+            "artifact_reasons=MANUAL_INTERRUPT,MANUAL_INTERRUPT,MANUAL_INTERRUPT",
+            result.stdout,
+        )
+        self.assertIn("can_resume=True,True,True", result.stdout)
+        self.assertIn("round_entries=[]", result.stdout)
+        self.assertIn("interrupted_report_exists=True", result.stdout)
+        self.assertIn("lock_exists=False", result.stdout)
+        self.assertNotIn("Traceback", result.stderr)
+
     def test_user_requested_mock_stop_remains_successful_in_subprocess(self) -> None:
         script = """
 import json

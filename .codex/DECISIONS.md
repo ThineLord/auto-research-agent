@@ -666,3 +666,10 @@
 - Boundary: do not redesign cross-file transactions, absorb ARA-054/055, change provider/prompt/
   scoring behavior, access ignored runtime, add dependencies, or rewrite stable runner structure
   without fault-matrix evidence.
+- Finding: fault injection immediately after round-directory creation, round-entry logging, and
+  memory loading reproduced three missing-checkpoint failures. In every case startup metadata
+  already existed, so rolling back only the empty round would still leave a misleading running run.
+- Resolution: extend only the existing manual-interrupt boundary over pre-agent round setup and
+  route both boundaries through one marker. Standard finalization records zero completed rounds and
+  a reusable next round, then re-raises `KeyboardInterrupt`; ordinary exceptions remain outside this
+  catch and keep their prior behavior.

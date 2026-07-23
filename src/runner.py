@@ -1287,6 +1287,11 @@ def run_iterative_rounds(
             f"(remaining_global_runtime={remaining}s)"
         )
 
+    def _mark_manual_interrupt() -> None:
+        nonlocal stop_reason
+        stop_reason = STOP_MANUAL_INTERRUPT
+        _log(console, log_path, mode, "manual_interrupt_caught")
+
     # round_index is strictly increasing and cannot be reset.
     for round_index in range(start_round, max_rounds + 1):
         elapsed_before_round = time.monotonic() - started_at
@@ -1305,53 +1310,71 @@ def run_iterative_rounds(
             _log(console, log_path, mode, f"user_stop_requested_before_round round={round_index}")
             break
 
-        if resumes_existing_run:
-            round_dir = _validate_pending_resume_round_dir(run_root, round_index)
-            round_dir = make_round_dir(run_root, round_index, allow_existing=round_dir.exists())
-        else:
-            round_dir = make_round_dir(run_root, round_index)
-        _log(console, log_path, mode, f"round_enter round={round_index}")
-        console.rule(f"Round {round_index}")
-        draft_output = ""
-        review_output = ""
-        revised_output = ""
-        judge_output = ""
-        agent_timings_seconds = {
-            "draft": 0.0,
-            "review": 0.0,
-            "revise": 0.0,
-            "judge": 0.0,
-        }
-        draft_previous_review_output = last_review_output
-        draft_previous_draft_output = last_draft_output
-        draft_previous_revised_output = last_revised_output
-        draft_previous_best_output = best_output
+        try:
+            if resumes_existing_run:
+                round_dir = _validate_pending_resume_round_dir(run_root, round_index)
+                round_dir = make_round_dir(
+                    run_root,
+                    round_index,
+                    allow_existing=round_dir.exists(),
+                )
+            else:
+                round_dir = make_round_dir(run_root, round_index)
+            _log(console, log_path, mode, f"round_enter round={round_index}")
+            console.rule(f"Round {round_index}")
+            draft_output = ""
+            review_output = ""
+            revised_output = ""
+            judge_output = ""
+            agent_timings_seconds = {
+                "draft": 0.0,
+                "review": 0.0,
+                "revise": 0.0,
+                "judge": 0.0,
+            }
+            draft_previous_review_output = last_review_output
+            draft_previous_draft_output = last_draft_output
+            draft_previous_revised_output = last_revised_output
+            draft_previous_best_output = best_output
 
-        def _persist_round_outputs(stage: str) -> None:
-            save_round_outputs(
-                round_dir,
-                draft=draft_output,
-                review=review_output,
-                revised=revised_output,
-                judge=judge_output,
+            def _persist_round_outputs(stage: str) -> None:
+                save_round_outputs(
+                    round_dir,
+                    draft=draft_output,
+                    review=review_output,
+                    revised=revised_output,
+                    judge=judge_output,
+                )
+                _log(
+                    console,
+                    log_path,
+                    mode,
+                    f"round_partial_saved round={round_index} stage={stage}",
+                )
+
+            memory_text = get_memory_for_prompt(memory_path)
+            memory_words = len(memory_text.split())
+            _log(
+                console,
+                log_path,
+                mode,
+                f"memory_loaded round={round_index} words={memory_words} limit=1500",
             )
-            _log(console, log_path, mode, f"round_partial_saved round={round_index} stage={stage}")
+            if memory_words > 1500:
+                memory_text = " ".join(memory_text.split()[-1500:])
+                _log(console, log_path, mode, f"memory_truncated round={round_index}")
 
-        memory_text = get_memory_for_prompt(memory_path)
-        memory_words = len(memory_text.split())
-        _log(
-            console,
-            log_path,
-            mode,
-            f"memory_loaded round={round_index} words={memory_words} limit=1500",
-        )
-        if memory_words > 1500:
-            memory_text = " ".join(memory_text.split()[-1500:])
-            _log(console, log_path, mode, f"memory_truncated round={round_index}")
-
-        if _stop_requested(stop_signal_path):
-            stop_reason = STOP_USER_REQUESTED
-            _log(console, log_path, mode, f"user_stop_requested_before_round round={round_index}")
+            if _stop_requested(stop_signal_path):
+                stop_reason = STOP_USER_REQUESTED
+                _log(
+                    console,
+                    log_path,
+                    mode,
+                    f"user_stop_requested_before_round round={round_index}",
+                )
+                break
+        except KeyboardInterrupt:
+            _mark_manual_interrupt()
             break
 
         try:
@@ -1592,8 +1615,7 @@ def run_iterative_rounds(
             console.print(f"[yellow]{paused_until_reset_message}[/yellow]")
             break
         except KeyboardInterrupt:
-            stop_reason = STOP_MANUAL_INTERRUPT
-            _log(console, log_path, mode, "manual_interrupt_caught")
+            _mark_manual_interrupt()
             break
         except Exception as exc:  # noqa: BLE001
             stop_reason = STOP_EXCEPTION

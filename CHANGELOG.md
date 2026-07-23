@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Fixed
+
+* Manual interrupts during pending round-directory creation, round-entry logging, or project-memory
+  loading now follow the same resumable checkpoint, run-summary, run-config, and interrupted-report
+  finalization as interrupts raised by an agent. The empty pending round remains safe to reuse on
+  resume, while cooperative stops and non-interrupt exceptions keep their existing behavior.
+
 ### Testing
 
 * The test suite now verifies pytest's native `unittest.subTest` exit-code contract in isolated

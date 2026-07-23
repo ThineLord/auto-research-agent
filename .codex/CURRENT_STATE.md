@@ -9,10 +9,10 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `b064a93c0e74610c961b5604d5e5700fcf4420d2` (the exact
+- State recorded against commit: `66d8a4f8736ff3f56c05d741d1e5396baa3ff3da` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `b064a93c0e74610c961b5604d5e5700fcf4420d2` (exact local,
+- Last externally verified fallback: `66d8a4f8736ff3f56c05d741d1e5396baa3ff3da` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
 - Active task at this snapshot: ARA-056. The owner explicitly approved the greater-than-30-minute,
@@ -802,15 +802,28 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
   `IN_PROGRESS` task.
 - Ran the ARA-056 baseline `make check`: Ruff, imports, repository-safety self/worktree/staged
   scans, and pytest pass with `397 passed, 618 subtests` in 25.76 seconds.
+- Committed and pushed the ARA-056 activation checkpoint as `66d8a4f`; push/PR runs
+  `30003426104`/`30003428837` passed Python 3.10/3.13.
+- Reproduced all three pre-agent interrupt gaps after round-directory creation, round-entry logging,
+  and memory loading: each propagated `KeyboardInterrupt` without `checkpoint.json`, producing the
+  expected `3 failed`.
+- Moved only those pre-agent operations under a `KeyboardInterrupt` boundary shared with the
+  existing manual-interrupt marker. Ordinary exceptions, cooperative stops, agent behavior,
+  startup ordering, and schemas remain unchanged.
+- Added a three-stage unit fault matrix that verifies standard checkpoint/summary/config/report
+  finalization and successful reuse of the empty pending round, plus a module-entrypoint regression
+  for status 130, lock release, empty-round state, and traceback suppression.
+- Focused coverage passes `2 passed, 3 subtests`; CLI process coverage passes `3 passed`; related
+  runner/CLI/session/storage/recovery coverage passes `135 passed, 339 subtests`.
+- Indexed `make check` passes Ruff, imports, both repository-safety scans, and pytest with `399
+  passed, 621 subtests` in 19.85 seconds.
 
 ## Remaining Steps
 
-- Build a provider-free fault matrix for interrupts during round-directory creation, logging, and
-  memory loading before the protected agent phase.
-- Implement the smallest lifecycle correction that preserves ARA-023 status 130, ARA-041 startup
-  transaction ordering, artifact schemas, and ordinary success/failure behavior.
-- Run focused, related, full, recovery, safety, and remote CI validation before marking ARA-056
-  complete.
+- Finish complete diff, recovery-state, compatibility, and sensitive-pattern review; correct any
+  scope or evidence mismatch before staging.
+- Run indexed validation, commit and push the ARA-056 implementation, then verify exact remote
+  equality and Python 3.10/3.13 push/PR CI.
 - Leave deferred tasks untouched.
 
 ## Test Status
@@ -879,6 +892,13 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
   seconds).
 - ARA-056 baseline `make check` passes all gates with `397 passed, 618 subtests` in 25.76 seconds;
   both safety modes scan 105 tracked files with zero findings.
+- ARA-056 pre-fix matrix produces the expected `3 failed`: round-directory, round-log, and
+  memory-load interrupts leave no checkpoint.
+- ARA-056 focused final coverage passes `2 passed, 3 subtests`; CLI status/lock compatibility passes
+  `3 passed`; related runner/CLI/session/storage/recovery coverage passes `135 passed, 339
+  subtests`.
+- ARA-056 indexed `make check` passes `399 passed, 621 subtests` in 19.85 seconds with 62
+  formatted files, 105 tracked files, and zero safety findings.
 - ARA-053 pre-fix collision/cache regression produced the expected `4 failed, 1 passed`: all three
   equal-shape path pairs shared an identity and `/bravo` loaded `/alpha` health evidence.
 - ARA-053 focused final coverage passes `4 passed, 14 subtests`; UI/recovery tests pass `84 passed,
@@ -1474,6 +1494,13 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Recent Failed Command
 
+- The first ARA-056 post-implementation recovery check found CURRENT/RESUME still naming the older
+  `b064a93` fallback after LAST_VALIDATION advanced to remote-verified activation `66d8a4f`; the
+  named fallback fields were synchronized before staging.
+- The ARA-056 pre-fix fault matrix failed all three subtests as expected because no checkpoint was
+  written after round-directory, round-log, or memory-load interruption.
+- The first corrected ARA-056 focused command passed its tests and Ruff lint, then stopped because
+  Ruff format would reflow the new test; the file was formatted and the full focused command passed.
 - The first ARA-060 closeout recovery check rejected a recursive Remaining Steps bullet that asked
   to finalize a task already marked `DONE`; the invalid bullet was removed before staging.
 - The first ARA-060 focused command passed both sentinel tests, then stopped at Ruff's import-order
@@ -1759,7 +1786,7 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 ```bash
 git status --short --branch
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
-rg -n "KeyboardInterrupt|round_dir|memory" src/runner.py tests
+git diff --check
 ```
 
 ## Interruption Recovery

@@ -674,8 +674,11 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Commit required: yes.
 - Dependencies: preserve ARA-023 status 130 and ARA-041 startup transaction ordering.
 - Approval: owner explicitly approved the greater-than-30-minute, medium-risk work on 2026-07-23.
-- Baseline: `make check` passes `397 passed, 618 subtests` with 105 tracked files and zero safety
-  findings; fault-matrix reproduction is next.
+- Local validation: the expected pre-fix fault matrix produced `3 failed`; focused final coverage
+  passes `2 passed, 3 subtests`, the CLI status/lock layer passes `3 passed`, related runner/CLI/
+  session/storage/recovery coverage passes `135 passed, 339 subtests`, and indexed `make check` passes
+  `399 passed, 621 subtests` with 105 tracked files and zero safety findings. Review, indexed
+  validation, commit, push, and remote CI remain.
 
 ## ARA-057 - Reject orphan mode-specific output options before work
 
