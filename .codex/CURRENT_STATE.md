@@ -4,20 +4,19 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: close out the owner-approved ARA-055 design stage while preserving a separate
-  approval boundary for runtime implementation.
+- Current goal: implement only ARA-055 package 1: pure deterministic after-image builders and a
+  strict bounded in-memory journal codec, with no runtime journal routing.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `09aeda64141c7fc0a0f40de01d2846acb87ef85a` (the exact
+- State recorded against commit: `ccdfcf425175d3213c9468274edc652bf4e18367` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `09aeda64141c7fc0a0f40de01d2846acb87ef85a` (exact local,
+- Last externally verified fallback: `ccdfcf425175d3213c9468274edc652bf4e18367` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none after design validation. ARA-055 runtime transaction
-  implementation, artifact migration, dependency changes, provider calls, and ignored runtime
-  remain excluded and deferred.
+- Active task at this snapshot: `ARA-055` implementation package 1. Packages 2-7, runtime journal
+  I/O/routing, migration, dependency changes, provider calls, and ignored runtime remain excluded.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -881,9 +880,12 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Remaining Steps
 
-- There is no unblocked implementation task. ARA-055 runtime packages stay deferred until the
-  owner separately approves one or more packages from
-  `docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md`.
+- Define failing codec/builder tests for exact schemas, size/depth/ID/digest bounds, fixed artifact
+  enums, deterministic JSON, and byte-compatible current artifact builders.
+- Implement one isolated package-1 module and minimal storage/config builder extraction without
+  journal filesystem I/O or runtime routing.
+- Run focused, related, full, staged-safety, remote, and CI validation; then return ARA-055 to
+  deferred with packages 2-7 still approval-gated.
 - Keep legacy nonempty canonical partials immutable and fail-closed; an explicit migration remains
   outside ARA-054 authorization.
 - Preserve the confirmed ARA-055 boundary: current ARA-054 does not make canonical publication,

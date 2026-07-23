@@ -64,7 +64,7 @@ annotations. Preserve its literal string lookalikes, metadata, request/redaction
 and installed-fallback behavior.
 ARA-058 is complete through remote-equal closeout `1419d5e`; closeout push/PR runs
 `29264305133`/`29264308515` passed Python 3.10/3.13, all four wheel steps, and zero annotations with
-exact PR body readback. Use `09aeda64141c7fc0a0f40de01d2846acb87ef85a` as the conservative exact
+exact PR body readback. Use `ccdfcf425175d3213c9468274edc652bf4e18367` as the conservative exact
 externally verified fallback.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
@@ -129,15 +129,15 @@ pass; full pytest reports `417 passed, 633 subtests`. Push/PR runs
 attempts, whole-round retry, shared classifier eligibility, bounded disk/attempt use, no-replace
 publication, and nonempty legacy canonical fail-closed behavior.
 
-ARA-055's design stage is complete in
-`docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md`; no task is `IN_PROGRESS`. The 40-case
-provider-free characterization covers ten post-publication boundaries across I/O/manual interrupt
-and internal/configured external storage. Runtime journals, runner/reader integration, diagnostic
-integration, artifact migration, dependency changes, provider calls, and ignored runtime remain
-unapproved. Do not start an implementation package without separate owner approval.
-Design commit `09aeda6` is exact local/upstream/`ls-remote`/PR-head equal; push/PR runs
-`30018465335`/`30018466172` passed Python 3.10/3.13 and every isolated-wheel/check step.
-There is no unblocked implementation task.
+ARA-055 package 1 is the sole `IN_PROGRESS` task. Resume by reading
+`docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md`, then inspect the isolated codec/builder
+tests and module before changing them. Authorized work is limited to deterministic pure
+after-image builders, strict bounded in-memory encode/decode, fixed artifact enums, and
+provider-free tests. Do not create/read journal files, register journal paths, route runner,
+preview, UI, reports, or diagnostic mode, add dependencies, migrate artifacts, call providers, or
+inspect ignored runtime. Packages 2-7 remain unapproved.
+The package-1 baseline is `ccdfcf4`, exact local/upstream/`ls-remote`/PR-head equal; push/PR runs
+`30018740608`/`30018744223` and local `make check` are green.
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 

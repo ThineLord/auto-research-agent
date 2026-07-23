@@ -774,3 +774,18 @@
   schemas stay preserved and fail closed.
 - Authorization: this is a design decision only. All runtime packages in
   `docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md` require separate approval.
+
+## 2026-07-23 - Approve ARA-055 implementation package 1 only
+
+- Approval: after the ARA-055 design closeout recommended package 1, the owner said `批准`.
+- Authorized scope: extract deterministic history, memory, research-state, checkpoint, summary,
+  and config after-image builders; add one strict bounded in-memory round-journal codec with fixed
+  artifact enums; add provider-free unit tests.
+- Compatibility requirement: public artifact serialization and current runtime behavior remain
+  unchanged. Existing writer functions may delegate to pure builders only when byte-for-byte
+  regressions prove equivalence.
+- Excluded scope: no runtime journal I/O, journal path registration, transaction prepare/recovery,
+  runner/preview/UI/report/diagnostic routing, dependencies, provider calls, ignored runtime,
+  artifact migration, or packages 2-7.
+- Checkpoint requirement: commit and push the activation state before implementation, then keep the
+  implementation and final recovery closeout as separately validated commits.

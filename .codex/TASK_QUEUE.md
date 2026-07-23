@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `DEFERRED`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -713,6 +713,16 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Remaining approval boundary: runtime packages remain unapproved. Do not add journals, reroute
   runtime readers/writers, integrate diagnostic mode, change artifact schemas, or migrate
   historical `published_uncommitted` evidence without separate owner approval.
+- Package 1 approval: after the design closeout recommended pure builders and a strict journal
+  codec, the owner explicitly said `批准` on 2026-07-23. This authorizes deterministic after-image
+  builders, strict bounded in-memory schema encode/decode, fixed artifact enums, and provider-free
+  tests only.
+- Package 1 exclusions: do not create/read a runtime journal file, register journal paths, recover
+  or publish attempts, route runner/preview/UI/diagnostic code, mutate artifacts, add dependencies,
+  or migrate legacy evidence. Packages 2-7 remain deferred.
+- Package 1 baseline: exact local/upstream/`ls-remote`/PR-head equality at `ccdfcf4`; push/PR runs
+  `30018740608`/`30018744223` pass Python 3.10/3.13 and every isolated-wheel/check step. Local
+  provider-free `make check` passes `417 passed, 633 subtests` over 109 tracked files in 33.66s.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 
