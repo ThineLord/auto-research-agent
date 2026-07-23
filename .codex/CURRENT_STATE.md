@@ -4,20 +4,20 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: ARA-055 package 2 is complete; preserve its verified recovery boundary while
-  awaiting separate owner approval for package 3 runner integration.
+- Current goal: implement only ARA-055 package 3 by routing successful iterative rounds through
+  the prepared round-commit engine while preserving existing outputs and control flow.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `faf1791ee44aacc1f64f8987903a848d2fa62f93` (the exact
-  externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
-  live).
-- Last externally verified fallback: `faf1791ee44aacc1f64f8987903a848d2fa62f93` (exact local,
+- State recorded against commit: `9d04f46f3f8b173e8d2b3045870ea212ce9a08b6` (the exact
+  externally verified package-2 closeout retained by the additive recovery schema; resolve current
+  `HEAD` live).
+- Last externally verified fallback: `9d04f46f3f8b173e8d2b3045870ea212ce9a08b6` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-055 package 3 runner integration is the recommended next
-  task but remains approval-blocked; packages 4-7, migration, dependency/config changes, provider
-  calls, and ignored runtime remain excluded.
+- Active task at this snapshot: ARA-055 package 3 runner integration. Packages 4-7,
+  resume-preview/UI/analytics/report/diagnostic routing, finalization journaling, migration,
+  dependency/config changes, provider calls, and ignored runtime remain excluded.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -99,6 +99,27 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   tests/test_round_attempts.py tests/test_round_commit.py`; the latest full `make check` and
   implementation CI are green. Do not start package 3 or treat the dormant engine as runner
   integration without owner approval.
+
+## ARA-055 Package 3 Activation
+
+- Owner approval: `批准 ARA-055 package 3` on 2026-07-24.
+- Stable baseline: `9d04f46f3f8b173e8d2b3045870ea212ce9a08b6`, exact local/upstream/
+  `ls-remote`/PR-head equal with successful push/PR runs `30027550772`/`30027556705`.
+- Authorized implementation: successful iterative rounds create the immutable journal before the
+  ready transition and use `prepare_round_commit` plus `recover_round_commit`; the checkpoint stays
+  the last transaction artifact and ordinary outputs, stop logic, and public schemas remain
+  compatible.
+- Required validation: runner-order regression, internal/configured-external storage, provider-free
+  interruption and retry checks, related round/recovery suites, full `make check`, staged safety,
+  exact remote equality, and Python 3.10/3.13 CI.
+- Explicit exclusions: packages 4-7; resume-preview, UI, analytics, reports, and diagnostic routing;
+  finalization journal; legacy migration; dependency/config changes; real provider calls; ignored
+  runtime data.
+- Next command after this activation checkpoint is committed and pushed:
+  `.venv/bin/python -m pytest -q tests/test_round_commit_runner.py`.
+- Interruption recovery: verify the activation commit and CI, then read the package-3 focused tests,
+  `src/runner.py`, and the package-2 engine before continuing. Do not widen recovery to runner entry
+  or finalization.
 
 ## Completed Steps
 

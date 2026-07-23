@@ -857,3 +857,19 @@
 - Boundary: package 2 is complete but KI-055 is not resolved in the current live runner. Package 3
   remains a separate high-risk routing change requiring owner approval; no package-3 code was
   started.
+
+## 2026-07-24 - Approve ARA-055 implementation package 3 only
+
+- Approval: the owner explicitly said `批准 ARA-055 package 3`.
+- Authorized scope: route successful iterative rounds through the already verified
+  `prepare_round_commit` and `recover_round_commit` engine, with journal preparation before the
+  ready transition and checkpoint as the last transaction artifact.
+- Compatibility requirement: preserve public artifact bytes, canonical round output, metric
+  semantics, best-output behavior, prompts, logs, stop conditions, and ordinary control flow.
+- Validation requirement: add provider-free runner integration, internal/configured-external
+  storage, interruption, and retry coverage before the implementation is treated as stable.
+- Excluded scope: packages 4-7; recovery at runner entry; resume-preview, UI, analytics, reports, or
+  diagnostic routing; finalization journaling; legacy migration; dependency/config changes;
+  provider calls; ignored runtime data.
+- Checkpoint requirement: commit and push this activation state before editing the runner, then keep
+  implementation and recovery closeout in separately validated commits.

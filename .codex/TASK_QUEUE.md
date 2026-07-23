@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `BLOCKED`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -759,9 +759,20 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Package 2 completion: implementation commit `faf1791e` is exact local/upstream/`ls-remote`/
   PR-head equal; push/PR runs `30026934582`/`30026936443` pass Python 3.10/3.13 and every workflow
   step. Draft PR 13 is updated and cleanly mergeable.
-- Current blocker: package 3 changes the iterative runner's publication path and requires separate
-  owner approval under the accepted package design and repository safety protocol. Until then
-  there is no unblocked ARA-055 implementation task.
+- Package 3 approval: the owner explicitly said `批准 ARA-055 package 3` on 2026-07-24.
+- Package 3 authorized scope: route successful iterative rounds through `prepare_round_commit` and
+  `recover_round_commit`, create the immutable journal before the ready transition, keep checkpoint
+  last, and preserve ordinary outputs and control flow.
+- Package 3 acceptance: runner-order regression plus internal/configured-external provider-free
+  fault/retry validation proves no duplicate round and exact artifact convergence, followed by
+  related regression, `make check`, staged safety, push, and Python 3.10/3.13 CI.
+- Package 3 exclusions: no packages 4-7; no resume-preview, UI, analytics, report, or diagnostic
+  routing; no finalization journal, legacy migration, dependency/config change, provider call, or
+  ignored-runtime access.
+- Package 3 baseline: exact local/upstream/`ls-remote`/PR-head equality at `9d04f46`; push/PR runs
+  `30027550772`/`30027556705` pass Python 3.10/3.13 and every workflow step.
+- Current work: activation checkpoint before runner edits. The next focused command is
+  `.venv/bin/python -m pytest -q tests/test_round_commit_runner.py`.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 
