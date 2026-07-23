@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-23T21:40:17+08:00",
+  "recorded_at": "2026-07-23T22:01:06+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "e4e784e19879c917e61d8466dd71c0c3afae20c4",
-  "last_known_stable_commit": "e4e784e19879c917e61d8466dd71c0c3afae20c4",
+  "head_commit": "816b035c766c0f3caf57ea7ff708ff0278e3a2ae",
+  "last_known_stable_commit": "816b035c766c0f3caf57ea7ff708ff0278e3a2ae",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "e4e784e19879c917e61d8466dd71c0c3afae20c4",
+  "state_recorded_against_commit": "816b035c766c0f3caf57ea7ff708ff0278e3a2ae",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-23T21:40:17+08:00",
-    "commit": "e4e784e19879c917e61d8466dd71c0c3afae20c4",
+    "verified_at": "2026-07-23T22:01:06+08:00",
+    "commit": "816b035c766c0f3caf57ea7ff708ff0278e3a2ae",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 30012047804,
+        "run_id": 30012529719,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "e4e784e19879c917e61d8466dd71c0c3afae20c4",
+        "head_sha": "816b035c766c0f3caf57ea7ff708ff0278e3a2ae",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 30012050777,
+        "run_id": 30012529172,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "e4e784e19879c917e61d8466dd71c0c3afae20c4",
+        "head_sha": "816b035c766c0f3caf57ea7ff708ff0278e3a2ae",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,28 @@
       }
     }
   },
-  "status": "ara054_storage_classifier_foundation_remote_verified",
+  "status": "ara054_runtime_package_active",
   "commands": [
+    {
+      "command": "ARA-054 runtime-package baseline and remote verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "commit": "816b035c766c0f3caf57ea7ff708ff0278e3a2ae",
+        "ruff_files": 64,
+        "pytest_passed": 408,
+        "pytest_subtests_passed": 625,
+        "tracked_files_scanned": 108,
+        "staged_files_scanned": 108,
+        "safety_findings": 0,
+        "duration_seconds": 22.65,
+        "push_run_id": 30012529719,
+        "pull_request_run_id": 30012529172,
+        "python_310": "success",
+        "python_313": "success",
+        "provider_calls": 0
+      }
+    },
     {
       "command": "ARA-054 storage/classifier foundation indexed make check and remote verification",
       "exit_code": 0,

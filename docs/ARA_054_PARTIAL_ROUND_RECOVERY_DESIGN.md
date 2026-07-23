@@ -1,10 +1,10 @@
 # ARA-054 Partial-Round Recovery Design
 
-Status: design complete; implementation package 1 approved
+Status: design complete; runtime recovery package approved
 
 Date: 2026-07-23
 
-Scope: provider-free recovery design plus package 1 storage/classifier foundations
+Scope: provider-free recovery design, staging foundations, and approved runtime recovery package
 
 ## Decision summary
 
@@ -22,9 +22,10 @@ trustworthy stage boundary, agent error state, timing state, or prompt/config id
 particular, empty output and the current one-byte placeholder are not distinguishable from
 legitimate empty model output.
 
-The owner subsequently approved implementation package 1: create-only attempt storage primitives
-and a shared recovery classifier. Runner write-path switching, canonical publication, legacy
-migration, and ARA-055 remain outside that authorization.
+The owner subsequently approved the runtime recovery package: manifest transitions,
+empty-canonical handoff, disk-budget protection, staged runner writes, canonical publication, and
+shared runner/preview classification. Legacy migration and ARA-055 remain outside that
+authorization.
 
 ## Confirmed current behavior
 
@@ -382,9 +383,9 @@ detectable, but it cannot by itself prove that both history generations committe
 
 ## Implementation work packages requiring approval
 
-The approved foundation is implemented in `e4e784e`: item 1 and the discovery/classifier/count-cap
-portion of item 2 are complete. Runtime callers, manifest transitions, free-space/disk-budget
-policy, and items 3-6 remain deferred.
+The foundation is implemented in `e4e784e`: item 1 and the discovery/classifier/count-cap portion
+of item 2 are complete. The owner has now approved the remaining item-2 resource protection plus
+items 3-5. Item 6 remains deferred, and legacy migration must not be implemented.
 
 1. Add create-only anchored stage-output and attempt-manifest helpers with unit fault tests.
 2. Add attempt discovery, validation, resource bounds, and shared eligibility classification.

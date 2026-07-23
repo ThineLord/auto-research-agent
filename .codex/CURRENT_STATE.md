@@ -4,20 +4,20 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: preserve the remotely verified ARA-054 storage/classifier foundation and await
-  separate approval before any runtime writer, publication, preview, or migration integration.
+- Current goal: implement the owner-approved ARA-054 runtime recovery package: manifest
+  transitions, empty-canonical handoff, disk-budget protection, and shared runner/preview staging.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `e4e784e19879c917e61d8466dd71c0c3afae20c4` (the exact
+- State recorded against commit: `816b035c766c0f3caf57ea7ff708ff0278e3a2ae` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `e4e784e19879c917e61d8466dd71c0c3afae20c4` (exact local,
+- Last externally verified fallback: `816b035c766c0f3caf57ea7ff708ff0278e3a2ae` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. The approved ARA-054 storage/classifier foundation is
-  complete and remote-verified. Runtime writer switching, canonical publication, preview/UI
-  integration, disk-budget policy, legacy migration, and ARA-055 remain deferred.
+- Active task at this snapshot: `ARA-054` runtime package. Manifest transitions,
+  empty-canonical handoff, disk-budget protection, staged runner writes, publication, and shared
+  preview/runner classification are authorized. Legacy migration and ARA-055 remain excluded.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 

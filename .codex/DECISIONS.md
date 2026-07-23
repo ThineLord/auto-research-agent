@@ -709,3 +709,17 @@
 - Completion boundary: package 1 may complete independently while KI-054 remains open. Runtime
   recovery behavior must not be claimed fixed until a later approved package is implemented and
   the full interrupt/quota matrix passes.
+
+## 2026-07-23 - Approve ARA-054 runtime recovery package
+
+- Approval: after receiving the recommended next task, the owner said `继续`.
+- Authorized scope: manifest transitions, empty-canonical handoff, bounded disk-space protection,
+  staged runner writes, canonical publication, shared runner/preview classification, and
+  provider-free interrupt/quota regression coverage.
+- Excluded scope: do not migrate legacy canonical partials, alter experiment semantics, or absorb
+  the ARA-055 histories/checkpoint transaction.
+- Compatibility boundary: completed canonical rounds must keep the same four filenames and bytes;
+  existing ambiguous partials remain fail-closed and immutable.
+- Interruption boundary: every independently safe phase must be committed and pushed. If
+  publication cannot be separated safely from ARA-055, stop at the last verified staging
+  checkpoint rather than weakening recovery guarantees.

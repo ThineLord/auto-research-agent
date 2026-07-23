@@ -628,7 +628,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-054 - Reconcile resumable mid-round stops with partial output directories
 
-- Status: `DEFERRED`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: high
 - Description: interrupts or quota stops after review/revise/Judge persist a partial next-round
@@ -664,6 +664,13 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Remaining dependency: separate owner approval for manifest transitions, runtime writer/preview
   integration, empty-canonical handling, disk-budget policy, publication, and any explicit legacy
   migration. ARA-055 remains a separate transaction design.
+- Runtime-package approval: after receiving the exact recommended next task, the owner said
+  `继续` on 2026-07-23. This authorizes manifest transitions, empty-canonical handoff,
+  disk-budget protection, staged runner writes, canonical publication, and shared resume-preview
+  diagnostics. It does not authorize legacy migration or folding in ARA-055.
+- Runtime-package baseline: exact local/upstream/`ls-remote`/PR-head equality at `816b035`; push/PR
+  runs `30012529719`/`30012529172` pass. Provider-free `make check` passes `408 passed, 625
+  subtests` over 108 files in 22.65 seconds.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 

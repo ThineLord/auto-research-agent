@@ -553,8 +553,8 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## KI-054 - Resumable mid-round stops leave an ineligible partial round
 
-- Status: storage/classifier foundation complete in `e4e784e`; runtime integration and migration
-  remain deferred, so the user-visible recovery inconsistency is still open
+- Status: storage/classifier foundation complete in `e4e784e`; the owner-approved runtime
+  integration package is active, while legacy migration remains deferred
 - Severity: P2 recovery consistency, high-risk compatibility surface
 - Evidence: the runner persists partial next-round outputs after agent stages and can finalize an
   interrupt or quota stop with `can_resume=true`, while resume validation rejects a nonempty pending

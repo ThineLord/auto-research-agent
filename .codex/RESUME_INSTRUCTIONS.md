@@ -64,7 +64,7 @@ annotations. Preserve its literal string lookalikes, metadata, request/redaction
 and installed-fallback behavior.
 ARA-058 is complete through remote-equal closeout `1419d5e`; closeout push/PR runs
 `29264305133`/`29264308515` passed Python 3.10/3.13, all four wheel steps, and zero annotations with
-exact PR body readback. Use `e4e784e19879c917e61d8466dd71c0c3afae20c4` as the conservative exact
+exact PR body readback. Use `816b035c766c0f3caf57ea7ff708ff0278e3a2ae` as the conservative exact
 externally verified fallback.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
@@ -121,18 +121,16 @@ Push/PR runs `30004044807`/`30004047971` passed Python 3.10/3.13, all four isola
 and zero annotations. Preserve ARA-041 startup transaction ordering, cooperative status-0 stops,
 schemas, and ordinary exception behavior.
 
-ARA-054's approved storage/classifier foundation is complete and remote-verified at `e4e784e`. The
-eight-case
+ARA-054's storage/classifier foundation is complete and the owner has now approved the runtime
+recovery package. The eight-case
 provider-free matrix confirms that every post-stage interrupt/quota checkpoint claims resumability
 while preview and actual resume reject the canonical four-file directory. Read
 `docs/ARA_054_PARTIAL_ROUND_RECOVERY_DESIGN.md` before any follow-up. It selects append-only attempt
 staging and whole-round retry, rejects mid-stage continuation and rollback, keeps legacy canonical
-partials fail-closed, and leaves ARA-055 separate. No task is `IN_PROGRESS`. The foundation adds
-create-only attempt paths, strict discovery/hash checks, a shared classifier, and a 32-attempt cap,
-but is intentionally not wired into runner/resume behavior. Do not add manifest transitions,
-switch the runtime write path, publish canonical output, set disk-budget policy, migrate legacy
-artifacts, absorb ARA-055, or mutate existing partial evidence without a new scoped approval.
-There is no unblocked implementation task.
+partials fail-closed, and leaves ARA-055 separate. `ARA-054` is the sole `IN_PROGRESS` task.
+Implement manifest transitions, empty-canonical handoff, disk-budget protection, staged runner
+writes, canonical publication, and shared runner/preview diagnostics with provider-free tests.
+Do not migrate legacy artifacts, absorb ARA-055, or mutate existing canonical/partial evidence.
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 
