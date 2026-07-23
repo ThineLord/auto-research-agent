@@ -4,20 +4,20 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: implement the owner-approved first ARA-054 package: create-only attempt storage
-  primitives and a shared recovery classifier, without changing the runtime write path.
+- Current goal: preserve the remotely verified ARA-054 storage/classifier foundation and await
+  separate approval before any runtime writer, publication, preview, or migration integration.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `ab1466b49173911253d95e61a4fde5cf7e775cf8` (the exact
+- State recorded against commit: `e4e784e19879c917e61d8466dd71c0c3afae20c4` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `ab1466b49173911253d95e61a4fde5cf7e775cf8` (exact local,
+- Last externally verified fallback: `e4e784e19879c917e61d8466dd71c0c3afae20c4` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: `ARA-054` implementation package 1 only. Attempt storage helpers
-  and the pure/shared classifier are authorized. Runtime writer switching, canonical publication,
-  legacy migration, and ARA-055 remain outside this package.
+- Active task at this snapshot: none. The approved ARA-054 storage/classifier foundation is
+  complete and remote-verified. Runtime writer switching, canonical publication, preview/UI
+  integration, disk-budget policy, legacy migration, and ARA-055 remain deferred.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -844,13 +844,26 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
   passed.
 - Indexed recovery-closeout `make check` passes Ruff, imports, both repository-safety scans, and
   pytest with `399 passed, 621 subtests` over 106 tracked/staged files in 22.27 seconds.
+- Implemented create-only anchored text/JSON writes and exclusive
+  `partial_rounds/round_NN/attempt_<id>/output` allocation. Failed writes remain immutable evidence;
+  existing leaves and attempt identifiers cannot be overwritten or path-expanded.
+- Added the provider-free `src.round_attempts` foundation: strict identity/schema/hash validation,
+  deterministic stopped-attempt discovery, fail-closed canonical/attempt conflict handling, an
+  initial 32-attempt cap, and a path-redacted shared recovery classification result.
+- Added nine focused tests plus fault, collision, identifier, count, hash, malformed-manifest,
+  canonical-conflict, link, and byte-preservation coverage.
+- Indexed `make check` passes Ruff, imports, both repository-safety scans, and pytest with `408
+  passed, 625 subtests` over 108 tracked/staged files in 19.49 seconds.
+- Committed the foundation as `e4e784e`, pushed it with exact local/upstream/`ls-remote`/PR-head
+  equality, and verified push/PR runs `30012047804`/`30012050777`: Python 3.10/3.13, every
+  isolated-wheel step, and all CI jobs passed. Draft PR 13 remains open and mergeable.
 
 ## Remaining Steps
 
-- Do not implement ARA-054 until the owner separately approves the staged-attempt design and its
-  proposed additive metadata, publication, UI/CLI, and legacy-migration scope.
-- If implementation is approved, begin with create-only anchored attempt helpers and the focused
-  fault matrix; do not start with a runner rewrite or legacy artifact mutation.
+- Do not route the runner or resume preview through staged attempts without a new scoped approval.
+- If runtime integration is approved, first define the empty-canonical handoff and disk-budget
+  policy, then add manifest transition helpers and the full interrupt/quota matrix. Do not start
+  with a broad runner rewrite or legacy artifact mutation.
 - Keep ARA-055 separately deferred. ARA-054 does not make canonical publication, both histories,
   memory, best output, and recovery metadata one atomic transaction.
 - Do not activate ARA-018 without an owner license/distribution decision.
@@ -1823,8 +1836,8 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ```bash
 git status --short --branch
-.venv/bin/python -m pytest -q tests/test_recovery_state.py
-git diff --check
+git rev-parse HEAD
+git log --oneline --decorate -n 10
 ```
 
 ## Interruption Recovery
@@ -1864,9 +1877,10 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   pre-agent/agent manual-interrupt marker, status 130, reusable empty pending rounds, ARA-041 startup
   ordering, cooperative status-0 stops, schemas, ordinary exception behavior, and legacy resume
   compatibility; do not broaden into ARA-054/055 transaction design.
-- ARA-054 is authorized for design only. Do not change runner/resume/storage runtime behavior,
-  artifact schemas, or compatibility loaders, and do not move, delete, truncate, replace, or
-  overwrite partial-round evidence. Use only synthetic provider-free temporary workspaces.
+- ARA-054's storage/classifier foundation is complete at `e4e784e`. It is not wired into
+  runner/resume behavior, does not fix KI-054 by itself, and does not authorize manifest
+  transitions, publication, disk-budget policy, UI/CLI changes, or migration. Do not move, delete,
+  truncate, replace, or overwrite partial-round evidence.
 - The selected ARA-054 design is append-only attempt staging with whole-round retry, not mid-stage
   continuation. Existing canonical partial rounds remain fail-closed and require a separately
   approved explicit migration; do not infer stage truth from placeholders or

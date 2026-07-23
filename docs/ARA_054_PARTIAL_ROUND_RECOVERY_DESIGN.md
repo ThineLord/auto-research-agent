@@ -382,6 +382,10 @@ detectable, but it cannot by itself prove that both history generations committe
 
 ## Implementation work packages requiring approval
 
+The approved foundation is implemented in `e4e784e`: item 1 and the discovery/classifier/count-cap
+portion of item 2 are complete. Runtime callers, manifest transitions, free-space/disk-budget
+policy, and items 3-6 remain deferred.
+
 1. Add create-only anchored stage-output and attempt-manifest helpers with unit fault tests.
 2. Add attempt discovery, validation, resource bounds, and shared eligibility classification.
 3. Route partial stage persistence to attempts while preserving canonical successful output bytes.

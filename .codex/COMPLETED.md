@@ -994,3 +994,16 @@ Validation and implementation outcomes will be appended only after they are actu
 - Design contract and indexed `make check` pass with `399 passed, 621 subtests` over 106 files.
   Design commit `946f40f` is remote-equal; push/PR runs `30007167214`/`30007170465` passed Python
   3.10/3.13 and every isolated-wheel step.
+
+## 2026-07-23 - ARA-054 storage and classifier foundation
+
+- Added anchored create-only text/JSON primitives and exclusive append-only attempt directory
+  allocation. Existing leaves, stopped evidence, and canonical round files are never overwritten.
+- Added strict attempt identity, timestamp, schema, stage-prefix, size, SHA-256, and filesystem
+  validation with path-redacted classifications and an initial 32-attempt cap.
+- Preserved current runner/resume behavior, canonical output format, legacy fail-closed handling,
+  provider behavior, experiment results, and the separate ARA-055 transaction boundary.
+- Focused coverage passes `9 passed, 4 subtests`; indexed `make check` passes `408 passed, 625
+  subtests` over 108 tracked/index files with zero safety findings.
+- Foundation commit `e4e784e` is remote-equal; push/PR runs
+  `30012047804`/`30012050777` passed Python 3.10/3.13 and every isolated-wheel step.

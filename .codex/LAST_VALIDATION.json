@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-23T21:34:02+08:00",
+  "recorded_at": "2026-07-23T21:40:17+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "ab1466b49173911253d95e61a4fde5cf7e775cf8",
-  "last_known_stable_commit": "ab1466b49173911253d95e61a4fde5cf7e775cf8",
+  "head_commit": "e4e784e19879c917e61d8466dd71c0c3afae20c4",
+  "last_known_stable_commit": "e4e784e19879c917e61d8466dd71c0c3afae20c4",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "ab1466b49173911253d95e61a4fde5cf7e775cf8",
+  "state_recorded_against_commit": "e4e784e19879c917e61d8466dd71c0c3afae20c4",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-23T20:36:14+08:00",
-    "commit": "ab1466b49173911253d95e61a4fde5cf7e775cf8",
+    "verified_at": "2026-07-23T21:40:17+08:00",
+    "commit": "e4e784e19879c917e61d8466dd71c0c3afae20c4",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 30007547159,
+        "run_id": 30012047804,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "ab1466b49173911253d95e61a4fde5cf7e775cf8",
+        "head_sha": "e4e784e19879c917e61d8466dd71c0c3afae20c4",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 30007550054,
+        "run_id": 30012050777,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "ab1466b49173911253d95e61a4fde5cf7e775cf8",
+        "head_sha": "e4e784e19879c917e61d8466dd71c0c3afae20c4",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,28 @@
       }
     }
   },
-  "status": "ara054_storage_package_active",
+  "status": "ara054_storage_classifier_foundation_remote_verified",
   "commands": [
+    {
+      "command": "ARA-054 storage/classifier foundation indexed make check and remote verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "commit": "e4e784e19879c917e61d8466dd71c0c3afae20c4",
+        "ruff_files": 64,
+        "pytest_passed": 408,
+        "pytest_subtests_passed": 625,
+        "tracked_files_scanned": 108,
+        "staged_files_scanned": 108,
+        "safety_findings": 0,
+        "duration_seconds": 19.49,
+        "push_run_id": 30012047804,
+        "pull_request_run_id": 30012050777,
+        "python_310": "success",
+        "python_313": "success",
+        "provider_calls": 0
+      }
+    },
     {
       "command": "ARA-054 indexed recovery-closeout make check",
       "exit_code": 0,
@@ -4695,6 +4715,9 @@
     }
   ],
   "notes": [
+    "ARA-054 storage and classifier foundation e4e784e is pushed with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 30012047804 and 30012050777 passed Python 3.10 and 3.13 plus all isolated-wheel steps.",
+    "ARA-054 focused coverage passes 9 tests and 4 subtests; indexed make check passes 408 tests and 625 subtests over 108 tracked and staged files with zero safety findings and zero provider calls.",
+    "ARA-054 runtime writer switching, manifest transitions, preview and UI integration, empty-canonical handling, disk-budget policy, publication, migration, and ARA-055 remain deferred.",
     "ARA-054 design closeout ab1466b is pushed with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 30007547159 and 30007550054 passed Python 3.10 and 3.13 plus all four isolated-wheel steps.",
     "ARA-054 selects append-only attempt staging with whole-round retry, immutable stopped evidence, create-only stage outputs, shared eligibility classification, bounded attempts, and fail-closed legacy partials; implementation package 1 is active while runtime integration and migration remain unauthorized.",
     "ARA-054 provider-free characterization confirmed eight of eight post-persistence interrupt/quota cases had checkpoint can_resume true but preview and actual resume false with complete_uncheckpointed status, while every checkpoint and round byte remained unchanged.",

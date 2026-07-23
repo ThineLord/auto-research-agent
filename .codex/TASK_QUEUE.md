@@ -628,7 +628,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-054 - Reconcile resumable mid-round stops with partial output directories
 
-- Status: `IN_PROGRESS`
+- Status: `DEFERRED`
 - Priority: P2
 - Risk: high
 - Description: interrupts or quota stops after review/revise/Judge persist a partial next-round
@@ -655,8 +655,15 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Design validation: indexed `make check` passes `399 passed, 621 subtests` over 106 files in 21.00
   seconds. Push/PR runs `30007167214`/`30007170465` passed Python 3.10/3.13 and isolated-wheel
   validation.
-- Remaining dependency: separate owner approval for runtime implementation, additive metadata, and
-  any explicit legacy migration. ARA-055 remains a separate transaction design.
+- Foundation result: `e4e784e` adds create-only anchored attempt storage, strict manifest/output
+  inspection, shared recovery classification, and the initial 32-attempt cap without changing the
+  runner or resume preview. Focused tests pass `9 passed, 4 subtests`; indexed `make check` passes
+  `408 passed, 625 subtests` over 108 files.
+- Foundation verification: exact local/upstream/`ls-remote`/PR-head equality; push/PR runs
+  `30012047804`/`30012050777` passed Python 3.10/3.13 and isolated-wheel validation.
+- Remaining dependency: separate owner approval for manifest transitions, runtime writer/preview
+  integration, empty-canonical handling, disk-budget policy, publication, and any explicit legacy
+  migration. ARA-055 remains a separate transaction design.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
