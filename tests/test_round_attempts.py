@@ -6,14 +6,20 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import src.storage as storage_module
 from src.round_attempts import (
     MAX_ATTEMPTS_PER_ROUND,
+    MAX_RETAINED_ATTEMPT_BYTES_PER_ROUND,
+    MIN_FREE_BYTES_FOR_ATTEMPT,
     RoundAttemptBlockedError,
     classify_round_recovery,
     create_round_attempt,
+    mark_attempt_ready_to_publish,
+    mark_attempt_stopped,
+    persist_attempt_stage,
     write_attempt_stage_output,
 )
 from src.storage import write_json_file
@@ -22,6 +28,151 @@ CONFIG_DIGEST = "a" * 64
 
 
 class RoundAttemptStorageTests(unittest.TestCase):
+    def test_manifest_transitions_record_each_stage_and_stop_immutably(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "run-id"
+            run_root.mkdir()
+            attempt_dir = create_round_attempt(
+                run_root=run_root,
+                round_index=2,
+                run_config_sha256=CONFIG_DIGEST,
+                attempt_id="12345678abcdef00",
+                created_at="2026-07-23T12:00:00+00:00",
+            )
+
+            draft_path = persist_attempt_stage(
+                attempt_dir,
+                "draft",
+                " draft result ",
+                updated_at="2026-07-23T12:01:00+00:00",
+            )
+            manifest = json.loads((attempt_dir / "attempt.json").read_text(encoding="utf-8"))
+            self.assertEqual(draft_path.read_bytes(), b"draft result\n")
+            self.assertEqual(manifest["completed_stages"], ["draft"])
+            self.assertEqual(manifest["last_successful_agent"], "draft")
+            self.assertEqual(
+                manifest["outputs"]["01_draft.md"]["sha256"],
+                hashlib.sha256(b"draft result\n").hexdigest(),
+            )
+
+            with self.assertRaisesRegex(RoundAttemptBlockedError, "expected review"):
+                persist_attempt_stage(attempt_dir, "revise", "out of order")
+            with self.assertRaisesRegex(ValueError, "move backwards"):
+                persist_attempt_stage(
+                    attempt_dir,
+                    "review",
+                    "review",
+                    updated_at="2026-07-23T11:59:00+00:00",
+                )
+            self.assertFalse((attempt_dir / "output" / "02_review.md").exists())
+
+            mark_attempt_stopped(
+                attempt_dir,
+                "MANUAL_INTERRUPT",
+                updated_at="2026-07-23T12:02:00+00:00",
+            )
+            stopped_bytes = (attempt_dir / "attempt.json").read_bytes()
+            classification = classify_round_recovery(run_root, 2)
+            self.assertEqual(classification.status, "staged_partial")
+            self.assertTrue(classification.can_create_attempt)
+            self.assertEqual(classification.latest_verified_completed_stage, "draft")
+            with self.assertRaisesRegex(RoundAttemptBlockedError, "state stopped"):
+                persist_attempt_stage(attempt_dir, "review", "must not write")
+            self.assertEqual((attempt_dir / "attempt.json").read_bytes(), stopped_bytes)
+            self.assertFalse((attempt_dir / "output" / "02_review.md").exists())
+
+    def test_ready_transition_requires_all_four_verified_outputs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "run-id"
+            run_root.mkdir()
+            attempt_dir = create_round_attempt(
+                run_root=run_root,
+                round_index=1,
+                run_config_sha256=CONFIG_DIGEST,
+                attempt_id="12345678abcdef00",
+            )
+            persist_attempt_stage(attempt_dir, "draft", "draft")
+            with self.assertRaisesRegex(RoundAttemptBlockedError, "four completed stages"):
+                mark_attempt_ready_to_publish(attempt_dir)
+
+            persist_attempt_stage(
+                attempt_dir,
+                "review",
+                "review error",
+                agent_succeeded=False,
+            )
+            for stage in ("revise", "judge"):
+                persist_attempt_stage(attempt_dir, stage, stage)
+            mark_attempt_ready_to_publish(attempt_dir)
+
+            manifest = json.loads((attempt_dir / "attempt.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["state"], "ready_to_publish")
+            self.assertEqual(manifest["last_successful_agent"], "judge")
+            classification = classify_round_recovery(run_root, 1)
+            self.assertEqual(classification.status, "publication_pending")
+            self.assertFalse(classification.can_create_attempt)
+
+    def test_disk_and_retained_byte_budgets_block_before_allocation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "run-id"
+            run_root.mkdir()
+            with (
+                patch(
+                    "src.round_attempts.shutil.disk_usage",
+                    return_value=SimpleNamespace(free=MIN_FREE_BYTES_FOR_ATTEMPT - 1),
+                ),
+                self.assertRaisesRegex(RoundAttemptBlockedError, "insufficient_disk_space"),
+            ):
+                create_round_attempt(
+                    run_root=run_root,
+                    round_index=1,
+                    run_config_sha256=CONFIG_DIGEST,
+                    attempt_id="12345678abcdef00",
+                )
+            self.assertFalse((run_root / "partial_rounds").exists())
+
+            with patch(
+                "src.round_attempts._retained_attempt_bytes",
+                return_value=MAX_RETAINED_ATTEMPT_BYTES_PER_ROUND + 1,
+            ):
+                classification = classify_round_recovery(run_root, 1)
+            self.assertEqual(classification.status, "retained_attempt_budget_exceeded")
+            self.assertFalse(classification.can_create_attempt)
+            self.assertGreater(
+                classification.retained_attempt_bytes,
+                MAX_RETAINED_ATTEMPT_BYTES_PER_ROUND,
+            )
+
+    def test_manifest_update_failure_preserves_orphan_output_and_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "run-id"
+            run_root.mkdir()
+            attempt_dir = create_round_attempt(
+                run_root=run_root,
+                round_index=1,
+                run_config_sha256=CONFIG_DIGEST,
+                attempt_id="12345678abcdef00",
+            )
+            manifest_before = (attempt_dir / "attempt.json").read_bytes()
+
+            with (
+                patch(
+                    "src.round_attempts.write_json_file",
+                    side_effect=OSError("injected manifest failure"),
+                ),
+                self.assertRaisesRegex(OSError, "injected manifest failure"),
+            ):
+                persist_attempt_stage(attempt_dir, "draft", "orphan evidence")
+
+            self.assertEqual((attempt_dir / "attempt.json").read_bytes(), manifest_before)
+            self.assertEqual(
+                (attempt_dir / "output" / "01_draft.md").read_bytes(),
+                b"orphan evidence\n",
+            )
+            classification = classify_round_recovery(run_root, 1)
+            self.assertEqual(classification.status, "attempt_unverifiable")
+            self.assertFalse(classification.can_create_attempt)
+
     def test_attempt_creation_and_stage_outputs_are_create_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             run_root = Path(tmp) / "run-id"

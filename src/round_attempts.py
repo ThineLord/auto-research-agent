@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -14,8 +15,10 @@ from typing import Any
 from .storage import (
     artifact_path_exists,
     list_artifact_entry_names,
+    list_artifact_regular_files,
     make_round_attempt_dir,
     read_regular_text,
+    write_json_file,
     write_json_file_create_only,
     write_text_create_only,
 )
@@ -23,6 +26,8 @@ from .storage import (
 ATTEMPT_SCHEMA_VERSION = 1
 ATTEMPT_KIND = "partial_round_attempt"
 MAX_ATTEMPTS_PER_ROUND = 32
+MIN_FREE_BYTES_FOR_ATTEMPT = 16 * 1024 * 1024
+MAX_RETAINED_ATTEMPT_BYTES_PER_ROUND = 256 * 1024 * 1024
 ATTEMPT_ID_PATTERN = re.compile(r"[a-z0-9][a-z0-9_-]{7,63}\Z")
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
 STOP_REASON_PATTERN = re.compile(r"[A-Z][A-Z0-9_]{0,63}\Z")
@@ -58,6 +63,8 @@ class RoundRecoveryClassification:
     preserved_attempt_count: int
     latest_verified_completed_stage: str | None
     blocked_reason: str | None
+    retained_attempt_bytes: int = 0
+    free_bytes: int | None = None
     attempts: tuple[AttemptInspection, ...] = ()
 
 
@@ -107,6 +114,8 @@ def create_round_attempt(
     attempt_id: str | None = None,
     created_at: str | None = None,
     max_attempts: int = MAX_ATTEMPTS_PER_ROUND,
+    min_free_bytes: int = MIN_FREE_BYTES_FOR_ATTEMPT,
+    max_retained_bytes: int = MAX_RETAINED_ATTEMPT_BYTES_PER_ROUND,
 ) -> Path:
     """Allocate an attempt and create its initial manifest without overwriting evidence."""
     run_root = Path(run_root).expanduser().absolute()
@@ -123,6 +132,8 @@ def create_round_attempt(
         run_root,
         round_index,
         max_attempts=max_attempts,
+        min_free_bytes=min_free_bytes,
+        max_retained_bytes=max_retained_bytes,
     )
     if not classification.can_create_attempt:
         reason = classification.blocked_reason or classification.status
@@ -162,6 +173,173 @@ def write_attempt_stage_output(attempt_dir: Path, stage: str, content: str) -> P
     output_path = Path(attempt_dir) / "output" / output_name
     write_text_create_only(output_path, content)
     return output_path
+
+
+def _transition_timestamp(value: str | None, *, not_before: str) -> str:
+    timestamp = value or datetime.now().astimezone().isoformat()
+    parsed = _aware_timestamp(timestamp)
+    lower_bound = _aware_timestamp(not_before)
+    if parsed is None or lower_bound is None:
+        raise ValueError("updated_at must be a timezone-aware ISO-8601 timestamp")
+    if parsed < lower_bound:
+        raise ValueError("updated_at cannot move backwards")
+    return timestamp
+
+
+def _transition_manifest(attempt_dir: Path) -> tuple[Path, int, AttemptInspection, dict[str, Any]]:
+    run_root, attempt_id = _attempt_run_root(attempt_dir)
+    round_index = int(Path(attempt_dir).parent.name.removeprefix("round_"))
+    inspection = _inspect_attempt(
+        run_root=run_root,
+        round_index=round_index,
+        attempt_dir=Path(attempt_dir),
+        attempt_id=attempt_id,
+    )
+    if not inspection.verified:
+        raise RoundAttemptBlockedError(inspection.reason or "attempt is unverifiable")
+    try:
+        manifest = json.loads(read_regular_text(Path(attempt_dir) / "attempt.json"))
+    except (OSError, UnicodeError, ValueError, RecursionError):
+        raise RoundAttemptBlockedError("attempt manifest is unreadable") from None
+    if not isinstance(manifest, dict):
+        raise RoundAttemptBlockedError("attempt manifest is invalid")
+    return run_root, round_index, inspection, manifest
+
+
+def _write_transition_manifest(
+    attempt_dir: Path,
+    *,
+    run_root: Path,
+    round_index: int,
+    manifest: dict[str, Any],
+) -> None:
+    write_json_file(Path(attempt_dir) / "attempt.json", manifest)
+    attempt_id = Path(attempt_dir).name.removeprefix("attempt_")
+    inspection = _inspect_attempt(
+        run_root=run_root,
+        round_index=round_index,
+        attempt_dir=Path(attempt_dir),
+        attempt_id=attempt_id,
+    )
+    if not inspection.verified:
+        raise RoundAttemptBlockedError(inspection.reason or "attempt transition is unverifiable")
+
+
+def persist_attempt_stage(
+    attempt_dir: Path,
+    stage: str,
+    content: str,
+    *,
+    agent_succeeded: bool = True,
+    updated_at: str | None = None,
+) -> Path:
+    """Create the next stage output and atomically record its digest in the manifest."""
+    run_root, round_index, inspection, manifest = _transition_manifest(attempt_dir)
+    if inspection.state != "active":
+        raise RoundAttemptBlockedError(f"attempt state {inspection.state} is immutable")
+    if not isinstance(agent_succeeded, bool):
+        raise ValueError("agent_succeeded must be a boolean")
+    if len(inspection.completed_stages) >= len(STAGE_ORDER):
+        raise RoundAttemptBlockedError("all attempt stages are already persisted")
+    expected_stage = STAGE_ORDER[len(inspection.completed_stages)]
+    if stage != expected_stage:
+        raise RoundAttemptBlockedError(f"expected {expected_stage} stage, received {stage}")
+    transition_time = _transition_timestamp(
+        updated_at,
+        not_before=str(manifest["updated_at"]),
+    )
+
+    output_path = write_attempt_stage_output(attempt_dir, stage, content)
+    output_bytes = read_regular_text(output_path).encode("utf-8")
+    output_name = STAGE_OUTPUT_FILES[stage]
+    completed_stages = [*inspection.completed_stages, stage]
+    outputs = dict(manifest["outputs"])
+    outputs[output_name] = {
+        "size": len(output_bytes),
+        "sha256": hashlib.sha256(output_bytes).hexdigest(),
+    }
+    manifest.update(
+        {
+            "completed_stages": completed_stages,
+            "last_successful_agent": stage
+            if agent_succeeded
+            else manifest.get("last_successful_agent"),
+            "updated_at": transition_time,
+            "outputs": outputs,
+        }
+    )
+    _write_transition_manifest(
+        attempt_dir,
+        run_root=run_root,
+        round_index=round_index,
+        manifest=manifest,
+    )
+    return output_path
+
+
+def mark_attempt_stopped(
+    attempt_dir: Path,
+    stop_reason: str,
+    *,
+    updated_at: str | None = None,
+) -> None:
+    """Freeze an active attempt as immutable stopped evidence."""
+    if not isinstance(stop_reason, str) or STOP_REASON_PATTERN.fullmatch(stop_reason) is None:
+        raise ValueError("stop_reason must be a restricted uppercase identifier")
+    run_root, round_index, inspection, manifest = _transition_manifest(attempt_dir)
+    if inspection.state == "stopped" and manifest.get("stop_reason") == stop_reason:
+        return
+    if inspection.state != "active":
+        raise RoundAttemptBlockedError(f"attempt state {inspection.state} cannot be stopped")
+    manifest.update(
+        {
+            "state": "stopped",
+            "stop_reason": stop_reason,
+            "updated_at": _transition_timestamp(
+                updated_at,
+                not_before=str(manifest["updated_at"]),
+            ),
+        }
+    )
+    _write_transition_manifest(
+        attempt_dir,
+        run_root=run_root,
+        round_index=round_index,
+        manifest=manifest,
+    )
+
+
+def mark_attempt_ready_to_publish(
+    attempt_dir: Path,
+    *,
+    updated_at: str | None = None,
+) -> None:
+    """Freeze a verified four-stage active attempt for canonical publication."""
+    run_root, round_index, inspection, manifest = _transition_manifest(attempt_dir)
+    if inspection.state == "ready_to_publish":
+        return
+    if inspection.state != "active":
+        raise RoundAttemptBlockedError(
+            f"attempt state {inspection.state} cannot become ready_to_publish"
+        )
+    if inspection.completed_stages != STAGE_ORDER:
+        raise RoundAttemptBlockedError("ready_to_publish requires four completed stages")
+    manifest.update(
+        {
+            "state": "ready_to_publish",
+            "stop_reason": None,
+            "updated_at": _transition_timestamp(
+                updated_at,
+                not_before=str(manifest["updated_at"]),
+            ),
+        }
+    )
+    _write_transition_manifest(
+        attempt_dir,
+        run_root=run_root,
+        round_index=round_index,
+        manifest=manifest,
+    )
 
 
 def _invalid_attempt(attempt_id: str, reason: str) -> AttemptInspection:
@@ -223,8 +401,8 @@ def _inspect_attempt(
     ):
         return _invalid_attempt(attempt_id, "manifest_identity_or_schema_mismatch")
 
-    expected_last_agent = completed_stages[-1] if completed_stages else None
-    if manifest.get("last_successful_agent") != expected_last_agent:
+    last_successful_agent = manifest.get("last_successful_agent")
+    if last_successful_agent is not None and last_successful_agent not in completed_stages:
         return _invalid_attempt(attempt_id, "last_agent_mismatch")
     stop_reason = manifest.get("stop_reason")
     if state == "stopped":
@@ -281,6 +459,8 @@ def _classification(
     action: str,
     attempts: tuple[AttemptInspection, ...] = (),
     blocked_reason: str | None = None,
+    retained_attempt_bytes: int = 0,
+    free_bytes: int | None = None,
 ) -> RoundRecoveryClassification:
     verified_attempts = [attempt for attempt in attempts if attempt.verified]
     latest = max(
@@ -296,7 +476,70 @@ def _classification(
         preserved_attempt_count=len(attempts),
         latest_verified_completed_stage=latest_stage,
         blocked_reason=blocked_reason,
+        retained_attempt_bytes=retained_attempt_bytes,
+        free_bytes=free_bytes,
         attempts=attempts,
+    )
+
+
+def _retained_attempt_bytes(run_root: Path, round_index: int) -> int:
+    attempts_root = run_root / "partial_rounds" / f"round_{round_index:02d}"
+    if not artifact_path_exists(attempts_root, allow_directory=True):
+        return 0
+    total = 0
+    for path in list_artifact_regular_files(attempts_root):
+        total += len(read_regular_text(path).encode("utf-8"))
+    return total
+
+
+def _eligible_classification(
+    *,
+    run_root: Path,
+    round_index: int,
+    status: str,
+    action: str,
+    attempts: tuple[AttemptInspection, ...],
+    min_free_bytes: int,
+    max_retained_bytes: int,
+) -> RoundRecoveryClassification:
+    try:
+        retained_bytes = _retained_attempt_bytes(run_root, round_index)
+        free_bytes = int(shutil.disk_usage(run_root).free)
+    except (OSError, UnicodeError, ValueError):
+        return _classification(
+            status="disk_space_unavailable",
+            can_create=False,
+            action="fail_safe_require_user_action",
+            attempts=attempts,
+            blocked_reason="disk_space_unavailable",
+        )
+    if retained_bytes > max_retained_bytes:
+        return _classification(
+            status="retained_attempt_budget_exceeded",
+            can_create=False,
+            action="archive_attempts_before_retry",
+            attempts=attempts,
+            blocked_reason="retained_attempt_budget_exceeded",
+            retained_attempt_bytes=retained_bytes,
+            free_bytes=free_bytes,
+        )
+    if free_bytes < min_free_bytes:
+        return _classification(
+            status="insufficient_disk_space",
+            can_create=False,
+            action="free_disk_space_before_retry",
+            attempts=attempts,
+            blocked_reason="insufficient_disk_space",
+            retained_attempt_bytes=retained_bytes,
+            free_bytes=free_bytes,
+        )
+    return _classification(
+        status=status,
+        can_create=True,
+        action=action,
+        attempts=attempts,
+        retained_attempt_bytes=retained_bytes,
+        free_bytes=free_bytes,
     )
 
 
@@ -305,12 +548,26 @@ def classify_round_recovery(
     round_index: int,
     *,
     max_attempts: int = MAX_ATTEMPTS_PER_ROUND,
+    min_free_bytes: int = MIN_FREE_BYTES_FOR_ATTEMPT,
+    max_retained_bytes: int = MAX_RETAINED_ATTEMPT_BYTES_PER_ROUND,
 ) -> RoundRecoveryClassification:
     """Classify whether a fresh append-only attempt may be allocated for one round."""
     run_root = Path(run_root).expanduser().absolute()
     round_index = _validate_round_index(round_index)
     if isinstance(max_attempts, bool) or not isinstance(max_attempts, int) or max_attempts < 1:
         raise ValueError("max_attempts must be a positive integer")
+    if (
+        isinstance(min_free_bytes, bool)
+        or not isinstance(min_free_bytes, int)
+        or min_free_bytes < 0
+    ):
+        raise ValueError("min_free_bytes must be a non-negative integer")
+    if (
+        isinstance(max_retained_bytes, bool)
+        or not isinstance(max_retained_bytes, int)
+        or max_retained_bytes < 0
+    ):
+        raise ValueError("max_retained_bytes must be a non-negative integer")
     canonical = run_root / f"round_{round_index:02d}"
     attempts_root = run_root / "partial_rounds" / f"round_{round_index:02d}"
 
@@ -359,10 +616,14 @@ def classify_round_recovery(
             blocked_reason="attempt_limit_reached",
         )
     if not attempt_names:
-        return _classification(
+        return _eligible_classification(
+            run_root=run_root,
+            round_index=round_index,
             status="new_round",
-            can_create=True,
             action="create_new_attempt",
+            attempts=(),
+            min_free_bytes=min_free_bytes,
+            max_retained_bytes=max_retained_bytes,
         )
 
     parsed_names: list[tuple[str, str]] = []
@@ -419,9 +680,12 @@ def classify_round_recovery(
             attempts=attempts,
             blocked_reason="publication_pending",
         )
-    return _classification(
+    return _eligible_classification(
+        run_root=run_root,
+        round_index=round_index,
         status="staged_partial",
-        can_create=True,
         action="retry_round_preserve_attempt",
         attempts=attempts,
+        min_free_bytes=min_free_bytes,
+        max_retained_bytes=max_retained_bytes,
     )
