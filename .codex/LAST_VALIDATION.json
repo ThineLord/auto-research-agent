@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-23T22:59:19+08:00",
+  "recorded_at": "2026-07-23T23:02:35+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "fc5f4c7514ff20b3cd8aa626a58f04c101529f10",
-  "last_known_stable_commit": "fc5f4c7514ff20b3cd8aa626a58f04c101529f10",
+  "head_commit": "09aeda64141c7fc0a0f40de01d2846acb87ef85a",
+  "last_known_stable_commit": "09aeda64141c7fc0a0f40de01d2846acb87ef85a",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "fc5f4c7514ff20b3cd8aa626a58f04c101529f10",
+  "state_recorded_against_commit": "09aeda64141c7fc0a0f40de01d2846acb87ef85a",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-23T22:53:22+08:00",
-    "commit": "fc5f4c7514ff20b3cd8aa626a58f04c101529f10",
+    "verified_at": "2026-07-23T23:02:35+08:00",
+    "commit": "09aeda64141c7fc0a0f40de01d2846acb87ef85a",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 30017222245,
+        "run_id": 30018465335,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "fc5f4c7514ff20b3cd8aa626a58f04c101529f10",
+        "head_sha": "09aeda64141c7fc0a0f40de01d2846acb87ef85a",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 30017225423,
+        "run_id": 30018466172,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "fc5f4c7514ff20b3cd8aa626a58f04c101529f10",
+        "head_sha": "09aeda64141c7fc0a0f40de01d2846acb87ef85a",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -73,6 +73,9 @@
         "activation_commit": "fc5f4c7514ff20b3cd8aa626a58f04c101529f10",
         "activation_push_run_id": 30017222245,
         "activation_pull_request_run_id": 30017225423,
+        "design_commit": "09aeda64141c7fc0a0f40de01d2846acb87ef85a",
+        "design_push_run_id": 30018465335,
+        "design_pull_request_run_id": 30018466172,
         "python_310": "success",
         "python_313": "success",
         "provider_calls": 0,

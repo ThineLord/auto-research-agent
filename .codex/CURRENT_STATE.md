@@ -9,10 +9,10 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `fc5f4c7514ff20b3cd8aa626a58f04c101529f10` (the exact
+- State recorded against commit: `09aeda64141c7fc0a0f40de01d2846acb87ef85a` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `fc5f4c7514ff20b3cd8aa626a58f04c101529f10` (exact local,
+- Last externally verified fallback: `09aeda64141c7fc0a0f40de01d2846acb87ef85a` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
 - Active task at this snapshot: none after design validation. ARA-055 runtime transaction
@@ -892,6 +892,13 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Test Status
 
+- ARA-055 design characterization covers 40 provider-free cases across ten current write
+  boundaries, `OSError`/`KeyboardInterrupt`, and internal/configured-external storage. Recovery
+  state passes `6 passed, 1 subtest`; full validation passes `417 passed, 633 subtests`, 109-file
+  staged safety scanning is clean, and runtime-code/provider changes are zero.
+- ARA-055 design commit `09aeda6` is exact local/upstream/`ls-remote`/PR-head equal. Push/PR runs
+  `30018465335`/`30018466172` passed Python 3.10/3.13, every isolated-wheel step, formatting, lint,
+  imports, safety scans, and tests. PR 13 remains open, draft, and mergeable.
 - ARA-054 runtime publication/integration focused coverage passes `232 passed, 468 subtests`.
   Provider-free full pytest passes `417 passed, 633 subtests`; `make check` passes formatting,
   lint, imports, both repository-safety scans, and the same full suite over 108 tracked files.

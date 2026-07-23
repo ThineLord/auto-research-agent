@@ -707,6 +707,9 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   map, 40-case fault matrix, selected immutable project-local write-ahead journal, idempotent
   before/after-hash roll-forward, checkpoint-last commit point, separate finalization transaction,
   compatibility rules, security bounds, and implementation packages.
+- Design verification: commit `09aeda6` is exact local/upstream/`ls-remote`/PR-head equal;
+  push/PR runs `30018465335`/`30018466172` pass Python 3.10/3.13 and every isolated-wheel/check
+  step. Local full validation is `417 passed, 633 subtests`; staged safety scans 109 files clean.
 - Remaining approval boundary: runtime packages remain unapproved. Do not add journals, reroute
   runtime readers/writers, integrate diagnostic mode, change artifact schemas, or migrate
   historical `published_uncommitted` evidence without separate owner approval.

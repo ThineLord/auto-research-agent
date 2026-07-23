@@ -1039,3 +1039,6 @@ Validation and implementation outcomes will be appended only after they are actu
 - Added `docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md`. Runtime implementation, schemas,
   migration, providers, experiments, and canonical artifacts were not changed and remain
   separately approval-gated.
+- Design commit `09aeda6` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Push/PR runs `30018465335`/`30018466172` passed Python 3.10/3.13, every isolated-wheel/check
+  step, and PR 13 remains open, draft, and mergeable.
