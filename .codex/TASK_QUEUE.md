@@ -1,6 +1,6 @@
 # Codex Task Queue
 
-Updated: 2026-07-13 (Asia/Shanghai)
+Updated: 2026-07-23 (Asia/Hong_Kong)
 
 Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
@@ -747,23 +747,31 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   equality. Push/PR runs `29266119109`/`29266121277` passed Python 3.10/3.13, all four isolated-wheel
   steps, and zero annotations.
 
-## ARA-060 - Make unittest subtest failures fail the pytest process
+## ARA-060 - Verify unittest subtest failures fail the pytest process
 
-- Status: `TODO`
-- Priority: P1
-- Risk: medium
-- Description: under the current pytest 9 environment, failures reported only inside
-  `unittest.TestCase.subTest` are rendered as `SUBFAILED` but can leave the process status at zero;
-  the repository contains 102 `subTest` call sites across 14 files, so CI can miss regressions.
-- Related files: test infrastructure/configuration, a subprocess sentinel regression, CI tests
+- Status: `IN_PROGRESS`
+- Priority: P2 (downgraded after direct reproduction disproved the P1 finding)
+- Risk: low
+- Description: ARA-059 recorded pytest 9 returning zero after 16 `SUBFAILED` reports, raising a P1
+  concern across 102 `subTest` call sites in 14 files. Live direct reproduction now returns status 1;
+  the historical zero belonged to an outer orchestration script that printed nested command output
+  without propagating the nested exit code.
+- Related files: subprocess contract sentinel, validation/recovery records, CI tests
 - Acceptance criteria: an isolated subtest-only assertion failure deterministically makes the same
   local and CI pytest command nonzero while normal passing subtests retain existing reporting;
   existing tests need no bulk semantic rewrite.
 - Validation command: isolated subprocess sentinel, representative subtest suites, then
   `make check` and Python 3.10/3.13 GitHub Actions.
 - Commit required: yes.
-- Dependencies: choose a no-dependency hook or an evidence-based pytest policy; any dependency or
-  test-configuration change must receive the repository-required safety approval before work.
+- Dependencies: repository-required test-configuration safety approval received from the owner on
+  2026-07-23. Prefer a no-dependency hook; any new dependency still requires separate evidence and
+  must not be added merely to simplify implementation.
+- Local validation: isolated direct pytest probes return status 1 for one and 16 subtest-only
+  failures, while passing subtests return 0. Added a no-plugin-autoload, timeout-bounded subprocess
+  sentinel without changing configuration or dependencies; focused tests pass `2 passed`, and the
+  existing 14-file subtest cohort passes `321 passed, 618 subtests`. Full `make check` passes `397
+  passed, 618 subtests` with 62 formatted files and zero safety findings; review, commit, push, and
+  remote CI remain.
 
 ## ARA-011 - Prevent failed rounds from replacing a trusted best output
 

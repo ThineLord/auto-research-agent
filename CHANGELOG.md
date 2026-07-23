@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Testing
+
+* The test suite now verifies pytest's native `unittest.subTest` exit-code contract in isolated
+  subprocesses: subtest-only failures must return status 1, while passing subtests return 0. An
+  earlier apparent zero exit was traced to an orchestration wrapper that printed nested command
+  output without propagating its exit status; no pytest configuration or dependency change was
+  needed.
+
 ### Security
 
 * Ollama request, timeout, and model-list fallback failures now render only the configured

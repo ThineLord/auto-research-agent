@@ -1,23 +1,23 @@
 # Codex Current State
 
-Updated: 2026-07-14 (Asia/Shanghai)
+Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: preserve the remotely verified ARA-059 checkpoint and await repository-required
-  safety approval before any ARA-060 test-infrastructure change.
+- Current goal: complete approved ARA-060 by locking pytest's already-correct subtest exit contract
+  and correcting the historical wrapper-status record without configuration or dependency changes.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `a7d00a668168c0ed7766ce2d579d8201f2a0a33b` (the exact
+- State recorded against commit: `b196af970948ecb5c20c5c524f111079afa7b9d5` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `a7d00a668168c0ed7766ce2d579d8201f2a0a33b` (exact local,
+- Last externally verified fallback: `b196af970948ecb5c20c5c524f111079afa7b9d5` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-059 is implementation-complete and remote-verified;
-  ARA-060 is the highest-priority TODO but requires safety approval before test configuration or
-  dependency work.
+- Active task at this snapshot: ARA-060. The owner approved scoped test-configuration work on
+  2026-07-23; the no-dependency sentinel and local validation are complete, while review, commit,
+  push, and remote CI verification remain.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -773,13 +773,32 @@ Updated: 2026-07-14 (Asia/Shanghai)
 - Committed ARA-059 as `a7d00a6`, pushed it with exact local/upstream/`ls-remote`/PR-head equality,
   and verified push/PR runs `29266119109`/`29266121277`: Python 3.10/3.13, all four isolated-wheel
   steps, and every annotation set passed cleanly. Draft PR 13 remains open, draft, and mergeable.
+- Re-verified the ARA-059 closeout `b196af9` on 2026-07-23: local/upstream/`ls-remote`/PR-head are
+  exact, closeout push/PR runs `29266539401`/`29266544263` remain successful, and PR 13 remains
+  open, draft, and mergeable.
+- Received explicit owner approval for ARA-060 test-configuration work on 2026-07-23 and activated
+  it as the sole `IN_PROGRESS` task without changing dependencies.
+- Ran the current baseline `make check`: Ruff, imports, both repository-safety modes, and pytest
+  passed with `395 passed, 618 subtests` in 20.45 seconds.
+- Reproduced one and 16 subtest-only failures with direct pytest 9.0.3 invocations; both returned
+  status 1. Archived ARA-059 evidence showed the apparent zero came from an outer parallel script
+  that printed nested command output without propagating nested exit codes.
+- Added a no-new-dependency subprocess sentinel for failing and passing `unittest.subTest` behavior.
+  It disables third-party plugin autoload, removes inherited pytest injection options, uses a
+  temporary isolated root, and has a 30-second child timeout.
+- Focused sentinel tests pass `2 passed`; the pre-existing 14-file subtest cohort passes `321
+  passed, 618 subtests`. No pytest configuration, production code, provider, or ignored runtime was
+  changed.
+- Indexed ARA-060 `make check` passes Ruff format/lint over 62 files, imports, repository-safety
+  self/worktree/staged scans over 105 tracked files, and pytest (`397 passed, 618 subtests` in
+  21.54 seconds).
 
 ## Remaining Steps
 
-- Obtain the repository-required safety approval before changing test configuration or dependencies
-  for ARA-060.
-- After approval, activate ARA-060 and first reproduce the subtest-only zero-exit behavior in an
-  isolated subprocess sentinel.
+- Finish complete diff, recovery-state, and sensitive-pattern review; correct any evidence or scope
+  mismatch before staging.
+- Commit and push the reviewed ARA-060 sentinel/state correction, then verify exact remote equality
+  and Python 3.10/3.13 push/PR CI.
 - Leave ARA-056 and deferred tasks untouched.
 
 ## Test Status
@@ -829,6 +848,17 @@ Updated: 2026-07-14 (Asia/Shanghai)
   isolated-wheel steps, and zero annotations.
 - ARA-059 recovery closeout `make check` passes Ruff format/lint, imports, repository-safety
   self/worktree/staged scans, and pytest (`395 passed, 618 subtests` in 17.76 seconds).
+- ARA-059 closeout `b196af9` is the live verified fallback: closeout push/PR runs
+  `29266539401`/`29266544263` remain successful on Python 3.10/3.13 with all four isolated-wheel
+  steps and zero annotations.
+- ARA-060 baseline `make check` passes `395 passed, 618 subtests` in 20.45 seconds.
+- ARA-060 direct one-failure and 16-failure subprocess probes both return 1; the passing sentinel
+  returns 0. Focused tracked sentinel tests pass `2 passed` in 0.46 seconds.
+- The 14 existing files containing 102 real `self.subTest(...)` call sites pass `321 passed, 618
+  subtests` in 34.30 seconds; the sentinel source uses dynamic method lookup so audit counts remain
+  102 call sites across those same 14 files.
+- ARA-060 indexed `make check` passes all gates with `397 passed, 618 subtests` in 21.54 seconds;
+  Ruff covers 62 files and both repository-safety modes scan 105 tracked files with zero findings.
 - ARA-053 pre-fix collision/cache regression produced the expected `4 failed, 1 passed`: all three
   equal-shape path pairs shared an identity and `/bravo` loaded `/alpha` health evidence.
 - ARA-053 focused final coverage passes `4 passed, 14 subtests`; UI/recovery tests pass `84 passed,
@@ -1424,6 +1454,14 @@ Updated: 2026-07-14 (Asia/Shanghai)
 
 ## Recent Failed Command
 
+- The first ARA-060 focused command passed both sentinel tests, then stopped at Ruff's import-order
+  check with `I001`; imports were reordered and the complete focused command passed.
+- The first representative-cohort invocation ran through an outer orchestration call that yielded
+  before the nested pytest result was returned, so its exit status was not accepted as evidence.
+  A direct session-aware rerun completed with `321 passed, 618 subtests`.
+- The historical ARA-059 parallel review similarly printed 16 nested `SUBFAILED` reports while its
+  outer JavaScript returned 0; direct reproduction proves pytest itself returned 1. ARA-060 corrects
+  that record rather than changing working pytest configuration.
 - The first ARA-059 closeout recovery run failed one contract assertion because the resume section
   heading was renamed while its exact historical text is a tested lookup key. The original heading
   is restored; the body still states that no task is active.
@@ -1699,7 +1737,7 @@ Updated: 2026-07-14 (Asia/Shanghai)
 ```bash
 git status --short --branch
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
-.venv/bin/python -m pytest -q tests/test_ui_helpers.py tests/test_config.py
+git diff --cached --check
 ```
 
 ## Interruption Recovery
@@ -1732,9 +1770,9 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - Keep ARA-059 confined to raw Ollama model-name typing. Preserve literal string lookalikes,
   metadata coercion, case-sensitive de-duplication/sorting, installed fallback, exact requests, and
   endpoint redaction; do not blacklist name text or reinterpret legacy artifacts.
-- ARA-060 owns the confirmed pytest subtest exit-status gap. Do not change dependencies or test
-  configuration without the repository-required safety approval, and do not fold that global test
-  infrastructure decision into ARA-059.
+- ARA-060 audits the historically reported pytest subtest exit-status gap. Direct reproduction
+  disproved the gap; preserve the working pytest/unittest behavior, add only the isolated contract
+  sentinel, and do not fold the historical evidence correction into ARA-059.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

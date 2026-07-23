@@ -634,3 +634,22 @@
 - Boundary: the helper does not validate model-name syntax, length, control characters, Gemini or
   artifact names, or legacy UI session strings that are indistinguishable from genuine names. A
   refresh or process restart naturally replaces an older process-local inventory.
+
+## 2026-07-23 - Approve ARA-060 test-gate hardening
+
+- Approval: the owner explicitly approved ARA-060 on 2026-07-23, satisfying the repository safety
+  gate for a scoped pytest/test-configuration change.
+- Decision order: reproduce the reported subtest-only zero-exit defect in an isolated subprocess,
+  prefer a standard-library/no-new-dependency hook, and add both failing and passing sentinel
+  coverage before changing the canonical test gate.
+- Compatibility: preserve ordinary pytest/unittest failures, successful subtest reporting,
+  Python 3.10/3.13 CI, existing test semantics, and the current `make check` entrypoint. Do not bulk
+  rewrite the 102 call sites merely to compensate for infrastructure behavior.
+- Boundary: this approval does not authorize production behavior changes, provider calls, ignored
+  runtime access, dependency additions without new evidence, or changes to experiment artifacts.
+- Finding: direct pytest 9.0.3 execution returns status 1 for both one and 16 subtest-only failures.
+  The historical zero was the successful status of an outer parallel orchestration script that
+  rendered nested stdout but did not inspect or propagate nested `exit_code` values.
+- Resolution: do not change pytest configuration or add a dependency. Add an isolated subprocess
+  contract test with third-party plugin autoload disabled, inherited pytest injection options
+  removed, and a fixed timeout; retain ARA-059's parent aggregates as local defense in depth.

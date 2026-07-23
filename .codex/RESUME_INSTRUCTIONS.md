@@ -46,18 +46,23 @@ The checkout has a known stale invalid `.git/REBASE_HEAD`; do not interpret that
 
 ## 4. Validate the active task before continuing
 
-ARA-059 is complete through remote-equal implementation `a7d00a6`. One shared scalar helper accepts
-and trims only string names before shared inventory de-duplication or UI health matching. Focused
-tests pass `2 passed, 37 subtests`, related tests pass `103 passed, 157 subtests`, indexed full
-`make check` passes `395 passed, 618 subtests`, and three independent reviews are green. Push/PR
-runs `29266119109`/`29266121277` passed Python 3.10/3.13, all four isolated-wheel steps, and zero
-annotations. The recovery-closeout `make check` also passes `395 passed, 618 subtests`. Preserve
-literal string lookalikes, metadata, requests, redaction, list-container behavior, and installed
-fallback; do not call a provider, read ignored runtime, or broaden into provider/artifact schema
-migration.
+ARA-060 is active with explicit owner approval from 2026-07-23. Direct pytest 9.0.3 probes with one
+and 16 subtest-only failures both return status 1; the historical apparent zero was an outer
+parallel script that rendered nested output without propagating nested exit codes. A tracked
+isolated subprocess sentinel now verifies failure returns 1 and passing subtests return 0 with no
+plugin autoload, inherited pytest injection, or unbounded child process. Focused tests pass `2
+passed`; the 14-file existing subtest cohort passes `321 passed, 618 subtests`. Run recovery and
+full `make check` next if the live worktree differs from this snapshot; the current full gate passes
+`397 passed, 618 subtests`. Do not change pytest configuration or dependencies, bulk rewrite the
+102 call sites, change production behavior, call a provider, or read ignored runtime.
+
+ARA-059 is complete through remote-equal closeout `b196af9`. Closeout push/PR runs
+`29266539401`/`29266544263` passed Python 3.10/3.13, all four isolated-wheel steps, and zero
+annotations. Preserve its literal string lookalikes, metadata, request/redaction, list-container,
+and installed-fallback behavior.
 ARA-058 is complete through remote-equal closeout `1419d5e`; closeout push/PR runs
 `29264305133`/`29264308515` passed Python 3.10/3.13, all four wheel steps, and zero annotations with
-exact PR body readback. Use `a7d00a668168c0ed7766ce2d579d8201f2a0a33b` as the conservative exact
+exact PR body readback. Use `b196af970948ecb5c20c5c524f111079afa7b9d5` as the conservative exact
 externally verified fallback.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
@@ -105,10 +110,10 @@ not claim same-UID real-directory replacement, post-open/new-temp hard-link race
 ancestors, or Windows active replacement. ARA-018 remains owner-blocked; ARA-019, ARA-026, ARA-006,
 and ARA-007 remain deferred under their recorded dependencies.
 
-No task is `IN_PROGRESS`. ARA-060 is the highest-priority TODO, but its test-configuration or
-dependency decision requires repository safety approval before implementation. ARA-056 remains a
-separate P2 task. ARA-018 requires an explicit owner license/distribution decision. Do not start
-ARA-019, ARA-026, ARA-006, or ARA-007 until their recorded dependencies are satisfied.
+ARA-060 is the sole `IN_PROGRESS` task. Its test-configuration approval is satisfied, but adding a
+dependency remains outside scope without separate evidence. ARA-056 remains a separate P2 task.
+ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
+ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 
 ## 5. Safety boundaries
 
@@ -124,5 +129,5 @@ git status --short --branch
 git rev-parse --verify HEAD
 .venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
 .venv/bin/python -m pytest -q tests/test_recovery_state.py
-.venv/bin/python -m pytest -q tests/test_ui_helpers.py tests/test_config.py
+git diff --check
 ```

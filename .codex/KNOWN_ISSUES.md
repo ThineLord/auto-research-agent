@@ -1,6 +1,6 @@
 # Known Issues
 
-Updated: 2026-07-12 (Asia/Shanghai)
+Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## KI-001 - Stale invalid `.git/REBASE_HEAD`
 
@@ -511,15 +511,23 @@ Updated: 2026-07-12 (Asia/Shanghai)
   indistinguishable from genuine names and are naturally replaced on refresh or process restart;
   text blacklists are explicitly rejected.
 
-## KI-060 - Pytest can return zero for unittest subtest-only failures
+## KI-060 - Historical subtest zero-exit finding used the wrapper status
 
-- Status: open; queued as ARA-060
-- Severity: P1 CI and regression reliability
-- Evidence: the first ARA-059 pre-fix matrix reported 16 `SUBFAILED` cases and no failing parent
-  tests, yet `.venv/bin/python -m pytest` returned status 0. Adding aggregate parent assertions made
-  the same confirmed defects return status 1; pytest 9.0.3 is installed without `pytest-subtests`.
-- Impact: any regression asserted only inside one of 102 `subTest` call sites across 14 test files may be
-  visible in output but still pass local/CI gates.
+- Status: active ARA-060; historical false positive corrected locally, remote validation pending
+- Severity: P2 test assurance and historical evidence accuracy
+- Evidence: the first ARA-059 pre-fix matrix reported 16 `SUBFAILED` cases and its outer orchestration
+  call returned 0. Archived command evidence shows that wrapper printed each nested command's
+  `output` but never checked or propagated `exit_code`; direct pytest 9.0.3 probes with one and 16
+  subtest-only failures both return 1.
+- Impact: the incorrect P1 record could motivate unnecessary pytest configuration or dependency
+  changes and made historical validation evidence ambiguous. Future pytest version drift still
+  merits an explicit contract sentinel because 102 real call sites span 14 test files.
+- Resolution: add an isolated subprocess sentinel proving subtest-only failure returns 1 and passing
+  subtests return 0. Disable third-party plugin autoload, remove inherited pytest injection options,
+  and bound the child process without changing the canonical pytest configuration or dependencies.
+  Focused, representative-cohort, recovery, and full local validation now pass.
 - Boundary: ARA-059 adds parent-level aggregate assertions only to its two new tests. A repository-wide
   correction must preserve Python 3.10/3.13, avoid masking ordinary failures, and follow the safety
-  approval rule before changing test configuration or dependencies.
+  approval rule before changing test configuration or dependencies. Configuration approval is now
+  satisfied, but evidence shows no configuration change is needed; adding a dependency remains
+  disallowed without separate evidence.
