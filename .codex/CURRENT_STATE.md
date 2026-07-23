@@ -4,19 +4,20 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: preserve the remotely verified ARA-054 design checkpoint and await separate owner
-  approval before implementing its high-risk recovery and schema changes.
+- Current goal: implement the owner-approved first ARA-054 package: create-only attempt storage
+  primitives and a shared recovery classifier, without changing the runtime write path.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `946f40f3190b9dd2ca2f99233d7ced32c4826f7d` (the exact
+- State recorded against commit: `ab1466b49173911253d95e61a4fde5cf7e775cf8` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `946f40f3190b9dd2ca2f99233d7ced32c4826f7d` (exact local,
+- Last externally verified fallback: `ab1466b49173911253d95e61a4fde5cf7e775cf8` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. The ARA-054 design stage is complete and remote-verified;
-  runtime implementation, schema changes, and migration remain deferred pending separate approval.
+- Active task at this snapshot: `ARA-054` implementation package 1 only. Attempt storage helpers
+  and the pure/shared classifier are authorized. Runtime writer switching, canonical publication,
+  legacy migration, and ARA-055 remain outside this package.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 

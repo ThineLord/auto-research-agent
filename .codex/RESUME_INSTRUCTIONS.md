@@ -121,15 +121,16 @@ Push/PR runs `30004044807`/`30004047971` passed Python 3.10/3.13, all four isola
 and zero annotations. Preserve ARA-041 startup transaction ordering, cooperative status-0 stops,
 schemas, and ordinary exception behavior.
 
-ARA-054's owner-approved design stage is complete at remote-equal `946f40f`. The eight-case
+ARA-054's owner-approved design stage is complete, and the owner subsequently approved
+implementation package 1 by saying `继续`. The eight-case
 provider-free matrix confirms that every post-stage interrupt/quota checkpoint claims resumability
 while preview and actual resume reject the canonical four-file directory. Read
 `docs/ARA_054_PARTIAL_ROUND_RECOVERY_DESIGN.md` before any follow-up. It selects append-only attempt
 staging and whole-round retry, rejects mid-stage continuation and rollback, keeps legacy canonical
-partials fail-closed, and leaves ARA-055 separate. Do not implement runtime behavior, change
-schemas, or move, delete, truncate, replace, or overwrite partial evidence without separate owner
-approval. No task is `IN_PROGRESS`.
-There is no unblocked implementation task.
+partials fail-closed, and leaves ARA-055 separate. `ARA-054` is the sole `IN_PROGRESS` task.
+Implement only create-only attempt storage primitives and the shared recovery classifier with
+provider-free tests. Do not switch the runtime write path, publish canonical output, migrate legacy
+artifacts, absorb ARA-055, or move/delete/truncate/replace/overwrite existing partial evidence.
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 

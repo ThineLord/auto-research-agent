@@ -1,10 +1,10 @@
 # ARA-054 Partial-Round Recovery Design
 
-Status: design complete; runtime implementation is not authorized
+Status: design complete; implementation package 1 approved
 
 Date: 2026-07-23
 
-Scope: provider-free recovery design only
+Scope: provider-free recovery design plus package 1 storage/classifier foundations
 
 ## Decision summary
 
@@ -22,8 +22,9 @@ trustworthy stage boundary, agent error state, timing state, or prompt/config id
 particular, empty output and the current one-byte placeholder are not distinguishable from
 legitimate empty model output.
 
-This design does not authorize implementation, schema changes, or migration. Those require a
-separate owner approval.
+The owner subsequently approved implementation package 1: create-only attempt storage primitives
+and a shared recovery classifier. Runner write-path switching, canonical publication, legacy
+migration, and ARA-055 remain outside that authorization.
 
 ## Confirmed current behavior
 

@@ -628,7 +628,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-054 - Reconcile resumable mid-round stops with partial output directories
 
-- Status: `DEFERRED`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: high
 - Description: interrupts or quota stops after review/revise/Judge persist a partial next-round
@@ -642,8 +642,10 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Commit required: yes after scoped design approval.
 - Dependencies: requires an explicit staging/quarantine or partial-round compatibility design;
   estimated greater than 30 minutes and must not silently delete partial outputs.
-- Approval: owner approved the design stage on 2026-07-23. Runtime implementation, schema changes,
-  and any move/delete/overwrite of partial evidence remain unauthorized pending separate approval.
+- Approval: after the completed design stage, the owner said `继续` on 2026-07-23. This authorizes
+  implementation package 1 only: create-only attempt storage primitives and the shared recovery
+  classifier. Runtime writer switching, canonical publication, legacy migration, and ARA-055 are
+  not part of this package. No existing partial evidence may be moved, deleted, or overwritten.
 - Design baseline: `make check` passes `399 passed, 621 subtests` over 105 tracked files in 20.90
   seconds with zero provider calls. Provider-free stage characterization is next.
 - Design result: completed in `docs/ARA_054_PARTIAL_ROUND_RECOVERY_DESIGN.md` and committed as

@@ -696,3 +696,16 @@
   safe continuation boundary.
 - Legacy boundary: ambiguous canonical partial directories remain fail-closed. A journaled,
   explicit migration may be designed later but is not authorized or implemented.
+
+## 2026-07-23 - Approve ARA-054 implementation package 1
+
+- Approval: after receiving the recommended next task, the owner said `继续`.
+- Authorized scope: create-only attempt storage primitives plus a deterministic shared recovery
+  classifier and provider-free tests.
+- Excluded scope: do not switch the runner's canonical write path, publish staged output, migrate
+  legacy artifacts, or absorb ARA-055.
+- Evidence boundary: this package may create new test artifacts and new append-only attempt paths;
+  it must not move, delete, truncate, replace, or overwrite existing canonical or partial evidence.
+- Completion boundary: package 1 may complete independently while KI-054 remains open. Runtime
+  recovery behavior must not be claimed fixed until a later approved package is implemented and
+  the full interrupt/quota matrix passes.
