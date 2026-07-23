@@ -350,6 +350,30 @@ class RoundCommitRecoveryTests(unittest.TestCase):
         self.assertIn(ROUND_COMMIT_JOURNAL_NAME, PROJECT_RUNTIME_FILE_NAMES)
         self.assertIn(RUN_FINALIZE_JOURNAL_NAME, PROJECT_RUNTIME_FILE_NAMES)
 
+    def test_prepare_accepts_safe_configured_storage_checkpoint_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = self._fixture(tmp, external_storage=True)
+            project_dir = fixture["project_dir"]
+            alias_run_root = project_dir / "runs" / "run-1"  # type: ignore[operator]
+            write_json_file(
+                project_dir / "checkpoint.json",  # type: ignore[operator]
+                {
+                    "run_id": "run-1",
+                    "run_root": str(alias_run_root),
+                    "last_completed_round": 1,
+                    "best_score": 50.0,
+                    "can_resume": True,
+                },
+                anchor=project_dir,  # type: ignore[arg-type]
+            )
+            checkpoint_value = dict(fixture["checkpoint_after"].value)  # type: ignore[union-attr]
+            checkpoint_value["run_root"] = str(alias_run_root)
+            fixture["checkpoint_after"] = build_checkpoint_after_image(checkpoint_value)
+
+            payload = self._prepare(fixture)
+
+            self.assertEqual(payload["run_root"], str(fixture["run_root"]))
+
     def test_first_round_replaces_prior_run_history_without_creating_best_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             fixture = self._first_round_fixture(tmp)

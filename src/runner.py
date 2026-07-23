@@ -58,6 +58,15 @@ from .round_attempts import (
     persist_attempt_stage,
     publish_attempt,
 )
+from .round_commit import (
+    build_checkpoint_after_image,
+    build_project_memory_after_image,
+    build_research_state_after_image,
+)
+from .round_commit_recovery import (
+    prepare_round_commit,
+    recover_round_commit,
+)
 from .run_config import (
     INHERIT_GIT_ROOT,
     GitRootSetting,
@@ -646,6 +655,17 @@ def _history_entry_for_round(
     return None
 
 
+def _round_commit_history_is_compatible(
+    history: Sequence[Dict[str, Any]],
+    *,
+    start_round: int,
+) -> bool:
+    return len(history) == start_round - 1 and all(
+        type(entry.get("round")) is int and entry["round"] == expected_round
+        for expected_round, entry in enumerate(history, start=1)
+    )
+
+
 def _history_best_round(history: Sequence[Dict[str, Any]], best_score: float) -> int | None:
     last_improved_round: int | None = None
     matching_rounds: List[int] = []
@@ -1075,6 +1095,7 @@ def run_iterative_rounds(
     resumes_existing_run = base_resume_metadata["lifecycle_action"] == "resume_existing_run"
     score_history: List[Dict[str, Any]] = []
     round_metrics: List[Dict[str, Any]] = []
+    round_commit_enabled = not resumes_existing_run
     if resumes_existing_run:
         checkpoint_best_score = _history_float(initial_best_score)
         checkpoint_best_score = (
@@ -1089,6 +1110,18 @@ def run_iterative_rounds(
             checkpoint_best_score=checkpoint_best_score,
         )
         base_resume_metadata.update(history_metadata)
+        round_commit_enabled = start_round == 1 or (
+            history_metadata["score_history_source"] == "score_history"
+            and history_metadata["round_metrics_source"] == "round_metrics"
+            and _round_commit_history_is_compatible(
+                score_history,
+                start_round=start_round,
+            )
+            and _round_commit_history_is_compatible(
+                round_metrics,
+                start_round=start_round,
+            )
+        )
     prior_total_runtime = (
         _prior_runtime_seconds(
             existing_run_config.get("total_runtime_seconds"),
@@ -1719,34 +1752,12 @@ def run_iterative_rounds(
             )
             break
 
-        mark_attempt_ready_to_publish(current_attempt_dir)
-        round_dir = publish_attempt(current_attempt_dir)
-        current_attempt_dir = None
-        _log(
-            console,
-            log_path,
-            mode,
-            f"round_saved round={round_index} path={display_path(round_dir, repo_root)}",
-        )
-
-        last_review_output = review_output
-        last_draft_output = draft_output
-        last_revised_output = revised_output
-        last_judge_output = judge_output
-
         parsed_score = parse_score(judge_output)
         if parsed_score is None:
             score = 0.0
             invalid_score_seen = True
-            _log(console, log_path, mode, f"score_parse_failed round={round_index} fallback=0")
         else:
             score = parsed_score
-        _log(
-            console,
-            log_path,
-            mode,
-            f"score_extracted round={round_index} parsed={parsed_score is not None} value={score:.2f}",
-        )
         judge_rubric = parse_judge_rubric(judge_output)
         completed_rounds = round_index
 
@@ -1756,16 +1767,11 @@ def run_iterative_rounds(
             best_score = score
             best_round = round_index
             best_output = revised_output
-            write_text(best_output_path, best_output)
             non_improve_streak = 0
-            console.print(
-                f"[bold green]New best score:[/bold green] {best_score:.2f} -> updated best_output.md"
-            )
         else:
             non_improve_streak += 1
 
         repetitive_judge = _is_repetitive_judge(judge_output, judge_history)
-        judge_history.append(judge_output)
 
         previous_score = _history_float(round_metrics[-1].get("score")) if round_metrics else None
         continuation_source = draft_previous_revised_output or draft_previous_draft_output
@@ -1876,11 +1882,6 @@ def run_iterative_rounds(
             "model": model_name,
             "drafting_mode": drafting_mode,
         }
-        score_history.append(round_metric)
-        round_metrics.append(round_metric)
-        write_score_history(score_history_path, score_history)
-        write_score_history(round_metrics_path, round_metrics)
-
         memory_summary = summarize_round_memory(
             revised_output=revised_output,
             review_output=review_output,
@@ -1888,23 +1889,6 @@ def run_iterative_rounds(
             current_best_score=best_score,
             topic_keywords=topic_keywords,
         )
-        update_project_memory(
-            memory_path=memory_path,
-            round_index=round_index,
-            summary=memory_summary,
-        )
-        update_research_state(
-            state_path=research_state_path,
-            round_index=round_index,
-            best_score=best_score,
-            revised_output=revised_output,
-            review_output=review_output,
-            judge_output=judge_output,
-            topic_keywords=topic_keywords,
-        )
-        _log(console, log_path, mode, f"memory_updated round={round_index}")
-        _log(console, log_path, mode, f"research_state_updated round={round_index}")
-
         checkpoint_data = {
             "run_id": run_id,
             "run_root": str(run_root),
@@ -1930,7 +1914,95 @@ def run_iterative_rounds(
                 stop_reason="",
             ),
         }
-        write_json_file(checkpoint_path, checkpoint_data)
+        used_round_commit = round_commit_enabled
+        if used_round_commit:
+            memory_after = build_project_memory_after_image(
+                read_text(memory_path),
+                round_index=round_index,
+                summary=memory_summary,
+            )
+            research_state_after = build_research_state_after_image(
+                round_index=round_index,
+                best_score=best_score,
+                revised_output=revised_output,
+                review_output=review_output,
+                judge_output=judge_output,
+                topic_keywords=topic_keywords,
+            )
+            checkpoint_after = build_checkpoint_after_image(checkpoint_data)
+            prepare_round_commit(
+                project_dir=project_dir,
+                run_root=run_root,
+                attempt_dir=current_attempt_dir,
+                round_metric=round_metric,
+                best_output_write=improved,
+                memory_after=memory_after,
+                research_state_after=research_state_after,
+                checkpoint_after=checkpoint_after,
+            )
+            recover_round_commit(project_dir)
+            round_dir = run_root / f"round_{round_index:02d}"
+        else:
+            mark_attempt_ready_to_publish(current_attempt_dir)
+            round_dir = publish_attempt(current_attempt_dir)
+            if improved:
+                write_text(best_output_path, best_output)
+            score_history.append(round_metric)
+            round_metrics.append(round_metric)
+            write_score_history(score_history_path, score_history)
+            write_score_history(round_metrics_path, round_metrics)
+            update_project_memory(
+                memory_path=memory_path,
+                round_index=round_index,
+                summary=memory_summary,
+            )
+            update_research_state(
+                state_path=research_state_path,
+                round_index=round_index,
+                best_score=best_score,
+                revised_output=revised_output,
+                review_output=review_output,
+                judge_output=judge_output,
+                topic_keywords=topic_keywords,
+            )
+            write_json_file(checkpoint_path, checkpoint_data)
+            round_commit_enabled = _round_commit_history_is_compatible(
+                score_history,
+                start_round=round_index + 1,
+            ) and _round_commit_history_is_compatible(
+                round_metrics,
+                start_round=round_index + 1,
+            )
+
+        current_attempt_dir = None
+        _log(
+            console,
+            log_path,
+            mode,
+            f"round_saved round={round_index} path={display_path(round_dir, repo_root)}",
+        )
+        last_review_output = review_output
+        last_draft_output = draft_output
+        last_revised_output = revised_output
+        last_judge_output = judge_output
+        if parsed_score is None:
+            _log(console, log_path, mode, f"score_parse_failed round={round_index} fallback=0")
+        _log(
+            console,
+            log_path,
+            mode,
+            f"score_extracted round={round_index} parsed={parsed_score is not None} value={score:.2f}",
+        )
+        if improved:
+            console.print(
+                f"[bold green]New best score:[/bold green] {best_score:.2f} -> updated best_output.md"
+            )
+        judge_history.append(judge_output)
+        if used_round_commit:
+            score_history.append(round_metric)
+            round_metrics.append(round_metric)
+        _log(console, log_path, mode, f"memory_updated round={round_index}")
+        _log(console, log_path, mode, f"research_state_updated round={round_index}")
 
         elapsed_after_round = time.monotonic() - started_at
         _log(

@@ -1,7 +1,8 @@
 """Provider-free prepare, classification, and recovery for round commits.
 
-The engine is intentionally not called by the runner yet. ARA-055 package 3 owns
-runtime routing after this isolated package has been fault-tested.
+The iterative runner uses this engine for new and fully evidenced histories.
+Legacy histories without a complete pair retain their pre-transaction compatibility
+path because their missing before-generation cannot be reconstructed safely.
 """
 
 from __future__ import annotations
@@ -351,6 +352,7 @@ def _history_after_image(
 def _validate_checkpoint_before(
     generation: _Generation,
     *,
+    project_dir: Path,
     round_index: int,
     run_root: Path,
 ) -> None:
@@ -359,10 +361,19 @@ def _validate_checkpoint_before(
     if not generation.present or generation.text is None:
         raise _blocked("checkpoint_before_missing")
     value = _strict_json(generation.text, code="checkpoint_before_invalid")
+    checkpoint_run_root = value.get("run_root") if isinstance(value, dict) else None
+    canonical_checkpoint_root, checkpoint_root_blocker = validate_project_run_root(
+        project_dir=project_dir,
+        run_root_value=checkpoint_run_root,
+        require_writable=True,
+    )
+    checkpoint_run_root_matches = (
+        checkpoint_root_blocker is None and canonical_checkpoint_root == run_root
+    )
     if (
         not isinstance(value, dict)
         or value.get("run_id") != run_root.name
-        or value.get("run_root") != str(run_root)
+        or not checkpoint_run_root_matches
         or value.get("last_completed_round") != round_index - 1
         or isinstance(value.get("last_completed_round"), bool)
     ):
@@ -372,14 +383,24 @@ def _validate_checkpoint_before(
 def _validate_checkpoint_after(
     image: AfterImage,
     *,
+    project_dir: Path,
     round_index: int,
     run_root: Path,
 ) -> None:
     value = image.value
+    checkpoint_run_root = value.get("run_root") if isinstance(value, dict) else None
+    canonical_checkpoint_root, checkpoint_root_blocker = validate_project_run_root(
+        project_dir=project_dir,
+        run_root_value=checkpoint_run_root,
+        require_writable=True,
+    )
+    checkpoint_run_root_matches = (
+        checkpoint_root_blocker is None and canonical_checkpoint_root == run_root
+    )
     if (
         not isinstance(value, dict)
         or value.get("run_id") != run_root.name
-        or value.get("run_root") != str(run_root)
+        or not checkpoint_run_root_matches
         or value.get("last_completed_round") != round_index
         or isinstance(value.get("last_completed_round"), bool)
     ):
@@ -462,6 +483,7 @@ def prepare_round_commit(
     )
     _validate_checkpoint_after(
         checkpoint_after,
+        project_dir=project_dir,
         round_index=round_index,
         run_root=run_root,
     )
@@ -477,6 +499,7 @@ def prepare_round_commit(
     }
     _validate_checkpoint_before(
         generations["checkpoint"],
+        project_dir=project_dir,
         round_index=round_index,
         run_root=run_root,
     )

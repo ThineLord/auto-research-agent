@@ -4,6 +4,13 @@
 
 ### Fixed
 
+* New iterative rounds with complete history evidence now prepare one immutable project-local
+  transaction before canonical publication, then recover best output, both history files, memory,
+  research state, and checkpoint in a fixed checkpoint-last order. Interrupted writes can be
+  retried without duplicating a round even when run storage is on another configured filesystem.
+  Legacy resumes missing one history or earlier metric evidence retain their existing compatibility
+  path because a trustworthy transaction before-generation cannot be reconstructed or migrated
+  implicitly.
 * Interrupted and free-tier-quota-paused rounds now use append-only staged attempts instead of
   writing placeholders into canonical `round_NN` directories. Resume preserves every stopped
   attempt, revalidates hashes and disk/attempt budgets with the same classifier used by preview,
