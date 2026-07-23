@@ -1161,14 +1161,13 @@ def summarize_round_memory(
     }
 
 
-def update_project_memory(
+def build_project_memory_text(
+    existing: str,
     *,
-    memory_path: Path,
     round_index: int,
     summary: Dict[str, str],
-    anchor: Path | None = None,
-) -> None:
-    existing = read_text(memory_path, anchor=anchor)
+) -> str:
+    """Build the next memory.md contents without performing filesystem I/O."""
     if AUTO_MEMORY_HEADER in existing:
         manual_part = existing.split(AUTO_MEMORY_HEADER, 1)[0].rstrip()
     else:
@@ -1204,8 +1203,28 @@ def update_project_memory(
         combined = f"{manual_tail}\n\n{auto_section}".strip()
     if _word_count(combined) > MAX_MEMORY_WORDS:
         combined = _tail_words(combined, MAX_MEMORY_WORDS)
-    combined = combined.strip() + "\n"
+    return combined.strip() + "\n"
+
+
+def update_project_memory(
+    *,
+    memory_path: Path,
+    round_index: int,
+    summary: Dict[str, str],
+    anchor: Path | None = None,
+) -> None:
+    existing = read_text(memory_path, anchor=anchor)
+    combined = build_project_memory_text(
+        existing,
+        round_index=round_index,
+        summary=summary,
+    )
     _atomic_write_text(memory_path, combined, anchor=anchor)
+
+
+def build_score_history_text(history: List[Dict[str, Any]]) -> str:
+    """Serialize score history exactly as the existing writer does."""
+    return json.dumps(history, indent=2)
 
 
 def write_score_history(
@@ -1214,7 +1233,7 @@ def write_score_history(
     *,
     anchor: Path | None = None,
 ) -> None:
-    _atomic_write_text(path, json.dumps(history, indent=2), anchor=anchor)
+    _atomic_write_text(path, build_score_history_text(history), anchor=anchor)
 
 
 def get_memory_for_prompt(memory_path: Path, *, anchor: Path | None = None) -> str:
@@ -1225,17 +1244,16 @@ def get_memory_for_prompt(memory_path: Path, *, anchor: Path | None = None) -> s
     return _tail_words(content, MAX_PROMPT_MEMORY_WORDS)
 
 
-def update_research_state(
+def build_research_state(
     *,
-    state_path: Path,
     round_index: int,
     best_score: float,
     revised_output: str,
     review_output: str,
     judge_output: str,
     topic_keywords: Optional[Sequence[str]] = None,
-    anchor: Path | None = None,
 ) -> Dict[str, Any]:
+    """Build research-state data without performing filesystem I/O."""
     revised_lines = _collect_meaningful_lines(revised_output)
     review_lines = _collect_meaningful_lines(review_output)
     judge_lines = _collect_meaningful_lines(judge_output)
@@ -1282,7 +1300,28 @@ def update_research_state(
         ),
         "current_best_score": round(best_score, 2),
     }
+    return state
 
+
+def update_research_state(
+    *,
+    state_path: Path,
+    round_index: int,
+    best_score: float,
+    revised_output: str,
+    review_output: str,
+    judge_output: str,
+    topic_keywords: Optional[Sequence[str]] = None,
+    anchor: Path | None = None,
+) -> Dict[str, Any]:
+    state = build_research_state(
+        round_index=round_index,
+        best_score=best_score,
+        revised_output=revised_output,
+        review_output=review_output,
+        judge_output=judge_output,
+        topic_keywords=topic_keywords,
+    )
     _atomic_write_text(state_path, json.dumps(state, indent=2), anchor=anchor)
     return state
 
