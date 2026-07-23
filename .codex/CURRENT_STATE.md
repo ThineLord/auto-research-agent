@@ -4,21 +4,19 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: complete the owner-approved ARA-054 design stage: characterize the mismatch between
-  partial next-round outputs and resume eligibility, then specify a byte-preserving recovery
-  contract without changing runtime behavior.
+- Current goal: preserve the remotely verified ARA-054 design checkpoint and await separate owner
+  approval before implementing its high-risk recovery and schema changes.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `d60a7a1b5226d6ddd6dff2fb82456ecd12fb18c1` (the exact
+- State recorded against commit: `946f40f3190b9dd2ca2f99233d7ced32c4826f7d` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `d60a7a1b5226d6ddd6dff2fb82456ecd12fb18c1` (exact local,
+- Last externally verified fallback: `946f40f3190b9dd2ca2f99233d7ced32c4826f7d` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: ARA-054 design stage only, approved by the owner on 2026-07-23.
-  Runtime implementation, schema changes, and moving, deleting, or overwriting partial evidence
-  remain unauthorized pending a separate implementation approval.
+- Active task at this snapshot: none. The ARA-054 design stage is complete and remote-verified;
+  runtime implementation, schema changes, and migration remain deferred pending separate approval.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -828,17 +826,32 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
   documentation only.
 - Ran the ARA-054 design baseline `make check`: Ruff, imports, both repository-safety scans, and
   pytest pass with `399 passed, 621 subtests` over 105 tracked files in 20.90 seconds.
+- Reproduced an eight-case post-persistence matrix covering draft/review/revise/Judge with manual
+  interrupt and cloud daily quota. Every case wrote a resumable checkpoint for zero completed
+  rounds, but preview and actual resume rejected the four-file canonical directory as
+  `complete_uncheckpointed`; rejected attempts preserved every round and checkpoint byte.
+- Confirmed the root cause: every stage persistence rewrites all four canonical output files and
+  serializes future-stage empty values as one newline, while checkpoint eligibility uses only the
+  stop reason and both resume guards reject every nonempty pending canonical round.
+- Added `docs/ARA_054_PARTIAL_ROUND_RECOVERY_DESIGN.md`. It selects append-only per-round attempts,
+  whole-round retry, create-only stage outputs, immutable stopped evidence, shared preview/runner
+  eligibility, fail-closed legacy handling, bounded retries, and an explicit ARA-055 boundary.
+- Verified the design contract and indexed `make check`: `399 passed, 621 subtests` over 106
+  tracked/staged files in 21.00 seconds with zero provider calls or safety findings.
+- Committed the design as `946f40f`, pushed it with exact local/upstream/`ls-remote` equality, and
+  verified push/PR runs `30007167214`/`30007170465`: Python 3.10/3.13 and every isolated-wheel step
+  passed.
+- Indexed recovery-closeout `make check` passes Ruff, imports, both repository-safety scans, and
+  pytest with `399 passed, 621 subtests` over 106 tracked/staged files in 22.27 seconds.
 
 ## Remaining Steps
 
-- Characterize ARA-054 draft/review/revise/Judge interrupt and quota stops using provider-free temporary
-  workspaces, recording partial-output bytes, checkpoint identity, preview classification, and
-  retry behavior.
-- Map writer, reader, schema, filesystem, security, and ARA-055 transaction boundaries.
-- Compare staging/quarantine, partial-round compatibility, and rollback designs; reject any design
-  that silently deletes, moves, or overwrites partial evidence.
-- Produce and validate the ARA-054 design document. Do not implement its runtime behavior without a
-  separate owner approval.
+- Do not implement ARA-054 until the owner separately approves the staged-attempt design and its
+  proposed additive metadata, publication, UI/CLI, and legacy-migration scope.
+- If implementation is approved, begin with create-only anchored attempt helpers and the focused
+  fault matrix; do not start with a runner rewrite or legacy artifact mutation.
+- Keep ARA-055 separately deferred. ARA-054 does not make canonical publication, both histories,
+  memory, best output, and recovery metadata one atomic transaction.
 - Do not activate ARA-018 without an owner license/distribution decision.
 
 ## Test Status
@@ -1808,7 +1821,9 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 ## Next Command
 
 ```bash
-rg -n "round_partial_saved|can_resume|uncheckpointed|next_round" src tests
+git status --short --branch
+.venv/bin/python -m pytest -q tests/test_recovery_state.py
+git diff --check
 ```
 
 ## Interruption Recovery
@@ -1851,6 +1866,10 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
 - ARA-054 is authorized for design only. Do not change runner/resume/storage runtime behavior,
   artifact schemas, or compatibility loaders, and do not move, delete, truncate, replace, or
   overwrite partial-round evidence. Use only synthetic provider-free temporary workspaces.
+- The selected ARA-054 design is append-only attempt staging with whole-round retry, not mid-stage
+  continuation. Existing canonical partial rounds remain fail-closed and require a separately
+  approved explicit migration; do not infer stage truth from placeholders or
+  `last_successful_agent`.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

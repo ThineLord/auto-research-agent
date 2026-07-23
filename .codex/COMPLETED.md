@@ -976,3 +976,21 @@ Validation and implementation outcomes will be appended only after they are actu
 - Committed as `795665d` and pushed with exact local/upstream/`ls-remote`/PR-head equality. Push run
   `30004044807` and pull-request run `30004047971` passed Python 3.10/3.13, every isolated-wheel
   step, and all four job annotation sets are empty.
+
+## 2026-07-23 - ARA-054 partial-round recovery design
+
+- Reproduced eight post-persistence cases across draft/review/revise/Judge and manual
+  interrupt/cloud quota. All wrote `can_resume=true` for zero completed rounds, but preview and
+  actual resume rejected the four canonical files as `complete_uncheckpointed`; the rejected
+  resume preserved every artifact byte.
+- Confirmed that each stage currently writes all four canonical files, using one newline for future
+  outputs, while eligibility uses only stop reason. File presence and `last_successful_agent` cannot
+  safely identify a continuation boundary.
+- Selected append-only attempt staging with immutable stopped evidence and whole-round retry.
+  Rejected deletion, overwrite, rollback, and mid-stage continuation. Kept ambiguous legacy
+  canonical partials fail-closed and ARA-055's cross-artifact transaction separate.
+- Added `docs/ARA_054_PARTIAL_ROUND_RECOVERY_DESIGN.md`; no runtime, test behavior, artifact schema,
+  provider, prompt, score, experiment, or canonical artifact changed.
+- Design contract and indexed `make check` pass with `399 passed, 621 subtests` over 106 files.
+  Design commit `946f40f` is remote-equal; push/PR runs `30007167214`/`30007170465` passed Python
+  3.10/3.13 and every isolated-wheel step.

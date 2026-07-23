@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-23T20:16:59+08:00",
+  "recorded_at": "2026-07-23T20:34:10+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "d60a7a1b5226d6ddd6dff2fb82456ecd12fb18c1",
-  "last_known_stable_commit": "d60a7a1b5226d6ddd6dff2fb82456ecd12fb18c1",
+  "head_commit": "946f40f3190b9dd2ca2f99233d7ced32c4826f7d",
+  "last_known_stable_commit": "946f40f3190b9dd2ca2f99233d7ced32c4826f7d",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "d60a7a1b5226d6ddd6dff2fb82456ecd12fb18c1",
+  "state_recorded_against_commit": "946f40f3190b9dd2ca2f99233d7ced32c4826f7d",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-23T20:02:28+08:00",
-    "commit": "d60a7a1b5226d6ddd6dff2fb82456ecd12fb18c1",
+    "verified_at": "2026-07-23T20:31:48+08:00",
+    "commit": "946f40f3190b9dd2ca2f99233d7ced32c4826f7d",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 30004494316,
+        "run_id": 30007167214,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "d60a7a1b5226d6ddd6dff2fb82456ecd12fb18c1",
+        "head_sha": "946f40f3190b9dd2ca2f99233d7ced32c4826f7d",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 30004498366,
+        "run_id": 30007170465,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "d60a7a1b5226d6ddd6dff2fb82456ecd12fb18c1",
+        "head_sha": "946f40f3190b9dd2ca2f99233d7ced32c4826f7d",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,85 @@
       }
     }
   },
-  "status": "ara054_design_approved_baseline_passed_characterization_pending",
+  "status": "ara054_design_closeout_indexed_full_passed_awaiting_commit_push_ci",
   "commands": [
+    {
+      "command": "ARA-054 indexed recovery-closeout make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_files": 62,
+        "pytest_passed": 399,
+        "pytest_subtests_passed": 621,
+        "tracked_files_scanned": 106,
+        "staged_files_scanned": 106,
+        "safety_findings": 0,
+        "duration_seconds": 22.27,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-054 design commit remote equality and GitHub Actions verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "commit": "946f40f3190b9dd2ca2f99233d7ced32c4826f7d",
+        "local_equals_upstream": true,
+        "local_equals_ls_remote": true,
+        "pull_request_head_equal": true,
+        "ahead": 0,
+        "behind": 0,
+        "push_run_id": 30007167214,
+        "pull_request_run_id": 30007170465,
+        "python_310": "success",
+        "python_313": "success",
+        "isolated_wheel_steps": 4,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-054 indexed design contract and make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "design_document_lines": 446,
+        "design_document_bytes": 20478,
+        "ruff_files": 62,
+        "pytest_passed": 399,
+        "pytest_subtests_passed": 621,
+        "tracked_files_scanned": 106,
+        "staged_files_scanned": 106,
+        "safety_findings": 0,
+        "duration_seconds": 21.0,
+        "provider_calls": 0
+      }
+    },
+    {
+      "command": "ARA-054 provider-free post-persistence interrupt/quota matrix",
+      "exit_code": 0,
+      "result": "confirmed_mismatch",
+      "summary": {
+        "stages": [
+          "draft",
+          "review",
+          "revise",
+          "judge"
+        ],
+        "fault_types": [
+          "manual_interrupt",
+          "cloud_daily_quota"
+        ],
+        "cases": 8,
+        "checkpoint_can_resume_true": 8,
+        "preview_can_resume_false": 8,
+        "actual_resume_started_false": 8,
+        "next_round_status": "complete_uncheckpointed",
+        "blocked_reason": "partial_next_round_exists",
+        "round_bytes_preserved": 8,
+        "checkpoint_bytes_preserved": 8,
+        "provider_calls": 0
+      }
+    },
     {
       "command": "ARA-054 design startup recovery verification and baseline make check",
       "exit_code": 0,
@@ -4166,6 +4243,38 @@
   ],
   "failures": [
     {
+      "command": "first ARA-054 design closeout recovery consistency test",
+      "result": "corrected_before_commit",
+      "summary": {
+        "pytest_failed": 2,
+        "pytest_passed": 4,
+        "pytest_subtests_passed": 1,
+        "cause": "the no-active-task resume sentinel was omitted and one remaining-step boundary sentence used finalization keywords",
+        "fix": "restored the exact no-unblocked-task sentinel and described the ARA-055 boundary as an atomic transaction; rerun passed"
+      }
+    },
+    {
+      "command": "first ARA-054 activation recovery consistency test",
+      "result": "corrected_before_commit",
+      "summary": {
+        "pytest_failed": 1,
+        "pytest_passed": 5,
+        "pytest_subtests_passed": 1,
+        "cause": "one active-task bullet used the word checkpoint without naming ARA-054",
+        "fix": "the bullet now attributes the work to the sole active task; rerun passed"
+      }
+    },
+    {
+      "command": "first ARA-054 design commit diff check",
+      "result": "corrected_before_commit",
+      "summary": {
+        "exit_code": 2,
+        "cause": "two Markdown metadata lines used trailing spaces for hard line breaks",
+        "fix": "replaced hard breaks with blank lines; cached diff check then passed",
+        "commit_created_before_fix": false
+      }
+    },
+    {
       "command": "first ARA-058 locally-complete recovery consistency test",
       "result": "corrected_before_commit",
       "summary": {
@@ -4517,6 +4626,10 @@
   ],
   "not_run": [
     {
+      "check": "real provider smoke for ARA-054 design",
+      "reason": "The writer/preview disagreement and byte-preservation contract are deterministic local recovery behavior; synthetic agents, injected faults, temporary workspaces, and existing resume guards cover the design evidence without credentials, network use, cost, or ignored runtime."
+    },
+    {
       "check": "real provider smoke for ARA-047",
       "reason": "Resume-history numeric parsing, fail-before-write behavior, CLI status mapping, and legacy compatibility are deterministic local artifact boundaries; temporary histories and fake agents cover them without credentials, network access, cost, or ignored runtime."
     },
@@ -4582,6 +4695,10 @@
     }
   ],
   "notes": [
+    "ARA-054 design commit 946f40f is pushed with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 30007167214 and 30007170465 passed Python 3.10 and 3.13 plus all four isolated-wheel steps.",
+    "ARA-054 selects append-only attempt staging with whole-round retry, immutable stopped evidence, create-only stage outputs, shared eligibility classification, bounded attempts, and fail-closed legacy partials; implementation and migration remain unauthorized.",
+    "ARA-054 provider-free characterization confirmed eight of eight post-persistence interrupt/quota cases had checkpoint can_resume true but preview and actual resume false with complete_uncheckpointed status, while every checkpoint and round byte remained unchanged.",
+    "ARA-054 indexed design validation passes 399 tests and 621 subtests over 106 tracked and staged files with zero safety findings and zero provider calls.",
     "ARA-056 implementation 795665d is pushed with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 30004044807 and 30004047971 passed Python 3.10 and 3.13, all four isolated-wheel steps, and zero annotations.",
     "ARA-056 local fix covers round-directory creation, round-entry logging, console setup, memory loading and truncation, and the pre-agent cooperative-stop check with one shared manual-interrupt marker; ordinary exceptions retain their prior behavior.",
     "ARA-056 pre-fix evidence is 3 failed subtests with missing checkpoint.json; focused final coverage passes 2 tests and 3 subtests, CLI status and lock coverage passes 3 tests, related coverage passes 135 tests and 339 subtests, and indexed make check passes 399 tests and 621 subtests.",

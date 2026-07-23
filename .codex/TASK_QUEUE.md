@@ -628,7 +628,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-054 - Reconcile resumable mid-round stops with partial output directories
 
-- Status: `IN_PROGRESS`
+- Status: `DEFERRED`
 - Priority: P2
 - Risk: high
 - Description: interrupts or quota stops after review/revise/Judge persist a partial next-round
@@ -646,6 +646,15 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   and any move/delete/overwrite of partial evidence remain unauthorized pending separate approval.
 - Design baseline: `make check` passes `399 passed, 621 subtests` over 105 tracked files in 20.90
   seconds with zero provider calls. Provider-free stage characterization is next.
+- Design result: completed in `docs/ARA_054_PARTIAL_ROUND_RECOVERY_DESIGN.md` and committed as
+  `946f40f`. The eight-case post-persistence matrix confirms checkpoint/preview disagreement while
+  preserving all bytes. Append-only attempt staging with whole-round retry is selected; mid-stage
+  continuation and rollback are rejected.
+- Design validation: indexed `make check` passes `399 passed, 621 subtests` over 106 files in 21.00
+  seconds. Push/PR runs `30007167214`/`30007170465` passed Python 3.10/3.13 and isolated-wheel
+  validation.
+- Remaining dependency: separate owner approval for runtime implementation, additive metadata, and
+  any explicit legacy migration. ARA-055 remains a separate transaction design.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 

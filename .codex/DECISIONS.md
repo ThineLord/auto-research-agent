@@ -688,3 +688,11 @@
 - Acceptance boundary: the selected design must specify deterministic discovery, ownership,
   retry, compatibility, crash recovery, and migration behavior, and must keep ARA-055's
   cross-filesystem history transaction problem explicit rather than silently absorbing it.
+- Result: select append-only attempt staging beneath the run root and retry an interrupted round
+  from draft. Stopped attempts are immutable; successful canonical output retains the existing four
+  filenames and bytes.
+- Rejected alternatives: do not delete/rollback evidence, overwrite canonical partial files, or
+  continue from an apparent last stage. Current placeholders and marker ordering cannot prove a
+  safe continuation boundary.
+- Legacy boundary: ambiguous canonical partial directories remain fail-closed. A journaled,
+  explicit migration may be designed later but is not authorized or implemented.

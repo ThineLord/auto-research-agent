@@ -553,7 +553,7 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## KI-054 - Resumable mid-round stops leave an ineligible partial round
 
-- Status: active design only; implementation not yet approved
+- Status: design complete in `946f40f`; runtime implementation deferred pending owner approval
 - Severity: P2 recovery consistency, high-risk compatibility surface
 - Evidence: the runner persists partial next-round outputs after agent stages and can finalize an
   interrupt or quota stop with `can_resume=true`, while resume validation rejects a nonempty pending
@@ -564,3 +564,7 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 - Design boundary: preserve completed rounds and all partial-output bytes; do not silently delete,
   move, truncate, replace, or overwrite evidence. Runtime behavior, schemas, and migration remain
   unchanged until a separately approved implementation.
+- Design result: use append-only attempt staging and retry the whole round from draft. Existing
+  canonical partial rounds remain fail-closed because placeholders, `last_successful_agent`, and
+  file presence do not reliably identify a resumable agent boundary. ARA-055 separately owns the
+  multi-artifact round-commit transaction.
