@@ -822,3 +822,38 @@
   access, or packages 3-7.
 - Checkpoint requirement: push this activation state before adding engine code, then keep
   implementation and recovery closeout in separately validated commits.
+
+## 2026-07-24 - Keep ARA-055 package 2 dormant, create-only, and roll-forward only
+
+- Journal decision: register exactly the two fixed phase-journal names, create the round journal
+  exclusively before publication, reopen and compare its exact bytes, and remove it only when the
+  same single-link leaf still matches.
+- Recovery decision: revalidate the selected project, configured run storage, stable run identity,
+  run config, ARA-054 attempt, canonical publication, immutable journal, and each artifact
+  generation. Accept exact before or after hashes only; never infer or roll back a generation.
+- Ordering decision: reconcile publication first; apply best output, project history, run history,
+  memory, research state, then checkpoint last; verify the complete after generation before
+  conditional cleanup.
+- Compatibility decision: a new run's round one replaces old project history while an unchanged
+  non-improving best output remains absent or byte-identical. Public artifact formats and ARA-054
+  canonical bytes stay unchanged.
+- Safety decision: bounded reads and conditional cleanup reject symlink/hard-link/special leaves;
+  fixed diagnostic codes suppress path-bearing formatted exception causes. The cooperative lock
+  remains outside this package, and hostile same-UID replacement remains outside the documented
+  guarantee.
+- Deferral: this module has no runtime caller. Runner/resume-preview/UI/report/diagnostic routing,
+  finalization, migration, dependencies, providers, ignored runtime, and packages 3-7 remain
+  unapproved.
+
+## 2026-07-24 - Complete ARA-055 implementation package 2
+
+- Result: implementation `faf1791e` adds only the dormant round prepare/classify/recover engine,
+  trusted storage primitives, and provider-free fault coverage.
+- Verification: focused/related coverage passes `75 passed, 162 subtests`; full `make check` passes
+  `449 passed, 787 subtests`; staged safety scans 113 files clean. Push/PR runs
+  `30026934582`/`30026936443` pass Python 3.10/3.13 and every workflow step.
+- GitHub: exact local/upstream/`ls-remote`/PR-head equality holds at the implementation commit;
+  draft PR 13 is open, cleanly mergeable, and updated.
+- Boundary: package 2 is complete but KI-055 is not resolved in the current live runner. Package 3
+  remains a separate high-risk routing change requiring owner approval; no package-3 code was
+  started.

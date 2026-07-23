@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `IN_PROGRESS`
+- Status: `BLOCKED`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -747,6 +747,21 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Package 2 baseline: exact local/upstream/`ls-remote`/PR-head equality at `064f5bd`; push/PR runs
   `30021141942`/`30021145878` pass Python 3.10/3.13 and every isolated-wheel/check step. Local
   provider-free `make check` passes `431 passed, 688 subtests` over 111 tracked files in 33.38s.
+- Package 2 activation: commit `e899268` is exact local/upstream/`ls-remote` equal; push/PR runs
+  `30024767388`/`30024770453` pass Python 3.10/3.13 and every check step.
+- Package 2 local result: the dormant engine and trusted storage primitives are implemented without
+  a runner caller. The internal/configured-external before/after matrix covers create, publication,
+  every artifact, cleanup, `OSError`, and `KeyboardInterrupt`; focused/related validation passes
+  `75 passed, 162 subtests`; full `make check` passes `449 passed, 787 subtests` plus every format,
+  lint, import, and safety gate. Commit, push, PR update, and CI remain.
+- Package 2 resume command: explicitly stage the ten task-owned files and run the staged safety
+  scan. Packages 3-7 remain unapproved even after package 2 closes.
+- Package 2 completion: implementation commit `faf1791e` is exact local/upstream/`ls-remote`/
+  PR-head equal; push/PR runs `30026934582`/`30026936443` pass Python 3.10/3.13 and every workflow
+  step. Draft PR 13 is updated and cleanly mergeable.
+- Current blocker: package 3 changes the iterative runner's publication path and requires separate
+  owner approval under the accepted package design and repository safety protocol. Until then
+  there is no unblocked ARA-055 implementation task.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-07-24T00:19:40+08:00",
+  "recorded_at": "2026-07-24T00:57:10+08:00",
   "branch": "codex/sol-autonomous-hardening",
-  "head_commit": "064f5bdde5dd5e2e14d12c0ce5b48277cb87cd18",
-  "last_known_stable_commit": "064f5bdde5dd5e2e14d12c0ce5b48277cb87cd18",
+  "head_commit": "faf1791ee44aacc1f64f8987903a848d2fa62f93",
+  "last_known_stable_commit": "faf1791ee44aacc1f64f8987903a848d2fa62f93",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-  "state_recorded_against_commit": "064f5bdde5dd5e2e14d12c0ce5b48277cb87cd18",
+  "state_recorded_against_commit": "faf1791ee44aacc1f64f8987903a848d2fa62f93",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-24T00:19:40+08:00",
-    "commit": "064f5bdde5dd5e2e14d12c0ce5b48277cb87cd18",
+    "verified_at": "2026-07-24T00:57:10+08:00",
+    "commit": "faf1791ee44aacc1f64f8987903a848d2fa62f93",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 30021141942,
+        "run_id": 30026934582,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "064f5bdde5dd5e2e14d12c0ce5b48277cb87cd18",
+        "head_sha": "faf1791ee44aacc1f64f8987903a848d2fa62f93",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-        "run_id": 30021145878,
+        "run_id": 30026936443,
         "event": "pull_request",
         "workflow": "CI",
-        "head_sha": "064f5bdde5dd5e2e14d12c0ce5b48277cb87cd18",
+        "head_sha": "faf1791ee44aacc1f64f8987903a848d2fa62f93",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,81 @@
       }
     }
   },
-  "status": "ara055_package2_active",
+  "status": "ara055_package2_complete",
   "commands": [
+    {
+      "command": "ARA-055 package 2 implementation remote and CI verification",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "implementation_commit": "faf1791ee44aacc1f64f8987903a848d2fa62f93",
+        "remote_equal": true,
+        "pull_request": 13,
+        "pull_request_state": "open_draft_mergeable",
+        "pull_request_comment_id": 5061117056,
+        "push_run_id": 30026934582,
+        "pull_request_run_id": 30026936443,
+        "python_310": "success",
+        "python_313": "success",
+        "all_workflow_steps": "success",
+        "provider_calls": 0,
+        "ignored_runtime_access": 0,
+        "runner_routing_changes": 0
+      }
+    },
+    {
+      "command": "make check",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "ruff_formatted_files": 68,
+        "ruff": "passed",
+        "imports": "passed",
+        "repository_safety_self_test": "passed",
+        "tracked_files_scanned": 111,
+        "safety_findings": 0,
+        "pytest_passed": 449,
+        "pytest_subtests_passed": 787,
+        "pytest_duration_seconds": 146.24,
+        "provider_calls": 0,
+        "ignored_runtime_access": 0
+      }
+    },
+    {
+      "command": "ARA-055 package 2 focused and cross-filesystem fault validation",
+      "exit_code": 0,
+      "result": "passed",
+      "summary": {
+        "focused_and_related_pytest_passed": 75,
+        "focused_and_related_pytest_subtests_passed": 162,
+        "storage_layouts": [
+          "internal",
+          "configured_external"
+        ],
+        "fault_types": [
+          "OSError",
+          "KeyboardInterrupt"
+        ],
+        "covered_boundaries": [
+          "journal_create",
+          "ready_transition",
+          "publication",
+          "best_output",
+          "score_history",
+          "round_metrics",
+          "memory",
+          "research_state",
+          "checkpoint",
+          "journal_cleanup"
+        ],
+        "duration_seconds": 56.57,
+        "ruff": "passed",
+        "format": "passed",
+        "provider_calls": 0,
+        "ignored_runtime_access": 0,
+        "runner_routing_changes": 0
+      }
+    },
     {
       "command": "ARA-055 package 2 baseline and remote verification",
       "exit_code": 0,
@@ -4445,6 +4518,34 @@
   ],
   "failures": [
     {
+      "command": "read-only blocked-status queue search",
+      "result": "corrected_without_file_change",
+      "summary": {
+        "exit_code": 0,
+        "cause": "a backticked status token inside a double-quoted shell command was interpreted by zsh",
+        "effect": "zsh printed command not found; no file changed",
+        "fix": "reran with a literal-safe single-quoted search pattern"
+      }
+    },
+    {
+      "command": "first ARA-055 package 2 recovery-state test command",
+      "result": "corrected_without_file_change",
+      "summary": {
+        "exit_code": 4,
+        "cause": "the command named nonexistent tests/test_recovery_state_consistency.py",
+        "fix": "discovered and ran tests/test_recovery_state.py; 6 tests and 1 subtest passed"
+      }
+    },
+    {
+      "command": "first ARA-055 package 2 focused lint and test command",
+      "result": "corrected_without_file_change",
+      "summary": {
+        "exit_code": 127,
+        "cause": "bare python is unavailable in the shell",
+        "fix": "reran with .venv/bin/python; requested Ruff and pytest gates passed"
+      }
+    },
+    {
       "command": "first ARA-054 design closeout recovery consistency test",
       "result": "corrected_before_commit",
       "summary": {
@@ -4828,6 +4929,10 @@
   ],
   "not_run": [
     {
+      "check": "real provider smoke for ARA-055 package 2",
+      "reason": "Journal preparation, publication reconciliation, generation classification, cross-filesystem recovery, and fault injection are deterministic local behavior; temporary workspaces and existing ARA-054 evidence cover them without credentials, network access, cost, or ignored runtime."
+    },
+    {
       "check": "real provider smoke for ARA-054 design",
       "reason": "The writer/preview disagreement and byte-preservation contract are deterministic local recovery behavior; synthetic agents, injected faults, temporary workspaces, and existing resume guards cover the design evidence without credentials, network use, cost, or ignored runtime."
     },
@@ -4897,6 +5002,9 @@
     }
   ],
   "notes": [
+    "ARA-055 package 2 is complete and remote-verified at faf1791e; push and pull-request runs 30026934582 and 30026936443 passed Python 3.10 and 3.13 plus every workflow step.",
+    "ARA-055 package 2 focused and related coverage passes 75 tests and 162 subtests; full make check passes 449 tests and 787 subtests; staged safety scans 113 tracked and indexed files with zero findings.",
+    "No task is active; ARA-055 package 3 runner integration is the recommended next task but requires separate owner approval.",
     "ARA-054 storage and classifier foundation e4e784e is pushed with exact local, upstream, ls-remote, and PR-head equality; push and pull-request runs 30012047804 and 30012050777 passed Python 3.10 and 3.13 plus all isolated-wheel steps.",
     "ARA-054 focused coverage passes 9 tests and 4 subtests; indexed make check passes 408 tests and 625 subtests over 108 tracked and staged files with zero safety findings and zero provider calls.",
     "ARA-054 runtime recovery is complete at 75f3d9a with manifest transitions, shared runner and preview classification, bounded storage, and safe publication; legacy migration and ARA-055 remain deferred.",

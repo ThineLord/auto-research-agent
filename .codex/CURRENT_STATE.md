@@ -4,20 +4,20 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: implement only ARA-055 package 2: the create-only round prepare/recovery engine,
-  dry-run conflict classification, and provider-free cross-filesystem fault matrix.
+- Current goal: ARA-055 package 2 is complete; preserve its verified recovery boundary while
+  awaiting separate owner approval for package 3 runner integration.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `064f5bdde5dd5e2e14d12c0ce5b48277cb87cd18` (the exact
+- State recorded against commit: `faf1791ee44aacc1f64f8987903a848d2fa62f93` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `064f5bdde5dd5e2e14d12c0ce5b48277cb87cd18` (exact local,
+- Last externally verified fallback: `faf1791ee44aacc1f64f8987903a848d2fa62f93` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: `ARA-055` implementation package 2. Package 3 runner integration
-  and packages 4-7 remain unapproved; migration, dependency/config changes, provider calls, and
-  ignored runtime remain excluded.
+- Active task at this snapshot: none. ARA-055 package 3 runner integration is the recommended next
+  task but remains approval-blocked; packages 4-7, migration, dependency/config changes, provider
+  calls, and ignored runtime remain excluded.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -66,6 +66,39 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   `.venv/bin/python -m pytest -q tests/test_round_commit_recovery.py`.
 - Interruption recovery: verify the activation commit and CI first, then read the package-2 tests
   and engine module before continuing. Never synthesize a missing journal from canonical output.
+
+## ARA-055 Package 2 Closeout
+
+- Activation commit `e89926869db86eadf5e68115fdc9d7f943073651` is exact local/upstream/
+  `ls-remote` equal; push/PR runs `30024767388`/`30024770453` passed.
+- Implementation commit `faf1791ee44aacc1f64f8987903a848d2fa62f93` is exact local/upstream/
+  `ls-remote`/PR-head equal. Push/PR runs `30026934582`/`30026936443` passed Python 3.10/3.13 and
+  every install, isolated-wheel, format, lint, import, safety, and test step.
+- The implementation adds a fixed create-only project journal, bounded no-follow/single-link reads,
+  exact conditional cleanup, run/config/attempt/canonical revalidation, read-only classification,
+  ARA-054 publication reconciliation, and checkpoint-last idempotent roll-forward.
+- The internal/configured-external fault matrix covers journal creation, ready/publication
+  handoffs, all six artifact writes, cleanup, `OSError`, and `KeyboardInterrupt`, before and after
+  each boundary. It also covers retry after partial application, first-round old-run replacement,
+  third-generation conflicts, changed storage/config, and unsafe journal leaves.
+- Focused and related validation passes `75 passed, 162 subtests` in 56.57 seconds. Full
+  `make check` passes formatting over 68 files, Ruff, imports, repository-safety self-test/scans,
+  and `449 passed, 787 subtests` in 146.24 seconds. Direct `python` was unavailable in the shell, so
+  focused validation used the repository `.venv/bin/python`; this is an environment correction,
+  not a code failure.
+- Explicit staging scanned 113 tracked/index files with zero safety findings. Draft PR 13 is open,
+  cleanly mergeable, and updated with comment `5061117056`. No provider or ignored-runtime access
+  occurred.
+- Package 2 is complete. The engine deliberately has no runner caller, so KI-055's live runner
+  exposure remains until separately approved package 3.
+- Next command after owner approval of package 3: rerun the live Git/CI recovery checks, read
+  `docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md`, and activate only package 3 before any
+  runner edit.
+- If interrupted, inspect the live worktree, rerun
+  `.venv/bin/python -m pytest -q tests/test_round_commit_recovery.py tests/test_storage.py
+  tests/test_round_attempts.py tests/test_round_commit.py`; the latest full `make check` and
+  implementation CI are green. Do not start package 3 or treat the dormant engine as runner
+  integration without owner approval.
 
 ## Completed Steps
 
@@ -1622,6 +1655,14 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Recent Failed Command
 
+- A read-only queue search used a backticked status token in a double-quoted shell command, so zsh
+  attempted to execute that token and printed `command not found`. It changed no file; the search
+  was rerun with a literal-safe single-quoted pattern.
+- The first package-2 recovery-state command named a nonexistent
+  `tests/test_recovery_state_consistency.py`, so pytest collected no tests. Repository discovery
+  found the tracked `tests/test_recovery_state.py`; the corrected run passed `6 passed, 1 subtest`.
+- The first focused lint/test command used unavailable bare `python`. It changed no file and was
+  rerun with the repository `.venv/bin/python`, passing all requested gates.
 - The first ARA-056 closeout recovery check required the exact no-TODO sentinel sentence
   `There is no unblocked implementation task`; equivalent prose was replaced with the tested phrase
   before staging.

@@ -1060,3 +1060,21 @@ Validation and implementation outcomes will be appended only after they are actu
 - Implementation commit `4cd4bf4` is exact local/upstream/`ls-remote`/PR-head equal. Push/PR runs
   `30020697130`/`30020701903` passed Python 3.10/3.13 and every isolated-wheel/check step.
   Runtime journal I/O/routing and packages 2-7 remain separately approval-gated.
+
+## 2026-07-24 - ARA-055 package-2 round recovery engine
+
+- Added a fixed create-only project journal, bounded no-follow/single-link reads, exact conditional
+  cleanup, run/config/attempt/canonical revalidation, and read-only generation classification.
+- Added ARA-054 publication reconciliation and idempotent cross-filesystem roll-forward in fixed
+  best/history/history/memory/research/checkpoint order, with checkpoint last.
+- Covered internal/configured-external storage plus `OSError`/`KeyboardInterrupt` before and after
+  journal creation, publication handoffs, all six artifact writes, and cleanup. Retry, conflict,
+  unsafe-leaf, changed-identity, and first-round compatibility cases pass.
+- Focused/related validation passes `75 passed, 162 subtests`; full `make check` passes `449
+  passed, 787 subtests`; staged safety scans 113 files clean. No provider or ignored runtime was
+  accessed.
+- Implementation `faf1791e` is exact local/upstream/`ls-remote`/PR-head equal. Push/PR runs
+  `30026934582`/`30026936443` passed Python 3.10/3.13 and every workflow step; draft PR 13 is
+  updated and cleanly mergeable.
+- The engine is intentionally dormant. Package 3 runner integration remains separately
+  approval-gated, so KI-055's current runner exposure is not claimed resolved.
