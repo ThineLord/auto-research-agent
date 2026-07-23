@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `DEFERRED`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -734,6 +734,19 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Deferral boundary: package 1 is complete. Package 2 (runtime round prepare/recovery engine and
   cross-filesystem fault matrix) is the recommended next task but requires explicit owner approval.
   Packages 3-7, migration, dependencies, providers, and ignored runtime remain unapproved.
+- Package 2 approval: after the package-1 closeout explicitly recommended the round
+  prepare/recovery engine and cross-filesystem fault matrix, the owner said `批准下一个任务` on
+  2026-07-24.
+- Package 2 authorized scope: add the fixed project-local create-only round journal, trusted
+  project/run identity revalidation, dry-run before/after/conflict classification, ARA-054
+  publication reconciliation, idempotent roll-forward application, fixed path-redacted
+  diagnostics, and provider-free internal/configured-external fault tests.
+- Package 2 exclusions: do not route the iterative runner, resume preview, UI, analytics, reports,
+  or diagnostic mode through the engine; do not add the finalization journal, migrate legacy
+  evidence, change dependencies, call providers, inspect ignored runtime, or start packages 3-7.
+- Package 2 baseline: exact local/upstream/`ls-remote`/PR-head equality at `064f5bd`; push/PR runs
+  `30021141942`/`30021145878` pass Python 3.10/3.13 and every isolated-wheel/check step. Local
+  provider-free `make check` passes `431 passed, 688 subtests` over 111 tracked files in 33.38s.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

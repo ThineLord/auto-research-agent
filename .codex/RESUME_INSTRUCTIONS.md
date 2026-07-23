@@ -64,7 +64,7 @@ annotations. Preserve its literal string lookalikes, metadata, request/redaction
 and installed-fallback behavior.
 ARA-058 is complete through remote-equal closeout `1419d5e`; closeout push/PR runs
 `29264305133`/`29264308515` passed Python 3.10/3.13, all four wheel steps, and zero annotations with
-exact PR body readback. Use `4cd4bf4fde5051edc3f50cb19983ddeba23c2113` as the conservative exact
+exact PR body readback. Use `064f5bdde5dd5e2e14d12c0ce5b48277cb87cd18` as the conservative exact
 externally verified fallback.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
@@ -129,16 +129,17 @@ pass; full pytest reports `417 passed, 633 subtests`. Push/PR runs
 attempts, whole-round retry, shared classifier eligibility, bounded disk/attempt use, no-replace
 publication, and nonempty legacy canonical fail-closed behavior.
 
-ARA-055 package 1 is complete at externally verified implementation commit `4cd4bf4`. Its pure
-builders and bounded strict codec have no filesystem or runtime caller. Focused tests pass `14
-passed, 55 subtests`; final `make check` passes `431 passed, 688 subtests`; push/PR runs
-`30020697130`/`30020701903` passed Python 3.10/3.13 and isolated-wheel validation. Read
-`docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md`, `src/round_commit.py`, and
-`tests/test_round_commit.py` before any follow-up. Do not create/read journal files, register
-journal paths, route runner/preview/UI/reports/diagnostic mode, add dependencies, migrate
-artifacts, call providers, or inspect ignored runtime without a separately approved package.
-There is no unblocked implementation task. ARA-055 package 2 is the recommended next task but
-requires explicit owner approval; packages 3-7 remain unapproved.
+ARA-055 package 1 is complete at implementation commit `4cd4bf4` and recovery closeout `064f5bd`.
+Package 2 is the sole `IN_PROGRESS` task after the owner said `批准下一个任务` on 2026-07-24.
+Resume by reading `docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md`, `src/round_commit.py`,
+`tests/test_round_commit.py`, and any new package-2 engine/test files before changing them. The
+authorized work is limited to fixed create-only journal storage, secure identity/evidence
+validation, dry-run before/after/conflict classification, ARA-054 publication reconciliation,
+idempotent checkpoint-last recovery, and provider-free fault tests. Do not route runner,
+resume-preview, UI, analytics, reports, or diagnostic mode; do not add finalization, dependencies,
+migration, providers, ignored-runtime access, or packages 3-7. Baseline `make check` passes `431
+passed, 688 subtests`; exact branch equality holds at `064f5bd`; push/PR runs
+`30021141942`/`30021145878` pass Python 3.10/3.13 and isolated-wheel validation.
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 

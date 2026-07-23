@@ -1,22 +1,23 @@
 # Codex Current State
 
-Updated: 2026-07-23 (Asia/Hong_Kong)
+Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: preserve the completed ARA-055 package-1 foundation and wait for explicit approval
-  before any runtime transaction package.
+- Current goal: implement only ARA-055 package 2: the create-only round prepare/recovery engine,
+  dry-run conflict classification, and provider-free cross-filesystem fault matrix.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `4cd4bf4fde5051edc3f50cb19983ddeba23c2113` (the exact
+- State recorded against commit: `064f5bdde5dd5e2e14d12c0ce5b48277cb87cd18` (the exact
   externally verified fallback retained by the additive recovery schema; resolve current `HEAD`
   live).
-- Last externally verified fallback: `4cd4bf4fde5051edc3f50cb19983ddeba23c2113` (exact local,
+- Last externally verified fallback: `064f5bdde5dd5e2e14d12c0ce5b48277cb87cd18` (exact local,
   remote-tracking, `ls-remote`, and GitHub branch equality plus all Python 3.10/3.13 push/PR jobs
   passed)
-- Active task at this snapshot: none. ARA-055 packages 2-7, runtime journal I/O/routing, migration,
-  dependency changes, provider calls, and ignored runtime remain approval-gated.
+- Active task at this snapshot: `ARA-055` implementation package 2. Package 3 runner integration
+  and packages 4-7 remain unapproved; migration, dependency/config changes, provider calls, and
+  ignored runtime remain excluded.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -46,6 +47,25 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
   `.venv/bin/python -m pytest -q tests/test_round_commit.py`.
 - Interruption recovery: read `docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md`, this section,
   and `.codex/TASK_QUEUE.md`; do not infer approval for packages 2-7.
+
+## ARA-055 Package 2 Activation
+
+- Owner approval: `批准下一个任务` on 2026-07-24 after package 2 was explicitly recommended.
+- Stable fallback: `064f5bdde5dd5e2e14d12c0ce5b48277cb87cd18`, exact local/upstream/
+  `ls-remote`/PR-head equal with green push/PR runs `30021141942`/`30021145878`.
+- Baseline: `make check` passes formatting, lint, imports, repository safety, and `431 passed, 688
+  subtests` over 111 tracked files in 33.38 seconds.
+- Authorized implementation: fixed project-local create-only journal; secure read/remove;
+  project/run/attempt/config/canonical revalidation; before/after/conflict dry-run classification;
+  ARA-054 publication reconciliation; idempotent apply with checkpoint last; path-redacted
+  diagnostics; internal/configured-external provider-free fault tests.
+- Explicit exclusions: no runner/resume-preview/UI/analytics/report/diagnostic routing, no
+  finalization journal, no migration, no dependencies/config changes, no providers, no ignored
+  runtime, and no packages 3-7.
+- Next command after this activation checkpoint is committed and pushed:
+  `.venv/bin/python -m pytest -q tests/test_round_commit_recovery.py`.
+- Interruption recovery: verify the activation commit and CI first, then read the package-2 tests
+  and engine module before continuing. Never synthesize a missing journal from canonical output.
 
 ## Completed Steps
 
@@ -901,8 +921,12 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Remaining Steps
 
-- Do not begin ARA-055 package 2 until the owner explicitly approves its round prepare/recovery
-  engine and fault matrix.
+- Add failing package-2 tests for trusted create-only journal I/O, dry-run classification,
+  ARA-054 publication reconciliation, idempotent apply/recovery, conflict fail-closed behavior,
+  and internal/configured-external fault boundaries.
+- Implement the isolated package-2 engine without adding a runner or preview caller.
+- Run focused, ARA-054/storage/resume regression, fault-matrix, full, staged-safety, remote, and CI
+  validation; then return ARA-055 to deferred with packages 3-7 approval-gated.
 - Keep legacy nonempty canonical partials immutable and fail-closed; an explicit migration remains
   outside ARA-054 authorization.
 - Preserve the confirmed ARA-055 boundary: current ARA-054 does not make canonical publication,
@@ -911,6 +935,10 @@ Updated: 2026-07-23 (Asia/Hong_Kong)
 
 ## Test Status
 
+- ARA-055 package-2 baseline `make check` passes formatting, lint, imports, safety scans, and `431
+  passed, 688 subtests` over 111 tracked files in 33.38 seconds. Exact local/upstream/
+  `ls-remote`/PR-head equality holds at `064f5bd`; push/PR runs
+  `30021141942`/`30021145878` pass Python 3.10/3.13 and every isolated-wheel/check step.
 - ARA-055 package-1 focused tests pass `14 passed, 55 subtests`; related regression passes `111
   passed, 277 subtests`; final `make check` passes formatting, lint, imports, safety scans, and
   `431 passed, 688 subtests` over 111 staged files.

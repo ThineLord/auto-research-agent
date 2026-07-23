@@ -805,3 +805,20 @@
   on that order.
 - Deferral: runtime create-only journal storage, trusted path revalidation, prepare/apply/recovery,
   fault injection, and runner integration remain package 2 or later and require separate approval.
+
+## 2026-07-24 - Approve ARA-055 implementation package 2 only
+
+- Approval: after the package-1 closeout recommended package 2, the owner said
+  `批准下一个任务`.
+- Authorized scope: implement the fixed create-only round journal and provider-free
+  prepare/classify/apply/recover engine; revalidate trusted project/run identity and ARA-054
+  attempt/publication evidence; add dry-run conflict diagnostics and the internal/configured
+  external storage fault matrix.
+- Compatibility requirement: preserve canonical output and public artifact bytes, keep recovery
+  idempotent and provider-free, accept only exact before/after generations, write checkpoint last,
+  and fail closed without path/content disclosure on any unknown generation or identity.
+- Excluded scope: no runner, resume-preview, UI, analytics, report, or diagnostic routing; no
+  finalization journal, legacy migration, dependency/config change, provider call, ignored runtime
+  access, or packages 3-7.
+- Checkpoint requirement: push this activation state before adding engine code, then keep
+  implementation and recovery closeout in separately validated commits.
