@@ -926,7 +926,11 @@ except SystemExit:
     run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
     print(f"artifact_reasons={checkpoint['stop_reason']},{run_summary['stop_reason']},{run_config['stop_reason']}")
     print(f"can_resume={checkpoint['can_resume']},{run_summary['can_resume']},{run_config['can_resume']}")
-    print(f"round_entries={sorted(path.name for path in (run_root / 'round_01').iterdir())}")
+    attempts = list((run_root / "partial_rounds" / "round_01").glob("attempt_*"))
+    attempt = json.loads((attempts[0] / "attempt.json").read_text(encoding="utf-8"))
+    print(f"attempt_state={attempt['state']}")
+    print(f"attempt_stages={attempt['completed_stages']}")
+    print(f"canonical_exists={(run_root / 'round_01').exists()}")
     print(f"interrupted_report_exists={(project_dir / 'interrupted_report.md').is_file()}")
     print(f"lock_exists={(project_dir / RUN_LOCK_FILENAME).exists()}")
     raise
@@ -947,7 +951,9 @@ except SystemExit:
             result.stdout,
         )
         self.assertIn("can_resume=True,True,True", result.stdout)
-        self.assertIn("round_entries=[]", result.stdout)
+        self.assertIn("attempt_state=stopped", result.stdout)
+        self.assertIn("attempt_stages=[]", result.stdout)
+        self.assertIn("canonical_exists=False", result.stdout)
         self.assertIn("interrupted_report_exists=True", result.stdout)
         self.assertIn("lock_exists=False", result.stdout)
         self.assertNotIn("Traceback", result.stderr)

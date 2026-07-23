@@ -1,6 +1,6 @@
 # ARA-054 Partial-Round Recovery Design
 
-Status: design complete; runtime recovery package approved
+Status: runtime recovery package implemented; validation in progress
 
 Date: 2026-07-23
 
@@ -27,12 +27,12 @@ empty-canonical handoff, disk-budget protection, staged runner writes, canonical
 shared runner/preview classification. Legacy migration and ARA-055 remain outside that
 authorization.
 
-## Confirmed current behavior
+## Confirmed pre-implementation behavior
 
 The characterization used only `FakeAgents`, synthetic text, and temporary directories. It made no
 provider calls and did not inspect ignored project data.
 
-Current writer and reader behavior:
+The pre-implementation writer and reader behavior was:
 
 - `src/runner.py` creates canonical `round_NN` before the first agent.
 - `_persist_round_outputs()` calls `save_round_outputs()` after draft, review, revise, and Judge.
@@ -146,7 +146,7 @@ unexpected existing entry fails closed.
 
 ## Attempt metadata
 
-`attempt.json` is a new, attempt-local schema. This is a proposal, not an implemented schema:
+`attempt.json` is the implemented attempt-local schema:
 
 ```json
 {
@@ -162,6 +162,7 @@ unexpected existing entry fails closed.
   "created_at": "<ISO-8601>",
   "updated_at": "<ISO-8601>",
   "run_config_sha256": "<hex digest>",
+  "canonical_handoff": "atomic_rename",
   "outputs": {
     "01_draft.md": {"size": 123, "sha256": "<hex digest>"},
     "02_review.md": {"size": 456, "sha256": "<hex digest>"}
@@ -188,18 +189,19 @@ that a retry is safe.
 
 ## Checkpoint and preview contract
 
-The existing checkpoint and run-config schema versions need not change. Additive resume metadata
-may describe the stopped attempt:
+The existing checkpoint and run-config schema versions remain unchanged. Additive checkpoint and
+run-summary metadata describes the classified pending round without persisting an arbitrary
+attempt path:
 
 ```json
 {
   "partial_round": {
-    "schema_version": 1,
     "round": 2,
-    "attempt_id": "<restricted opaque identifier>",
-    "state": "stopped",
-    "completed_stages": ["draft", "review"],
-    "resume_action": "retry_round_preserve_attempt"
+    "status": "staged_partial",
+    "safety_action": "retry_round_preserve_attempt",
+    "preserved_attempt_count": 1,
+    "latest_verified_completed_stage": "review",
+    "blocked_reason": null
   }
 }
 ```
@@ -259,24 +261,28 @@ After all four outputs and hashes verify, at the current output-publication poin
 reordering history writes:
 
 1. Mark the attempt `ready_to_publish`.
-2. Confirm canonical `round_NN` is absent.
-3. Atomically rename the attempt's `output` directory to canonical `round_NN` on the same
-   filesystem. Do not use replacement semantics.
-4. Verify the canonical files against the manifest.
-5. Mark the attempt `published` and record only the canonical relative name.
+2. Use the handoff selected at attempt creation:
+   - when canonical `round_NN` was absent, atomically rename the attempt's `output` directory with
+     no-replace semantics;
+   - when a historical empty canonical directory was reserved, create each verified file once in
+     stage order, retain the complete attempt output, and permit an exact verified prefix to resume
+     after interruption.
+3. Verify the canonical files against the manifest.
+4. Mark the attempt `published` and record only the canonical relative name and publication mode.
 
-Stopped attempts are never moved. The controlled rename is limited to a fully successful,
-hash-verified output directory after a separately approved implementation.
+Stopped attempts are never moved. Publication is limited to a fully successful, hash-verified
+output tree.
 
 Crash reconciliation around publication is deterministic:
 
-| Attempt output | Canonical round | Manifest state | Recovery |
-| --- | --- | --- | --- |
-| present | absent | `ready_to_publish` | publication not committed; verify and retry publication |
-| absent | present | `ready_to_publish` | verify hashes, mark output `published`, then apply the ARA-055 boundary |
-| absent | present | `published` | normal committed publication |
-| present | present | any | conflict; preserve both and fail closed |
-| absent | absent | any completed state | evidence missing; fail closed |
+| Handoff | Attempt output | Canonical round | Manifest state | Recovery |
+| --- | --- | --- | --- | --- |
+| atomic rename | present | absent | `ready_to_publish` | verify and retry publication |
+| atomic rename | absent | exact | `ready_to_publish` | reconcile manifest, then apply ARA-055 boundary |
+| reserved empty | present | exact prefix | `ready_to_publish` | create only the missing verified suffix |
+| either | expected form | exact | `published` | normal published attempt |
+| either | any | conflicting | any | preserve both and fail closed |
+| either | absent | absent | any completed state | evidence missing; fail closed |
 
 The rename is process-atomic because both paths are beneath one run root. Parent-directory fsync and
 hostile same-UID replacement are not claimed; those limitations match the repository's existing
@@ -288,16 +294,19 @@ combination as `published_uncommitted` and fail closed until ARA-055 defines its
 
 ## Existing legacy partial rounds
 
-A canonical pending `round_NN` without a valid attempt manifest is legacy ambiguous state. It may
-contain legitimate empty output, current placeholders, user-added files, or a completed output
-whose history was not committed. It must not be auto-adopted or overwritten.
+A nonempty canonical pending `round_NN` without a valid matching attempt manifest is legacy
+ambiguous state. It may contain placeholders, user-added files, or a completed output whose
+history was not committed. It must not be auto-adopted or overwritten.
 
-Initial implementation behavior:
+Implemented behavior:
 
-- preview reports `next_round_status=legacy_partial`
-- checkpoint-derived `can_resume` is overridden to false
-- action is `explicit_migration_required`
-- every byte remains in place
+- a genuinely empty canonical directory can be preserved as a reservation and receives verified
+  create-only output during publication;
+- any nonempty canonical directory without a matching valid ready/published attempt remains legacy
+  ambiguous state;
+- preview reports it as partial and overrides checkpoint-derived `can_resume` to false;
+- action is `explicit_migration_required` in the classifier;
+- every existing byte remains in place.
 
 A future explicit migration can be designed as a journaled, same-filesystem rename into a new
 attempt directory after hashing and validating the complete tree. It must require a separate owner

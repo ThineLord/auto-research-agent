@@ -180,6 +180,74 @@ class InterruptingAgents(FakeAgents):
         raise KeyboardInterrupt
 
 
+class StageStoppingAgents(FakeAgents):
+    def __init__(self, stage: str, exception_type: type[BaseException]) -> None:
+        super().__init__([80])
+        self.stage = stage
+        self.exception_type = exception_type
+
+    def _stop(self, stage: str) -> None:
+        if stage != self.stage:
+            return
+        if self.exception_type is CloudFreeDailyQuotaExhausted:
+            raise CloudFreeDailyQuotaExhausted("daily quota test stop")
+        raise self.exception_type
+
+    def draft(
+        self,
+        *,
+        task: str,
+        memory: str,
+        round_index: int,
+        previous_best: str,
+        previous_judge: str,
+        drafting_mode: str = "best_guided",
+        previous_review: str = "",
+        previous_draft: str = "",
+        previous_revised: str = "",
+    ) -> str:
+        self._stop("draft")
+        return super().draft(
+            task=task,
+            memory=memory,
+            round_index=round_index,
+            previous_best=previous_best,
+            previous_judge=previous_judge,
+            drafting_mode=drafting_mode,
+            previous_review=previous_review,
+            previous_draft=previous_draft,
+            previous_revised=previous_revised,
+        )
+
+    def review(self, *, task: str, memory: str, draft_output: str) -> str:
+        self._stop("review")
+        return super().review(task=task, memory=memory, draft_output=draft_output)
+
+    def revise(
+        self,
+        *,
+        task: str,
+        memory: str,
+        draft_output: str,
+        review_output: str,
+    ) -> str:
+        self._stop("revise")
+        return super().revise(
+            task=task,
+            memory=memory,
+            draft_output=draft_output,
+            review_output=review_output,
+        )
+
+    def judge(self, *, task: str, memory: str, revised_output: str) -> str:
+        self._stop("judge")
+        return super().judge(
+            task=task,
+            memory=memory,
+            revised_output=revised_output,
+        )
+
+
 class StopAfterJudgeAgents(FakeAgents):
     def __init__(self, stop_path: Path, stop_after_judge: int) -> None:
         super().__init__([91, 92, 93, 94])
@@ -1042,6 +1110,74 @@ class RoundLoopTests(unittest.TestCase):
             self.assertTrue(checkpoint["paused_until_reset"])
             self.assertEqual(checkpoint["last_completed_round"], 0)
 
+    def test_interrupt_and_quota_stage_matrix_preserves_resumable_attempts(self) -> None:
+        stages = ("draft", "review", "revise", "judge")
+        stop_cases = (
+            (KeyboardInterrupt, STOP_MANUAL_INTERRUPT),
+            (CloudFreeDailyQuotaExhausted, STOP_CLOUD_DAILY_QUOTA),
+        )
+        for exception_type, expected_reason in stop_cases:
+            for stage_index, stage in enumerate(stages):
+                with (
+                    self.subTest(exception=exception_type.__name__, stage=stage),
+                    tempfile.TemporaryDirectory() as tmp,
+                ):
+                    project_dir = Path(tmp) / "project"
+                    project_dir.mkdir()
+                    memory_path = project_dir / "memory.md"
+                    memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                    kwargs = {
+                        "console": Console(),
+                        "agents": StageStoppingAgents(stage, exception_type),
+                        "task_text": "Design a privacy-aware memory adapter.",
+                        "project_dir": project_dir,
+                        "memory_path": memory_path,
+                        "mode": "test",
+                        "model_name": "fake-model",
+                        "max_rounds": 1,
+                        "stop_if_no_improvement_rounds": 10,
+                        "global_max_runtime_seconds": 60,
+                        "per_agent_timeout_seconds": 300,
+                    }
+                    if exception_type is KeyboardInterrupt:
+                        with self.assertRaises(KeyboardInterrupt):
+                            run_iterative_rounds(**kwargs)
+                    else:
+                        result = run_iterative_rounds(**kwargs)
+                        self.assertEqual(result["stop_reason"], expected_reason)
+
+                    checkpoint = json.loads(
+                        (project_dir / "checkpoint.json").read_text(encoding="utf-8")
+                    )
+                    run_root = Path(checkpoint["run_root"])
+                    attempts = list((run_root / "partial_rounds" / "round_01").glob("attempt_*"))
+                    self.assertEqual(len(attempts), 1)
+                    manifest = json.loads(
+                        (attempts[0] / "attempt.json").read_text(encoding="utf-8")
+                    )
+                    self.assertEqual(manifest["state"], "stopped")
+                    self.assertEqual(manifest["stop_reason"], expected_reason)
+                    self.assertEqual(manifest["completed_stages"], list(stages[:stage_index]))
+                    self.assertFalse((run_root / "round_01").exists())
+                    self.assertTrue(checkpoint["can_resume"])
+                    preview = build_resume_preview(
+                        project_dir=project_dir,
+                        checkpoint=checkpoint,
+                        repo_root=Path(tmp),
+                    )
+                    self.assertTrue(preview["can_resume"])
+                    self.assertEqual(preview["next_round_status"], "staged_partial")
+                    self.assertEqual(
+                        preview["next_round_safety_action"],
+                        "retry_round_preserve_attempt",
+                    )
+                    self.assertEqual(preview["next_round_preserved_attempt_count"], 1)
+                    expected_latest = stages[stage_index - 1] if stage_index else None
+                    self.assertEqual(
+                        preview["next_round_latest_verified_completed_stage"],
+                        expected_latest,
+                    )
+
     def test_manual_interrupt_finalizes_resumable_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_dir = Path(tmp) / "project"
@@ -1078,19 +1214,19 @@ class RoundLoopTests(unittest.TestCase):
             self.assertTrue((project_dir / "interrupted_report.md").is_file())
 
     def test_pre_agent_interrupts_finalize_and_resume_the_pending_round(self) -> None:
-        for stage in ("round_dir", "round_log", "memory_load"):
+        for stage in ("attempt_dir", "round_log", "memory_load"):
             with self.subTest(stage=stage), tempfile.TemporaryDirectory() as tmp:
                 project_dir = Path(tmp) / "project"
                 project_dir.mkdir()
                 memory_path = project_dir / "memory.md"
                 memory_path.write_text("Manual memory.\n", encoding="utf-8")
                 agents = RecordingAgents()
-                original_make_round_dir = runner_module.make_round_dir
+                original_create_round_attempt = runner_module.create_round_attempt
                 original_log = runner_module._log
                 original_get_memory = runner_module.get_memory_for_prompt
 
-                def interrupt_after_round_dir(*args: object, **kwargs: object) -> Path:
-                    original_make_round_dir(*args, **kwargs)
+                def interrupt_after_attempt_dir(*args: object, **kwargs: object) -> Path:
+                    original_create_round_attempt(*args, **kwargs)
                     raise KeyboardInterrupt
 
                 def interrupt_after_round_log(
@@ -1108,12 +1244,12 @@ class RoundLoopTests(unittest.TestCase):
                     raise KeyboardInterrupt
 
                 with ExitStack() as stack:
-                    if stage == "round_dir":
+                    if stage == "attempt_dir":
                         stack.enter_context(
                             patch.object(
                                 runner_module,
-                                "make_round_dir",
-                                side_effect=interrupt_after_round_dir,
+                                "create_round_attempt",
+                                side_effect=interrupt_after_attempt_dir,
                             )
                         )
                     elif stage == "round_log":
@@ -1162,7 +1298,14 @@ class RoundLoopTests(unittest.TestCase):
                     self.assertTrue(artifact["can_resume"])
                 self.assertEqual(checkpoint["last_completed_round"], 0)
                 self.assertEqual(checkpoint["resume_metadata"]["next_round"], 1)
-                self.assertEqual(list((run_root / "round_01").iterdir()), [])
+                self.assertFalse((run_root / "round_01").exists())
+                attempts = list((run_root / "partial_rounds" / "round_01").glob("attempt_*"))
+                self.assertEqual(len(attempts), 1)
+                attempt_manifest = json.loads(
+                    (attempts[0] / "attempt.json").read_text(encoding="utf-8")
+                )
+                self.assertEqual(attempt_manifest["state"], "stopped")
+                self.assertEqual(attempt_manifest["completed_stages"], [])
                 self.assertTrue((project_dir / "interrupted_report.md").is_file())
 
                 resumed = run_iterative_rounds(
@@ -1282,10 +1425,16 @@ class RoundLoopTests(unittest.TestCase):
             self.assertEqual([entry["round"] for entry in score_history], [1])
             self.assertEqual([entry["score"] for entry in score_history], [88.0])
             self.assertNotIn(0.0, [entry["score"] for entry in score_history])
-            self.assertTrue((run_root / "round_02").exists())
+            self.assertFalse((run_root / "round_02").exists())
+            attempts = list((run_root / "partial_rounds" / "round_02").glob("attempt_*"))
+            self.assertEqual(len(attempts), 1)
+            attempt_manifest = json.loads(
+                (attempts[0] / "attempt.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(attempt_manifest["state"], "stopped")
             self.assertIn(
                 "Judge skipped",
-                (run_root / "round_02" / "04_judge.md").read_text(encoding="utf-8"),
+                (attempts[0] / "output" / "04_judge.md").read_text(encoding="utf-8"),
             )
 
     def test_resume_starts_after_last_real_completed_round(self) -> None:

@@ -49,6 +49,15 @@ from .resume_safety import (
     validate_resume_round_dir,
     validate_resume_run_root,
 )
+from .round_attempts import (
+    RoundAttemptBlockedError,
+    classify_round_recovery,
+    create_round_attempt,
+    mark_attempt_ready_to_publish,
+    mark_attempt_stopped,
+    persist_attempt_stage,
+    publish_attempt,
+)
 from .run_config import (
     INHERIT_GIT_ROOT,
     GitRootSetting,
@@ -64,14 +73,11 @@ from .storage import (
     display_path,
     ensure_project_runtime_paths_safe,
     get_memory_for_prompt,
-    list_artifact_entry_names,
-    make_round_dir,
     make_run_root,
     parse_score,
     read_json_file,
     read_regular_text,
     read_text,
-    save_round_outputs,
     summarize_round_memory,
     unlink_artifact_file,
     update_project_memory,
@@ -116,13 +122,11 @@ def _validate_pending_resume_round_dir(run_root: Path, round_index: int) -> Path
     )
     if path_error or round_dir is None:
         raise ResumeHistoryError(RESUME_PATH_MESSAGES[path_error or UNSAFE_ROUND_PATH])
-    try:
-        has_entries = bool(list_artifact_entry_names(round_dir, missing_ok=True))
-    except OSError:
-        raise ResumeHistoryError("pending round directory cannot be inspected safely") from None
-    if has_entries:
+    classification = classify_round_recovery(run_root, round_index)
+    if not classification.can_create_attempt:
         raise ResumeHistoryError(
-            f"pending round {round_index} directory already contains files; resume is blocked"
+            f"pending round {round_index} is blocked: "
+            f"{classification.blocked_reason or classification.status}"
         )
     return round_dir
 
@@ -887,6 +891,10 @@ def _base_resume_metadata(
             "next_round_safety_action",
             "next_round_existing_files",
             "next_round_missing_expected_files",
+            "next_round_preserved_attempt_count",
+            "next_round_latest_verified_completed_stage",
+            "next_round_retained_attempt_bytes",
+            "next_round_free_bytes",
         ):
             if key in checkpoint_preview:
                 metadata[key] = checkpoint_preview[key]
@@ -1214,6 +1222,9 @@ def run_iterative_rounds(
             f"model={model_name}",
         )
         write_json_file(run_root / "run_manifest.json", run_manifest)
+    run_config_sha256 = hashlib.sha256(
+        read_regular_text(run_config_path).encode("utf-8")
+    ).hexdigest()
     if project_metadata:
         _log(
             console,
@@ -1274,6 +1285,8 @@ def run_iterative_rounds(
     provider_quota_failure_seen = any(
         entry.get("provider_failure_this_round") for entry in round_metrics
     )
+    current_attempt_dir: Path | None = None
+    current_round_index: int | None = None
 
     def _remaining_runtime_seconds() -> int:
         remaining = global_max_runtime_seconds - (time.monotonic() - started_at)
@@ -1292,8 +1305,42 @@ def run_iterative_rounds(
         stop_reason = STOP_MANUAL_INTERRUPT
         _log(console, log_path, mode, "manual_interrupt_caught")
 
+    def _stop_current_attempt(reason: str) -> None:
+        attempt_dir = current_attempt_dir
+        if attempt_dir is None and current_round_index is not None:
+            classification = classify_round_recovery(run_root, current_round_index)
+            active_attempts = [
+                attempt for attempt in classification.attempts if attempt.state == "active"
+            ]
+            if len(active_attempts) == 1:
+                attempt_dir = (
+                    run_root
+                    / "partial_rounds"
+                    / f"round_{current_round_index:02d}"
+                    / f"attempt_{active_attempts[0].attempt_id}"
+                )
+        if attempt_dir is None:
+            return
+        try:
+            mark_attempt_stopped(attempt_dir, reason)
+        except RoundAttemptBlockedError as exc:
+            _log(
+                console,
+                log_path,
+                mode,
+                f"attempt_stop_blocked reason={reason} detail={exc}",
+            )
+        except OSError as exc:
+            _log(
+                console,
+                log_path,
+                mode,
+                f"attempt_stop_failed reason={reason} error_type={type(exc).__name__}",
+            )
+
     # round_index is strictly increasing and cannot be reset.
     for round_index in range(start_round, max_rounds + 1):
+        current_round_index = round_index
         elapsed_before_round = time.monotonic() - started_at
         if elapsed_before_round >= global_max_runtime_seconds:
             stop_reason = STOP_EXCEPTION
@@ -1312,14 +1359,12 @@ def run_iterative_rounds(
 
         try:
             if resumes_existing_run:
-                round_dir = _validate_pending_resume_round_dir(run_root, round_index)
-                round_dir = make_round_dir(
-                    run_root,
-                    round_index,
-                    allow_existing=round_dir.exists(),
-                )
-            else:
-                round_dir = make_round_dir(run_root, round_index)
+                _validate_pending_resume_round_dir(run_root, round_index)
+            current_attempt_dir = create_round_attempt(
+                run_root=run_root,
+                round_index=round_index,
+                run_config_sha256=run_config_sha256,
+            )
             _log(console, log_path, mode, f"round_enter round={round_index}")
             console.rule(f"Round {round_index}")
             draft_output = ""
@@ -1337,13 +1382,17 @@ def run_iterative_rounds(
             draft_previous_revised_output = last_revised_output
             draft_previous_best_output = best_output
 
-            def _persist_round_outputs(stage: str) -> None:
-                save_round_outputs(
-                    round_dir,
-                    draft=draft_output,
-                    review=review_output,
-                    revised=revised_output,
-                    judge=judge_output,
+            def _persist_round_outputs(
+                stage: str,
+                content: str,
+                error: str | None,
+            ) -> None:
+                assert current_attempt_dir is not None
+                persist_attempt_stage(
+                    current_attempt_dir,
+                    stage,
+                    content,
+                    agent_succeeded=not error,
                 )
                 _log(
                     console,
@@ -1375,6 +1424,7 @@ def run_iterative_rounds(
                 break
         except KeyboardInterrupt:
             _mark_manual_interrupt()
+            _stop_current_attempt(STOP_MANUAL_INTERRUPT)
             break
 
         try:
@@ -1442,7 +1492,7 @@ def run_iterative_rounds(
                 _log(
                     console, log_path, mode, f"user_stop_requested_after_draft round={round_index}"
                 )
-            _persist_round_outputs("draft")
+            _persist_round_outputs("draft", draft_output, draft_error)
             if not draft_error:
                 last_successful_agent = "draft"
             if draft_error:
@@ -1496,9 +1546,9 @@ def run_iterative_rounds(
                         mode,
                         f"user_stop_requested_after_review round={round_index}",
                     )
-                _persist_round_outputs("review")
-                if not review_error:
-                    last_successful_agent = "review"
+            _persist_round_outputs("review", review_output, review_error)
+            if not review_error:
+                last_successful_agent = "review"
 
             if draft_error or review_error:
                 revised_output = "[REVISE SKIPPED] draft/review agent failed."
@@ -1552,9 +1602,9 @@ def run_iterative_rounds(
                         mode,
                         f"user_stop_requested_after_revise round={round_index}",
                     )
-                _persist_round_outputs("revise")
-                if not revise_error:
-                    last_successful_agent = "revise"
+            _persist_round_outputs("revise", revised_output, revise_error)
+            if not revise_error:
+                last_successful_agent = "revise"
 
             if revise_error:
                 judge_output = "SCORE: 0\n- Judge skipped because revise step failed."
@@ -1601,9 +1651,10 @@ def run_iterative_rounds(
                     )
                 if not judge_error:
                     last_successful_agent = "judge"
-            _persist_round_outputs("judge")
+            _persist_round_outputs("judge", judge_output, judge_error)
         except CloudFreeDailyQuotaExhausted as exc:
             stop_reason = STOP_CLOUD_DAILY_QUOTA
+            _stop_current_attempt(STOP_CLOUD_DAILY_QUOTA)
             paused_until_reset_message = str(exc)
             _log(
                 console,
@@ -1616,9 +1667,11 @@ def run_iterative_rounds(
             break
         except KeyboardInterrupt:
             _mark_manual_interrupt()
+            _stop_current_attempt(STOP_MANUAL_INTERRUPT)
             break
         except Exception as exc:  # noqa: BLE001
             stop_reason = STOP_EXCEPTION
+            _stop_current_attempt(STOP_EXCEPTION)
             _log(console, log_path, mode, f"exception round={round_index} error={exc}")
             break
 
@@ -1655,22 +1708,9 @@ def run_iterative_rounds(
         else:
             consecutive_provider_quota_failures = 0
 
-        save_round_outputs(
-            round_dir,
-            draft=draft_output,
-            review=review_output,
-            revised=revised_output,
-            judge=judge_output,
-        )
-        _log(
-            console,
-            log_path,
-            mode,
-            f"round_saved round={round_index} path={display_path(round_dir, repo_root)}",
-        )
-
         if any(_is_user_stop_error(err) for err in round_errors):
             stop_reason = STOP_USER_REQUESTED
+            _stop_current_attempt(STOP_USER_REQUESTED)
             _log(
                 console,
                 log_path,
@@ -1678,6 +1718,16 @@ def run_iterative_rounds(
                 f"round_incomplete_not_scored round={round_index} reason={STOP_USER_REQUESTED}",
             )
             break
+
+        mark_attempt_ready_to_publish(current_attempt_dir)
+        round_dir = publish_attempt(current_attempt_dir)
+        current_attempt_dir = None
+        _log(
+            console,
+            log_path,
+            mode,
+            f"round_saved round={round_index} path={display_path(round_dir, repo_root)}",
+        )
 
         last_review_output = review_output
         last_draft_output = draft_output
@@ -1992,11 +2042,21 @@ def run_iterative_rounds(
         f"best_score={best_score_text} last_successful_agent={last_successful_agent}",
     )
 
-    can_resume = stop_reason in {
+    stop_reason_allows_resume = stop_reason in {
         STOP_USER_REQUESTED,
         STOP_MANUAL_INTERRUPT,
         STOP_CLOUD_DAILY_QUOTA,
         STOP_PROVIDER_QUOTA_EXHAUSTED,
+    }
+    next_round_recovery = classify_round_recovery(run_root, completed_rounds + 1)
+    can_resume = stop_reason_allows_resume and next_round_recovery.can_create_attempt
+    partial_round = {
+        "round": completed_rounds + 1,
+        "status": next_round_recovery.status,
+        "safety_action": next_round_recovery.safety_action,
+        "preserved_attempt_count": next_round_recovery.preserved_attempt_count,
+        "latest_verified_completed_stage": (next_round_recovery.latest_verified_completed_stage),
+        "blocked_reason": next_round_recovery.blocked_reason,
     }
     checkpoint_final = {
         "run_id": run_id,
@@ -2016,6 +2076,7 @@ def run_iterative_rounds(
         "project": project_metadata or {},
         "cloud_free": _cloud_free_status(agents),
         "provider_quota_failure_seen": provider_quota_failure_seen,
+        "partial_round": partial_round,
         "resume_metadata": _resume_metadata_for_checkpoint(
             base_metadata=base_resume_metadata,
             completed_rounds=completed_rounds,
@@ -2073,6 +2134,7 @@ def run_iterative_rounds(
             "best_score": round(best_score, 2),
             "stop_reason": stop_reason,
             "can_resume": can_resume,
+            "partial_round": partial_round,
             "total_runtime_seconds": round(total_runtime, 3),
             "total_elapsed_seconds": round(total_runtime, 3),
             "total_agent_elapsed_seconds": metrics_totals["total_agent_elapsed_seconds"],

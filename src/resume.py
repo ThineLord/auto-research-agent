@@ -19,9 +19,11 @@ from .resume_safety import (
     validate_resume_round_dir,
     validate_resume_run_root,
 )
+from .round_attempts import classify_round_recovery
 from .run_config import INHERIT_GIT_ROOT, GitRootSetting
 from .runner import ResumeHistoryError, run_iterative_rounds
 from .storage import (
+    artifact_path_exists,
     artifact_path_is_safe,
     ensure_project_runtime_paths_safe,
     list_artifact_entry_names,
@@ -127,8 +129,12 @@ def inspect_next_round_directory(
     next_round_path = safe_round_path
     try:
         existing_names = list_artifact_entry_names(next_round_path, missing_ok=True)
-        directory_exists = next_round_path.exists()
-    except OSError:
+        directory_exists = artifact_path_exists(next_round_path, allow_directory=True)
+        round_index = _strict_round_int(next_round_path.name.removeprefix("round_"))
+        if round_index is None or round_index < 1:
+            raise ValueError
+        classification = classify_round_recovery(next_round_path.parent, round_index)
+    except (OSError, ValueError):
         return {
             "path": "",
             "display_path": "N/A",
@@ -141,29 +147,6 @@ def inspect_next_round_directory(
             "existing_files": [],
             "missing_expected_files": list(ROUND_OUTPUT_FILES),
         }
-    if not directory_exists:
-        return {
-            "path": str(next_round_path),
-            "display_path": display_path,
-            "exists": False,
-            "status": "missing",
-            "blocks_resume": False,
-            "safety_action": "proceed_create_round_dir",
-            "existing_files": [],
-            "missing_expected_files": list(ROUND_OUTPUT_FILES),
-        }
-
-    if not existing_names:
-        return {
-            "path": str(next_round_path),
-            "display_path": display_path,
-            "exists": True,
-            "status": "empty",
-            "blocks_resume": False,
-            "safety_action": "proceed_reuse_empty_round_dir",
-            "existing_files": [],
-            "missing_expected_files": list(ROUND_OUTPUT_FILES),
-        }
 
     expected_present = [
         name
@@ -172,21 +155,38 @@ def inspect_next_round_directory(
     ]
     missing_expected = [name for name in ROUND_OUTPUT_FILES if name not in expected_present]
     unexpected_entries = [name for name in existing_names if name not in ROUND_OUTPUT_FILES]
-    status = (
-        "complete_uncheckpointed"
-        if len(expected_present) == len(ROUND_OUTPUT_FILES) and not unexpected_entries
-        else "partial"
-    )
+    status = classification.status
+    action = classification.safety_action
+    if status == "new_round":
+        status = "missing"
+        action = "proceed_create_round_dir"
+    elif status == "legacy_empty_canonical":
+        status = "empty"
+    elif status == "legacy_partial":
+        status = (
+            "complete_uncheckpointed"
+            if len(expected_present) == len(ROUND_OUTPUT_FILES) and not unexpected_entries
+            else "partial"
+        )
+        action = NEXT_ROUND_FAIL_SAFE_ACTION
+    blocked_reason = classification.blocked_reason
+    if classification.status == "legacy_partial":
+        blocked_reason = "partial_next_round_exists"
     return {
         "path": str(next_round_path),
         "display_path": display_path,
-        "exists": True,
+        "exists": directory_exists,
         "status": status,
-        "blocks_resume": True,
-        "safety_action": NEXT_ROUND_FAIL_SAFE_ACTION,
+        "blocks_resume": not classification.can_create_attempt,
+        "blocked_reason": blocked_reason,
+        "safety_action": action,
         "existing_files": existing_names,
         "missing_expected_files": missing_expected,
         "unexpected_entries": unexpected_entries,
+        "preserved_attempt_count": classification.preserved_attempt_count,
+        "latest_verified_completed_stage": (classification.latest_verified_completed_stage),
+        "retained_attempt_bytes": classification.retained_attempt_bytes,
+        "free_bytes": classification.free_bytes,
     }
 
 
@@ -314,6 +314,12 @@ def build_resume_preview(
         "next_round_safety_action": next_round_info["safety_action"],
         "next_round_existing_files": next_round_info["existing_files"],
         "next_round_missing_expected_files": next_round_info["missing_expected_files"],
+        "next_round_preserved_attempt_count": next_round_info.get("preserved_attempt_count", 0),
+        "next_round_latest_verified_completed_stage": next_round_info.get(
+            "latest_verified_completed_stage"
+        ),
+        "next_round_retained_attempt_bytes": next_round_info.get("retained_attempt_bytes", 0),
+        "next_round_free_bytes": next_round_info.get("free_bytes"),
     }
 
     if not checkpoint_can_resume:

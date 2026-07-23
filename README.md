@@ -76,7 +76,9 @@ Mock mode 会复用正常 round runner，写入 `run_config.json`、`round_metri
 - `estimated_*_tokens` 是基于可见字符数的保守估算，不是 provider 账单 token。
 - Rubric summaries 只是 Judge 已返回结构化子项的趋势汇总，不是新的 benchmark 分数。
 - `make resume` 会继续 checkpoint 指向的旧 run；`make run` 会新建 run，即使旧 `best_output.md` 可作为上下文。
-- 如果下一轮目录已经存在且非空，resume 会 fail-safe 阻塞，避免覆盖 partial/uncheckpointed 输出。
+- 新运行会把未完成轮次写入 `partial_rounds/` 的只增 attempt；中断或免费层配额暂停后，
+  resume 会保留旧 attempt 并从 draft 重试该轮。没有可信 attempt manifest 的旧式非空
+  `round_NN` 仍会 fail-safe 阻塞，避免覆盖 partial/uncheckpointed 输出。
 - resume 会保留并追加同一 run 的既有 metrics/score history、best-round 和上一轮上下文；如果既有
   history 无法安全解析、互相冲突或包含重复/未来轮次，会在写入任何 run artifact 前 fail-safe
   阻塞，并让 CLI 返回非零状态。
@@ -388,9 +390,12 @@ source distribution，也不会启动 Ollama、调用 Gemini 或运行需要模�
 - `make resume` 会继续 checkpoint 指向的旧 run，从下一轮开始写入同一个 run 目录；已完成轮次文件会保留。
 - checkpoint 如果显式包含 `run_id`，它必须与 canonical run 目录名一致；旧 manifest 的创建期
   provenance 和未知扩展字段会保留，无法无损读取时 resume 会在写入前停止。
-- 如果下一轮目录已经存在且非空，resume 会 fail-safe 停止，避免覆盖 partial/uncheckpointed 输出；先人工检查、移动或删除该目录后再恢复。
+- 新运行的未完成轮次保存在 `partial_rounds/round_NN/attempt_*`；resume 会验证并保留旧
+  attempt，再从 draft 创建新 attempt。没有可信 manifest 的旧式非空 `round_NN` 仍会
+  fail-safe 停止，且不会自动移动、删除或覆盖。
 - 普通 `make run` 会新建一个 run；如果 `best_output.md` 已存在，默认 drafting mode 可能把它作为 previous-best context，但这不是 resume。
-- 进度不会丢：每轮都会写入 `runs/round_xx`，并更新 checkpoint、run_config 和 run_summary 中的 `resume_metadata`
+- 进度不会丢：进行中的阶段写入只增 attempt，四阶段完整验证后才发布为 `runs/round_xx`；
+  checkpoint、run_config 和 run_summary 会记录恢复诊断
 
 ## 哪些文件不要提交
 

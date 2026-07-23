@@ -4,6 +4,11 @@
 
 ### Fixed
 
+* Interrupted and free-tier-quota-paused rounds now use append-only staged attempts instead of
+  writing placeholders into canonical `round_NN` directories. Resume preserves every stopped
+  attempt, revalidates hashes and disk/attempt budgets with the same classifier used by preview,
+  and retries the round from draft. A complete attempt publishes without replacing an existing
+  canonical directory; legacy nonempty canonical partials remain fail-closed and unchanged.
 * Manual interrupts during pending round-directory creation, round-entry logging, or project-memory
   loading now follow the same resumable checkpoint, run-summary, run-config, and interrupted-report
   finalization as interrupts raised by an agent. The empty pending round remains safe to reuse on
