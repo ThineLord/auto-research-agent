@@ -4,6 +4,9 @@
 
 ### Fixed
 
+* Numeric CLI overrides now reject non-finite, out-of-range, and inconsistent values with startup
+  status 2 instead of silently clamping them or carrying an invalid effective delay range into a
+  run. Documented boundary values, including a zero quota-failure threshold, remain supported.
 * A pending round transaction is now recovered under the project run lock before provider
   preflight, client construction, or new runner work. Resume preview and UI expose recoverable and
   conflicting states without mutating artifacts; analytics, benchmark reports, comparison rows,

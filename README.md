@@ -73,6 +73,9 @@ Mock mode 会复用正常 round runner，写入 `run_config.json`、`round_metri
 稳定里程碑的几个边界：
 
 - Mock mode 只是 demo/CI/docs smoke；真实研究结论请用 `make diagnostic` / `make run`。
+- 数值 CLI override 会使用与配置相同的安全边界；`nan`、`inf`、负值、超限重试/延时/
+  prompt 大小，以及最终 `max_delay_seconds < min_delay_seconds` 的组合会在项目或 provider
+  初始化前以状态 2 停止，而不会静默钳制。
 - `estimated_*_tokens` 是基于可见字符数的保守估算，不是 provider 账单 token。
 - Rubric summaries 只是 Judge 已返回结构化子项的趋势汇总，不是新的 benchmark 分数。
 - `make resume` 会继续 checkpoint 指向的旧 run；`make run` 会新建 run，即使旧 `best_output.md` 可作为上下文。

@@ -75,6 +75,11 @@ make run ARGS="--model phi3:mini"
 `ollama_base_url` 不是有效 HTTP/HTTPS 地址，或 `project_name` 不是简单项目文件夹名，
 会直接显示具体配置错误并停止。
 
+数值 CLI override 也遵守相同边界：延时必须是有限非负数且最大延时不超过 86400 秒，
+重试次数为 0–20，prompt 大小至少 1000 字符，轮数至少为 1，provider quota 连续失败
+阈值允许为 0 但不能为负。CLI 与配置合并后的最大延时不能小于最小延时；无效输入会在
+创建项目或 provider 前以状态 2 停止。
+
 推荐继续使用当前嵌套格式：
 
 ```yaml

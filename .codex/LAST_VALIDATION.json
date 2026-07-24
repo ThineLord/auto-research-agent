@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-    "recorded_at": "2026-07-24T16:57:54+08:00",
+    "recorded_at": "2026-07-24T17:15:07+08:00",
   "branch": "codex/sol-autonomous-hardening",
-    "head_commit": "00a488dce12f7be548ce00d1980d97fd4883e4ff",
-    "last_known_stable_commit": "00a488dce12f7be548ce00d1980d97fd4883e4ff",
+    "head_commit": "2ac99e0fde929dc9d919702e2e7195ced1d0f7af",
+    "last_known_stable_commit": "2ac99e0fde929dc9d919702e2e7195ced1d0f7af",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-    "state_recorded_against_commit": "00a488dce12f7be548ce00d1980d97fd4883e4ff",
+    "state_recorded_against_commit": "2ac99e0fde929dc9d919702e2e7195ced1d0f7af",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-24T16:57:54+08:00",
-    "commit": "00a488dce12f7be548ce00d1980d97fd4883e4ff",
+    "verified_at": "2026-07-24T17:08:49+08:00",
+    "commit": "2ac99e0fde929dc9d919702e2e7195ced1d0f7af",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 30035438824,
+        "run_id": 30080995141,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "00a488dce12f7be548ce00d1980d97fd4883e4ff",
+        "head_sha": "2ac99e0fde929dc9d919702e2e7195ced1d0f7af",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-                "run_id": 30035441752,
+                "run_id": 30080997040,
         "event": "pull_request",
         "workflow": "CI",
-                "head_sha": "00a488dce12f7be548ce00d1980d97fd4883e4ff",
+                "head_sha": "2ac99e0fde929dc9d919702e2e7195ced1d0f7af",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,61 @@
       }
     }
   },
-    "status": "ara061_activated",
+    "status": "ara061_local_validation_passed",
     "commands": [
+        {
+            "command": "ARA-061 explicit staging and indexed safety validation",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "staged_paths": 8,
+                "tracked_files_scanned": 115,
+                "safety_findings": 0,
+                "cached_diff_check": "passed",
+                "recovery_pytest_passed": 6,
+                "recovery_pytest_subtests_passed": 1,
+                "focused_pytest_passed": 4,
+                "focused_pytest_subtests_passed": 18,
+                "provider_calls": 0,
+                "ignored_runtime_access": 0
+            }
+        },
+        {
+            "command": "make check",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "ruff_formatted_files": 70,
+                "ruff": "passed",
+                "imports": "passed",
+                "repository_safety_self_test": "passed",
+                "tracked_files_scanned": 115,
+                "safety_findings": 0,
+                "pytest_passed": 466,
+                "pytest_subtests_passed": 809,
+                "pytest_duration_seconds": 180.21,
+                "provider_calls": 0,
+                "ignored_runtime_access": 0
+            }
+        },
+        {
+            "command": "ARA-061 focused and related local implementation validation",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "focused_pytest_passed": 4,
+                "focused_pytest_subtests_passed": 18,
+                "related_pytest_passed": 244,
+                "related_pytest_subtests_passed": 554,
+                "ruff": "passed",
+                "ruff_format": "passed",
+                "diff_check": "passed",
+                "module_entrypoint_no_project_write": true,
+                "provider_calls": 0,
+                "ignored_runtime_access": 0,
+                "next_command": "make check"
+            }
+        },
         {
             "command": "ARA-061 activation baseline and numeric override reproduction",
             "exit_code": 0,

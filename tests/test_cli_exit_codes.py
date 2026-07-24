@@ -14,6 +14,7 @@ from unittest.mock import patch
 
 import src.cli as cli_module
 import src.llm as llm_module
+from src.cloud_free import CloudFreeConfig
 from src.config import (
     AppConfig,
     ConfigValidationError,
@@ -110,6 +111,162 @@ class CliExitCodeTests(unittest.TestCase):
                     cli_module._requires_generation_resources(args),
                     expected,
                 )
+
+    def test_numeric_cli_rejects_invalid_values_before_runtime_setup(self) -> None:
+        invalid_cases = (
+            ("min-delay-negative", ["--min-delay-seconds", "-0.01"]),
+            ("min-delay-nan", ["--min-delay-seconds", "nan"]),
+            ("min-delay-infinite", ["--min-delay-seconds", "inf"]),
+            ("max-delay-negative", ["--max-delay-seconds", "-0.01"]),
+            ("max-delay-nan", ["--max-delay-seconds", "nan"]),
+            ("max-delay-infinite", ["--max-delay-seconds", "inf"]),
+            ("max-delay-too-large", ["--max-delay-seconds", "86400.01"]),
+            ("max-retries-negative", ["--max-retries", "-1"]),
+            ("max-retries-too-large", ["--max-retries", "21"]),
+            ("max-rounds-too-small", ["--max-rounds", "0"]),
+            ("prompt-budget-too-small", ["--prompt-budget-chars", "999"]),
+            ("max-prompt-too-small", ["--max-prompt-chars", "999"]),
+            (
+                "quota-failure-threshold-negative",
+                ["--max-provider-quota-failures", "-1"],
+            ),
+            (
+                "inconsistent-explicit-delays",
+                ["--min-delay-seconds", "100", "--max-delay-seconds", "1"],
+            ),
+        )
+
+        for case_name, argv in invalid_cases:
+            with self.subTest(case=case_name):
+                stderr = io.StringIO()
+                with (
+                    patch.object(sys, "argv", ["auto-research-agent", *argv]),
+                    redirect_stderr(stderr),
+                    patch.object(
+                        cli_module,
+                        "resolve_runtime_layout",
+                        side_effect=AssertionError("runtime setup reached"),
+                    ) as resolve_runtime_layout,
+                ):
+                    with self.assertRaises(SystemExit) as raised:
+                        cli_module.main()
+
+                self.assertEqual(raised.exception.code, 2)
+                self.assertNotIn("Traceback", stderr.getvalue())
+                resolve_runtime_layout.assert_not_called()
+
+    def test_numeric_cli_accepts_documented_boundary_values(self) -> None:
+        args = cli_module.parse_args(
+            [
+                "--min-delay-seconds",
+                "0",
+                "--max-delay-seconds",
+                "86400",
+                "--max-retries",
+                "20",
+                "--max-rounds",
+                "1",
+                "--prompt-budget-chars",
+                "1000",
+                "--max-prompt-chars",
+                "1000",
+                "--max-provider-quota-failures",
+                "0",
+            ]
+        )
+
+        cloud_free = cli_module._apply_cloud_free_arg_overrides(AppConfig(), args)
+
+        self.assertEqual(cloud_free.min_delay_seconds, 0.0)
+        self.assertEqual(cloud_free.max_delay_seconds, 86400.0)
+        self.assertEqual(cloud_free.max_retries, 20)
+        self.assertEqual(args.max_rounds, 1)
+        self.assertEqual(cloud_free.prompt_budget_chars, 1000)
+        self.assertEqual(args.max_prompt_chars, 1000)
+        self.assertEqual(args.max_provider_quota_failures, 0)
+
+    def test_numeric_cli_rejects_effective_delay_conflict_before_project_work(self) -> None:
+        cases = (
+            (
+                "cli-max-below-config-min",
+                ["--max-delay-seconds", "50"],
+                CloudFreeConfig(min_delay_seconds=100, max_delay_seconds=3600),
+            ),
+            (
+                "cli-min-above-config-max",
+                ["--min-delay-seconds", "100"],
+                CloudFreeConfig(min_delay_seconds=None, max_delay_seconds=50),
+            ),
+        )
+
+        for case_name, override_argv, cloud_free in cases:
+            with self.subTest(case=case_name), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                args = cli_module.parse_args(["--survey", "--project", "selected", *override_argv])
+                console = SimpleNamespace(print=lambda *args, **kwargs: None)
+                with (
+                    patch.object(cli_module, "parse_args", return_value=args),
+                    patch.object(cli_module, "Console", return_value=console),
+                    patch.object(
+                        cli_module,
+                        "resolve_runtime_layout",
+                        return_value=SimpleNamespace(workspace_root=root),
+                    ),
+                    patch.object(
+                        cli_module,
+                        "load_app_config",
+                        return_value=AppConfig(cloud_free=cloud_free),
+                    ),
+                    patch.object(
+                        cli_module,
+                        "seed_default_mock_project",
+                        side_effect=AssertionError("project setup reached"),
+                    ) as seed_default_mock_project,
+                    patch.object(cli_module, "load_project_input") as load_project_input,
+                    patch.object(cli_module, "list_installed_ollama_models") as list_models,
+                ):
+                    with self.assertRaises(SystemExit) as raised:
+                        cli_module.main()
+
+                self.assertEqual(raised.exception.code, 2)
+                seed_default_mock_project.assert_not_called()
+                load_project_input.assert_not_called()
+                list_models.assert_not_called()
+
+    def test_module_entrypoint_rejects_invalid_numeric_cli_before_project_creation(
+        self,
+    ) -> None:
+        project_name = f"ara061-numeric-guard-{os.getpid()}"
+        project_dir = ROOT / "projects" / project_name
+        self.assertFalse(project_dir.exists())
+        invalid_cases = (
+            ("non-finite", ["--max-delay-seconds", "inf"]),
+            (
+                "inconsistent-delays",
+                ["--min-delay-seconds", "100", "--max-delay-seconds", "1"],
+            ),
+        )
+
+        for case_name, override_argv in invalid_cases:
+            with self.subTest(case=case_name):
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        "-m",
+                        "src.main",
+                        "--project",
+                        project_name,
+                        *override_argv,
+                    ],
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertNotIn("Traceback", result.stdout + result.stderr)
+                self.assertFalse(project_dir.exists())
 
     def test_mode_specific_outputs_require_their_matching_primary_mode(self) -> None:
         primary_modes = (

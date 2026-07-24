@@ -9,10 +9,10 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `00a488dce12f7be548ce00d1980d97fd4883e4ff` (the exact
-  externally verified ARA-055 package-4 closeout retained by the additive recovery schema; resolve
-  current `HEAD` live).
-- Last externally verified fallback: `00a488dce12f7be548ce00d1980d97fd4883e4ff` (exact local,
+- State recorded against commit: `2ac99e0fde929dc9d919702e2e7195ced1d0f7af` (the exact
+  externally verified ARA-061 activation checkpoint retained by the additive recovery schema;
+  resolve current `HEAD` live).
+- Last externally verified fallback: `2ac99e0fde929dc9d919702e2e7195ced1d0f7af` (exact local,
   remote-tracking, `ls-remote`, GitHub branch, and PR-head equality plus all Python 3.10/3.13
   push/PR jobs passed)
 - Active task at this snapshot: ARA-061. Authorized scope is strict finite/range/cross-option
@@ -212,8 +212,21 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   and prove failure occurs before project writes or provider work.
 - Explicit exclusions: no config-file schema or default changes, scheduler-policy redesign,
   dependencies, providers, ignored runtime, experiment changes, or ARA-055 package 5.
-- Next command after this activation checkpoint is committed and pushed:
-  `.venv/bin/python -m pytest -q tests/test_round_loop.py -k numeric_cli`.
+- Local implementation now rejects non-finite/out-of-range values at parsing, rejects an invalid
+  effective delay relation after configuration merge, and removes the previous silent CLI clamps.
+  Existing valid boundaries and `--max-rounds` validation remain covered.
+- Focused validation passes `4 passed, 18 subtests`; related CLI/cloud/config/runner/project/UI
+  regression passes `244 passed, 554 subtests`. Ruff check/format and `git diff --check` pass.
+  Activation push/PR runs `30080995141`/`30080997040` both completed successfully.
+- Full `make check` passes formatting over 70 files, Ruff, imports, repository safety in tracked
+  and staged modes over 115 files with zero findings, and `466 passed, 809 subtests` in 180.21
+  seconds. After explicit eight-path staging, staged safety and cached diff checks pass; recovery
+  state passes `6 passed, 1 subtest`, and the focused CLI guard passes `4 passed, 18 subtests`.
+- Current uncommitted task files are `src/cli.py`, `tests/test_cli_exit_codes.py`, `CHANGELOG.md`,
+  `README.md`, `docs/USER_GUIDE.md`, and this recovery update. No provider or ignored-runtime
+  access occurred.
+- Next command:
+  `git diff --check`, then explicitly stage only the recorded ARA-061 paths.
 
 ## Completed Steps
 
@@ -1069,10 +1082,10 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Remaining Steps
 
-- Add ARA-061 failing parser and effective-delay tests for all reproduced invalid classes.
-- Implement the smallest shared finite/range validators and effective min/max check.
-- Run ARA-061 focused, provider-free CLI no-write, related cloud/config/runner, full, recovery, and
-  safety validation before its semantic commit and closeout.
+- Review and explicitly stage the ARA-061 implementation, tests, docs, and recovery records; rerun
+  staged safety validation, then commit and push if the index exactly matches the reviewed scope.
+- Verify exact local/upstream/`ls-remote`/PR-head equality and both Python 3.10/3.13 push/PR CI
+  events before closing ARA-061.
 - Await explicit owner approval before activating ARA-055 package 5; do not change finalization
   writers or readers while it remains approval-gated.
 - Preserve packages 3-4 transaction ordering, lock-held entry recovery, and non-mutating read-only
@@ -1086,9 +1099,15 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Test Status
 
-- ARA-061 baseline recovery-state validation passes `6 passed, 1 subtest`. The approved pre-fix
-  matrix accepts all seven invalid numeric override classes; no provider or ignored runtime was
-  accessed.
+- ARA-061 focused validation passes `4 passed, 18 subtests`; related CLI/cloud/config/runner/
+  project/UI regression passes `244 passed, 554 subtests`. Ruff and diff checks pass, and the real
+  module entrypoint proves invalid input exits 2 without project creation. No provider or ignored
+  runtime was accessed.
+- ARA-061 activation `2ac99e0` is exact local/upstream/`ls-remote`/PR-head equal; push/PR runs
+  `30080995141`/`30080997040` passed.
+- ARA-061 full `make check` passes formatting over 70 files, Ruff, imports, tracked/staged safety
+  over 115 files with zero findings, and `466 passed, 809 subtests` in 180.21 seconds. Recovery
+  state passes `6 passed, 1 subtest`.
 - ARA-055 package-4 closeout `00a488d` is exact local/upstream/`ls-remote`/PR-head equal.
   Closeout push/PR runs `30035438824`/`30035441752` passed Python 3.10/3.13 and every workflow
   step.

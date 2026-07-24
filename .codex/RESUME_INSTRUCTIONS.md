@@ -64,8 +64,8 @@ annotations. Preserve its literal string lookalikes, metadata, request/redaction
 and installed-fallback behavior.
 ARA-058 is complete through remote-equal closeout `1419d5e`; closeout push/PR runs
 `29264305133`/`29264308515` passed Python 3.10/3.13, all four wheel steps, and zero annotations with
-exact PR body readback. Use `00a488dce12f7be548ce00d1980d97fd4883e4ff` as the conservative exact
-externally verified fallback.
+exact PR body readback. The later ARA-055 package-4 closeout `00a488d` remains historical evidence,
+not the active recovery fallback.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
 it imported the editable checkout and advanced ignored `projects/example` state after a missing
@@ -138,11 +138,13 @@ and blocks read-only mixed-generation consumers without mutation. PR 13 comment 
 records the result.
 
 ARA-061 is the sole active task after the owner said `批准ARA061` on 2026-07-24. Use
-`00a488dce12f7be548ce00d1980d97fd4883e4ff` as the conservative exact externally verified
-fallback; closeout push/PR runs `30035438824`/`30035441752` passed Python 3.10/3.13 and every
-workflow step. Reproduce only in parser/direct temporary probes, then add failing tests before
-changing `src/cli.py`. Preserve valid zero/boundary behavior and fail invalid values before
-project writes or provider work.
+`2ac99e0fde929dc9d919702e2e7195ced1d0f7af` as the conservative exact externally verified
+fallback; activation push/PR runs `30080995141`/`30080997040` passed. The local implementation,
+tests, and docs are uncommitted: focused validation passes `4 passed, 18 subtests`, related
+regression passes `244 passed, 554 subtests`, and full `make check` passes `466 passed, 809
+subtests` plus formatting, lint, imports, and zero-finding safety scans. Review and stage only the
+recorded task paths, rerun staged safety, then commit and push if green. Preserve valid zero/
+boundary behavior and fail invalid values before project writes or provider work.
 
 ARA-055 package 5 finalization journaling remains separately approval-gated. Do not add
 finalization writer/reader behavior, diagnostic routing, migration, configuration schema/default

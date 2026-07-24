@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import os
 from dataclasses import asdict, replace
 from pathlib import Path
@@ -91,6 +92,10 @@ _EXIT_STARTUP_ERROR = 2
 _EXIT_INTERRUPTED = 130
 
 
+class NumericCliOverrideError(ValueError):
+    """Raised when individually valid numeric overrides conflict after config resolution."""
+
+
 def _positive_round_count(value: str) -> int:
     try:
         parsed = int(value)
@@ -98,6 +103,53 @@ def _positive_round_count(value: str) -> int:
         raise argparse.ArgumentTypeError("must be an integer >= 1") from exc
     if parsed < 1:
         raise argparse.ArgumentTypeError("must be >= 1")
+    return parsed
+
+
+def _non_negative_finite_seconds(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a finite number >= 0") from exc
+    if not math.isfinite(parsed) or parsed < 0:
+        raise argparse.ArgumentTypeError("must be a finite number >= 0")
+    return parsed
+
+
+def _bounded_max_delay_seconds(value: str) -> float:
+    parsed = _non_negative_finite_seconds(value)
+    if parsed > 86400:
+        raise argparse.ArgumentTypeError("must be <= 86400")
+    return parsed
+
+
+def _bounded_retry_count(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer in [0, 20]") from exc
+    if not 0 <= parsed <= 20:
+        raise argparse.ArgumentTypeError("must be in range [0, 20]")
+    return parsed
+
+
+def _minimum_prompt_chars(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer >= 1000") from exc
+    if parsed < 1000:
+        raise argparse.ArgumentTypeError("must be >= 1000")
+    return parsed
+
+
+def _non_negative_count(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer >= 0") from exc
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be >= 0")
     return parsed
 
 
@@ -222,33 +274,33 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--min-delay-seconds",
-        type=float,
+        type=_non_negative_finite_seconds,
         default=None,
-        help="Override cloud free scheduler minimum delay.",
+        help="Override cloud free scheduler minimum delay with a finite value >= 0.",
     )
     parser.add_argument(
         "--max-delay-seconds",
-        type=float,
+        type=_bounded_max_delay_seconds,
         default=None,
-        help="Override cloud free scheduler maximum delay.",
+        help="Override cloud free scheduler maximum delay in [0, 86400].",
     )
     parser.add_argument(
         "--max-retries",
-        type=int,
+        type=_bounded_retry_count,
         default=None,
-        help="Override cloud free scheduler retry count.",
+        help="Override cloud free scheduler retry count in [0, 20].",
     )
     parser.add_argument(
         "--prompt-budget-chars",
-        type=int,
+        type=_minimum_prompt_chars,
         default=None,
-        help="Override cloud free prompt budget in characters.",
+        help="Override cloud free prompt budget in characters (>= 1000).",
     )
     parser.add_argument(
         "--max-prompt-chars",
-        type=int,
+        type=_minimum_prompt_chars,
         default=None,
-        help="Override maximum prompt size before an LLM call fails fast.",
+        help="Override maximum prompt size before an LLM call fails fast (>= 1000).",
     )
     parser.add_argument(
         "--max-rounds",
@@ -273,13 +325,19 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--max-provider-quota-failures",
-        type=int,
+        type=_non_negative_count,
         default=2,
         help="Stop after this many consecutive provider quota/rate-limit failed rounds.",
     )
     args = parser.parse_args(argv)
     if args.compare_runs is not None and len(args.compare_runs) < 2:
         parser.error("--compare-runs requires at least two RUN_DIR arguments")
+    if (
+        args.min_delay_seconds is not None
+        and args.max_delay_seconds is not None
+        and args.max_delay_seconds < args.min_delay_seconds
+    ):
+        parser.error("--max-delay-seconds must be >= --min-delay-seconds")
     output_dependencies = (
         ("--survey-output", args.survey_output, "--survey", args.survey),
         ("--compare-output", args.compare_output, "--compare-runs", args.compare_runs),
@@ -338,15 +396,22 @@ def _apply_cloud_free_arg_overrides(config, args: argparse.Namespace):
     if args.disable_cloud_free_mode:
         updates["cloud_free_mode"] = False
     if args.min_delay_seconds is not None:
-        updates["min_delay_seconds"] = max(0.0, args.min_delay_seconds)
+        updates["min_delay_seconds"] = args.min_delay_seconds
     if args.max_delay_seconds is not None:
-        updates["max_delay_seconds"] = max(0.0, args.max_delay_seconds)
+        updates["max_delay_seconds"] = args.max_delay_seconds
     if args.max_retries is not None:
-        updates["max_retries"] = max(0, args.max_retries)
+        updates["max_retries"] = args.max_retries
     if args.prompt_budget_chars is not None:
-        updates["prompt_budget_chars"] = max(1000, args.prompt_budget_chars)
+        updates["prompt_budget_chars"] = args.prompt_budget_chars
     if updates:
         cloud_free_config = replace(cloud_free_config, **updates)
+    if (
+        cloud_free_config.min_delay_seconds is not None
+        and cloud_free_config.max_delay_seconds < cloud_free_config.min_delay_seconds
+    ):
+        raise NumericCliOverrideError(
+            "--max-delay-seconds must be >= the effective --min-delay-seconds"
+        )
     return cloud_free_config
 
 
@@ -618,7 +683,11 @@ def main() -> None:
             "",
         ).strip()
     effective_gemini_api_key = gemini_api_key_override or gemini_config.api_key
-    cloud_free_config = _apply_cloud_free_arg_overrides(config, args)
+    try:
+        cloud_free_config = _apply_cloud_free_arg_overrides(config, args)
+    except NumericCliOverrideError as exc:
+        console.print(f"[red]Argument error: {exc}.[/red]")
+        raise SystemExit(_EXIT_STARTUP_ERROR) from None
     model_label = format_model_label(provider, model_name)
     base_url = config.ollama_base_url
     project_name = args.project.strip() if args.project else config.project_name
@@ -628,7 +697,7 @@ def main() -> None:
         raise SystemExit(_EXIT_STARTUP_ERROR)
     benchmark_preset = getattr(args, "benchmark_preset", None)
     max_rounds_override = getattr(args, "max_rounds", None)
-    max_provider_quota_failures = max(0, getattr(args, "max_provider_quota_failures", 2))
+    max_provider_quota_failures = getattr(args, "max_provider_quota_failures", 2)
     preset_rounds = benchmark_preset_rounds(benchmark_preset)
     max_rounds = config.max_rounds
     if preset_rounds is not None:
@@ -648,7 +717,7 @@ def main() -> None:
     top_p = config.top_p
     timeout_seconds = config_timeout
     if args.max_prompt_chars is not None:
-        max_prompt_chars = max(1000, args.max_prompt_chars)
+        max_prompt_chars = args.max_prompt_chars
     elif args.provider and provider != config_provider:
         max_prompt_chars = (
             DEFAULT_GEMINI_MAX_PROMPT_CHARS
