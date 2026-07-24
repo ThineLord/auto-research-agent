@@ -55,6 +55,14 @@ from .legacy_migration import (
     classify_legacy_history_migration,
     format_legacy_migration_report,
 )
+from .legacy_migration_execution import (
+    LegacyMigrationExecutionError,
+    LegacyMigrationExecutionIOError,
+    LegacyMigrationRecoveryError,
+    classify_legacy_migration_recovery,
+    execute_legacy_history_migration,
+    recover_legacy_history_migration,
+)
 from .literature_survey import run_literature_survey_mode
 from .llm import create_llm_client
 from .logging_config import configure_logging
@@ -75,7 +83,6 @@ from .project_input import ProjectInputError, load_project_input
 from .resume import run_resume_mode
 from .round_commit_recovery import (
     RoundCommitReadError,
-    RoundCommitRecoveryInspection,
     classify_diagnostic_finalize_recovery,
     classify_round_commit_recovery,
     classify_run_finalize_recovery,
@@ -233,6 +240,20 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
             "migration, or artifact writes."
         ),
     )
+    primary_modes.add_argument(
+        "--legacy-migration-execute",
+        type=str,
+        default=None,
+        metavar="PROJECT",
+        help="Execute one explicitly selected exact missing-history-twin migration.",
+    )
+    parser.add_argument(
+        "--legacy-migration-evidence",
+        type=str,
+        default=None,
+        metavar="DIR",
+        help="New owner-selected evidence directory required by --legacy-migration-execute.",
+    )
     parser.add_argument(
         "--analyze-output",
         type=str,
@@ -364,6 +385,10 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     for output_option, output_value, mode_option, mode_value in output_dependencies:
         if output_value is not None and not mode_value:
             parser.error(f"{output_option} requires {mode_option}")
+    if args.legacy_migration_execute is not None and args.legacy_migration_evidence is None:
+        parser.error("--legacy-migration-execute requires --legacy-migration-evidence")
+    if args.legacy_migration_evidence is not None and args.legacy_migration_execute is None:
+        parser.error("--legacy-migration-evidence requires --legacy-migration-execute")
     if args.gemini_api_key_override_env is not None:
         override_env = args.gemini_api_key_override_env.strip()
         try:
@@ -459,8 +484,34 @@ def _recover_pending_round_commit(
     *,
     console: Console,
     project_dir: Path,
-) -> RoundCommitRecoveryInspection:
+    run_lock_handle: object | None = None,
+) -> object:
     """Recover valid round and finalization journals under the project lock."""
+    migration = classify_legacy_migration_recovery(project_dir)
+    if migration.status != "absent":
+        if not migration.can_recover:
+            console.print(
+                "[red]Legacy migration recovery is blocked; preserved artifacts require "
+                "inspection.[/red]"
+            )
+            raise SystemExit(_EXIT_STARTUP_ERROR)
+        try:
+            recovered_migration = recover_legacy_history_migration(
+                project_dir,
+                lock_handle=run_lock_handle,
+            )
+        except (OSError, RuntimeError):
+            console.print(
+                "[red]Legacy migration recovery failed; preserved artifacts require "
+                "inspection.[/red]"
+            )
+            raise SystemExit(_EXIT_STARTUP_ERROR) from None
+        console.print(
+            "[yellow]Recovered pending legacy history migration before starting new runner "
+            "work.[/yellow]"
+        )
+        return recovered_migration
+
     inspection = classify_round_commit_recovery(project_dir)
     result = inspection
     if inspection.status != "absent":
@@ -650,6 +701,104 @@ def _run_legacy_migration_preview_cli(
     console.print(report, markup=False)
 
 
+def _run_legacy_migration_execute_cli(
+    args: argparse.Namespace,
+    console: Console,
+    root: Path,
+) -> None:
+    """Execute or resume one exact-copy migration before config/provider setup."""
+    project_name = str(getattr(args, "legacy_migration_execute", "")).strip()
+    project_error = _validate_project_override(project_name)
+    if project_error:
+        console.print(f"[red]{project_error}[/red]")
+        raise SystemExit(_EXIT_STARTUP_ERROR)
+    evidence_value = str(getattr(args, "legacy_migration_evidence", "")).strip()
+    if not evidence_value:
+        console.print("[red]Legacy migration evidence directory must be non-empty.[/red]")
+        raise SystemExit(_EXIT_STARTUP_ERROR)
+    project_dir = root / "projects" / project_name
+    evidence_dir = _resolve_repo_relative_path(root, evidence_value).expanduser().absolute()
+    try:
+        project_resolved = project_dir.resolve(strict=False)
+        evidence_resolved = evidence_dir.resolve(strict=False)
+        if evidence_resolved == project_resolved or project_resolved in evidence_resolved.parents:
+            console.print(
+                "[red]Legacy migration evidence directory must be outside the selected "
+                "project.[/red]"
+            )
+            raise SystemExit(_EXIT_STARTUP_ERROR)
+        recovery = classify_legacy_migration_recovery(project_dir)
+        if recovery.status == "absent":
+            inspection = classify_legacy_history_migration(project_dir)
+            if (
+                inspection.status != "eligible_candidate"
+                or inspection.classification != "exact_missing_history_twin"
+            ):
+                console.print(format_legacy_migration_report(inspection), markup=False)
+                raise SystemExit(_EXIT_OPERATION_ERROR)
+    except SystemExit:
+        raise
+    except (OSError, RuntimeError, ValueError):
+        console.print(
+            "[red]Legacy migration execution failed: selected project state is unsafe "
+            "or unavailable.[/red]"
+        )
+        raise SystemExit(_EXIT_OPERATION_ERROR) from None
+
+    lock_handle = None
+    try:
+        lock_handle, lock_error = acquire_run_lock(
+            project_dir,
+            mode="legacy_history_migration",
+            model_name="provider-free",
+        )
+        if lock_error or lock_handle is None:
+            console.print(
+                "[red]Legacy migration execution could not acquire the project lock.[/red]"
+            )
+            _print_run_lock_recovery_hint(console, root, project_dir)
+            raise SystemExit(_EXIT_STARTUP_ERROR)
+        recovery = classify_legacy_migration_recovery(project_dir)
+        if recovery.status == "absent":
+            result = execute_legacy_history_migration(
+                project_dir,
+                evidence_dir,
+                lock_handle=lock_handle,
+            )
+        else:
+            result = recover_legacy_history_migration(
+                project_dir,
+                lock_handle=lock_handle,
+                expected_evidence_dir=evidence_dir,
+            )
+    except KeyboardInterrupt:
+        console.print(
+            "[yellow]Legacy migration interrupted; any prepared transaction was preserved "
+            "for recovery.[/yellow]"
+        )
+        raise SystemExit(_EXIT_INTERRUPTED) from None
+    except (
+        LegacyMigrationExecutionError,
+        LegacyMigrationExecutionIOError,
+        LegacyMigrationRecoveryError,
+        OSError,
+        RuntimeError,
+        ValueError,
+    ):
+        console.print(
+            "[red]Legacy migration execution failed; preserved state requires inspection "
+            "or an exact retry.[/red]"
+        )
+        raise SystemExit(_EXIT_OPERATION_ERROR) from None
+    finally:
+        release_run_lock(lock_handle)
+    console.print("[green]Legacy history migration completed.[/green]")
+    console.print(f"status: {result.status}", markup=False)
+    console.print(f"run_id: {result.run_id}", markup=False)
+    console.print(f"source_artifact: {result.source_artifact}", markup=False)
+    console.print(f"target_artifact: {result.target_artifact}", markup=False)
+
+
 def _requires_generation_resources(args: argparse.Namespace) -> bool:
     return not any(
         getattr(args, mode, False)
@@ -657,6 +806,7 @@ def _requires_generation_resources(args: argparse.Namespace) -> bool:
             "compare_runs",
             "analyze_run",
             "legacy_migration_preview",
+            "legacy_migration_execute",
             "survey",
             "cloud_free_discover",
             "cloud_free_profile",
@@ -713,6 +863,9 @@ def main() -> None:
     root = layout.workspace_root
     if getattr(args, "legacy_migration_preview", None) is not None:
         _run_legacy_migration_preview_cli(args, console, root)
+        return
+    if getattr(args, "legacy_migration_execute", None) is not None:
+        _run_legacy_migration_execute_cli(args, console, root)
         return
     if getattr(args, "compare_runs", None):
         _run_compare_cli(args, console, root)
@@ -952,6 +1105,7 @@ def main() -> None:
             _recover_pending_round_commit(
                 console=console,
                 project_dir=project_dir,
+                run_lock_handle=run_lock_path,
             )
             agents = build_mock_agents(topic_context=topic_context)
             run_iterative_rounds(
@@ -1148,6 +1302,7 @@ def main() -> None:
         _recover_pending_round_commit(
             console=console,
             project_dir=project_dir,
+            run_lock_handle=run_lock_path,
         )
         _validate_model_provider_startup(
             args=args,

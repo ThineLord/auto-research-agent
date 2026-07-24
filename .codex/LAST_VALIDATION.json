@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-    "recorded_at": "2026-07-25T00:07:26+08:00",
+    "recorded_at": "2026-07-25T01:13:43+08:00",
   "branch": "codex/sol-autonomous-hardening",
     "head_commit": "c87063180ed7623424aa54722dad8a867788902c",
     "last_known_stable_commit": "c87063180ed7623424aa54722dad8a867788902c",
@@ -54,8 +54,121 @@
       }
     }
   },
-    "status": "ara055_package7c_activation",
+    "status": "ara055_package7c_validated_staged",
     "commands": [
+        {
+            "command": "final make check and isolated wheel after atomic-publication correction",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "format_files": 77,
+                "ruff_format": "passed",
+                "ruff_lint": "passed",
+                "imports": "passed",
+                "repository_safety": "passed_zero_findings",
+                "tracked_and_indexed_files_scanned": 123,
+                "pytest_passed": 519,
+                "pytest_subtests_passed": 979,
+                "pytest_seconds": 375.88,
+                "wheel_install_smoke": "passed",
+                "provider_calls": 0,
+                "ignored_runtime_access": 0,
+                "real_historical_execution": false
+            }
+        },
+        {
+            "command": "ARA-055 package 7C atomic target publication correction",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "focused_pytest_passed": 75,
+                "focused_pytest_subtests_passed": 127,
+                "atomic_noreplace_target": true,
+                "post_rename_interrupt_recoverable": true,
+                "receipt_failure_recoverable": true,
+                "cleanup_interrupt_recoverable": true,
+                "provider_calls": 0,
+                "ignored_runtime_access": 0,
+                "full_make_check_rerun_required": true,
+                "wheel_rerun_required": true
+            }
+        },
+        {
+            "command": "explicit package-only staging, staged safety, and isolated wheel before atomic-publication correction",
+            "exit_code": 0,
+            "result": "passed_superseded_by_later_code_change",
+            "summary": {
+                "indexed_files_scanned": 123,
+                "repository_safety": "passed_zero_findings",
+                "cached_diff_check": "passed",
+                "wheel_install_smoke": "passed",
+                "rerun_required": true
+            }
+        },
+        {
+            "command": "make check",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "format_files": 77,
+                "ruff_format": "passed",
+                "ruff_lint": "passed",
+                "imports": "passed",
+                "repository_safety": "passed_zero_findings",
+                "tracked_files_scanned": 121,
+                "pytest_passed": 516,
+                "pytest_subtests_passed": 977,
+                "pytest_seconds": 370.48,
+                "provider_calls": 0,
+                "ignored_runtime_access": 0
+            }
+        },
+        {
+            "command": ".venv/bin/python scripts/check_wheel_install.py before explicit staging",
+            "exit_code": 1,
+            "result": "failed_precondition",
+            "summary": {
+                "failure": "installed_layout_probe_status_1",
+                "cause": "wheel helper exports indexed tracked inputs and the new module was intentionally untracked",
+                "code_failure_confirmed": false,
+                "required_action": "explicit package-only staging and exact wheel rerun"
+            }
+        },
+        {
+            "command": "ARA-055 package 7C local implementation focused and related validation",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "activation_commit": "cee51159ce26472fbe751b5fe36e90cb9d39f9e9",
+                "focused_cli_entry_package_pytest_passed": 88,
+                "focused_cli_entry_package_subtests_passed": 186,
+                "related_pytest_passed": 170,
+                "related_pytest_subtests_passed": 369,
+                "related_pytest_seconds": 189.84,
+                "ruff_format": "passed",
+                "ruff_lint": "passed",
+                "diff_check": "passed",
+                "temporary_synthetic_fixtures_only": true,
+                "provider_calls": 0,
+                "ignored_runtime_access": 0,
+                "real_historical_execution": false,
+                "package_7d": false,
+                "full_make_check_pending": true
+            }
+        },
+        {
+            "command": ".venv/bin/python -m pytest -q tests/test_legacy_migration_execution.py",
+            "exit_code": 1,
+            "result": "expected_pre_implementation_failure",
+            "summary": {
+                "failed": 6,
+                "root_cause": "src.legacy_migration_execution_not_implemented",
+                "temporary_fixtures_only": true,
+                "provider_calls": 0,
+                "ignored_runtime_access": 0,
+                "production_code_changed": false
+            }
+        },
         {
             "command": "ARA-055 package 7C activation recovery and focused baseline",
             "exit_code": 0,

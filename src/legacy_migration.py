@@ -26,6 +26,7 @@ from .resume_safety import (
 from .round_attempts import classify_round_recovery
 from .round_commit_recovery import (
     DIAGNOSTIC_FINALIZE_JOURNAL_NAME,
+    LEGACY_MIGRATION_JOURNAL_NAME,
     ROUND_COMMIT_JOURNAL_NAME,
     RUN_FINALIZE_JOURNAL_NAME,
     RoundCommitRecoveryInspection,
@@ -34,7 +35,7 @@ from .round_commit_recovery import (
     classify_run_finalize_recovery,
 )
 from .run_config import RUN_CONFIG_SCHEMA_VERSION
-from .runtime import is_pid_running
+from .runtime import is_pid_running, run_lock_handle_is_current
 from .storage import (
     artifact_path_exists,
     artifact_path_is_safe,
@@ -422,6 +423,45 @@ def _read_history(path: Path, *, anchor: Path, artifact_name: str) -> _History |
 
 
 def _journal_classification(project_dir: Path) -> LegacyMigrationInspection | None:
+    migration_journal = _read_optional_json(
+        project_dir / LEGACY_MIGRATION_JOURNAL_NAME,
+        anchor=project_dir,
+        max_bytes=MAX_LEGACY_METADATA_BYTES,
+    )
+    if migration_journal.present:
+        if (
+            not isinstance(migration_journal.value, dict)
+            or type(migration_journal.value.get("schema_version")) is not int
+            or migration_journal.value.get("schema_version") != 1
+            or migration_journal.value.get("kind") != "legacy_history_migration"
+        ):
+            return _result(
+                "not_migratable",
+                "unknown_schema",
+                reasons=("unknown_transaction_schema",),
+            )
+        from .legacy_migration_execution import classify_legacy_migration_recovery
+
+        inspection = classify_legacy_migration_recovery(project_dir)
+        if inspection.status == "absent" or not inspection.journal_present:
+            return _result(
+                "unsafe",
+                "unsafe_storage_identity",
+                reasons=("current_transaction_changed",),
+            )
+        if inspection.status == "invalid":
+            return _result(
+                "unsafe",
+                "unsafe_serialization",
+                reasons=("invalid_current_transaction",),
+            )
+        return _result(
+            "already_supported",
+            "current_transaction_pending",
+            run_id=inspection.run_id,
+            completed_rounds=inspection.completed_rounds,
+            reasons=("current_transaction_present",),
+        )
     journal_classifiers: tuple[
         tuple[str, str, Callable[[Path], RoundCommitRecoveryInspection]], ...
     ] = (
@@ -638,7 +678,9 @@ def _metadata_conflicts(
     return False
 
 
-def _lock_state(project_dir: Path) -> str:
+def _lock_state(project_dir: Path, owned_lock: object | None = None) -> str:
+    if owned_lock is not None and run_lock_handle_is_current(project_dir, owned_lock):
+        return "owned"
     try:
         lock = _read_optional_json(
             project_dir / "active_run.json",
@@ -751,6 +793,8 @@ def _unsafe_result(
 
 def classify_legacy_history_migration(
     project_dir: Path,
+    *,
+    _owned_lock: object | None = None,
 ) -> LegacyMigrationInspection:
     """Classify one selected project without mutating any local state."""
     try:
@@ -812,7 +856,7 @@ def classify_legacy_history_migration(
         }.get(blocker, "checkpoint_run_identity_mismatch")
         return _unsafe_result(classification, reason=reason)
 
-    lock_state = _lock_state(project_dir)
+    lock_state = _lock_state(project_dir, _owned_lock)
     if lock_state == "live":
         return _result(
             "busy",

@@ -162,6 +162,15 @@ against ignored or real historical runtime, implement rollback/delete/quarantine
 projects, repair partial/sparse/string histories, adopt canonical evidence, rewrite the source,
 infer generations, or change dependencies/defaults/providers/experiments.
 
+The local package 7C worktree now contains the exact-copy engine, evidence/journal/receipt
+transaction, owned-lock execution/recovery, shared reader/entry guards, explicit provider-free
+CLI, documentation, and tests. Focused/CLI/entry/package coverage passes `88 passed, 186
+subtests`; the broader transaction/storage/reader/installed-package layer passes `170 passed, 369
+subtests`; atomic-publication coverage passes `75 passed, 127 subtests`; final `make check` passes
+`519 passed, 979 subtests`; and the final isolated wheel smoke passes. Resume with recovery-state,
+final focused, staged-safety, and cached-diff checks before commit; do not run against real history
+or start package 7D.
+
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 
@@ -178,6 +187,6 @@ ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 git status --short --branch
 git rev-parse --verify HEAD
 .venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
-.venv/bin/python -m pytest -q tests/test_recovery_state.py
+.venv/bin/python -m pytest -q tests/test_recovery_state.py tests/test_legacy_migration_execution.py tests/test_legacy_migration_cli.py
 git diff --check
 ```

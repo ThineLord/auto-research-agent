@@ -1,7 +1,7 @@
 # ARA-055 Legacy History Migration Design
 
 Status: package 7A read-only classifier and package 7B single-project preview are remotely
-verified; package 7C exact missing-twin execution is approved but not yet implemented
+verified; package 7C exact missing-twin execution is implemented and locally validated
 
 Date: 2026-07-24
 
@@ -17,7 +17,7 @@ finalization timestamp needed to reconstruct an ARA-055 transaction. Preserving 
 safer than inferring a plausible history. In particular, canonical Markdown is not a trustworthy
 source for timings, errors, score metadata, prompt-affecting state, or finalization fields.
 
-A future implementation may offer a read-only, explicitly targeted classifier. Its only future
+The implementation offers a read-only, explicitly targeted classifier. Its only
 execution-eligibility class is `exact_missing_history_twin`:
 
 - exactly one of project `score_history.json` and selected-run `round_metrics.json` is absent;
@@ -29,7 +29,7 @@ execution-eligibility class is `exact_missing_history_twin`:
 - no current-round canonical/attempt state is pending or ambiguous;
 - the source is a safe regular single-link file and the target leaf is safely absent.
 
-Execution, if separately approved, copies the source bytes exactly into the absent fixed target
+Execution copies the source bytes exactly into the absent fixed target
 using create-only publication. It does not rewrite the source, checkpoint, canonical output,
 summary, config, memory, research state, or best output. An owner-selected restricted evidence
 bundle must be durably created first, and an immutable project-local transaction record makes an
@@ -41,20 +41,22 @@ history synthesis, or automatic rollback.
 
 ## Authorization boundary
 
-The owner subsequently approved package 7A and then package 7B. Package 7A added a provider-free
-internal, explicitly targeted classifier plus strict machine and human report builders. Package 7B
-adds one explicit single-project CLI preview; it remains read-only and has no automatic caller.
+The owner subsequently approved packages 7A, 7B, and 7C. Package 7A added a provider-free internal,
+explicitly targeted classifier plus strict machine and human report builders. Package 7B added one
+explicit single-project CLI preview. Package 7C adds only the approved exact missing-twin execution,
+evidence, and roll-forward recovery path.
 
-Package 7A does not:
+Packages 7A-7C do not:
 
 - scan for projects/runs or inspect any unselected checkpoint, history, log, or provider artifact;
-- add a migration command, journal, receipt, or automatic runtime path;
-- copy, rewrite, move, quarantine, delete, or create a historical artifact;
+- add batch discovery, implicit migration, rollback, quarantine, or automatic target deletion;
+- rewrite or infer a source history, checkpoint, canonical output, result, or research artifact;
 - change a schema, dependency, configuration default, provider, score, prompt, metric, or result;
-- authorize package 7C execution or package 7D rollback.
+- authorize package 7D rollback.
 
-Approval of read-only classification must not be interpreted as approval to create a target
-history. Every later package retains its separate approval boundary.
+Package 7C approval authorizes creation only for `exact_missing_history_twin` after a fresh
+lock-held reclassification. Every other state remains read-only, and every later package retains
+its separate approval boundary.
 
 ## Current compatibility behavior
 
@@ -131,7 +133,7 @@ owner-led forensic decision outside automatic migration.
 | --- | --- | --- | --- |
 | L00 | valid round/finalize/diagnostic journal present | `current_transaction_pending` | use existing recovery; no migration |
 | L01 | paired, equal, strict `1..N` histories matching checkpoint | `already_transaction_eligible` | none |
-| L02 | one history absent; present history and authorities satisfy every exact-copy rule | `exact_missing_history_twin` | dry-run eligible; execution separately approved |
+| L02 | one history absent; present history and authorities satisfy every exact-copy rule | `exact_missing_history_twin` | explicit package 7C exact-copy only |
 | L03 | one history absent; present history is partial, sparse, non-integer, or non-consecutive | `incomplete_history_evidence` | preserve; never fill gaps |
 | L04 | paired histories have different round sequences | `history_sequence_conflict` | preserve and fail closed |
 | L05 | paired histories disagree on an overlapping field | `history_value_conflict` | preserve and fail closed |
@@ -187,7 +189,7 @@ below is mandatory.
 ### No other owner
 
 1. No round, run-finalize, or diagnostic-finalize transaction exists.
-2. No project/run lock is live. A future classifier may report `busy` without opening artifacts
+2. No project/run lock is live. The classifier reports `busy` without opening artifacts
    beyond the fixed lock metadata needed for that determination.
 3. No journal-less published round, canonical partial, or unverifiable attempt exists at the next
    round.
@@ -234,13 +236,14 @@ provider responses, environment values, or credentials.
 
 `classify_legacy_history_migration(project_dir)` returns the path-redacted inspection,
 `build_legacy_migration_report(inspection)` returns the fixed JSON-compatible object, and
-`format_legacy_migration_report(inspection)` returns bounded human text. These functions are
-internal APIs in package 7A; no command or automatic caller is added.
+`format_legacy_migration_report(inspection)` returns bounded human text. These functions were
+internal-only APIs in package 7A. Package 7B added the read-only preview; package 7C adds the
+separately approved exact-copy caller.
 
 Discovery success means only that the snapshot was classifiable. It must not describe a
-non-migratable result as command failure, corruption, or safe-to-delete evidence. A future CLI can
-reserve a distinct nonzero status for unsafe/unreadable input, but the exact CLI surface and exit
-contract belong to the separately approved discovery package.
+non-migratable result as corruption or safe-to-delete evidence. The preview remains successful
+report generation; the explicit execution command reserves nonzero status for a refusal or
+unsafe/unreadable input.
 
 ## Evidence and provenance bundle
 
@@ -272,11 +275,11 @@ The final receipt is written into that same bundle only after the target and its
 It records whether recovery, rather than the original process, completed publication. Evidence
 retention and deletion remain an owner policy; the tool never cleans a bundle automatically.
 
-## Future execution transaction
+## Exact-copy execution transaction
 
-If execution is separately approved, use one fixed project-local
-`.legacy_history_migration_transaction.json`. Adding this leaf to repository safety inventories
-and reader/entry guards is part of implementation, not this design.
+Execution uses one fixed project-local `.legacy_history_migration_transaction.json`. The fixed
+leaf participates in repository safety inventories, mutual transaction exclusion, shared reader
+blocking, and lock-held startup recovery.
 
 The strict create-only transaction contains only:
 
@@ -288,8 +291,10 @@ The strict create-only transaction contains only:
 - evidence-bundle manifest digest;
 - proof that the target was absent at preparation.
 
-It does not contain arbitrary writable paths or unbounded artifact contents. The source is the
-only target after-image and is reread through its fixed trusted anchor.
+It does not contain unbounded artifact contents. It records the exact owner-selected evidence
+directory plus its device/inode identity so startup recovery can finish the fixed receipt; that
+path is never printed or used for arbitrary leaf names. The source is the only target after-image
+and is reread through its fixed trusted anchor.
 
 Apply order:
 
@@ -365,7 +370,7 @@ package 7 design.
 
 ### Preserved
 
-- all existing artifact bytes until separately approved execution;
+- all non-target artifact bytes during approved execution;
 - paired histories and current ARA-055 transactions;
 - tolerant read-only support for partial, string-round, sparse, and older metadata;
 - canonical round and attempt classifications;
@@ -423,7 +428,8 @@ Status: implemented and remotely verified under the package 7B approval.
   path-redacted error. Classifier statuses remain report data and do not authorize execution.
 - Temporary and installed-package tests prove no provider construction, lock theft, scan-all
   behavior, package-resource requirement, or mutation.
-- There is still no execution path, JSON output file, batch discovery, or automatic caller.
+- At the 7B checkpoint there was no execution path, JSON output file, batch discovery, or
+  automatic caller.
 
 #### Reader guard audit
 
@@ -438,19 +444,21 @@ Current transaction-sensitive readers already converge on shared non-mutating gu
 - writer entrypoints acquire the existing project lock and call
   `_recover_pending_round_commit()` before provider/client/agent work.
 
-Package 7B does not invent a migration journal or add a speculative blocker for a file that does
-not exist. If package 7C is later approved, its fixed transaction must be added first to the shared
-entry recovery and `round_commit_read_blocker()` boundary; individual readers must not grow
-independent migration heuristics. Until then the preview remains the only migration-related
-runtime caller and cannot mutate state.
+Package 7B did not invent a migration journal or add a speculative blocker for a file that did not
+exist. Package 7C now adds the fixed transaction to shared entry recovery and
+`round_commit_read_blocker()`; individual readers do not grow independent migration heuristics.
+The preview remains read-only.
 
 ### 7C - Exact missing-twin execution
 
-Status: explicitly approved on 2026-07-25; implementation is active.
+Status: explicitly approved on 2026-07-25; implemented and locally validated, with remote CI
+verification pending.
 
-- Add restricted evidence-bundle creation, strict fixed journal codec, create-only exact-byte
-  publication, lock-held recovery, and reader/entry guards.
-- Support only `exact_missing_history_twin`; every other class remains report-only.
+- `--legacy-migration-execute PROJECT --legacy-migration-evidence DIR` executes before generation
+  resources, config, project input, provider/client, or network setup.
+- Restricted evidence-bundle creation, a strict fixed journal codec, create-only exact-byte
+  publication, lock-held roll-forward recovery, and shared reader/entry guards are implemented.
+- Only `exact_missing_history_twin` is executable; every other class remains report-only.
 - Do not implement rollback, bulk discovery, partial repair, or canonical adoption.
 
 ### 7D - Explicit rollback, only if a real need is demonstrated

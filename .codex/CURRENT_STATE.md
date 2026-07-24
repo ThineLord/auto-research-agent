@@ -573,6 +573,55 @@ Updated: 2026-07-25 (Asia/Hong_Kong)
   repair, canonical adoption, source rewrite, inferred field/round generation, dependency/default/
   provider/experiment change, real historical execution, or ignored-runtime access.
 
+## ARA-055 Package 7C Red-Test Checkpoint
+
+- Added `tests/test_legacy_migration_execution.py` with strict codec, both source directions,
+  internal/configured-external storage, owned-lock, evidence-before-journal, interruption/recovery,
+  third-generation conflict, byte-preservation, and shared-reader-blocker expectations.
+- Expected pre-implementation result: `6 failed`; every failure is
+  `ModuleNotFoundError: src.legacy_migration_execution`, proving the approved execution surface is
+  absent before implementation.
+- No production code, real history, provider, ignored runtime, target, evidence bundle, journal, or
+  receipt was changed or accessed by this red run. The test uses only temporary synthetic fixtures.
+- If interrupted, inspect the untracked test and implement only its fixed exact-copy contract; do
+  not commit a known-failing production state or broaden into package 7D.
+
+## ARA-055 Package 7C Local Implementation Checkpoint
+
+- Added the strict `.legacy_history_migration_transaction.json` codec and exact-copy engine,
+  restricted create-only evidence bundle, owned-lock capability check, target/receipt
+  roll-forward, conditional journal cleanup, and fixed path-redacted failures.
+- Added `--legacy-migration-execute PROJECT --legacy-migration-evidence DIR` before generation
+  resources, config, project input, provider/client, or network work. Noneligible states report and
+  create no evidence; the evidence destination must be new and outside the selected project.
+- Shared entry recovery and `round_commit_read_blocker()` now cover the migration transaction.
+  Round, run-finalize, diagnostic-finalize, and migration journals are mutually exclusive.
+- Focused/CLI/entry/package coverage passes `88 passed, 186 subtests`; the broader transaction,
+  storage, analytics, comparison, benchmark, classifier, CLI, and installed-package layer passes
+  `170 passed, 369 subtests` in 189.84 seconds. Ruff formatting/lint and `git diff --check` pass.
+- Full `make check` passes all gates with `516 passed, 977 subtests` in 370.48 seconds. The first
+  isolated-wheel attempt failed at the installed-layout probe because the helper exports only
+  indexed tracked inputs and the new module was intentionally still untracked; this is a staging
+  precondition, not an accepted wheel result. Explicit package-only staging and an exact rerun are
+  required next.
+- Explicit staging scanned 123 indexed files with zero findings and the immediate wheel rerun
+  passed. A subsequent transaction re-audit found that direct `O_EXCL` target writes could leave a
+  partial third generation if interrupted mid-write. The target now uses same-directory,
+  fsync-before-publish, atomic no-replace rename; post-rename interruption, receipt failure, and
+  cleanup interruption all roll forward in tests. Updated storage/execution coverage passes `75
+  passed, 127 subtests`.
+- Because the atomic-publication correction followed the first green full/wheel runs, both gates
+  were rerun. Final `make check` passes every gate with `519 passed, 979 subtests` in 375.88
+  seconds, and the final isolated source-excluded wheel smoke passes.
+- Final explicit staging contains only the 17 ARA-055 package 7C code/test/documentation/state
+  paths, including `CHANGELOG.md`; staged repository safety scans 123 indexed files with zero
+  findings after the final state update.
+- All execution tests use temporary synthetic fixtures. No provider, network, ignored runtime,
+  real historical artifact, dependency, default, experiment, rollback, deletion, quarantine,
+  batch scan, partial repair, canonical adoption, or source rewrite was used.
+- The worktree intentionally remains uncommitted until full `make check`, isolated-wheel,
+  recovery-state, explicit staged safety, and scope review pass. Next command: `make check`.
+
 ## Completed Steps
 
 - Confirmed repository root, branch, remotes, recent history, upstream, and ahead/behind state.
@@ -1427,11 +1476,11 @@ Updated: 2026-07-25 (Asia/Hong_Kong)
 
 ## Remaining Steps
 
-- Audit existing lock, transaction, storage, CLI, and shared reader-guard primitives.
-- Add provider-free package 7C red tests, then implement the smallest exact-copy roll-forward
-  transaction and evidence contract.
-- Run ARA-055 focused/related tests, `make check`, isolated wheel, staged safety, scope review,
-  commit, push, Python 3.10/3.13 CI, and a final recovery snapshot.
+- Rerun recovery-state validation, final focused tests, staged safety, and cached scope/diff review
+  after the final validation-record update.
+- Commit and push the validated ARA-055 package 7C implementation, verify exact local/upstream/
+  `ls-remote`/PR-head equality and Python 3.10/3.13 push/PR CI, then write the final recovery
+  closeout.
 - Preserve all journal-less, partial, ambiguous, unsafe, and unknown legacy evidence byte-for-byte;
   do not broaden package 7C beyond the sole exact missing-twin class.
 - Do not activate ARA-018 without an owner license/distribution decision.

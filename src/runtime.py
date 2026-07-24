@@ -530,6 +530,34 @@ def acquire_run_lock(
     )
 
 
+def run_lock_handle_is_current(
+    project_dir: Path,
+    lock_handle: object,
+) -> bool:
+    """Return whether a live capability still owns this project's fixed lock."""
+    if not isinstance(lock_handle, RunLockHandle):
+        return False
+    if lock_handle._guard_file.closed or lock_handle.pid != os.getpid():
+        return False
+    expected_path = Path(project_dir).expanduser().absolute() / RUN_LOCK_FILENAME
+    if lock_handle.path.expanduser().absolute() != expected_path:
+        return False
+    try:
+        lock_data, regular_or_missing = _lock_metadata(lock_handle.path)
+    except OSError:
+        return False
+    return bool(
+        regular_or_missing
+        and lock_data.get("owner_token") == lock_handle.owner_token
+        and _parse_lock_pid(lock_data.get("pid")) == lock_handle.pid
+        and _metadata_guard_matches(
+            lock_data,
+            lock_handle.guard_device,
+            lock_handle.guard_inode,
+        )
+    )
+
+
 def release_run_lock(lock_handle: Optional[RunLockHandle | Path]) -> None:
     """Release only a live capability owned by the current process; bare paths fail closed."""
     if not isinstance(lock_handle, RunLockHandle):

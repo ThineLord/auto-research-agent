@@ -4,6 +4,11 @@
 
 ### Added
 
+* `--legacy-migration-execute PROJECT --legacy-migration-evidence DIR` now performs only the
+  explicitly approved `exact_missing_history_twin` migration. It creates an owner-only fixed-leaf
+  evidence bundle, publishes exact source bytes with atomic no-replace semantics under the project
+  lock, and rolls valid interrupted transactions forward before provider work. Every partial,
+  sparse, conflicting, unsafe, or unknown legacy state remains unchanged and fail-closed.
 * `--legacy-migration-preview PROJECT` now exposes the fixed ARA-055 legacy-history
   classification for one explicitly selected project. The command runs before configuration,
   generation-resource, provider, project-input, and lock setup; prints only the bounded

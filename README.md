@@ -70,7 +70,10 @@ Mock mode 会复用正常 round runner，写入 `run_config.json`、`round_metri
 8. `.venv/bin/python -m src.main --analyze-run ...`：无 provider 调用地检查单个 run。
 9. `.venv/bin/python -m src.main --legacy-migration-preview example`：只读分类一个旧项目的
    history 状态，不执行迁移。
-10. `make ui`：用 Streamlit 查看输入、进度、latest metadata、analytics dashboard、run comparison 和 outputs。
+10. `.venv/bin/python -m src.main --legacy-migration-execute example
+    --legacy-migration-evidence migration-evidence/example`：只对严格符合条件的缺失 history
+    twin 执行显式 exact-copy。
+11. `make ui`：用 Streamlit 查看输入、进度、latest metadata、analytics dashboard、run comparison 和 outputs。
 
 稳定里程碑的几个边界：
 
@@ -82,6 +85,11 @@ Mock mode 会复用正常 round runner，写入 `run_config.json`、`round_metri
 - `--legacy-migration-preview PROJECT` 只接受 `projects/` 下一个显式项目名，不扫描其他项目，
   不读取 provider/config，不取得或清理运行锁，也不创建、复制、修复或删除 artifact。报告中的
   `execution_authorized` 始终为 `false`；`eligible_candidate` 也不是执行授权。
+- `--legacy-migration-execute PROJECT --legacy-migration-evidence DIR` 只接受
+  `exact_missing_history_twin`。它取得项目锁、先创建 owner-only evidence bundle，再以
+  create-only 方式复制精确源 bytes；不会填补 sparse/partial/string-round history，不会改写
+  checkpoint、结果或 source，也不会实现 rollback。中断后的固定 transaction 会在下次取得锁的
+  runner 入口无 provider 地 roll-forward；冲突代际保留原文件并 fail closed。
 - Rubric summaries 只是 Judge 已返回结构化子项的趋势汇总，不是新的 benchmark 分数。
 - `make resume` 会继续 checkpoint 指向的旧 run；`make run` 会新建 run，即使旧 `best_output.md` 可作为上下文。
 - 新运行会把未完成轮次写入 `partial_rounds/` 的只增 attempt；中断或免费层配额暂停后，
@@ -270,7 +278,18 @@ resume eligibility。
 ```
 
 该命令只输出固定、路径脱敏的分类报告。它不会扫描其他项目、恢复 transaction、清理 lock
-或执行迁移；即使分类为 `exact_missing_history_twin`，仍需单独批准的后续执行包。
+或执行迁移。确认报告为 `exact_missing_history_twin` 后，可显式运行：
+
+```bash
+.venv/bin/python -m src.main \
+  --legacy-migration-execute example \
+  --legacy-migration-evidence migration-evidence/example
+```
+
+evidence 目录必须尚不存在，并且必须位于所选项目目录之外。命令在 config/provider 初始化前
+运行，只复制现有 history 的精确 UTF-8 bytes 到缺失的固定 twin，并生成
+`source_history.json`、`manifest.json` 和 `receipt.json`。其他分类不会写入 evidence 或项目；
+rollback、批量扫描、partial repair 和 canonical adoption 均不在该命令范围内。
 
 ## 常用命令
 

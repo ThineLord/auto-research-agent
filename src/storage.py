@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import ctypes
 import errno
 import json
 import os
 import re
 import stat
+import sys
 import tempfile
 import uuid
 from datetime import datetime
@@ -34,6 +36,8 @@ DEFAULT_RESEARCH_KEYWORDS = [
     "implementation",
     "experiment",
 ]
+_RENAME_NOREPLACE = 0x00000001
+_RENAME_EXCL = 0x00000004
 PROJECT_RUNTIME_FILE_NAMES = (
     "memory.md",
     "best_output.md",
@@ -868,6 +872,147 @@ def write_file_text_create_only(path: Path, content: str, *, anchor: Path | None
     _create_text_exclusive(path, content, anchor=anchor)
 
 
+def _raise_noreplace_rename_error(result: int, target: Path) -> None:
+    if result == 0:
+        return
+    error_number = ctypes.get_errno()
+    if error_number in {errno.EEXIST, errno.ENOTEMPTY}:
+        raise FileExistsError(error_number, os.strerror(error_number), target.name)
+    raise OSError(error_number, os.strerror(error_number), target.name)
+
+
+def _rename_child_noreplace(
+    parent_descriptor: int | None,
+    source_name: str,
+    target_name: str,
+    *,
+    parent: Path,
+) -> None:
+    """Atomically publish one staged child without replacing the target leaf."""
+    if sys.platform == "win32":
+        os.rename(parent / source_name, parent / target_name)
+        return
+    if parent_descriptor is None:
+        raise OSError(errno.ENOTSUP, "atomic no-replace publication is unavailable")
+    libc = ctypes.CDLL(None, use_errno=True)
+    source_bytes = os.fsencode(source_name)
+    target_bytes = os.fsencode(target_name)
+    if sys.platform == "darwin":
+        rename_exclusive = getattr(libc, "renameatx_np", None)
+        if rename_exclusive is None:
+            raise OSError(errno.ENOTSUP, "atomic no-replace publication is unavailable")
+        rename_exclusive.argtypes = [
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_uint,
+        ]
+        rename_exclusive.restype = ctypes.c_int
+        _raise_noreplace_rename_error(
+            rename_exclusive(
+                parent_descriptor,
+                source_bytes,
+                parent_descriptor,
+                target_bytes,
+                _RENAME_EXCL,
+            ),
+            parent / target_name,
+        )
+        return
+    if sys.platform.startswith("linux"):
+        rename_exclusive = getattr(libc, "renameat2", None)
+        if rename_exclusive is None:
+            raise OSError(errno.ENOTSUP, "atomic no-replace publication is unavailable")
+        rename_exclusive.argtypes = [
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_uint,
+        ]
+        rename_exclusive.restype = ctypes.c_int
+        _raise_noreplace_rename_error(
+            rename_exclusive(
+                parent_descriptor,
+                source_bytes,
+                parent_descriptor,
+                target_bytes,
+                _RENAME_NOREPLACE,
+            ),
+            parent / target_name,
+        )
+        return
+    raise OSError(errno.ENOTSUP, "atomic no-replace publication is unavailable")
+
+
+def write_file_text_publish_only(
+    path: Path,
+    content: str,
+    *,
+    anchor: Path | None = None,
+) -> None:
+    """Durably publish exact text atomically without replacing an existing leaf."""
+    path = _lexical_absolute(path)
+    parent_descriptor: int | None = None
+    descriptor = -1
+    staging_name = f".{path.name}.{uuid.uuid4().hex}.publish"
+    try:
+        parent_descriptor = _open_parent_directory(path, create=False, anchor=anchor)
+        if _entry_metadata(path, parent_descriptor) is not None:
+            raise FileExistsError(path.name)
+        flags = (
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_BINARY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        open_target: str | Path = (
+            staging_name if parent_descriptor is not None else path.parent / staging_name
+        )
+        open_kwargs = {"dir_fd": parent_descriptor} if parent_descriptor is not None else {}
+        descriptor = os.open(open_target, flags, 0o600, **open_kwargs)
+        _validate_regular_metadata(
+            os.fstat(descriptor),
+            kind="create-only publication staging",
+        )
+        with os.fdopen(descriptor, "w", encoding="utf-8") as file:
+            descriptor = -1
+            file.write(content)
+            file.flush()
+            os.fsync(file.fileno())
+        _rename_child_noreplace(
+            parent_descriptor,
+            staging_name,
+            path.name,
+            parent=path.parent,
+        )
+    except BaseException:
+        try:
+            if parent_descriptor is not None:
+                os.unlink(staging_name, dir_fd=parent_descriptor)
+            else:
+                (path.parent / staging_name).unlink(missing_ok=True)
+        except OSError:
+            pass
+        if parent_descriptor is not None:
+            try:
+                os.fsync(parent_descriptor)
+            except OSError:
+                pass
+        raise
+    else:
+        if parent_descriptor is not None:
+            os.fsync(parent_descriptor)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+
+
 def read_file_text(path: Path, *, anchor: Path | None = None) -> str:
     """Read a text file exactly as stored, returning an empty string if missing."""
     try:
@@ -943,6 +1088,7 @@ def _make_directory_child(
     *,
     allow_existing: bool,
     anchor: Path | None = None,
+    mode: int = 0o777,
 ) -> Path:
     parent = _lexical_absolute(parent)
     child = parent / name
@@ -950,7 +1096,7 @@ def _make_directory_child(
     if parent_descriptor is not None:
         try:
             try:
-                os.mkdir(name, dir_fd=parent_descriptor)
+                os.mkdir(name, mode=mode, dir_fd=parent_descriptor)
             except FileExistsError:
                 if not allow_existing:
                     raise
@@ -964,13 +1110,32 @@ def _make_directory_child(
     try:
         metadata = child.lstat()
     except FileNotFoundError:
-        child.mkdir()
+        child.mkdir(mode=mode)
     else:
         if not allow_existing:
             raise FileExistsError(child.name)
         if _path_is_link_or_junction(child, metadata) or not stat.S_ISDIR(metadata.st_mode):
             raise _unsafe_path_error("directory")
     return child
+
+
+def create_artifact_directory_only(
+    path: Path,
+    *,
+    anchor: Path | None = None,
+    mode: int = 0o700,
+) -> Path:
+    """Create one fixed directory without replacement through an anchored parent."""
+    path = _lexical_absolute(path)
+    if path.name in {"", ".", ".."} or type(mode) is not int or mode != 0o700:
+        raise ValueError("create-only artifact directory parameters are invalid")
+    return _make_directory_child(
+        path.parent,
+        path.name,
+        allow_existing=False,
+        anchor=anchor,
+        mode=mode,
+    )
 
 
 def make_round_dir(

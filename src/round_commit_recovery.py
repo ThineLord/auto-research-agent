@@ -53,6 +53,7 @@ from .storage import (
 ROUND_COMMIT_JOURNAL_NAME = ".round_commit_transaction.json"
 RUN_FINALIZE_JOURNAL_NAME = ".run_finalize_transaction.json"
 DIAGNOSTIC_FINALIZE_JOURNAL_NAME = ".diagnostic_finalize_transaction.json"
+LEGACY_MIGRATION_JOURNAL_NAME = ".legacy_history_migration_transaction.json"
 MAX_ROUND_COMMIT_ARTIFACT_BYTES = 64 * 1024 * 1024
 MAX_ROUND_COMMIT_METADATA_BYTES = 2 * 1024 * 1024
 _EMPTY_SHA256 = hashlib.sha256(b"").hexdigest()
@@ -144,6 +145,7 @@ def _project_context(project_dir: Path) -> tuple[Path, Path]:
                 project_dir / ROUND_COMMIT_JOURNAL_NAME,
                 project_dir / RUN_FINALIZE_JOURNAL_NAME,
                 project_dir / DIAGNOSTIC_FINALIZE_JOURNAL_NAME,
+                project_dir / LEGACY_MIGRATION_JOURNAL_NAME,
             ],
             anchor=project_dir,
         )
@@ -445,10 +447,13 @@ def prepare_run_finalize(
     round_journal_path = project_dir / ROUND_COMMIT_JOURNAL_NAME
     journal_path = project_dir / RUN_FINALIZE_JOURNAL_NAME
     diagnostic_path = project_dir / DIAGNOSTIC_FINALIZE_JOURNAL_NAME
+    migration_path = project_dir / LEGACY_MIGRATION_JOURNAL_NAME
     if _journal_exists(round_journal_path, anchor=project_dir):
         raise _blocked("round_commit_journal_present")
     if _journal_exists(diagnostic_path, anchor=project_dir):
         raise _blocked("diagnostic_finalize_journal_present")
+    if _journal_exists(migration_path, anchor=project_dir):
+        raise _blocked("legacy_migration_journal_present")
     if _journal_exists(journal_path, anchor=project_dir):
         raise _blocked("run_finalize_journal_exists")
     run_root = _validated_run_root(
@@ -626,10 +631,13 @@ def prepare_round_commit(
     journal_path = project_dir / ROUND_COMMIT_JOURNAL_NAME
     finalization_path = project_dir / RUN_FINALIZE_JOURNAL_NAME
     diagnostic_path = project_dir / DIAGNOSTIC_FINALIZE_JOURNAL_NAME
+    migration_path = project_dir / LEGACY_MIGRATION_JOURNAL_NAME
     if _journal_exists(finalization_path, anchor=project_dir):
         raise _blocked("finalization_journal_present")
     if _journal_exists(diagnostic_path, anchor=project_dir):
         raise _blocked("diagnostic_finalize_journal_present")
+    if _journal_exists(migration_path, anchor=project_dir):
+        raise _blocked("legacy_migration_journal_present")
     if _journal_exists(journal_path, anchor=project_dir):
         raise _blocked("round_commit_journal_exists")
 
@@ -804,6 +812,8 @@ def _load_round_commit_context(project_dir: Path) -> _RoundCommitContext | None:
         raise _blocked("finalization_journal_present")
     if _journal_exists(diagnostic_path, anchor=project_dir):
         raise _blocked("diagnostic_finalize_journal_present")
+    if _journal_exists(project_dir / LEGACY_MIGRATION_JOURNAL_NAME, anchor=project_dir):
+        raise _blocked("legacy_migration_journal_present")
     try:
         journal_text = read_regular_text_bounded(
             journal_path,
@@ -985,6 +995,8 @@ def _load_run_finalize_context(project_dir: Path) -> _RunFinalizeContext | None:
         raise _blocked("round_commit_journal_present")
     if _journal_exists(diagnostic_path, anchor=project_dir):
         raise _blocked("diagnostic_finalize_journal_present")
+    if _journal_exists(project_dir / LEGACY_MIGRATION_JOURNAL_NAME, anchor=project_dir):
+        raise _blocked("legacy_migration_journal_present")
     try:
         journal_text = read_regular_text_bounded(
             journal_path,
@@ -1337,6 +1349,7 @@ def prepare_diagnostic_finalize(
     for other_path, code in (
         (project_dir / ROUND_COMMIT_JOURNAL_NAME, "round_commit_journal_present"),
         (project_dir / RUN_FINALIZE_JOURNAL_NAME, "run_finalize_journal_present"),
+        (project_dir / LEGACY_MIGRATION_JOURNAL_NAME, "legacy_migration_journal_present"),
         (journal_path, "diagnostic_finalize_journal_exists"),
     ):
         if _journal_exists(other_path, anchor=project_dir):
@@ -1411,6 +1424,7 @@ def _load_diagnostic_finalize_context(project_dir: Path) -> _RunFinalizeContext 
     for other_path, code in (
         (project_dir / ROUND_COMMIT_JOURNAL_NAME, "round_commit_journal_present"),
         (project_dir / RUN_FINALIZE_JOURNAL_NAME, "run_finalize_journal_present"),
+        (project_dir / LEGACY_MIGRATION_JOURNAL_NAME, "legacy_migration_journal_present"),
     ):
         if _journal_exists(other_path, anchor=project_dir):
             raise _blocked(code)
@@ -1679,14 +1693,20 @@ def round_commit_read_blocker(
         blocker = "finalization_pending" if finalization.can_recover else "finalization_conflict"
         return blocker, finalization
     diagnostic = classify_diagnostic_finalize_recovery(project_dir)
-    if diagnostic.status == "absent":
+    if diagnostic.status != "absent":
+        blocker = (
+            "diagnostic_finalization_pending"
+            if diagnostic.can_recover
+            else "diagnostic_finalization_conflict"
+        )
+        return blocker, diagnostic
+    from .legacy_migration_execution import classify_legacy_migration_recovery
+
+    migration = classify_legacy_migration_recovery(project_dir)
+    if migration.status == "absent":
         return None, diagnostic
-    blocker = (
-        "diagnostic_finalization_pending"
-        if diagnostic.can_recover
-        else "diagnostic_finalization_conflict"
-    )
-    return blocker, diagnostic
+    blocker = "legacy_migration_pending" if migration.can_recover else "legacy_migration_conflict"
+    return blocker, migration  # type: ignore[return-value]
 
 
 def ensure_round_commit_readable(

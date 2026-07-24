@@ -1002,6 +1002,19 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Package 7C baseline: `c87063180ed7623424aa54722dad8a867788902c` is exact remote-equal;
   push/PR runs `30106096013`/`30106101027` pass Python 3.10/3.13 with zero annotations.
   Classifier/preview/recovery coverage passes `27 passed, 115 subtests`.
+- Package 7C red tests: `tests/test_legacy_migration_execution.py` covers codec, internal/external
+  dual-direction execution, owned lock, evidence ordering, interruption recovery, third-generation
+  conflict, preservation, and reader blocking. The expected pre-implementation result is `6
+  failed`, all from the absent `src.legacy_migration_execution` module.
+- Package 7C local result: the exact-copy engine, restricted fixed-leaf evidence bundle, immutable
+  project journal, create-only target and receipt, owned-lock recovery, shared reader blocker,
+  startup recovery, mutual transaction exclusion, and explicit provider-free CLI are implemented.
+  All other legacy classes remain preserve-only.
+- Package 7C local validation: focused/CLI/entry/package coverage passes `88 passed, 186 subtests`;
+  the broader transaction/storage/reader/installed-package layer passes `170 passed, 369 subtests`;
+  post-audit atomic-publication coverage passes `75 passed, 127 subtests`; final `make check` passes
+  `519 passed, 979 subtests` in 375.88 seconds; and the final isolated wheel smoke passes. Final
+  recovery/focused/staged review, commit/push, remote equality, CI, and closeout remain.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

@@ -497,6 +497,65 @@ main()
             self.assertEqual(_tree_hashes(workspace), workspace_before)
             self.assertEqual(_tree_hashes(package_parent), package_without_prompt)
 
+    def test_installed_legacy_execute_bypasses_generation_resources(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package_parent = self._copy_installed_package(root)
+            (package_parent / "src" / "_bundled" / "prompts" / "judge.md").unlink()
+            package_without_prompt = _tree_hashes(package_parent)
+            workspace = root / "workspace"
+            project_dir = workspace / "projects" / "selected"
+            project_run = project_dir / "runs" / "run-001"
+            project_run.mkdir(parents=True)
+            source = json.dumps(
+                [
+                    {
+                        "round": 1,
+                        "score": 81.0,
+                        "successful_research_round": True,
+                    }
+                ],
+                indent=2,
+            ).encode()
+            (project_dir / "checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "run-001",
+                        "run_root": str(project_run),
+                        "last_completed_round": 1,
+                        "best_score": 81.0,
+                        "best_round": 1,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (project_dir / "score_history.json").write_bytes(source)
+            evidence_dir = workspace / "migration-evidence"
+
+            result = self._run_installed(
+                package_parent=package_parent,
+                workspace=workspace,
+                argv=[
+                    "--legacy-migration-execute",
+                    "selected",
+                    "--legacy-migration-evidence",
+                    str(evidence_dir),
+                ],
+            )
+            combined = result.stdout + result.stderr
+
+            self.assertEqual(result.returncode, 0, combined)
+            self.assertIn("Legacy history migration completed", result.stdout)
+            self.assertNotIn("Package resource error", combined)
+            self.assertNotIn("Config error", combined)
+            self.assertNotIn("Traceback", combined)
+            self.assertNotIn(str(root), combined)
+            self.assertEqual((project_run / "round_metrics.json").read_bytes(), source)
+            self.assertEqual((evidence_dir / "source_history.json").read_bytes(), source)
+            self.assertTrue((evidence_dir / "manifest.json").is_file())
+            self.assertTrue((evidence_dir / "receipt.json").is_file())
+            self.assertEqual(_tree_hashes(package_parent), package_without_prompt)
+
     def test_interrupted_seed_never_publishes_a_partial_project(self) -> None:
         class InterruptingWriter:
             def __init__(self, path: Path) -> None:

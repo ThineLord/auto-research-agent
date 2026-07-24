@@ -108,6 +108,43 @@ class StorageTests(unittest.TestCase):
                 )
             self.assertTrue(hardlink.exists())
 
+    def test_atomic_publish_only_survives_post_rename_interrupt_and_never_replaces(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "target.json"
+            content = '{\r\n  "exact": "bytes"\r\n}'
+            original_rename = storage_module._rename_child_noreplace
+
+            def rename_then_interrupt(*args: object, **kwargs: object) -> None:
+                original_rename(*args, **kwargs)
+                raise KeyboardInterrupt
+
+            with (
+                patch.object(
+                    storage_module,
+                    "_rename_child_noreplace",
+                    side_effect=rename_then_interrupt,
+                ),
+                self.assertRaises(KeyboardInterrupt),
+            ):
+                storage_module.write_file_text_publish_only(
+                    target,
+                    content,
+                    anchor=root,
+                )
+
+            self.assertEqual(target.read_bytes(), content.encode("utf-8"))
+            self.assertEqual(target.stat().st_nlink, 1)
+            self.assertEqual(list(root.glob(".*.publish")), [])
+
+            with self.assertRaises(FileExistsError):
+                storage_module.write_file_text_publish_only(
+                    target,
+                    "replacement",
+                    anchor=root,
+                )
+            self.assertEqual(target.read_bytes(), content.encode("utf-8"))
+
     @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
     def test_recursive_artifact_listing_is_sorted_and_skips_linked_directories(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
