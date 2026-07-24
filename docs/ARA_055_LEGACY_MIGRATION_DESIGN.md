@@ -1,7 +1,7 @@
 # ARA-055 Legacy History Migration Design
 
-Status: package 7A read-only classifier is remotely verified; package 7B single-project preview is
-locally implemented; execution is not implemented or approved
+Status: package 7A read-only classifier and package 7B single-project preview are remotely
+verified; execution is not implemented or approved
 
 Date: 2026-07-24
 
@@ -413,7 +413,7 @@ Status: implemented and remotely verified as an internal API under the package 7
 
 ### 7B - Discovery integration and reader guard design verification
 
-Status: locally implemented under the package 7B approval; remote verification remains.
+Status: implemented and remotely verified under the package 7B approval.
 
 - `--legacy-migration-preview PROJECT` selects exactly `projects/<PROJECT>` and prints the fixed
   bounded human report.
