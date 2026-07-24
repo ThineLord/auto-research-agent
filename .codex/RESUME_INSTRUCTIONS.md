@@ -153,6 +153,13 @@ temporary synthetic fixtures. Preserve packages 3-6 transactions and all existin
 Do not inspect ignored runtime, implement or execute migration, add a command/API, change schemas/
 defaults/dependencies/providers/experiments, move/delete/quarantine evidence, or infer missing
 generations.
+
+The local package-7 design is now in `docs/ARA_055_LEGACY_MIGRATION_DESIGN.md`. It permits only one
+future exact missing-history-twin candidate and classifies every ambiguous state as non-migratable.
+Focused tests pass `51 passed, 50 subtests`; full `make check` passes `481 passed, 849 subtests`.
+If interrupted before the design commit, inspect the task-owned diff, rerun
+`.venv/bin/python -m pytest -q tests/test_recovery_state.py`, explicitly stage only the two design
+documents and `.codex` records, then run staged safety. Do not implement package 7A or execution.
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 

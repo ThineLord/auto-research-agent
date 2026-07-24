@@ -1056,3 +1056,17 @@
   Ambiguous states must be classified as non-migratable rather than repaired by inference.
 - Excluded scope: no migration implementation/command, schema/default/dependency/provider/
   experiment change, ignored-runtime inspection, artifact move/delete/rewrite, or package execution.
+
+## 2026-07-24 - Restrict legacy migration to one exact missing-twin candidate
+
+- Decision: do not build a general repair command. Preserve partial, divergent, journal-less
+  published/canonical/finalization/diagnostic, unsafe, unknown, and uncorrelated states without
+  inference, normalization, cleanup, or quarantine.
+- Sole candidate: when exactly one fixed history is absent, the present history must be a bounded
+  strict-integer `1..N` list exactly matching the selected checkpoint and all present run
+  authorities, with no pending journal, current-round ambiguity, unsafe storage, or live owner.
+- Future execution shape: create a restricted owner-selected evidence bundle first, then use a
+  fixed project-local create-only roll-forward transaction to copy exact source bytes into the
+  absent fixed target with no replacement. Do not update any other artifact.
+- Approval boundary: package 7A read-only classification, package 7C exact-copy execution, and any
+  later destructive rollback are separately approval-gated. This design authorizes none of them.

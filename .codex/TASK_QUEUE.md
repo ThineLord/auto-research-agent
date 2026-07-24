@@ -895,6 +895,21 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   push/PR runs `30088704158`/`30088706374` pass Python 3.10/3.13 and every workflow step.
 - Package 7 next command: read the ARA-055 design, relevant Git history, compatibility tests, and
   current readers/writers before drafting the migration design.
+- Package 7 design result: `docs/ARA_055_LEGACY_MIGRATION_DESIGN.md` rejects general legacy repair
+  and defines 21 fixed state classes. Only an absent twin history backed by one strict, complete,
+  checkpoint-correlated, uncontested history is a future exact-copy candidate. Partial/conflicting
+  histories, journal-less published/canonical/finalization/diagnostic states, legacy manifest
+  fallback, and unsafe/unknown evidence remain byte-identical and non-migratable.
+- Package 7 design boundaries: discovery is read-only and explicitly targeted; future execution
+  would require an owner-selected restricted evidence bundle, one fixed create-only roll-forward
+  transaction, and exact-byte no-replace target creation. Discovery, execution, and destructive
+  rollback are three independent approval gates; none is implemented or authorized here.
+- Package 7 local validation: focused compatibility/recovery suites pass `51 passed, 50 subtests`;
+  full `make check` passes `481 passed, 849 subtests` plus formatting, Ruff, imports, and zero-
+  finding safety scans over 117 tracked files.
+- Package 7 remaining: staged safety/recovery validation, design commit/push, Python 3.10/3.13
+  push/PR CI, PR update, and recovery closeout. Recommended next package after closeout is 7A
+  read-only classifier/report schema, requiring separate owner approval.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

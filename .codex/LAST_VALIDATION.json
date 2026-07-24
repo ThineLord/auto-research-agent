@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-    "recorded_at": "2026-07-24T19:31:20+08:00",
+    "recorded_at": "2026-07-24T20:05:00+08:00",
   "branch": "codex/sol-autonomous-hardening",
     "head_commit": "fe514e073047c10dc84b322225f01db2cb126e83",
     "last_known_stable_commit": "fe514e073047c10dc84b322225f01db2cb126e83",
@@ -54,8 +54,32 @@
       }
     }
   },
-    "status": "ara055_package7_design_activated",
+    "status": "ara055_package7_design_local_validated",
     "commands": [
+        {
+            "command": "ARA-055 package 7 design focused and full local validation",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "design_document": "docs/ARA_055_LEGACY_MIGRATION_DESIGN.md",
+                "legacy_state_classes": 21,
+                "automatic_execution_classes": 0,
+                "future_exact_copy_candidates": 1,
+                "focused_pytest_passed": 51,
+                "focused_pytest_subtests_passed": 50,
+                "make_check_pytest_passed": 481,
+                "make_check_subtests_passed": 849,
+                "make_check_duration_seconds": 225.44,
+                "ruff_formatted_files": 72,
+                "imports": "passed",
+                "tracked_files_scanned": 117,
+                "safety_findings": 0,
+                "provider_calls": 0,
+                "ignored_runtime_access": 0,
+                "migration_implementation": false,
+                "artifact_mutation": false
+            }
+        },
         {
             "command": "ARA-055 package 7 design activation and recovery audit",
             "exit_code": 0,

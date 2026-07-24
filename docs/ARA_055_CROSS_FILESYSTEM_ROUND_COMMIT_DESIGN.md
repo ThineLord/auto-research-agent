@@ -1,6 +1,7 @@
 # ARA-055 Cross-Filesystem Round Commit Design
 
-Status: design complete; runtime implementation is not approved
+Status: design complete; implementation packages 1-6 are complete; package 7 execution is not
+approved
 
 Date: 2026-07-23
 
@@ -531,7 +532,8 @@ and approval.
 6. **Diagnostic integration**
    - only if separately approved after the iterative path is stable.
 7. **Legacy migration**
-   - explicitly excluded; requires a new design and owner approval.
+   - design is complete in `docs/ARA_055_LEGACY_MIGRATION_DESIGN.md`;
+   - discovery implementation, execution, and rollback remain separately approval-gated.
 
 Each package should be a separate small commit with a clean recovery point. Runtime packages 2-6
 must not start from this design-stage approval.

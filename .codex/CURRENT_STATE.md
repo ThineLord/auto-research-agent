@@ -4,8 +4,8 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: complete the explicitly approved ARA-055 package 7 legacy-migration design without
-  reading ignored runtime, mutating historical artifacts, or implementing a migration.
+- Current goal: close out the explicitly approved ARA-055 package 7 legacy-migration design
+  without reading ignored runtime, mutating historical artifacts, or implementing a migration.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
@@ -15,9 +15,10 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 - Last externally verified fallback: `fe514e073047c10dc84b322225f01db2cb126e83` (exact local,
   remote-tracking, `ls-remote`, GitHub branch, and PR-head equality plus all Python 3.10/3.13
   push/PR jobs passed)
-- Active task at this snapshot: ARA-055 package 7 design stage. Authorization is limited to tracked
-  code/history inspection, temporary synthetic fixtures, legacy-state classification, migration
-  threat modeling, rollback/provenance requirements, and durable documentation.
+- Active task at this snapshot: ARA-055 package 7 design validation/publication. Authorization is
+  limited to tracked code/history inspection, temporary synthetic fixtures, legacy-state
+  classification, migration threat modeling, rollback/provenance requirements, durable
+  documentation, and provider-free validation.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -394,6 +395,31 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   `DONE`, marked only ARA-055 `IN_PROGRESS`, and must pass before the activation commit.
 - Next command after the activation checkpoint is pushed: inspect the design document, Git history,
   legacy compatibility tests, and reader/writer call graph before adding any design text.
+
+## ARA-055 Package 7 Design Local Checkpoint
+
+- `docs/ARA_055_LEGACY_MIGRATION_DESIGN.md` defines 21 fixed legacy classifications, preserves
+  every ambiguous/unsafe generation, and rejects general repair, canonical-Markdown inference,
+  placeholder histories, stale-finalization reconstruction, automatic rollback, quarantine, or
+  cleanup.
+- The only future execution candidate is `exact_missing_history_twin`: exactly one history is
+  absent and the other is strict integer `1..N`, bounded, safe, checkpoint-correlated, and
+  uncontested. Even this candidate permits only a future create-only exact-byte copy after a
+  restricted evidence bundle and fixed roll-forward transaction; discovery, execution, and
+  rollback each require later independent approval.
+- Current paired histories and journals need no migration. Partial/sparse/string-round histories,
+  divergent histories, journal-less `published_uncommitted`, canonical-without-provenance,
+  journal-less finalization/diagnostic splits, legacy manifest fallback, and unsafe/unknown states
+  are explicitly non-migratable.
+- Focused compatibility/recovery validation passes `51 passed, 50 subtests` across round commit,
+  attempt, entry, run-finalization, diagnostic-finalization, and run-config suites.
+- Full `make check` passes formatting over 72 files, Ruff, imports, repository safety over 117
+  tracked files with zero findings, and `481 passed, 849 subtests` in 225.44 seconds.
+- No provider, network experiment, ignored runtime, canonical artifact, dependency, schema,
+  default, CLI/API, migration implementation, execution, deletion, or quarantine was used.
+- Remaining design-stage work: review and explicitly stage the two design documents plus recovery
+  records, run staged safety/recovery-state checks, commit/push, verify Python 3.10/3.13 push and PR
+  CI, update draft PR 13, and create the final recovery closeout.
 
 ## Completed Steps
 
@@ -2287,7 +2313,8 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 ```bash
 git status --short --branch
 git rev-parse HEAD
-.venv/bin/python -m pytest -q tests/test_diagnostic_finalize_recovery.py
+.venv/bin/python -m pytest -q tests/test_recovery_state.py
+git diff --check
 ```
 
 ## Interruption Recovery
@@ -2335,13 +2362,10 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   continuation. Existing canonical partial rounds remain fail-closed and require a separately
   approved explicit migration; do not infer stage truth from placeholders or
   `last_successful_agent`.
-- ARA-055 package 6 is active from the externally verified package-5 closeout `ecf9ead`. Preserve
-  package 3's
-  journal-before-ready and checkpoint-last ordering, package 4's lock-held entry recovery and
-  non-mutating read-only guards, configured external storage, exact metric semantics, and legacy
-  incomplete-history compatibility and package 5's summary/config/checkpoint transaction. Package
-  6 may change only diagnostic transaction/recovery and approved reader/entry routing. Do not start
-  package 7 migration, dependency changes, providers, or ignored runtime without separate approval.
+- ARA-055 packages 1-6 are complete. Package 7 authorization covers design only: preserve every
+  current journal and artifact byte, do not inspect ignored runtime, and do not implement discovery,
+  execution, rollback, cleanup, or quarantine. The design's future 7A read-only classifier is the
+  next possible package and still requires separate owner approval.
 - ARA-061 is complete. Reject only invalid numeric CLI override values and inconsistent effective
   delay bounds; preserve valid zero-disable quota behavior, existing configuration-file validation,
   defaults, scheduler policy, provider behavior, and experiment semantics.

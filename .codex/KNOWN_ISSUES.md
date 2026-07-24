@@ -573,17 +573,16 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## KI-055 - Published rounds can split history and finalization generations
 
-- Status: iterative and finalization generations are fixed and remote-verified through package 5;
-  the separately approved diagnostic writer remains active package-6 work
+- Status: new iterative, run-finalization, and diagnostic generations are fixed and remote-verified
+  through package 6; journal-less legacy migration design is complete but unimplemented
 - Severity: P2 recovery and provenance consistency, high-risk compatibility surface
 - Evidence: 40 provider-free temporary cases covered ten post-publication write boundaries,
   `OSError`/`KeyboardInterrupt`, and internal/configured-external run storage. Failure before the
   run-local history write leaves canonical round 2 and a verified `published` attempt, project
   history `[1,2]`, run history `[1]`, and checkpoint round 1.
-- Impact: package 4 now recovers a valid pending round journal at iterative entry and prevents
-  transaction-sensitive readers from consuming pending/conflicting round generations. Failures
-  after the per-round checkpoint can still separately leave stale run summary/config data visible
-  to analytics or provenance readers.
+- Impact: packages 3-6 recover valid current journals and prevent transaction-sensitive readers
+  from consuming pending/conflicting generations. Historical journal-less split, partial, or
+  uncorrelated artifacts remain preserved and can still require owner-led forensic handling.
 - Design result: `docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md` selects an immutable
   project-local journal with bounded deltas/after-images, exact before/after hashes, idempotent
   roll-forward across filesystems, checkpoint-last visibility, and a separate finalization
@@ -612,6 +611,11 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 - Package-7 design activation: the owner approved tracked-only design work on 2026-07-24. Runtime
   artifacts remain deliberately uninspected; the design must not infer missing before-generations
   or authorize mutation. Implementation/execution requires a later explicit approval.
+- Package-7 design result: general repair is rejected. Only a safely absent twin history with one
+  strict complete checkpoint-correlated source is a future exact-byte-copy candidate; all
+  ambiguous, partial, journal-less published/canonical/finalization/diagnostic, unsafe, and unknown
+  states are non-migratable. Read-only discovery, exact-copy execution, and destructive rollback
+  remain three separate approval gates.
 - Package-1 result: commit `4cd4bf4` adds filesystem-free exact after-image builders and a strict
   bounded journal codec with provider-free regression coverage. No runtime caller creates, reads,
   or applies the journal yet, so this issue remains open.
