@@ -574,7 +574,8 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 ## KI-055 - Published rounds can split history and finalization generations
 
 - Status: new iterative, run-finalization, and diagnostic generations are fixed and remote-verified
-  through package 6; journal-less legacy migration design is complete but unimplemented
+  through package 6; package 7A read-only legacy classification is remote-verified, while migration
+  execution remains deferred
 - Severity: P2 recovery and provenance consistency, high-risk compatibility surface
 - Evidence: 40 provider-free temporary cases covered ten post-publication write boundaries,
   `OSError`/`KeyboardInterrupt`, and internal/configured-external run storage. Failure before the
@@ -623,8 +624,10 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   are implemented without a caller capable of mutation. Synthetic internal/configured-external
   coverage passes `17 passed, 114 subtests`; related transaction/recovery regression passes `224
   passed, 642 subtests`; final `make check` passes `498 passed, 963 subtests` plus all static,
-  import, safety, and isolated-wheel gates. Final staging and remote verification remain before
-  closeout.
+  import, safety, and isolated-wheel gates.
+- Package-7A completion: `f9b29f8` is exact remote-equal; push/PR runs
+  `30098547791`/`30098553022` passed Python 3.10/3.13 and every workflow step with zero
+  annotations. Package 7B integration and package 7C execution remain unapproved.
 - Package-1 result: commit `4cd4bf4` adds filesystem-free exact after-image builders and a strict
   bounded journal codec with provider-free regression coverage. No runtime caller creates, reads,
   or applies the journal yet, so this issue remains open.

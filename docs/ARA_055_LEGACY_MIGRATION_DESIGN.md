@@ -1,7 +1,7 @@
 # ARA-055 Legacy History Migration Design
 
-Status: package 7A read-only classifier implemented; discovery integration and execution are not
-implemented or approved
+Status: package 7A read-only classifier implemented and remotely verified; discovery integration
+and execution are not implemented or approved
 
 Date: 2026-07-24
 
@@ -404,7 +404,7 @@ not turn tolerance into fabricated provenance.
 
 ### 7A - Read-only classifier and report schema
 
-Status: implemented as an internal API under the package 7A approval.
+Status: implemented and remotely verified as an internal API under the package 7A approval.
 
 - Fixed state/reason enums and explicitly targeted inspection are implemented.
 - No-follow/bounded safety validation and path-redacted human/JSON output are implemented.

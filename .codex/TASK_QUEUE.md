@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `IN_PROGRESS`
+- Status: `DEFERRED`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -939,8 +939,15 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   `make check` passes `498 passed, 963 subtests` plus every static/import/safety gate over 120
   tracked/index files with zero findings.
 - Package 7A pre-commit checkpoint: all nine task-owned paths are explicitly staged; final staged
-  safety scans 120 files with zero findings and cached diff checks pass. Commit/push/CI/PR
-  verification and closeout remain. Keep the task `IN_PROGRESS` until remotely verified.
+  safety scans 120 files with zero findings and cached diff checks pass. This checkpoint was
+  subsequently committed and remotely verified as recorded below.
+- Package 7A completion: implementation `f9b29f8fb324c1c07805128071b69aa978324a5f` is exact
+  local/upstream/`ls-remote`/GitHub branch/PR-head equal. Push/PR runs
+  `30098547791`/`30098553022` passed Python 3.10/3.13 and every workflow step; all four annotation
+  sets are empty. PR comment `5070698572` records the result.
+- Deferral boundary: ARA-055's approved work is complete through package 7A. Package 7B discovery
+  integration, package 7C exact-copy execution, and any rollback remain separately approval-gated;
+  no unblocked ARA-055 implementation is active.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

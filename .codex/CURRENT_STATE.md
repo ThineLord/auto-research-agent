@@ -4,24 +4,21 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: implement the explicitly approved ARA-055 package 7A read-only legacy classifier
-  and report schema without adding any migration execution or artifact mutation.
+- Current goal: preserve the remotely verified ARA-055 package 7A read-only classifier closeout
+  and wait for an explicitly approved next task.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0` (the exact
-  externally verified ARA-055 package 7 design closeout retained by the additive recovery schema;
+- State recorded against commit: `f9b29f8fb324c1c07805128071b69aa978324a5f` (the exact
+  externally verified ARA-055 package 7A implementation retained by the additive recovery schema;
   resolve current `HEAD` live).
-- Last externally verified fallback: `f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0` (exact local,
+- Last externally verified fallback: `f9b29f8fb324c1c07805128071b69aa978324a5f` (exact local,
   remote-tracking, `ls-remote`, GitHub branch, and PR-head equality plus all Python 3.10/3.13
   push/PR jobs passed)
-- Active task at this snapshot: ARA-055 package 7A read-only classifier/report implementation.
-  Migration execution, evidence-bundle writes, transaction writes, rollback, and batch discovery
-  remain unauthorized.
-- Uncommitted task-owned changes at this implementation checkpoint:
-  `src/legacy_migration.py`, `tests/test_legacy_migration.py`,
-  `docs/ARA_055_LEGACY_MIGRATION_DESIGN.md`, and the `.codex/` recovery files. Resolve the exact
-  live state with `git status --short --branch`.
+- Active task at this snapshot: none. Package 7B integration, package 7C execution, rollback, and
+  batch discovery remain unapproved.
+- Uncommitted changes: not persisted as a static claim. Resolve the exact live state with
+  `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
 ## Live Worktree Interpretation
 
@@ -483,9 +480,21 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   red test failed at collection because the new module did not yet exist, as intended; one related
   regression command named a nonexistent `tests/test_resume_safety.py`, ran zero tests, and was
   replaced with the repository's actual test files.
-- Remaining before a stable implementation commit: commit/push, remote equality, Python 3.10/3.13
-  CI, PR update, and a clean closeout checkpoint.
-- Next command: `git commit -m "feat: add read-only legacy migration classifier"`.
+- This local checkpoint was subsequently committed and remotely verified as recorded in the
+  package 7A closeout below.
+
+## ARA-055 Package 7A Closeout
+
+- Implementation `f9b29f8fb324c1c07805128071b69aa978324a5f` is exact local/upstream/
+  `ls-remote`/GitHub branch/PR-head equal.
+- Push run `30098547791` and pull-request run `30098553022` passed Python 3.10 and 3.13, every
+  install, isolated-wheel, format, lint, import, safety, and test step. All four job annotation
+  sets are empty.
+- Draft PR 13 is open and mergeable. Comment `5070698572` records the implementation, validation,
+  exact scope, and remaining approval boundaries.
+- Package 7A is complete. It adds no runtime caller or execution authority, so every inspected
+  project remains byte-identical. Package 7B discovery integration is the next possible package,
+  but it requires a new approval and long-task checkpoint.
 
 ## Completed Steps
 
@@ -1341,10 +1350,9 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Remaining Steps
 
-- Add ARA-055 package 7A failing tests for the fixed L00-L20 states and no-write contract.
-- Implement only the pure targeted classifier and additive path-redacted report schema.
-- Preserve all journal-less, partial, ambiguous, unsafe, and unknown legacy evidence byte-for-byte;
-  do not start exact-copy execution or rollback.
+- There is no unblocked implementation task.
+- Await explicit owner approval before package 7B discovery integration or package 7C execution.
+- Preserve all journal-less, partial, ambiguous, unsafe, and unknown legacy evidence byte-for-byte.
 - Do not activate ARA-018 without an owner license/distribution decision.
 
 ## Test Status
@@ -2373,8 +2381,8 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ```bash
 git status --short --branch
-git commit -m "feat: add read-only legacy migration classifier"
-git push origin codex/sol-autonomous-hardening
+git rev-parse HEAD
+.venv/bin/python -m pytest -q tests/test_recovery_state.py
 ```
 
 ## Interruption Recovery
@@ -2423,9 +2431,10 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   approved explicit migration; do not infer stage truth from placeholders or
   `last_successful_agent`.
 - ARA-055 packages 1-6 and package 7 design are complete; package 7A read-only classification is
-  explicitly approved and locally implemented. Preserve every current journal and artifact byte,
-  do not inspect ignored runtime, and do not add CLI/doctor/UI integration, execution, target or
-  evidence creation, rollback, cleanup, quarantine, or package 7B/7C/7D behavior.
+  complete and remote-verified at `f9b29f8`. Preserve every current journal and artifact byte, do
+  not inspect ignored runtime, and do not add CLI/doctor/UI integration, execution, target or
+  evidence creation, rollback, cleanup, quarantine, or package 7B/7C/7D behavior without a new
+  approval.
 - ARA-061 is complete. Reject only invalid numeric CLI override values and inconsistent effective
   delay bounds; preserve valid zero-disable quota behavior, existing configuration-file validation,
   defaults, scheduler policy, provider behavior, and experiment semantics.

@@ -141,25 +141,19 @@ passed, 809 subtests` plus formatting, lint, imports, and zero-finding safety sc
 status-2 boundary, valid zero/boundary behavior, unchanged configuration schema/defaults, and
 provider-free scope.
 
-ARA-055 package 7A is the sole active task after the owner said `批准，继续` on 2026-07-24.
-Last externally verified fallback: `f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0`. Push/PR runs
-`30091187286`/`30091190516` passed Python 3.10/3.13 and every workflow step; draft PR 13 is clean.
-Activation `80f24b6702e0fe78675a277047a77923b45de24e` was committed and pushed. The local
-implementation is intentionally uncommitted at this checkpoint: inspect `src/legacy_migration.py`,
-`tests/test_legacy_migration.py`, `docs/ARA_055_LEGACY_MIGRATION_DESIGN.md`, and the `.codex/`
-state diff before continuing. Focused tests pass `17 passed, 114 subtests`; related recovery/
-transaction regression passes `224 passed, 642 subtests`; recovery validation passes `6 passed, 1
-subtest`; the isolated wheel smoke passes; final `make check` passes `498 passed, 963 subtests`
-plus all static/import/safety gates.
+ARA-055 package 7A is complete and remotely verified. Last externally verified fallback:
+`f9b29f8fb324c1c07805128071b69aa978324a5f`. Local HEAD, upstream, `ls-remote`, the GitHub branch,
+and draft PR 13 all resolved to that commit. Push/PR runs `30098547791`/`30098553022` passed Python
+3.10/3.13 and every workflow step with zero annotations; PR comment `5070698572` records the
+implementation and validation result.
 
-Read `docs/ARA_055_LEGACY_MIGRATION_DESIGN.md` before any follow-up. It rejects general repair and
-permits only one exact missing-history-twin candidate. All nine task-owned paths were explicitly
-staged and final staged safety/cached checks passed. Continue with
-`git commit -m "feat: add read-only legacy migration classifier"`, push, CI/PR verification, and
-closeout. Do not add CLI/doctor/UI
-routing, execute migration, write an evidence bundle/journal/receipt, create a target, inspect
-ignored runtime, change dependencies/defaults/providers/experiments, scan all projects,
-move/delete/quarantine evidence, or infer missing generations.
+There is no unblocked implementation task. Read `docs/ARA_055_LEGACY_MIGRATION_DESIGN.md` before
+any follow-up. It rejects general repair and permits only one exact missing-history-twin
+classification candidate. Package 7B discovery integration and package 7C execution remain
+separately approval-gated. Do not add CLI/doctor/UI routing, execute migration, write an evidence
+bundle/journal/receipt, create a target, inspect ignored runtime, change
+dependencies/defaults/providers/experiments, scan all projects, move/delete/quarantine evidence,
+or infer missing generations without the corresponding owner approval.
 
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.

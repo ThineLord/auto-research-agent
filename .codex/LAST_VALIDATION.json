@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-    "recorded_at": "2026-07-24T22:01:00+08:00",
+    "recorded_at": "2026-07-24T22:06:26+08:00",
   "branch": "codex/sol-autonomous-hardening",
-    "head_commit": "f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0",
-    "last_known_stable_commit": "f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0",
+    "head_commit": "f9b29f8fb324c1c07805128071b69aa978324a5f",
+    "last_known_stable_commit": "f9b29f8fb324c1c07805128071b69aa978324a5f",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-    "state_recorded_against_commit": "f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0",
+    "state_recorded_against_commit": "f9b29f8fb324c1c07805128071b69aa978324a5f",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-24T21:04:24+08:00",
-    "commit": "f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0",
+    "verified_at": "2026-07-24T22:06:26+08:00",
+    "commit": "f9b29f8fb324c1c07805128071b69aa978324a5f",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 30091187286,
+        "run_id": 30098547791,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0",
+        "head_sha": "f9b29f8fb324c1c07805128071b69aa978324a5f",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-                "run_id": 30091190516,
+                "run_id": 30098553022,
         "event": "pull_request",
         "workflow": "CI",
-                "head_sha": "f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0",
+                "head_sha": "f9b29f8fb324c1c07805128071b69aa978324a5f",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,31 @@
       }
     }
   },
-    "status": "ara055_package7a_ready_to_commit",
+    "status": "ara055_package7a_complete",
     "commands": [
+        {
+            "command": "ARA-055 package 7A implementation remote, CI, and PR verification",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "implementation_commit": "f9b29f8fb324c1c07805128071b69aa978324a5f",
+                "local_equals_upstream": true,
+                "local_equals_ls_remote": true,
+                "github_branch_equals_local": true,
+                "pull_request": 13,
+                "pull_request_state": "open_draft_mergeable",
+                "pull_request_comment_id": 5070698572,
+                "push_run_id": 30098547791,
+                "pull_request_run_id": 30098553022,
+                "python_310": "success",
+                "python_313": "success",
+                "workflow_annotations": 0,
+                "provider_calls": 0,
+                "ignored_runtime_access": 0,
+                "migration_execution": false,
+                "artifact_mutation": false
+            }
+        },
         {
             "command": "ARA-055 package 7A final explicit staging and safety review",
             "exit_code": 0,
