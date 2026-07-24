@@ -143,17 +143,20 @@ provider-free scope.
 
 ARA-055 package 7B read-only discovery integration and reader guard verification are active after
 the owner confirmed the long-task assessment with `确认，启动` on 2026-07-24.
-Last externally verified fallback: `fd5ca1083985027909c05dfc4e2e7a442fb88f50`. Local HEAD, upstream,
+Last externally verified fallback: `605e3881494f9f83578f91a4bb3570541a71b39b`. Local HEAD, upstream,
 `ls-remote`, the GitHub branch, and draft PR 13 all resolved to that commit. Push/PR runs
-`30099699707`/`30099701936` passed Python 3.10/3.13 and every workflow step with zero annotations.
+`30102888080`/`30102891454` passed Python 3.10/3.13 and every workflow step with zero annotations.
 
-Read `docs/ARA_055_LEGACY_MIGRATION_DESIGN.md` and inspect the current doctor/preview and
-legacy-sensitive reader paths before editing runtime code. Integrate only one explicitly targeted
-read-only surface; do not add recursive project discovery. Package 7C execution remains separately
-approval-gated. Do not execute migration, write an evidence bundle/journal/receipt, create a
-target, steal or remove a lock, inspect ignored runtime, change
-dependencies/defaults/providers/experiments, scan all projects, move/delete/quarantine evidence,
-or infer missing generations.
+The local package 7B implementation adds only `--legacy-migration-preview PROJECT`, its temporary
+and installed-package tests, documentation, and `.codex` state. Focused tests pass `27 passed, 115
+subtests`; CLI/installed-package coverage passes `79 passed, 291 subtests`; related reader/
+transaction/UI coverage passes `218 passed, 468 subtests`; full `make check` passes `503 passed,
+970 subtests` plus formatting, lint, imports, and zero-finding safety scans. The isolated real-wheel
+install smoke and final focused/recovery rerun pass. Review and explicitly stage only the recorded
+package 7B paths next. Package 7C execution remains separately approval-gated. Do not execute
+migration, write an evidence bundle/journal/receipt, create a target, steal or remove a lock,
+inspect ignored runtime, change dependencies/defaults/providers/experiments, scan all projects,
+move/delete/quarantine evidence, or infer missing generations.
 
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.

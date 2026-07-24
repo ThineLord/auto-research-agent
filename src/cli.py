@@ -51,6 +51,10 @@ from .config import (
 )
 from .constants import RUN_LOCK_FILENAME
 from .diagnostic import run_diagnostic_mode
+from .legacy_migration import (
+    classify_legacy_history_migration,
+    format_legacy_migration_report,
+)
 from .literature_survey import run_literature_survey_mode
 from .llm import create_llm_client
 from .logging_config import configure_logging
@@ -218,6 +222,16 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         default=None,
         metavar="RUN_DIR",
         help="Analyze one run directory without provider calls.",
+    )
+    primary_modes.add_argument(
+        "--legacy-migration-preview",
+        type=str,
+        default=None,
+        metavar="PROJECT",
+        help=(
+            "Classify one projects/<PROJECT> legacy history without providers, locks, "
+            "migration, or artifact writes."
+        ),
     )
     parser.add_argument(
         "--analyze-output",
@@ -613,12 +627,36 @@ def _run_analyze_cli(args: argparse.Namespace, console: Console, root: Path) -> 
     return analysis
 
 
+def _run_legacy_migration_preview_cli(
+    args: argparse.Namespace,
+    console: Console,
+    root: Path,
+) -> None:
+    """Print one fixed read-only report before config or provider setup."""
+    project_name = str(getattr(args, "legacy_migration_preview", "")).strip()
+    project_error = _validate_project_override(project_name)
+    if project_error:
+        console.print(f"[red]{project_error}[/red]")
+        raise SystemExit(_EXIT_STARTUP_ERROR)
+    try:
+        inspection = classify_legacy_history_migration(root / "projects" / project_name)
+        report = format_legacy_migration_report(inspection)
+    except (OSError, RuntimeError, ValueError):
+        console.print(
+            "[red]Legacy migration preview failed: selected project state is unsafe "
+            "or unavailable.[/red]"
+        )
+        raise SystemExit(_EXIT_OPERATION_ERROR) from None
+    console.print(report, markup=False)
+
+
 def _requires_generation_resources(args: argparse.Namespace) -> bool:
     return not any(
         getattr(args, mode, False)
         for mode in (
             "compare_runs",
             "analyze_run",
+            "legacy_migration_preview",
             "survey",
             "cloud_free_discover",
             "cloud_free_profile",
@@ -673,6 +711,9 @@ def main() -> None:
         console.print(f"[red]Package resource error: {exc}[/red]")
         raise SystemExit(_EXIT_STARTUP_ERROR) from None
     root = layout.workspace_root
+    if getattr(args, "legacy_migration_preview", None) is not None:
+        _run_legacy_migration_preview_cli(args, console, root)
+        return
     if getattr(args, "compare_runs", None):
         _run_compare_cli(args, console, root)
         return

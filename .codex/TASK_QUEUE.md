@@ -965,6 +965,19 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Package 7B baseline: `fd5ca1083985027909c05dfc4e2e7a442fb88f50` is exact remote-equal;
   push/PR runs `30099699707`/`30099701936` pass Python 3.10/3.13 with zero annotations. Recovery
   plus package 7A focused tests pass `23 passed, 115 subtests`.
+- Package 7B activation: `605e3881494f9f83578f91a4bb3570541a71b39b` is exact remote-equal;
+  push/PR runs `30102888080`/`30102891454` pass Python 3.10/3.13 and every workflow step with zero
+  annotations.
+- Package 7B local result: one explicit `--legacy-migration-preview PROJECT` mode dispatches before
+  config/resources/provider/project-input/lock and prints the fixed read-only report. It has no
+  output writer, recursive discovery, automatic caller, or execution authority. The reader audit
+  preserves the shared current-transaction guard boundary for any separately approved package 7C.
+- Package 7B local validation: focused tests pass `27 passed, 115 subtests`; CLI/installed-package
+  tests pass `79 passed, 291 subtests`; related reader/transaction/UI regression passes `218
+  passed, 468 subtests`; full `make check` passes formatting, Ruff, imports, zero-finding safety
+  scans, and `503 passed, 970 subtests` in 355.04 seconds. The isolated wheel smoke and final
+  focused/recovery rerun (`27 passed, 115 subtests`) pass. Explicit staged safety, implementation
+  commit, push/PR CI, and closeout remain.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

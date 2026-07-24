@@ -1,7 +1,7 @@
 # ARA-055 Legacy History Migration Design
 
-Status: package 7A read-only classifier implemented and remotely verified; discovery integration
-and execution are not implemented or approved
+Status: package 7A read-only classifier is remotely verified; package 7B single-project preview is
+locally implemented; execution is not implemented or approved
 
 Date: 2026-07-24
 
@@ -41,17 +41,17 @@ history synthesis, or automatic rollback.
 
 ## Authorization boundary
 
-The owner subsequently approved package 7A only. Package 7A adds a provider-free internal,
-explicitly targeted classifier plus strict machine and human report builders. It does not expose
-the classifier through CLI, doctor, UI, or automatic startup paths.
+The owner subsequently approved package 7A and then package 7B. Package 7A added a provider-free
+internal, explicitly targeted classifier plus strict machine and human report builders. Package 7B
+adds one explicit single-project CLI preview; it remains read-only and has no automatic caller.
 
 Package 7A does not:
 
 - scan for projects/runs or inspect any unselected checkpoint, history, log, or provider artifact;
-- add a discovery command, migration command, journal, receipt, or runtime path;
+- add a migration command, journal, receipt, or automatic runtime path;
 - copy, rewrite, move, quarantine, delete, or create a historical artifact;
 - change a schema, dependency, configuration default, provider, score, prompt, metric, or result;
-- authorize package 7B integration, package 7C execution, or package 7D rollback.
+- authorize package 7C execution or package 7D rollback.
 
 Approval of read-only classification must not be interpreted as approval to create a target
 history. Every later package retains its separate approval boundary.
@@ -413,12 +413,36 @@ Status: implemented and remotely verified as an internal API under the package 7
 
 ### 7B - Discovery integration and reader guard design verification
 
-Status: not implemented or approved.
+Status: locally implemented under the package 7B approval; remote verification remains.
 
-- Expose the read-only result through an owner-approved doctor/preview surface.
-- Prove no provider construction, lock theft, scan-all behavior, or mutation.
-- Re-audit entry/readers for the future fixed migration transaction.
-- Still no execution path.
+- `--legacy-migration-preview PROJECT` selects exactly `projects/<PROJECT>` and prints the fixed
+  bounded human report.
+- Dispatch occurs before generation resources, config, project input, provider/client
+  construction, locks, and all writer paths.
+- Invalid project identifiers fail before inspection; unexpected inspection failures use a fixed
+  path-redacted error. Classifier statuses remain report data and do not authorize execution.
+- Temporary and installed-package tests prove no provider construction, lock theft, scan-all
+  behavior, package-resource requirement, or mutation.
+- There is still no execution path, JSON output file, batch discovery, or automatic caller.
+
+#### Reader guard audit
+
+Current transaction-sensitive readers already converge on shared non-mutating guards:
+
+- resume preview calls `round_commit_read_blocker()` before reading checkpoint-selected history;
+- analytics and comparison call `load_run_summary()`, which calls
+  `ensure_round_commit_readable()` before reading run summary/config/metrics;
+- benchmark analysis calls `ensure_round_commit_readable()` directly;
+- Streamlit analytics/comparison use those same helpers, and its resume control uses the shared
+  resume preview;
+- writer entrypoints acquire the existing project lock and call
+  `_recover_pending_round_commit()` before provider/client/agent work.
+
+Package 7B does not invent a migration journal or add a speculative blocker for a file that does
+not exist. If package 7C is later approved, its fixed transaction must be added first to the shared
+entry recovery and `round_commit_read_blocker()` boundary; individual readers must not grow
+independent migration heuristics. Until then the preview remains the only migration-related
+runtime caller and cannot mutate state.
 
 ### 7C - Exact missing-twin execution
 

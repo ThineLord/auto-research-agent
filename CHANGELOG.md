@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+* `--legacy-migration-preview PROJECT` now exposes the fixed ARA-055 legacy-history
+  classification for one explicitly selected project. The command runs before configuration,
+  generation-resource, provider, project-input, and lock setup; prints only the bounded
+  path-redacted human report; and never authorizes migration or writes an artifact.
+
 ### Fixed
 
 * Diagnostic finalization now records project history, run metrics, summary, finalized config, and

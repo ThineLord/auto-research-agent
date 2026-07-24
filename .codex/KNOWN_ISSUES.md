@@ -627,7 +627,13 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   import, safety, and isolated-wheel gates.
 - Package-7A completion: `f9b29f8` is exact remote-equal; push/PR runs
   `30098547791`/`30098553022` passed Python 3.10/3.13 and every workflow step with zero
-  annotations. Package 7B integration and package 7C execution remain unapproved.
+  annotations.
+- Package-7B local result: the explicit single-project preview is implemented without a writer,
+  provider/config dependency, lock acquisition, recursive discovery, or execution authority.
+  Focused tests pass `27 passed, 115 subtests`; related reader/transaction/UI regression passes
+  `218 passed, 468 subtests`; full `make check` passes `503 passed, 970 subtests` plus every static,
+  import, and safety gate, and the isolated wheel smoke passes. Staged validation and remote
+  verification remain; package 7C execution is unapproved.
 - Package-1 result: commit `4cd4bf4` adds filesystem-free exact after-image builders and a strict
   bounded journal codec with provider-free regression coverage. No runtime caller creates, reads,
   or applies the journal yet, so this issue remains open.

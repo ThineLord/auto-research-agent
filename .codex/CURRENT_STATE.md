@@ -9,10 +9,10 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `fd5ca1083985027909c05dfc4e2e7a442fb88f50` (the exact
-  externally verified ARA-055 package 7A closeout retained by the additive recovery schema;
+- State recorded against commit: `605e3881494f9f83578f91a4bb3570541a71b39b` (the exact
+  externally verified ARA-055 package 7B activation retained by the additive recovery schema;
   resolve current `HEAD` live).
-- Last externally verified fallback: `fd5ca1083985027909c05dfc4e2e7a442fb88f50` (exact local,
+- Last externally verified fallback: `605e3881494f9f83578f91a4bb3570541a71b39b` (exact local,
   remote-tracking, `ls-remote`, GitHub branch, and PR-head equality plus all Python 3.10/3.13
   push/PR jobs passed)
 - Active task at this snapshot: ARA-055 package 7B read-only discovery integration and reader
@@ -515,6 +515,35 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 - Exclusions: no package 7C exact-copy execution, rollback/delete/quarantine, batch discovery,
   dependency/default/config schema change, provider/network call, ignored runtime access, or
   experiment/result interpretation change.
+- Activation checkpoint `605e3881494f9f83578f91a4bb3570541a71b39b` is exact
+  local/upstream/`ls-remote`/PR-head equal. Push/PR runs `30102888080`/`30102891454` passed Python
+  3.10/3.13 and every workflow step; all four annotation sets are empty.
+
+## ARA-055 Package 7B Local Implementation Checkpoint
+
+- Added one mutually exclusive `--legacy-migration-preview PROJECT` mode. It selects exactly
+  `projects/<PROJECT>`, dispatches before generation resources/config/project input/provider/lock,
+  and prints only the fixed path-redacted human report.
+- The mode has no output-file option, mutation primitive, recursive discovery, automatic caller,
+  migration execution, or package 7C transaction. Every report keeps
+  `execution_authorized: false`.
+- Reader audit confirms resume, analytics, compare, benchmark, and Streamlit consumers already
+  converge on shared current-transaction blockers. A future package 7C transaction must extend
+  those shared entry/read boundaries rather than add per-reader heuristics.
+- Focused classifier/CLI/recovery tests pass `27 passed, 115 subtests`; CLI and installed-package
+  coverage passes `79 passed, 291 subtests`; related reader/transaction/UI coverage passes `218
+  passed, 468 subtests`. Full `make check` passes formatting over 75 files, Ruff, imports,
+  repository-safety self-test/scans over 120 tracked files with zero findings, and `503 passed,
+  970 subtests` in 355.04 seconds. The isolated real-wheel install smoke, final focused/recovery
+  rerun (`27 passed, 115 subtests`), and `git diff --check` also pass.
+- Expected corrections: four red tests initially failed because the CLI option did not exist; the
+  first installed-package fixture caused three subtest failures by pre-creating `projects/` inside
+  an older no-project-creation test and was split into an independent fixture; Ruff then identified
+  two new files needing format and one unused test import, all corrected before this checkpoint.
+- Task-owned changes are `src/cli.py`, `tests/test_legacy_migration_cli.py`,
+  `tests/test_cli_exit_codes.py`, `tests/test_package_resources.py`, `CHANGELOG.md`, `README.md`,
+  `docs/ARA_055_LEGACY_MIGRATION_DESIGN.md`, `docs/DEVELOPER_GUIDE.md`,
+  `docs/quickstart_zh.md`, and the package 7B `.codex/` state updates.
 
 ## Completed Steps
 
@@ -1370,11 +1399,10 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Remaining Steps
 
-- Audit the existing doctor/preview surfaces and all legacy-sensitive readers.
-- Add failing provider-free temporary-fixture tests for the selected read-only integration and
-  reader guards.
-- Implement the smallest additive ARA-055 package 7B surface, then run layered validation and
-  remote closeout.
+- Review and explicitly stage only the ARA-055 package 7B task-owned paths, then run staged safety
+  and cached-diff validation.
+- Commit and push the validated ARA-055 package 7B implementation, then verify Python 3.10/3.13
+  push/PR CI and create the recovery closeout.
 - Preserve all journal-less, partial, ambiguous, unsafe, and unknown legacy evidence byte-for-byte;
   do not start package 7C.
 - Do not activate ARA-018 without an owner license/distribution decision.
@@ -2405,8 +2433,8 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ```bash
 git status --short --branch
-git diff --check
-.venv/bin/python -m pytest -q tests/test_legacy_migration.py tests/test_recovery_state.py
+git diff --stat
+scripts/check_repo_safety.py --staged
 ```
 
 ## Interruption Recovery

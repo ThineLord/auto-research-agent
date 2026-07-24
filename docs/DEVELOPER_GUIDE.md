@@ -289,6 +289,11 @@ low-change round counts, rubric round counts, and compact rubric averages to tha
 The CLI `--analyze-run` path uses `src.run_analytics` to summarize one run into score trend,
 robustness, cost-ready, interpretability, rubric, and artifact sections without loading config or
 calling providers.
+The CLI `--legacy-migration-preview PROJECT` path dispatches even earlier: it selects exactly
+`projects/<PROJECT>`, calls the bounded no-follow classifier, and prints the fixed path-redacted
+human report without generation-resource validation, configuration, provider/client construction,
+project-input loading, lock acquisition, recursive discovery, or writes. Every classification is
+a discovery result; `execution_authorized` remains false.
 The CLI `--mock` path dispatches after project input resolution and before provider validation. It
 must remain deterministic, provider-free, and schema-additive: no Ollama discovery, Gemini key
 checks, network calls, prompt changes, or scoring-semantic changes. The synthetic Judge score exists

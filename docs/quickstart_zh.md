@@ -248,6 +248,17 @@ similarity/evolution、timeout/error、agent timing 和 estimated tokens。它�
 ```
 
 `--analyze-run` 不调用模型，会输出分数首尾变化、超时/错误、估算 token、相似度和 rubric 摘要。
+
+只读检查一个旧项目的 history 状态：
+
+```bash
+.venv/bin/python -m src.main --legacy-migration-preview example
+```
+
+该 preview 只检查 `projects/example` 这一显式项目，不扫描其他项目，不加载 provider/config，
+不取得或删除运行锁，也不创建、复制、修复或删除 artifact。输出中的
+`execution_authorized` 固定为 `false`。
+
 - `projects/example/model_ops.log`：UI 拉取或删除模型时的日志。
 
 当前输出约定：

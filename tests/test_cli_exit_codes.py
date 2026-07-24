@@ -92,6 +92,11 @@ class CliExitCodeTests(unittest.TestCase):
             ("survey", ["--survey"], False),
             ("cloud-discover", ["--cloud-free-discover"], False),
             ("cloud-profile", ["--cloud-free-profile"], False),
+            (
+                "legacy-migration-preview",
+                ["--legacy-migration-preview", "selected"],
+                False,
+            ),
             ("analyze", ["--analyze-run", "projects/selected/runs/run-1"], False),
             (
                 "compare",
@@ -279,6 +284,7 @@ class CliExitCodeTests(unittest.TestCase):
             ("mock", ["--mock"]),
             ("compare", ["--compare-runs", "run-a", "run-b"]),
             ("analyze", ["--analyze-run", "run-a"]),
+            ("legacy-preview", ["--legacy-migration-preview", "selected"]),
             ("cloud-discover", ["--cloud-free-discover"]),
             ("cloud-profile", ["--cloud-free-profile"]),
         )
