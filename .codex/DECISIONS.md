@@ -1096,3 +1096,17 @@
 - Human and machine reports contain fixed enums, logical artifact labels, bounded public run IDs,
   source digest/size where applicable, and no private path, content, exception graph, provider
   value, or environment value.
+
+## 2026-07-24 - Approve ARA-055 package 7B read-only integration
+
+- Approval: after package 7A closeout recommended package 7B, the owner said `批准，继续` and
+  confirmed the 60–90 minute long-task assessment with `确认，启动`.
+- Authorized scope: expose the existing explicitly targeted classifier through one read-only
+  doctor/preview surface and verify legacy-sensitive readers fail closed on unsafe transaction
+  state without mutation or path disclosure.
+- Safety boundary: preserve explicit single-project selection, fixed allowlisted reads,
+  internal/configured-external storage, live-lock busy classification, stale/malformed lock
+  preservation, and byte-compatible journal-less readers.
+- Excluded scope: package 7C execution, target/evidence/journal/receipt creation, recursive project
+  discovery, lock recovery/removal, rollback/delete/quarantine, dependency/default/config schema
+  or provider/experiment changes, ignored runtime access, and historical artifact mutation.

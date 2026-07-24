@@ -141,19 +141,19 @@ passed, 809 subtests` plus formatting, lint, imports, and zero-finding safety sc
 status-2 boundary, valid zero/boundary behavior, unchanged configuration schema/defaults, and
 provider-free scope.
 
-ARA-055 package 7A is complete and remotely verified. Last externally verified fallback:
-`f9b29f8fb324c1c07805128071b69aa978324a5f`. Local HEAD, upstream, `ls-remote`, the GitHub branch,
-and draft PR 13 all resolved to that commit. Push/PR runs `30098547791`/`30098553022` passed Python
-3.10/3.13 and every workflow step with zero annotations; PR comment `5070698572` records the
-implementation and validation result.
+ARA-055 package 7B read-only discovery integration and reader guard verification are active after
+the owner confirmed the long-task assessment with `确认，启动` on 2026-07-24.
+Last externally verified fallback: `fd5ca1083985027909c05dfc4e2e7a442fb88f50`. Local HEAD, upstream,
+`ls-remote`, the GitHub branch, and draft PR 13 all resolved to that commit. Push/PR runs
+`30099699707`/`30099701936` passed Python 3.10/3.13 and every workflow step with zero annotations.
 
-There is no unblocked implementation task. Read `docs/ARA_055_LEGACY_MIGRATION_DESIGN.md` before
-any follow-up. It rejects general repair and permits only one exact missing-history-twin
-classification candidate. Package 7B discovery integration and package 7C execution remain
-separately approval-gated. Do not add CLI/doctor/UI routing, execute migration, write an evidence
-bundle/journal/receipt, create a target, inspect ignored runtime, change
+Read `docs/ARA_055_LEGACY_MIGRATION_DESIGN.md` and inspect the current doctor/preview and
+legacy-sensitive reader paths before editing runtime code. Integrate only one explicitly targeted
+read-only surface; do not add recursive project discovery. Package 7C execution remains separately
+approval-gated. Do not execute migration, write an evidence bundle/journal/receipt, create a
+target, steal or remove a lock, inspect ignored runtime, change
 dependencies/defaults/providers/experiments, scan all projects, move/delete/quarantine evidence,
-or infer missing generations without the corresponding owner approval.
+or infer missing generations.
 
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.

@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `DEFERRED`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -948,6 +948,23 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Deferral boundary: ARA-055's approved work is complete through package 7A. Package 7B discovery
   integration, package 7C exact-copy execution, and any rollback remain separately approval-gated;
   no unblocked ARA-055 implementation is active.
+- Package 7B approval: after package 7A closeout recommended read-only discovery integration and
+  reader guard verification, the owner said `批准，继续` and confirmed the 60–90 minute long-task
+  assessment with `确认，启动` on 2026-07-24.
+- Package 7B authorized scope: expose the existing explicitly targeted classifier through one
+  read-only doctor/preview surface and verify legacy-sensitive readers fail closed on unsafe
+  transaction state without mutation or path disclosure.
+- Package 7B acceptance: provider-free temporary fixtures prove no recursive project scan, lock
+  theft, recovery, provider/client construction, ignored-runtime access, or filesystem mutation;
+  internal/configured-external storage, current readers, and journal-less compatibility remain
+  stable; focused/related tests, `make check`, isolated wheel, staged safety, push, and Python
+  3.10/3.13 CI pass.
+- Package 7B exclusions: no `--execute`, package 7C target creation, evidence bundle, transaction,
+  receipt, rollback/delete/quarantine, batch discovery, dependency/default/config/provider/
+  experiment change, or interpretation of existing artifacts.
+- Package 7B baseline: `fd5ca1083985027909c05dfc4e2e7a442fb88f50` is exact remote-equal;
+  push/PR runs `30099699707`/`30099701936` pass Python 3.10/3.13 with zero annotations. Recovery
+  plus package 7A focused tests pass `23 passed, 115 subtests`.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

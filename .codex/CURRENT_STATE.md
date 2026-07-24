@@ -4,19 +4,19 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: preserve the remotely verified ARA-055 package 7A read-only classifier closeout
-  and wait for an explicitly approved next task.
+- Current goal: implement the explicitly approved ARA-055 package 7B read-only discovery
+  integration and reader guard verification without authorizing migration execution.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `f9b29f8fb324c1c07805128071b69aa978324a5f` (the exact
-  externally verified ARA-055 package 7A implementation retained by the additive recovery schema;
+- State recorded against commit: `fd5ca1083985027909c05dfc4e2e7a442fb88f50` (the exact
+  externally verified ARA-055 package 7A closeout retained by the additive recovery schema;
   resolve current `HEAD` live).
-- Last externally verified fallback: `f9b29f8fb324c1c07805128071b69aa978324a5f` (exact local,
+- Last externally verified fallback: `fd5ca1083985027909c05dfc4e2e7a442fb88f50` (exact local,
   remote-tracking, `ls-remote`, GitHub branch, and PR-head equality plus all Python 3.10/3.13
   push/PR jobs passed)
-- Active task at this snapshot: none. Package 7B integration, package 7C execution, rollback, and
-  batch discovery remain unapproved.
+- Active task at this snapshot: ARA-055 package 7B read-only discovery integration and reader
+  guard verification. Package 7C execution, rollback, and batch discovery remain unapproved.
 - Uncommitted changes: not persisted as a static claim. Resolve the exact live state with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -495,6 +495,26 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 - Package 7A is complete. It adds no runtime caller or execution authority, so every inspected
   project remains byte-identical. Package 7B discovery integration is the next possible package,
   but it requires a new approval and long-task checkpoint.
+
+## ARA-055 Package 7B Activation
+
+- Owner approval: after package 7A closeout recommended package 7B, the owner said `批准，继续`
+  and then confirmed the 60–90 minute long-task assessment with `确认，启动` on 2026-07-24.
+- Stable fallback: `fd5ca1083985027909c05dfc4e2e7a442fb88f50`, exact local/upstream/
+  `ls-remote`/GitHub branch/PR-head equal. Push/PR runs `30099699707`/`30099701936`
+  passed Python 3.10/3.13 and every workflow step with zero annotations.
+- Baseline: recovery plus package 7A focused tests pass `23 passed, 115 subtests`; the worktree is
+  clean and draft PR 13 is open and mergeable.
+- Authorized scope: expose the existing explicitly targeted classifier through one owner-approved
+  read-only doctor/preview surface and verify every legacy-sensitive reader either remains
+  byte-compatible or fails closed on unsafe transaction state.
+- Acceptance: no provider/client construction, recursive project scan, lock theft, recovery,
+  migration execution, target/evidence/journal/receipt creation, or artifact mutation; preserve
+  internal/configured-external storage and path-redacted output; run focused/related tests,
+  `make check`, isolated wheel, staged safety, push, and Python 3.10/3.13 CI.
+- Exclusions: no package 7C exact-copy execution, rollback/delete/quarantine, batch discovery,
+  dependency/default/config schema change, provider/network call, ignored runtime access, or
+  experiment/result interpretation change.
 
 ## Completed Steps
 
@@ -1350,9 +1370,13 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Remaining Steps
 
-- There is no unblocked implementation task.
-- Await explicit owner approval before package 7B discovery integration or package 7C execution.
-- Preserve all journal-less, partial, ambiguous, unsafe, and unknown legacy evidence byte-for-byte.
+- Audit the existing doctor/preview surfaces and all legacy-sensitive readers.
+- Add failing provider-free temporary-fixture tests for the selected read-only integration and
+  reader guards.
+- Implement the smallest additive ARA-055 package 7B surface, then run layered validation and
+  remote closeout.
+- Preserve all journal-less, partial, ambiguous, unsafe, and unknown legacy evidence byte-for-byte;
+  do not start package 7C.
 - Do not activate ARA-018 without an owner license/distribution decision.
 
 ## Test Status
@@ -2381,8 +2405,8 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ```bash
 git status --short --branch
-git rev-parse HEAD
-.venv/bin/python -m pytest -q tests/test_recovery_state.py
+git diff --check
+.venv/bin/python -m pytest -q tests/test_legacy_migration.py tests/test_recovery_state.py
 ```
 
 ## Interruption Recovery
@@ -2430,11 +2454,11 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   continuation. Existing canonical partial rounds remain fail-closed and require a separately
   approved explicit migration; do not infer stage truth from placeholders or
   `last_successful_agent`.
-- ARA-055 packages 1-6 and package 7 design are complete; package 7A read-only classification is
-  complete and remote-verified at `f9b29f8`. Preserve every current journal and artifact byte, do
-  not inspect ignored runtime, and do not add CLI/doctor/UI integration, execution, target or
-  evidence creation, rollback, cleanup, quarantine, or package 7B/7C/7D behavior without a new
-  approval.
+- ARA-055 packages 1-6, package 7 design, and package 7A are complete. Package 7B read-only
+  discovery integration and reader guard verification are explicitly approved and active.
+  Preserve every current journal and artifact byte, do not inspect ignored runtime, and do not add
+  migration execution, target or evidence creation, rollback, cleanup, quarantine, batch
+  discovery, or package 7C/7D behavior.
 - ARA-061 is complete. Reject only invalid numeric CLI override values and inconsistent effective
   delay bounds; preserve valid zero-disable quota behavior, existing configuration-file validation,
   defaults, scheduler policy, provider behavior, and experiment semantics.
