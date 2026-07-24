@@ -64,7 +64,7 @@ annotations. Preserve its literal string lookalikes, metadata, request/redaction
 and installed-fallback behavior.
 ARA-058 is complete through remote-equal closeout `1419d5e`; closeout push/PR runs
 `29264305133`/`29264308515` passed Python 3.10/3.13, all four wheel steps, and zero annotations with
-exact PR body readback. Use `efcad88f1214060835d65b9e8f41c3fe78bc84aa` as the conservative exact
+exact PR body readback. Use `00a488dce12f7be548ce00d1980d97fd4883e4ff` as the conservative exact
 externally verified fallback.
 
 Do not rebuild or rerun ARA-004 merely to recover context. Do not repeat the original local harness:
@@ -137,10 +137,17 @@ every workflow step. Focused validation passes `9 passed`, related validation pa
 and blocks read-only mixed-generation consumers without mutation. PR 13 comment `5062099962`
 records the result.
 
-There is no unblocked implementation task. ARA-055 package 5 finalization journaling is the
-recommended next task but requires separate owner approval. Do not add finalization writer or
-reader behavior, diagnostic routing, migration, dependency/config changes, providers,
-ignored-runtime access, or packages 6-7 until separately authorized.
+ARA-061 is the sole active task after the owner said `批准ARA061` on 2026-07-24. Use
+`00a488dce12f7be548ce00d1980d97fd4883e4ff` as the conservative exact externally verified
+fallback; closeout push/PR runs `30035438824`/`30035441752` passed Python 3.10/3.13 and every
+workflow step. Reproduce only in parser/direct temporary probes, then add failing tests before
+changing `src/cli.py`. Preserve valid zero/boundary behavior and fail invalid values before
+project writes or provider work.
+
+ARA-055 package 5 finalization journaling remains separately approval-gated. Do not add
+finalization writer/reader behavior, diagnostic routing, migration, configuration schema/default
+changes, dependencies, providers, ignored-runtime access, scheduler-policy changes, or packages
+6-7 while implementing ARA-061.
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 

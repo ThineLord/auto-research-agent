@@ -4,21 +4,21 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: preserve the completed and externally verified ARA-055 package 4 recovery entry
-  and read-only consumer boundary while awaiting separate approval for any follow-up package.
+- Current goal: implement the explicitly approved ARA-061 numeric CLI validation without changing
+  configuration schemas, scheduler policy, defaults, providers, or experiment behavior.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `efcad88f1214060835d65b9e8f41c3fe78bc84aa` (the exact
-  externally verified package-4 implementation retained by the additive recovery schema; resolve
+- State recorded against commit: `00a488dce12f7be548ce00d1980d97fd4883e4ff` (the exact
+  externally verified ARA-055 package-4 closeout retained by the additive recovery schema; resolve
   current `HEAD` live).
-- Last externally verified fallback: `efcad88f1214060835d65b9e8f41c3fe78bc84aa` (exact local,
+- Last externally verified fallback: `00a488dce12f7be548ce00d1980d97fd4883e4ff` (exact local,
   remote-tracking, `ls-remote`, GitHub branch, and PR-head equality plus all Python 3.10/3.13
   push/PR jobs passed)
-- Active task at this snapshot: none. ARA-055 package 4 is complete; package 5 finalization
-  journaling is the recommended next task but remains separately approval-gated. Diagnostic
-  routing, migration, dependency/config changes, provider calls, ignored runtime, and packages
-  6-7 remain excluded.
+- Active task at this snapshot: ARA-061. Authorized scope is strict finite/range/cross-option
+  validation for the seven existing numeric CLI overrides plus provider-free regression coverage.
+  ARA-055 package 5, config-file schemas, dependencies, scheduler policy/defaults, provider calls,
+  experiment behavior, and ignored runtime remain excluded.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -196,6 +196,24 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   access.
 - Package 5's separate finalization transaction is recommended next but requires explicit owner
   approval before activation or implementation.
+
+## ARA-061 Activation
+
+- Owner approval: `批准ARA061` on 2026-07-24 after the required 45–60 minute long-task checkpoint.
+- Stable baseline: `00a488dce12f7be548ce00d1980d97fd4883e4ff`, exact local/upstream/
+  `ls-remote`/PR-head equal. Closeout push/PR runs `30035438824`/`30035441752` passed Python
+  3.10/3.13 and every install, isolated-wheel, format, lint, import, safety, and test step.
+- Reproduced behavior: inconsistent `--min-delay-seconds 100 --max-delay-seconds 1`, non-finite
+  `nan`/`inf` delays, negative retry/quota values, and subminimum prompt budget/limit values are
+  accepted. Several are silently clamped; the inconsistent and infinite delays reach the effective
+  cloud-free configuration.
+- Authorized implementation: reject invalid values at the argument/startup boundary, enforce the
+  effective delay relation after config resolution, preserve documented valid boundary values,
+  and prove failure occurs before project writes or provider work.
+- Explicit exclusions: no config-file schema or default changes, scheduler-policy redesign,
+  dependencies, providers, ignored runtime, experiment changes, or ARA-055 package 5.
+- Next command after this activation checkpoint is committed and pushed:
+  `.venv/bin/python -m pytest -q tests/test_round_loop.py -k numeric_cli`.
 
 ## Completed Steps
 
@@ -1051,7 +1069,10 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Remaining Steps
 
-- There is no unblocked implementation task.
+- Add ARA-061 failing parser and effective-delay tests for all reproduced invalid classes.
+- Implement the smallest shared finite/range validators and effective min/max check.
+- Run ARA-061 focused, provider-free CLI no-write, related cloud/config/runner, full, recovery, and
+  safety validation before its semantic commit and closeout.
 - Await explicit owner approval before activating ARA-055 package 5; do not change finalization
   writers or readers while it remains approval-gated.
 - Preserve packages 3-4 transaction ordering, lock-held entry recovery, and non-mutating read-only
@@ -1065,6 +1086,12 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Test Status
 
+- ARA-061 baseline recovery-state validation passes `6 passed, 1 subtest`. The approved pre-fix
+  matrix accepts all seven invalid numeric override classes; no provider or ignored runtime was
+  accessed.
+- ARA-055 package-4 closeout `00a488d` is exact local/upstream/`ls-remote`/PR-head equal.
+  Closeout push/PR runs `30035438824`/`30035441752` passed Python 3.10/3.13 and every workflow
+  step.
 - ARA-055 package-4 implementation `efcad88` is exact local/upstream/`ls-remote`/PR-head equal.
   Push/PR runs `30034539432`/`30034542276` passed Python 3.10/3.13 and every workflow step; draft
   PR 13 is open and cleanly mergeable.
@@ -2128,6 +2155,9 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   non-mutating read-only guards, configured external storage, exact metric semantics, and legacy
   incomplete-history compatibility. Do not start package 5 finalization, package 6 diagnostics,
   package 7 migration, dependency changes, providers, or ignored runtime without separate scope.
+- ARA-061 is active. Reject only invalid numeric CLI override values and inconsistent effective
+  delay bounds; preserve valid zero-disable quota behavior, existing configuration-file validation,
+  defaults, scheduler policy, provider behavior, and experiment semantics.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
 - Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
 - Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.

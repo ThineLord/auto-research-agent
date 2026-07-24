@@ -942,6 +942,29 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   `30002348583`/`30002350589` passed Python 3.10/3.13, all four isolated-wheel steps, and zero
   annotations.
 
+## ARA-061 - Reject invalid numeric CLI overrides instead of silently coercing them
+
+- Status: `IN_PROGRESS`
+- Priority: P2
+- Risk: medium
+- Description: cloud pacing, retry, prompt-budget, prompt-limit, and provider-quota CLI overrides
+  accept non-finite, negative, out-of-range, or mutually inconsistent values. Several are silently
+  clamped, while `min_delay_seconds > max_delay_seconds` and an infinite maximum delay can reach
+  runtime configuration despite the equivalent file configuration rejecting them.
+- Related files: `src/cli.py`, CLI/parser and cloud scheduler tests, user-facing CLI documentation
+- Acceptance criteria: all seven numeric overrides reject invalid input with argparse/startup
+  status 2 before project writes or provider work; effective max delay is never below effective
+  min delay; valid boundaries and the intentional zero-disable quota threshold remain compatible.
+- Validation command: focused parser/override tests, provider-free CLI no-write probes, related
+  cloud/config/runner tests, then `make check`.
+- Commit required: yes.
+- Dependencies: owner explicitly approved ARA-061 on 2026-07-24 after reviewing the 45–60 minute
+  task estimate and reproduced defect.
+- Reproduction: `--min-delay-seconds 100 --max-delay-seconds 1`, `nan`/`inf` delays, negative
+  retries/quota thresholds, and subminimum prompt budgets/limits are all currently accepted.
+- Scope boundary: no provider calls, ignored runtime access, config-file schema changes,
+  dependency changes, scheduler policy redesign, new default values, or ARA-055 package 5 work.
+
 ## ARA-011 - Prevent failed rounds from replacing a trusted best output
 
 - Status: `DONE`

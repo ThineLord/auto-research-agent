@@ -607,3 +607,17 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   before-generation exists. Finalization, diagnostic integration, and migration remain unapproved.
   Historical journal-less `published_uncommitted` evidence and manually edited third generations
   remain preserved and fail closed.
+
+## KI-061 - Numeric CLI overrides accept invalid or inconsistent values
+
+- Status: confirmed and active as ARA-061
+- Severity: P2 reliability, pacing, and user-intent integrity
+- Evidence: the current parser accepts non-finite delay values, negative retry/quota thresholds,
+  subminimum prompt budgets/limits, and `--min-delay-seconds 100 --max-delay-seconds 1`.
+- Impact: several invalid inputs are silently changed after parsing, so recorded/user-requested
+  intent differs from runtime behavior. Infinite or mutually inconsistent delay bounds can enter
+  the scheduler configuration and violate the file-config invariant.
+- Required fix: strict finite/range parsing plus an effective min/max relation check before project
+  writes or provider work, with valid zero/boundary compatibility retained.
+- Boundary: configuration-file schemas and defaults, scheduler policy, providers, experiments,
+  dependencies, ignored runtime, and ARA-055 package 5 are not part of ARA-061.

@@ -936,3 +936,18 @@
 - Boundary: finalization journaling is package 5 and remains separately approval-gated. Diagnostic
   recovery, legacy migration, dependencies/configuration, providers, ignored runtime, and packages
   6-7 remain outside this completion.
+
+## 2026-07-24 - Approve ARA-061 strict numeric CLI validation
+
+- Approval: after a bounded provider-free audit reproduced the defect and reported a 45–60 minute
+  estimate, the owner said `批准ARA061`.
+- Root cause: individual numeric CLI overrides use permissive built-in parsers and later clamp
+  several values instead of applying the finite/range invariants already enforced for equivalent
+  file configuration. Effective minimum and maximum delay overrides are never compared.
+- Authorized scope: validate the seven existing numeric overrides, enforce the resolved min/max
+  delay relation, retain valid boundaries including quota threshold zero, and add parser,
+  no-write/startup, and scheduler/config compatibility tests.
+- Failure policy: invalid user input exits with fixed argparse/startup status 2 before project
+  writes, provider preflight, client construction, or agent work. Do not silently reinterpret it.
+- Excluded scope: no configuration-file schema/default change, scheduler policy redesign,
+  dependency, provider, experiment, ignored-runtime, or ARA-055 package-5 change.

@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-    "recorded_at": "2026-07-24T02:46:05+08:00",
+    "recorded_at": "2026-07-24T16:57:54+08:00",
   "branch": "codex/sol-autonomous-hardening",
-    "head_commit": "efcad88f1214060835d65b9e8f41c3fe78bc84aa",
-    "last_known_stable_commit": "efcad88f1214060835d65b9e8f41c3fe78bc84aa",
+    "head_commit": "00a488dce12f7be548ce00d1980d97fd4883e4ff",
+    "last_known_stable_commit": "00a488dce12f7be548ce00d1980d97fd4883e4ff",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-    "state_recorded_against_commit": "efcad88f1214060835d65b9e8f41c3fe78bc84aa",
+    "state_recorded_against_commit": "00a488dce12f7be548ce00d1980d97fd4883e4ff",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-24T02:46:05+08:00",
-    "commit": "efcad88f1214060835d65b9e8f41c3fe78bc84aa",
+    "verified_at": "2026-07-24T16:57:54+08:00",
+    "commit": "00a488dce12f7be548ce00d1980d97fd4883e4ff",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 30034539432,
+        "run_id": 30035438824,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "efcad88f1214060835d65b9e8f41c3fe78bc84aa",
+        "head_sha": "00a488dce12f7be548ce00d1980d97fd4883e4ff",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-                "run_id": 30034542276,
+                "run_id": 30035441752,
         "event": "pull_request",
         "workflow": "CI",
-                "head_sha": "efcad88f1214060835d65b9e8f41c3fe78bc84aa",
+                "head_sha": "00a488dce12f7be548ce00d1980d97fd4883e4ff",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,29 @@
       }
     }
   },
-    "status": "ara055_package4_complete",
+    "status": "ara061_activated",
     "commands": [
+        {
+            "command": "ARA-061 activation baseline and numeric override reproduction",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "owner_approval": "approved_ara061",
+                "baseline_commit": "00a488dce12f7be548ce00d1980d97fd4883e4ff",
+                "remote_equal": true,
+                "pull_request": 13,
+                "pull_request_state": "open_draft_clean",
+                "push_run_id": 30035438824,
+                "pull_request_run_id": 30035441752,
+                "python_310": "success",
+                "python_313": "success",
+                "recovery_pytest_passed": 6,
+                "recovery_pytest_subtests_passed": 1,
+                "invalid_numeric_cases_accepted": 7,
+                "provider_calls": 0,
+                "ignored_runtime_access": 0
+            }
+        },
         {
             "command": "ARA-055 package 4 implementation remote and CI verification",
             "exit_code": 0,
@@ -4622,6 +4643,16 @@
   ],
   "failures": [
     {
+      "command": "first resumed startup marker inspection",
+      "result": "corrected_without_file_change",
+      "summary": {
+        "exit_code": 127,
+        "cause": "a zsh loop assigned the reserved path array and removed git from that subprocess PATH",
+        "effect": "the read-only command stopped after clean branch output; no file or Git state changed",
+        "fix": "reran with marker_path and marker_dir_path; repository, auth, recovery, and remote checks passed"
+      }
+    },
+    {
       "command": "read-only blocked-status queue search",
       "result": "corrected_without_file_change",
       "summary": {
@@ -5106,6 +5137,9 @@
     }
   ],
   "notes": [
+    "ARA-061 is the sole active task after explicit owner approval on 2026-07-24; implementation is limited to seven existing numeric CLI override guards and provider-free tests.",
+    "ARA-061 pre-fix reproduction accepts non-finite delays, negative retry/quota values, subminimum prompt budget/limit values, and a maximum delay below the minimum; provider calls and ignored-runtime access are zero.",
+    "ARA-055 package 4 closeout 00a488d is exact local, upstream, ls-remote, and PR-head equal; push and pull-request runs 30035438824 and 30035441752 passed Python 3.10 and 3.13 plus every workflow step.",
     "ARA-055 package 4 is complete and remote-verified at efcad88; push and pull-request runs 30034539432 and 30034542276 passed Python 3.10 and 3.13 plus every workflow step.",
     "ARA-055 package 4 focused coverage passes 9 tests; related coverage passes 256 tests and 540 subtests; the recovery matrix passes 16 tests and 99 subtests; full make check passes 462 tests and 791 subtests; staged safety scans 115 files with zero findings.",
     "There is no unblocked implementation task. ARA-055 package 5 finalization journaling is recommended next but remains separately approval-gated.",
