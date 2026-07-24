@@ -1,5 +1,16 @@
 # Completed Maintenance Work
 
+## 2026-07-24 - ARA-055 package 5 recoverable run finalization
+
+- Added a strict bounded create-only finalization journal for exact run summary, finalized run
+  configuration, and final checkpoint generations.
+- Recovery applies summary/config before checkpoint, handles internal/configured-external storage,
+  converges after write or cleanup interruption, and preserves unknown generations as conflicts.
+- Iterative entry recovers under the project lock; resume, UI, analytics, compare, report, and
+  artifact readers fail closed without mutation while finalization is pending or conflicting.
+- Implementation `5c9f0ce` is exact remote-equal. Local `make check` passes `473 passed, 825
+  subtests`; push/PR runs `30085545590`/`30085548995` pass Python 3.10/3.13 and all steps.
+
 ## 2026-07-10 - Startup and recovery audit
 
 - Confirmed the checkout root and `origin` URL.

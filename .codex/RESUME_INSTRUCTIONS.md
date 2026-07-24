@@ -145,16 +145,14 @@ passed, 809 subtests` plus formatting, lint, imports, and zero-finding safety sc
 status-2 boundary, valid zero/boundary behavior, unchanged configuration schema/defaults, and
 provider-free scope.
 
-ARA-055 package 5 is the sole active task after the owner said `批准` on 2026-07-24. Use
-`11562f61d21040dfb160b2df1f4a491f2b4ecd64` as the conservative exact externally verified
-fallback; push/PR runs `30082575170`/`30082577745` passed Python 3.10/3.13 and every workflow
-step. Read the package-5 section of `docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md`, then
-inspect the local implementation checkpoint in `.codex/CURRENT_STATE.md`. Focused validation
-passes `7 passed, 16 subtests`, affected regressions pass `112 passed, 372 subtests`, and final
-`make check` passes `473 passed, 825 subtests`; the next step is explicit staged safety validation
-and the implementation commit. Do not modify round transaction semantics,
-diagnostic routing, migration, configuration schema/defaults, dependencies, providers, ignored
-runtime, or packages 6-7.
+ARA-055 package 5 is complete at exact externally verified implementation
+`5c9f0ced8d45d3aafd406f3e4a84beb46d8d8d5c`; push/PR runs
+`30085545590`/`30085548995` passed Python 3.10/3.13 and every workflow step. Final local
+`make check` passes `473 passed, 825 subtests`, and staged safety scans 116 files clean. There is no
+active implementation task. Package 6 diagnostic routing and package 7 migration require separate
+owner approval; do not infer either from package 5 completion.
+Use `5c9f0ced8d45d3aafd406f3e4a84beb46d8d8d5c` as the conservative exact externally verified
+fallback. There is no unblocked implementation task.
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 

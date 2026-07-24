@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -839,10 +839,15 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   runner/UI integration are implemented locally. Focused validation passes `7 passed, 16 subtests`;
   affected regressions pass `112 passed, 372 subtests`; final `make check` passes `473 passed, 825
   subtests`. Staged safety, commit, push, dual CI, PR update, and recovery closeout remain.
-- Package 5 resume command: inspect and explicitly stage the 14 task-owned files. If interrupted,
+- Package 5 resume command: inspect and explicitly stage the 16 task-owned files. If interrupted,
   first rerun
   `.venv/bin/python -m pytest -q tests/test_run_finalize_recovery.py
   tests/test_round_commit_entry.py` and inspect the task-owned diff.
+- Package 5 completion: implementation `5c9f0ce` is exact local/upstream/`ls-remote`/GitHub
+  branch/PR-head equal. Push/PR runs `30085545590`/`30085548995` pass Python 3.10/3.13 and every
+  workflow step. Full local validation passes `473 passed, 825 subtests`; staged safety scans 116
+  files clean. Package 6 diagnostic recovery and package 7 migration remain separately
+  approval-gated.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

@@ -4,20 +4,19 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: implement the explicitly approved ARA-055 package 5 finalization transaction
-  without changing round commits, providers, experiments, configuration schemas, or legacy data.
+- Current goal: close out the completed ARA-055 package 5 finalization transaction without
+  inferring approval for package 6 diagnostics or package 7 migration.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `11562f61d21040dfb160b2df1f4a491f2b4ecd64` (the exact
-  externally verified ARA-061 closeout retained by the additive recovery schema;
+- State recorded against commit: `5c9f0ced8d45d3aafd406f3e4a84beb46d8d8d5c` (the exact
+  externally verified ARA-055 package 5 implementation retained by the additive recovery schema;
   resolve current `HEAD` live).
-- Last externally verified fallback: `11562f61d21040dfb160b2df1f4a491f2b4ecd64` (exact local,
+- Last externally verified fallback: `5c9f0ced8d45d3aafd406f3e4a84beb46d8d8d5c` (exact local,
   remote-tracking, `ls-remote`, GitHub branch, and PR-head equality plus all Python 3.10/3.13
   push/PR jobs passed)
-- Active task at this snapshot: ARA-055 package 5. Authorization is limited to the fixed
-  finalization journal, deterministic summary/config/final-checkpoint roll-forward, lock-held
-  iterative-entry recovery, non-mutating reader guards, and provider-free regression coverage.
+- Active task at this snapshot: none. ARA-055 package 5 is complete; package 6 diagnostic recovery
+  and package 7 legacy migration remain separately approval-gated.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -286,6 +285,26 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   `.venv/bin/python -m pytest -q tests/test_run_finalize_recovery.py
   tests/test_round_commit_entry.py`, then inspect the latest `make check` record. Do not commit if
   either fails.
+
+## ARA-055 Package 5 Closeout
+
+- Implementation commit `5c9f0ced8d45d3aafd406f3e4a84beb46d8d8d5c` is exact local/upstream/
+  `ls-remote`/GitHub branch/PR-head equal.
+- Push run `30085545590` and pull-request run `30085548995` both passed Python 3.10/3.13,
+  installation, isolated-wheel smoke, formatting, lint, import, repository safety, and all tests.
+- Finalization now uses one strict bounded create-only journal with exact before/after generations.
+  Recovery applies and verifies run summary, finalized run config, then final checkpoint; exact
+  cleanup is retryable and third generations remain preserved conflicts.
+- Internal and configured-external storage fault coverage includes all three writes and cleanup
+  under `OSError` and `KeyboardInterrupt`. Runner interruption/status behavior and compatible config
+  session metadata are covered by the full regression suite.
+- Iterative entry recovery remains under the existing lock. Resume, UI, analytics, comparison,
+  report, and artifact readers expose or reject pending/conflicting finalization without mutation.
+- Final local `make check` passes `473 passed, 825 subtests`; staged safety scans 116 files with zero
+  findings. No provider calls, ignored-runtime access, dependency/configuration changes, experiment
+  changes, diagnostic routing, legacy migration, or historical artifact mutation occurred.
+- Package 5 is complete. Package 6 diagnostic inspection/recovery is the next design package but
+  requires separate owner approval before activation.
 
 ## Completed Steps
 
@@ -2179,7 +2198,7 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 ```bash
 git status --short --branch
 git rev-parse HEAD
-make check
+.venv/bin/python -m pytest -q tests/test_recovery_state.py
 ```
 
 ## Interruption Recovery
@@ -2227,12 +2246,12 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   continuation. Existing canonical partial rounds remain fail-closed and require a separately
   approved explicit migration; do not infer stage truth from placeholders or
   `last_successful_agent`.
-- ARA-055 package 5 is active from pushed activation `a6cdd2f`. Preserve package 3's
+- ARA-055 package 5 is complete at externally verified `5c9f0ce`. Preserve package 3's
   journal-before-ready and checkpoint-last ordering, package 4's lock-held entry recovery and
   non-mutating read-only guards, configured external storage, exact metric semantics, and legacy
-  incomplete-history compatibility. Package 5 may change only final summary/config/checkpoint
-  finalization and approved reader/entry routing. Do not start package 6 diagnostics, package 7
-  migration, dependency changes, providers, or ignored runtime without separate scope.
+  incomplete-history compatibility and package 5's summary/config/checkpoint transaction. Do not
+  start package 6 diagnostics, package 7 migration, dependency changes, providers, or ignored
+  runtime without separate approval.
 - ARA-061 is complete. Reject only invalid numeric CLI override values and inconsistent effective
   delay bounds; preserve valid zero-disable quota behavior, existing configuration-file validation,
   defaults, scheduler policy, provider behavior, and experiment semantics.
