@@ -258,6 +258,35 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 - Next command:
   `.venv/bin/python -m pytest -q tests/test_run_finalize_recovery.py`.
 
+## ARA-055 Package 5 Local Implementation Checkpoint
+
+- Activation commit `a6cdd2f0924edeea64f43717533bb09a6a940f56` is pushed on the maintenance
+  branch. The implementation worktree is intentionally uncommitted until explicit staged safety
+  validation and the implementation commit.
+- Added a strict bounded finalization codec and fixed create-only journal for exact
+  `run_summary.json`, finalized `run_config.json`, and final `checkpoint.json` after-images.
+- Recovery classifies only before/after generations, applies summary then config then checkpoint,
+  verifies each write, and conditionally removes the unchanged journal. Unknown generations remain
+  read-only conflicts.
+- Iterative entry recovers valid finalization state under the existing lock. Resume and
+  analytics-related readers now block pending/conflicting finalization state without mutation.
+- The runner prepares the journal before any final artifact write and uses the recovery engine;
+  package 3/4 round transactions and diagnostic routing are unchanged.
+- Pre-fix focused evidence failed at collection because the approved API was absent. The first full
+  check then exposed 21 failures caused by an over-strict equality check between config and
+  checkpoint resume metadata. Comparing only the four established recovery-core fields preserves
+  allowed config session metadata; the affected rerun passes `112 passed, 372 subtests`.
+- Final focused validation passes `7 passed, 16 subtests`; UI/entry/finalization coverage passes `97
+  passed, 133 subtests`; final `make check` passes formatting over 71 files, Ruff, imports, repository
+  safety, and `473 passed, 825 subtests` in 318.12 seconds. Tracked safety scans 115 files with zero
+  findings.
+- Next command: explicitly stage the 16 task-owned code/test/documentation/state files, run staged
+  safety and cached-diff validation, then commit.
+- If interrupted: inspect the seven task-owned source/test files plus this state, rerun
+  `.venv/bin/python -m pytest -q tests/test_run_finalize_recovery.py
+  tests/test_round_commit_entry.py`, then inspect the latest `make check` record. Do not commit if
+  either fails.
+
 ## Completed Steps
 
 - Confirmed repository root, branch, remotes, recent history, upstream, and ahead/behind state.
@@ -2150,7 +2179,7 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 ```bash
 git status --short --branch
 git rev-parse HEAD
-.venv/bin/python -m pytest -q tests/test_round_commit_runner.py
+make check
 ```
 
 ## Interruption Recovery
@@ -2198,12 +2227,13 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   continuation. Existing canonical partial rounds remain fail-closed and require a separately
   approved explicit migration; do not infer stage truth from placeholders or
   `last_successful_agent`.
-- ARA-055 package 4 is complete at externally verified `efcad88`. Preserve package 3's
+- ARA-055 package 5 is active from pushed activation `a6cdd2f`. Preserve package 3's
   journal-before-ready and checkpoint-last ordering, package 4's lock-held entry recovery and
   non-mutating read-only guards, configured external storage, exact metric semantics, and legacy
-  incomplete-history compatibility. Do not start package 5 finalization, package 6 diagnostics,
-  package 7 migration, dependency changes, providers, or ignored runtime without separate scope.
-- ARA-061 is active. Reject only invalid numeric CLI override values and inconsistent effective
+  incomplete-history compatibility. Package 5 may change only final summary/config/checkpoint
+  finalization and approved reader/entry routing. Do not start package 6 diagnostics, package 7
+  migration, dependency changes, providers, or ignored runtime without separate scope.
+- ARA-061 is complete. Reject only invalid numeric CLI override values and inconsistent effective
   delay bounds; preserve valid zero-disable quota behavior, existing configuration-file validation,
   defaults, scheduler policy, provider behavior, and experiment semantics.
 - Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.

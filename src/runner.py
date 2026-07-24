@@ -62,10 +62,14 @@ from .round_commit import (
     build_checkpoint_after_image,
     build_project_memory_after_image,
     build_research_state_after_image,
+    build_run_config_after_image,
+    build_run_summary_after_image,
 )
 from .round_commit_recovery import (
     prepare_round_commit,
+    prepare_run_finalize,
     recover_round_commit,
+    recover_run_finalize,
 )
 from .run_config import (
     INHERIT_GIT_ROOT,
@@ -2179,7 +2183,6 @@ def run_iterative_rounds(
             }
         )
     checkpoint_final["can_resume"] = can_resume
-    write_json_file(checkpoint_path, checkpoint_final)
     successful_rounds = [
         entry["round"] for entry in round_metrics if entry.get("successful_research_round")
     ]
@@ -2192,69 +2195,65 @@ def run_iterative_rounds(
         entry["round"] for entry in round_metrics if entry.get("invalid_score_this_round")
     ]
     metrics_totals = summarize_round_metrics(round_metrics)
-    run_summary_path = run_root / "run_summary.json"
-    write_json_file(
-        run_summary_path,
-        {
-            "run_id": run_id,
-            "run_root": str(run_root),
-            "mode": mode,
-            "model": model_name,
-            "drafting_mode": drafting_mode,
-            "completed_rounds": completed_rounds,
-            "best_round": best_round,
-            "best_score": round(best_score, 2),
-            "stop_reason": stop_reason,
-            "can_resume": can_resume,
-            "partial_round": partial_round,
-            "total_runtime_seconds": round(total_runtime, 3),
-            "total_elapsed_seconds": round(total_runtime, 3),
-            "total_agent_elapsed_seconds": metrics_totals["total_agent_elapsed_seconds"],
-            "total_estimated_input_tokens": metrics_totals["total_estimated_input_tokens"],
-            "total_estimated_output_tokens": metrics_totals["total_estimated_output_tokens"],
-            "total_estimated_tokens": metrics_totals["total_estimated_tokens"],
-            "total_estimated_input_chars": metrics_totals["total_estimated_input_chars"],
-            "total_output_chars": metrics_totals["total_output_chars"],
-            "token_estimate_method": metrics_totals["token_estimate_method"],
-            "agent_metric_totals": metrics_totals["agent_metric_totals"],
-            "evolution_metric_totals": metrics_totals["evolution_metric_totals"],
-            "rubric_metric_totals": metrics_totals["rubric_metric_totals"],
-            "rubric_round_count": metrics_totals["rubric_metric_totals"]["rounds_with_rubric"],
-            "rubric_subscore_averages": metrics_totals["rubric_metric_totals"]["rubric_averages"],
-            "rubric_subscore_latest": metrics_totals["rubric_metric_totals"]["rubric_latest"],
-            "rubric_subscore_delta_first_to_latest": metrics_totals["rubric_metric_totals"][
-                "rubric_delta_first_to_latest"
-            ],
-            "avg_draft_to_revised_similarity": metrics_totals["evolution_metric_totals"][
-                "avg_draft_to_revised_similarity"
-            ],
-            "avg_revised_similarity_to_previous": metrics_totals["evolution_metric_totals"][
-                "avg_revised_similarity_to_previous"
-            ],
-            "avg_judge_similarity_to_previous": metrics_totals["evolution_metric_totals"][
-                "avg_judge_similarity_to_previous"
-            ],
-            "low_revision_change_rounds": metrics_totals["evolution_metric_totals"][
-                "low_revision_change_rounds"
-            ],
-            "low_previous_revised_change_rounds": metrics_totals["evolution_metric_totals"][
-                "low_previous_revised_change_rounds"
-            ],
-            "timeout_count": metrics_totals["timeout_count"],
-            "error_count": metrics_totals["error_count"],
-            "resume_metadata": checkpoint_final["resume_metadata"],
-            "score_history_path": str(score_history_path),
-            "round_metrics_path": str(round_metrics_path),
-            "run_config_path": str(run_config_path),
-            "successful_rounds": successful_rounds,
-            "timeout_rounds": timeout_rounds,
-            "error_rounds": error_rounds,
-            "provider_failure_rounds": provider_failure_rounds,
-            "invalid_score_rounds": invalid_score_rounds,
-            "round_count": len(round_metrics),
-        },
-    )
-    run_config = finalize_run_config(
+    run_summary = {
+        "run_id": run_id,
+        "run_root": str(run_root),
+        "mode": mode,
+        "model": model_name,
+        "drafting_mode": drafting_mode,
+        "completed_rounds": completed_rounds,
+        "best_round": best_round,
+        "best_score": round(best_score, 2),
+        "stop_reason": stop_reason,
+        "can_resume": can_resume,
+        "partial_round": partial_round,
+        "total_runtime_seconds": round(total_runtime, 3),
+        "total_elapsed_seconds": round(total_runtime, 3),
+        "total_agent_elapsed_seconds": metrics_totals["total_agent_elapsed_seconds"],
+        "total_estimated_input_tokens": metrics_totals["total_estimated_input_tokens"],
+        "total_estimated_output_tokens": metrics_totals["total_estimated_output_tokens"],
+        "total_estimated_tokens": metrics_totals["total_estimated_tokens"],
+        "total_estimated_input_chars": metrics_totals["total_estimated_input_chars"],
+        "total_output_chars": metrics_totals["total_output_chars"],
+        "token_estimate_method": metrics_totals["token_estimate_method"],
+        "agent_metric_totals": metrics_totals["agent_metric_totals"],
+        "evolution_metric_totals": metrics_totals["evolution_metric_totals"],
+        "rubric_metric_totals": metrics_totals["rubric_metric_totals"],
+        "rubric_round_count": metrics_totals["rubric_metric_totals"]["rounds_with_rubric"],
+        "rubric_subscore_averages": metrics_totals["rubric_metric_totals"]["rubric_averages"],
+        "rubric_subscore_latest": metrics_totals["rubric_metric_totals"]["rubric_latest"],
+        "rubric_subscore_delta_first_to_latest": metrics_totals["rubric_metric_totals"][
+            "rubric_delta_first_to_latest"
+        ],
+        "avg_draft_to_revised_similarity": metrics_totals["evolution_metric_totals"][
+            "avg_draft_to_revised_similarity"
+        ],
+        "avg_revised_similarity_to_previous": metrics_totals["evolution_metric_totals"][
+            "avg_revised_similarity_to_previous"
+        ],
+        "avg_judge_similarity_to_previous": metrics_totals["evolution_metric_totals"][
+            "avg_judge_similarity_to_previous"
+        ],
+        "low_revision_change_rounds": metrics_totals["evolution_metric_totals"][
+            "low_revision_change_rounds"
+        ],
+        "low_previous_revised_change_rounds": metrics_totals["evolution_metric_totals"][
+            "low_previous_revised_change_rounds"
+        ],
+        "timeout_count": metrics_totals["timeout_count"],
+        "error_count": metrics_totals["error_count"],
+        "resume_metadata": checkpoint_final["resume_metadata"],
+        "score_history_path": str(score_history_path),
+        "round_metrics_path": str(round_metrics_path),
+        "run_config_path": str(run_config_path),
+        "successful_rounds": successful_rounds,
+        "timeout_rounds": timeout_rounds,
+        "error_rounds": error_rounds,
+        "provider_failure_rounds": provider_failure_rounds,
+        "invalid_score_rounds": invalid_score_rounds,
+        "round_count": len(round_metrics),
+    }
+    finalized_run_config = finalize_run_config(
         run_config,
         stop_reason=stop_reason,
         can_resume=can_resume,
@@ -2264,7 +2263,15 @@ def run_iterative_rounds(
         total_runtime_seconds=total_runtime,
         ended_at=checkpoint_final["updated_at"],
     )
-    write_json_file(run_config_path, run_config)
+    prepare_run_finalize(
+        project_dir=project_dir,
+        run_root=run_root,
+        run_summary_after=build_run_summary_after_image(run_summary),
+        run_config_after=build_run_config_after_image(finalized_run_config),
+        checkpoint_after=build_checkpoint_after_image(checkpoint_final),
+    )
+    recover_run_finalize(project_dir)
+    run_config = finalized_run_config
 
     if stop_reason in {STOP_USER_REQUESTED, STOP_MANUAL_INTERRUPT}:
         write_interrupted_report(

@@ -985,3 +985,18 @@
   provider calls, ignored runtime, experiment changes, and packages 6-7.
 - Checkpoint requirement: commit and push this activation record before production or test changes,
   then keep implementation and recovery closeout separately verifiable.
+
+## 2026-07-24 - Implement finalization as an exact roll-forward transaction
+
+- Transaction boundary: the runner builds the existing final summary, finalized configuration, and
+  final checkpoint values in memory, persists one fixed create-only project journal, then applies
+  summary, configuration, and checkpoint in that order.
+- Recovery contract: each artifact must match either its recorded before or after digest; any third
+  generation is preserved as a read-only conflict. Every write is verified and journal cleanup is
+  conditional on the exact reopened transaction bytes.
+- Compatibility decision: summary and checkpoint resume metadata remain exactly equal. Finalized
+  config may retain established session metadata, so cross-artifact validation compares the four
+  recovery-core fields rather than discarding or rejecting compatible extra fields.
+- Routing: iterative entry recovers valid pending finalization under the existing project lock.
+  Preview, UI, analytics, compare, report, and artifact readers expose or reject pending/conflicting
+  state without mutation. Diagnostic integration and legacy migration remain separate packages.

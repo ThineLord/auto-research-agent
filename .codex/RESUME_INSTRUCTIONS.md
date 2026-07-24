@@ -149,7 +149,10 @@ ARA-055 package 5 is the sole active task after the owner said `批准` on 2026-
 `11562f61d21040dfb160b2df1f4a491f2b4ecd64` as the conservative exact externally verified
 fallback; push/PR runs `30082575170`/`30082577745` passed Python 3.10/3.13 and every workflow
 step. Read the package-5 section of `docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md`, then
-start with `tests/test_run_finalize_recovery.py`. Do not modify round transaction semantics,
+inspect the local implementation checkpoint in `.codex/CURRENT_STATE.md`. Focused validation
+passes `7 passed, 16 subtests`, affected regressions pass `112 passed, 372 subtests`, and final
+`make check` passes `473 passed, 825 subtests`; the next step is explicit staged safety validation
+and the implementation commit. Do not modify round transaction semantics,
 diagnostic routing, migration, configuration schema/defaults, dependencies, providers, ignored
 runtime, or packages 6-7.
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,

@@ -343,7 +343,7 @@ class RoundCommitEntryTests(unittest.TestCase):
                     "round_commit_recovery_required",
                 )
 
-    def test_finalization_only_state_remains_outside_package_four_routing(self) -> None:
+    def test_invalid_finalization_only_state_blocks_readers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_dir = Path(tmp) / "project"
             project_dir.mkdir()
@@ -353,13 +353,17 @@ class RoundCommitEntryTests(unittest.TestCase):
             )
 
             inspection = recovery_module.classify_round_commit_recovery(project_dir)
+            finalization = recovery_module.classify_run_finalize_recovery(project_dir)
             preview = build_resume_preview(
                 project_dir=project_dir,
                 checkpoint={},
             )
 
             self.assertEqual(inspection.status, "absent")
-            self.assertEqual(preview["blocked_reason"], "missing_checkpoint")
+            self.assertEqual(finalization.status, "invalid")
+            self.assertFalse(finalization.can_recover)
+            self.assertEqual(preview["blocked_reason"], "finalization_conflict")
+            self.assertEqual(preview["finalization_status"], "invalid")
 
 
 if __name__ == "__main__":

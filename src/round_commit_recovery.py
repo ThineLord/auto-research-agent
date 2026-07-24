@@ -27,12 +27,15 @@ from .round_attempts import (
 from .round_commit import (
     MAX_ROUND_COMMIT_JOURNAL_BYTES,
     ROUND_COMMIT_ARTIFACT_NAMES,
+    RUN_FINALIZE_ARTIFACT_NAMES,
     AfterImage,
     RoundCommitCodecError,
     build_best_output_after_image,
     build_history_after_image,
     decode_round_commit_journal,
+    decode_run_finalize_journal,
     encode_round_commit_journal,
+    encode_run_finalize_journal,
 )
 from .storage import (
     artifact_path_exists,
@@ -104,6 +107,15 @@ class _RoundCommitContext:
     journal_text: str
     payload: dict[str, object]
     attempt_state: str
+
+
+@dataclass(frozen=True)
+class _RunFinalizeContext:
+    project_dir: Path
+    run_root: Path
+    journal_path: Path
+    journal_text: str
+    payload: dict[str, object]
 
 
 def _blocked(code: str) -> RoundCommitRecoveryError:
@@ -330,6 +342,165 @@ def _before_record(generation: _Generation) -> dict[str, object]:
         "before_present": generation.present,
         "before_sha256": generation.sha256,
     }
+
+
+def _run_finalize_artifact_paths(
+    *,
+    project_dir: Path,
+    run_root: Path,
+) -> dict[str, tuple[Path, Path]]:
+    return {
+        "run_summary": (run_root / "run_summary.json", run_root),
+        "run_config": (run_root / "run_config.json", run_root),
+        "checkpoint": (project_dir / "checkpoint.json", project_dir),
+    }
+
+
+def _finalization_round(value: Mapping[str, object], field: str) -> int:
+    round_value = value.get(field)
+    if isinstance(round_value, bool) or not isinstance(round_value, int) or round_value < 0:
+        raise _blocked("run_finalize_after_image_mismatch")
+    return round_value
+
+
+def _validate_run_finalize_after_images(
+    *,
+    project_dir: Path,
+    run_root: Path,
+    run_summary_after: AfterImage,
+    run_config_after: AfterImage,
+    checkpoint_after: AfterImage,
+) -> tuple[AfterImage, AfterImage, AfterImage]:
+    summary = _validated_after_image(run_summary_after, kind="run_summary")
+    config = _validated_after_image(run_config_after, kind="run_config")
+    checkpoint = _validated_after_image(checkpoint_after, kind="checkpoint")
+    values = (summary.value, config.value, checkpoint.value)
+    if not all(isinstance(value, dict) for value in values):
+        raise _blocked("run_finalize_after_image_mismatch")
+    summary_value, config_value, checkpoint_value = values
+    assert isinstance(summary_value, dict)
+    assert isinstance(config_value, dict)
+    assert isinstance(checkpoint_value, dict)
+
+    for value in values:
+        if value.get("run_id") != run_root.name:
+            raise _blocked("run_finalize_after_image_mismatch")
+        candidate_root, blocker = validate_project_run_root(
+            project_dir=project_dir,
+            run_root_value=value.get("run_root"),
+            require_writable=True,
+        )
+        if blocker is not None or candidate_root != run_root:
+            raise _blocked("run_finalize_after_image_mismatch")
+
+    completed_rounds = _finalization_round(summary_value, "completed_rounds")
+    if (
+        _finalization_round(config_value, "completed_rounds") != completed_rounds
+        or _finalization_round(checkpoint_value, "last_completed_round") != completed_rounds
+        or config_value.get("status") != "completed"
+    ):
+        raise _blocked("run_finalize_after_image_mismatch")
+    common_fields = ("stop_reason", "can_resume", "best_round", "best_score")
+    for field in common_fields:
+        expected = summary_value.get(field)
+        if config_value.get(field) != expected or checkpoint_value.get(field) != expected:
+            raise _blocked("run_finalize_after_image_mismatch")
+    if summary_value.get("resume_metadata") != checkpoint_value.get("resume_metadata"):
+        raise _blocked("run_finalize_after_image_mismatch")
+    config_resume = config_value.get("resume_metadata")
+    checkpoint_resume = checkpoint_value.get("resume_metadata")
+    if not isinstance(config_resume, dict) or not isinstance(checkpoint_resume, dict):
+        raise _blocked("run_finalize_after_image_mismatch")
+    for field in ("can_resume", "last_completed_round", "next_round", "stop_reason"):
+        if config_resume.get(field) != checkpoint_resume.get(field):
+            raise _blocked("run_finalize_after_image_mismatch")
+    ended_at = config_value.get("ended_at")
+    if (
+        not isinstance(ended_at, str)
+        or not ended_at
+        or config_value.get("updated_at") != ended_at
+        or checkpoint_value.get("updated_at") != ended_at
+    ):
+        raise _blocked("run_finalize_after_image_mismatch")
+    return summary, config, checkpoint
+
+
+def prepare_run_finalize(
+    *,
+    project_dir: Path,
+    run_root: Path,
+    run_summary_after: AfterImage,
+    run_config_after: AfterImage,
+    checkpoint_after: AfterImage,
+    transaction_id: str | None = None,
+) -> dict[str, object]:
+    """Create and reopen the immutable finalization journal before final writes."""
+    project_dir, _ = _project_context(project_dir)
+    round_journal_path = project_dir / ROUND_COMMIT_JOURNAL_NAME
+    journal_path = project_dir / RUN_FINALIZE_JOURNAL_NAME
+    if _journal_exists(round_journal_path, anchor=project_dir):
+        raise _blocked("round_commit_journal_present")
+    if _journal_exists(journal_path, anchor=project_dir):
+        raise _blocked("run_finalize_journal_exists")
+    run_root = _validated_run_root(
+        project_dir=project_dir,
+        run_root_value=str(Path(run_root).expanduser().resolve(strict=False)),
+    )
+    summary, config, checkpoint = _validate_run_finalize_after_images(
+        project_dir=project_dir,
+        run_root=run_root,
+        run_summary_after=run_summary_after,
+        run_config_after=run_config_after,
+        checkpoint_after=checkpoint_after,
+    )
+    paths = _run_finalize_artifact_paths(project_dir=project_dir, run_root=run_root)
+    generations = {
+        name: _read_generation(path, anchor=anchor) for name, (path, anchor) in paths.items()
+    }
+    images = {
+        "run_summary": summary,
+        "run_config": config,
+        "checkpoint": checkpoint,
+    }
+    payload: dict[str, object] = {
+        "schema_version": 1,
+        "kind": "run_finalize",
+        "state": "prepared",
+        "transaction_id": transaction_id or f"finalize_{uuid.uuid4().hex}",
+        "run_id": run_root.name,
+        "run_root": str(run_root),
+        "run_root_identity": _run_root_identity(project_dir, run_root),
+        "artifacts": {
+            name: {
+                **_before_record(generations[name]),
+                "after_sha256": images[name].sha256,
+                "after_value": copy.deepcopy(images[name].value),
+            }
+            for name in RUN_FINALIZE_ARTIFACT_NAMES
+        },
+    }
+    try:
+        journal_text = encode_run_finalize_journal(payload)
+    except RoundCommitCodecError:
+        raise _blocked("run_finalize_journal_invalid") from None
+    try:
+        write_file_text_create_only(journal_path, journal_text, anchor=project_dir)
+    except FileExistsError:
+        raise _blocked("run_finalize_journal_exists") from None
+    except OSError:
+        raise RoundCommitRecoveryIOError("run_finalize_journal_create_failed") from None
+    try:
+        reopened_text = read_regular_text_bounded(
+            journal_path,
+            max_bytes=MAX_ROUND_COMMIT_JOURNAL_BYTES,
+            anchor=project_dir,
+        )
+        reopened = decode_run_finalize_journal(reopened_text)
+    except (OSError, UnicodeError, ValueError, RoundCommitCodecError):
+        raise _blocked("run_finalize_journal_reopen_failed") from None
+    if reopened_text != journal_text or reopened != payload:
+        raise _blocked("run_finalize_journal_reopen_mismatch")
+    return copy.deepcopy(payload)
 
 
 def _history_after_image(
@@ -788,6 +959,261 @@ def classify_round_commit_recovery(
         )
 
 
+def _load_run_finalize_context(project_dir: Path) -> _RunFinalizeContext | None:
+    project_dir, _ = _project_context(project_dir)
+    round_journal_path = project_dir / ROUND_COMMIT_JOURNAL_NAME
+    journal_path = project_dir / RUN_FINALIZE_JOURNAL_NAME
+    if not _journal_exists(journal_path, anchor=project_dir):
+        return None
+    if _journal_exists(round_journal_path, anchor=project_dir):
+        raise _blocked("round_commit_journal_present")
+    try:
+        journal_text = read_regular_text_bounded(
+            journal_path,
+            max_bytes=MAX_ROUND_COMMIT_JOURNAL_BYTES,
+            anchor=project_dir,
+        )
+        payload = decode_run_finalize_journal(journal_text)
+    except (OSError, UnicodeError, RuntimeError, ValueError, RoundCommitCodecError):
+        raise _blocked("run_finalize_journal_invalid") from None
+    run_id = payload["run_id"]
+    run_root = _validated_run_root(
+        project_dir=project_dir,
+        run_root_value=payload["run_root"],
+        expected_run_id=run_id if isinstance(run_id, str) else None,
+        expected_identity=payload["run_root_identity"],
+    )
+    artifacts = payload.get("artifacts")
+    if not isinstance(artifacts, dict):
+        raise _blocked("run_finalize_journal_invalid")
+    images: dict[str, AfterImage] = {}
+    for name in RUN_FINALIZE_ARTIFACT_NAMES:
+        record = artifacts.get(name)
+        if not isinstance(record, dict):
+            raise _blocked("run_finalize_journal_invalid")
+        value = record.get("after_value")
+        if not isinstance(value, dict):
+            raise _blocked("run_finalize_journal_invalid")
+        try:
+            text = json.dumps(value, indent=2, allow_nan=False)
+        except (TypeError, ValueError, RecursionError):
+            raise _blocked("run_finalize_journal_invalid") from None
+        images[name] = AfterImage(
+            value=copy.deepcopy(value),
+            text=text,
+            sha256=_sha256_text(text),
+        )
+    _validate_run_finalize_after_images(
+        project_dir=project_dir,
+        run_root=run_root,
+        run_summary_after=images["run_summary"],
+        run_config_after=images["run_config"],
+        checkpoint_after=images["checkpoint"],
+    )
+    return _RunFinalizeContext(
+        project_dir=project_dir,
+        run_root=run_root,
+        journal_path=journal_path,
+        journal_text=journal_text,
+        payload=payload,
+    )
+
+
+def _run_finalize_artifact_states(
+    context: _RunFinalizeContext,
+) -> tuple[tuple[str, str], ...]:
+    paths = _run_finalize_artifact_paths(
+        project_dir=context.project_dir,
+        run_root=context.run_root,
+    )
+    artifacts = context.payload.get("artifacts")
+    if not isinstance(artifacts, dict):
+        raise _blocked("run_finalize_journal_invalid")
+    states: list[tuple[str, str]] = []
+    for name in RUN_FINALIZE_ARTIFACT_NAMES:
+        record = artifacts.get(name)
+        if not isinstance(record, dict):
+            raise _blocked("run_finalize_journal_invalid")
+        path, anchor = paths[name]
+        try:
+            generation = _read_generation(path, anchor=anchor)
+        except RoundCommitRecoveryError:
+            raise _blocked(f"artifact_unsafe:{name}") from None
+        states.append((name, _classify_artifact(name, record, generation)))
+    return tuple(states)
+
+
+def _run_finalize_inspection(
+    context: _RunFinalizeContext,
+) -> RoundCommitRecoveryInspection:
+    states = _run_finalize_artifact_states(context)
+    conflicts = [name for name, state in states if state == "conflict"]
+    artifacts = context.payload["artifacts"]
+    assert isinstance(artifacts, dict)
+    checkpoint = artifacts["checkpoint"]
+    assert isinstance(checkpoint, dict)
+    checkpoint_value = checkpoint["after_value"]
+    assert isinstance(checkpoint_value, dict)
+    round_index = checkpoint_value["last_completed_round"]
+    assert isinstance(round_index, int)
+    if conflicts:
+        return RoundCommitRecoveryInspection(
+            status="conflict",
+            can_recover=False,
+            journal_present=True,
+            transaction_id=str(context.payload["transaction_id"]),
+            run_id=str(context.payload["run_id"]),
+            round_index=round_index,
+            artifact_states=states,
+            blocked_reason=f"artifact_conflict:{conflicts[0]}",
+        )
+    return RoundCommitRecoveryInspection(
+        status="complete" if all(state == "after" for _, state in states) else "apply_pending",
+        can_recover=True,
+        journal_present=True,
+        transaction_id=str(context.payload["transaction_id"]),
+        run_id=str(context.payload["run_id"]),
+        round_index=round_index,
+        artifact_states=states,
+    )
+
+
+def classify_run_finalize_recovery(
+    project_dir: Path,
+) -> RoundCommitRecoveryInspection:
+    """Inspect the finalization journal without changing any final artifact."""
+    try:
+        candidate_project = Path(project_dir).expanduser().absolute()
+        if not _journal_exists(
+            candidate_project / RUN_FINALIZE_JOURNAL_NAME,
+            anchor=candidate_project,
+        ):
+            return RoundCommitRecoveryInspection(
+                status="absent",
+                can_recover=False,
+                journal_present=False,
+            )
+        context = _load_run_finalize_context(project_dir)
+        if context is None:
+            return RoundCommitRecoveryInspection(
+                status="absent",
+                can_recover=False,
+                journal_present=False,
+            )
+        return _run_finalize_inspection(context)
+    except RoundCommitRecoveryError as exc:
+        status = (
+            "invalid"
+            if exc.code
+            in {
+                "project_runtime_unsafe",
+                "round_commit_journal_unsafe",
+                "run_finalize_journal_invalid",
+            }
+            else "conflict"
+        )
+        return RoundCommitRecoveryInspection(
+            status=status,
+            can_recover=False,
+            journal_present=True,
+            blocked_reason=exc.code,
+        )
+
+
+def _reload_same_run_finalize(expected: _RunFinalizeContext) -> _RunFinalizeContext:
+    current = _load_run_finalize_context(expected.project_dir)
+    if current is None:
+        raise _blocked("run_finalize_journal_missing")
+    if current.journal_text != expected.journal_text or current.payload != expected.payload:
+        raise _blocked("run_finalize_journal_changed")
+    inspection = _run_finalize_inspection(current)
+    if not inspection.can_recover:
+        raise _blocked(inspection.blocked_reason or "run_finalize_recovery_blocked")
+    return current
+
+
+def _apply_run_finalize_artifact(
+    context: _RunFinalizeContext,
+    artifact_name: str,
+) -> None:
+    paths = _run_finalize_artifact_paths(
+        project_dir=context.project_dir,
+        run_root=context.run_root,
+    )
+    artifacts = context.payload.get("artifacts")
+    if not isinstance(artifacts, dict):
+        raise _blocked("run_finalize_journal_invalid")
+    record = artifacts.get(artifact_name)
+    if not isinstance(record, dict):
+        raise _blocked("run_finalize_journal_invalid")
+    path, anchor = paths[artifact_name]
+    generation = _read_generation(path, anchor=anchor)
+    state = _classify_artifact(artifact_name, record, generation)
+    if state == "conflict":
+        raise _blocked(f"artifact_conflict:{artifact_name}")
+    if state == "after":
+        return
+    value = record.get("after_value")
+    try:
+        text = json.dumps(value, indent=2, allow_nan=False)
+    except (TypeError, ValueError, RecursionError):
+        raise _blocked(f"{artifact_name}_after_image_invalid") from None
+    if _sha256_text(text) != record.get("after_sha256"):
+        raise _blocked(f"{artifact_name}_after_image_digest_mismatch")
+    try:
+        write_file_text(path, text, anchor=anchor)
+    except OSError:
+        raise RoundCommitRecoveryIOError(f"artifact_write_failed:{artifact_name}") from None
+    verified = _read_generation(path, anchor=anchor)
+    if _classify_artifact(artifact_name, record, verified) != "after":
+        raise _blocked(f"artifact_verify_failed:{artifact_name}")
+
+
+def recover_run_finalize(
+    project_dir: Path,
+) -> RoundCommitRecoveryInspection:
+    """Roll final summary/config/checkpoint forward in their fixed safe order."""
+    initial = classify_run_finalize_recovery(project_dir)
+    if initial.status == "absent":
+        return initial
+    if not initial.can_recover:
+        raise _blocked(initial.blocked_reason or "run_finalize_recovery_blocked")
+    context = _load_run_finalize_context(project_dir)
+    if context is None:
+        return RoundCommitRecoveryInspection(
+            status="absent",
+            can_recover=False,
+            journal_present=False,
+        )
+    preflight = _run_finalize_inspection(context)
+    if not preflight.can_recover:
+        raise _blocked(preflight.blocked_reason or "run_finalize_recovery_blocked")
+    for artifact_name in RUN_FINALIZE_ARTIFACT_NAMES:
+        context = _reload_same_run_finalize(context)
+        _apply_run_finalize_artifact(context, artifact_name)
+    final_context = _reload_same_run_finalize(context)
+    final_inspection = _run_finalize_inspection(final_context)
+    if final_inspection.status != "complete":
+        raise _blocked("run_finalize_after_state_unverified")
+    try:
+        unlink_artifact_file_if_matches(
+            final_context.journal_path,
+            final_context.journal_text,
+            anchor=final_context.project_dir,
+        )
+    except OSError:
+        raise RoundCommitRecoveryIOError("run_finalize_journal_cleanup_failed") from None
+    return RoundCommitRecoveryInspection(
+        status="recovered",
+        can_recover=False,
+        journal_present=False,
+        transaction_id=final_inspection.transaction_id,
+        run_id=final_inspection.run_id,
+        round_index=final_inspection.round_index,
+        artifact_states=final_inspection.artifact_states,
+    )
+
+
 def infer_round_commit_project_dir(run_root: Path) -> Path | None:
     """Infer the project only from the supported lexical ``project/runs/run`` form."""
     run_root = Path(run_root).expanduser()
@@ -801,14 +1227,18 @@ def round_commit_read_blocker(
 ) -> tuple[str | None, RoundCommitRecoveryInspection]:
     """Return a fixed blocker without changing journal or artifact state."""
     inspection = classify_round_commit_recovery(project_dir)
-    if inspection.status == "absent":
-        return None, inspection
-    blocker = (
-        "round_commit_recovery_required"
-        if inspection.can_recover
-        else "round_commit_recovery_conflict"
-    )
-    return blocker, inspection
+    if inspection.status != "absent":
+        blocker = (
+            "round_commit_recovery_required"
+            if inspection.can_recover
+            else "round_commit_recovery_conflict"
+        )
+        return blocker, inspection
+    finalization = classify_run_finalize_recovery(project_dir)
+    if finalization.status == "absent":
+        return None, finalization
+    blocker = "finalization_pending" if finalization.can_recover else "finalization_conflict"
+    return blocker, finalization
 
 
 def ensure_round_commit_readable(

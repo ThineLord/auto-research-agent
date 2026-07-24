@@ -201,26 +201,43 @@ def build_resume_preview(
     checkpoint_path = project_dir / "checkpoint.json"
     recovery_blocker, recovery = round_commit_read_blocker(project_dir)
     if recovery_blocker is not None:
-        return {
-            "can_resume": False,
-            "blocked_reason": recovery_blocker,
-            "message": (
+        is_finalization = recovery_blocker.startswith("finalization_")
+        if is_finalization:
+            message = (
+                "a pending run finalization must be recovered under the project lock before resume"
+                if recovery.can_recover
+                else "run finalization recovery is blocked; preserve the artifacts and inspect them"
+            )
+        else:
+            message = (
                 "a pending round commit must be recovered under the project lock before resume"
                 if recovery.can_recover
                 else "round commit recovery is blocked; preserve the artifacts and inspect them"
-            ),
+            )
+        return {
+            "can_resume": False,
+            "blocked_reason": recovery_blocker,
+            "message": message,
             "checkpoint_path": str(checkpoint_path),
             "checkpoint_display_path": _display_path(checkpoint_path, repo_root),
             "run_id": recovery.run_id or "",
             "last_completed_round": (
-                recovery.round_index - 1
+                recovery.round_index
+                if is_finalization and recovery.round_index is not None
+                else recovery.round_index - 1
                 if recovery.round_index is not None and recovery.round_index > 0
                 else 0
             ),
-            "next_round": recovery.round_index,
-            "round_commit_status": recovery.status,
-            "round_commit_can_recover": recovery.can_recover,
-            "round_commit_journal_present": recovery.journal_present,
+            "next_round": None if is_finalization else recovery.round_index,
+            ("finalization_status" if is_finalization else "round_commit_status"): recovery.status,
+            (
+                "finalization_can_recover" if is_finalization else "round_commit_can_recover"
+            ): recovery.can_recover,
+            (
+                "finalization_journal_present"
+                if is_finalization
+                else "round_commit_journal_present"
+            ): recovery.journal_present,
         }
     if not checkpoint:
         return {

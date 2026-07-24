@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-    "recorded_at": "2026-07-24T17:50:23+08:00",
+    "recorded_at": "2026-07-24T18:15:00+08:00",
   "branch": "codex/sol-autonomous-hardening",
     "head_commit": "11562f61d21040dfb160b2df1f4a491f2b4ecd64",
     "last_known_stable_commit": "11562f61d21040dfb160b2df1f4a491f2b4ecd64",
@@ -54,8 +54,32 @@
       }
     }
   },
-    "status": "ara055_package5_activated",
+    "status": "ara055_package5_implementation_validated_locally",
     "commands": [
+        {
+            "command": "ARA-055 package 5 local implementation validation",
+            "exit_code": 0,
+            "result": "passed_after_compatibility_correction",
+            "summary": {
+                "activation_commit": "a6cdd2f0924edeea64f43717533bb09a6a940f56",
+                "focused_pytest_passed": 7,
+                "focused_pytest_subtests_passed": 16,
+                "affected_regression_pytest_passed": 112,
+                "affected_regression_subtests_passed": 372,
+                "initial_full_pytest_failed": 21,
+                "initial_full_pytest_passed": 462,
+                "initial_failure": "over-strict full resume_metadata equality rejected compatible run_config session metadata",
+                "make_check_pytest_passed": 473,
+                "make_check_subtests_passed": 825,
+                "make_check_duration_seconds": 318.12,
+                "ruff_formatted_files": 71,
+                "imports": "passed",
+                "tracked_files_scanned": 115,
+                "safety_findings": 0,
+                "provider_calls": 0,
+                "ignored_runtime_access": 0
+            }
+        },
         {
             "command": "ARA-055 package 5 activation baseline and remote verification",
             "exit_code": 0,

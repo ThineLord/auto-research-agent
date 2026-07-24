@@ -902,6 +902,8 @@ def describe_resume_state(
         if preview.get("blocked_reason") in {
             "round_commit_recovery_required",
             "round_commit_recovery_conflict",
+            "finalization_pending",
+            "finalization_conflict",
         }:
             return {
                 "can_resume": False,
@@ -913,6 +915,7 @@ def describe_resume_state(
                     "run_id": preview.get("run_id") or "N/A",
                     "next_round": preview.get("next_round"),
                     "round_commit_status": preview.get("round_commit_status"),
+                    "finalization_status": preview.get("finalization_status"),
                 },
             }
         return {
@@ -952,6 +955,8 @@ def describe_resume_state(
     if preview.get("blocked_reason") in {
         "round_commit_recovery_required",
         "round_commit_recovery_conflict",
+        "finalization_pending",
+        "finalization_conflict",
     }:
         return {
             "can_resume": False,
@@ -966,6 +971,7 @@ def describe_resume_state(
                 "run_id": preview.get("run_id") or "N/A",
                 "next_round": preview.get("next_round"),
                 "round_commit_status": preview.get("round_commit_status"),
+                "finalization_status": preview.get("finalization_status"),
             },
         }
     run_id = str(preview.get("run_id") or checkpoint.get("run_id") or "N/A")
@@ -1364,6 +1370,9 @@ def build_run_analytics_dashboard(project_dir: Path, checkpoint: dict[str, Any])
             "available": False,
             "blocked_reason": recovery_blocker,
             "round_commit_status": recovery.status,
+            "finalization_status": (
+                recovery.status if recovery_blocker.startswith("finalization_") else None
+            ),
             "cards": [],
             "score_rows": [],
             "rubric_rows": [],

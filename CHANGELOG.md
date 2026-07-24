@@ -4,6 +4,11 @@
 
 ### Fixed
 
+* Final run summary, finalized run configuration, and checkpoint now use a separate immutable
+  finalization journal with summary/config-before-checkpoint recovery. Interrupted final writes
+  converge idempotently across configured external run storage; iterative entry recovers valid
+  pending state under the existing lock, while preview, UI, analytics, comparison, and report
+  readers fail closed on pending or conflicting generations.
 * Numeric CLI overrides now reject non-finite, out-of-range, and inconsistent values with startup
   status 2 instead of silently clamping them or carrying an invalid effective delay range into a
   run. Documented boundary values, including a zero quota-failure threshold, remain supported.

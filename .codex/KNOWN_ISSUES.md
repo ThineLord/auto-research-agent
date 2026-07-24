@@ -591,6 +591,10 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 - Package-5 activation: the owner approved the fixed finalization journal on 2026-07-24. Scope is
   exact summary/config/final-checkpoint roll-forward plus approved entry/read-only routing only;
   diagnostic integration and legacy migration remain excluded.
+- Package-5 local checkpoint: a fixed create-only journal now records strict bounded after-images
+  and recovery applies summary/config before checkpoint. Focused validation passes `7 passed, 16
+  subtests`; final `make check` passes `473 passed, 825 subtests`. Staged safety and remote
+  verification remain before this issue can be marked fixed.
 - Package-1 result: commit `4cd4bf4` adds filesystem-free exact after-image builders and a strict
   bounded journal codec with provider-free regression coverage. No runtime caller creates, reads,
   or applies the journal yet, so this issue remains open.
@@ -607,7 +611,7 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   guards. Full `make check` passes `462 passed, 791 subtests`; push/PR CI
   `30034539432`/`30034542276` is green.
 - Boundary: incomplete legacy histories retain their prior compatibility path because no exact
-  before-generation exists. Finalization, diagnostic integration, and migration remain unapproved.
+  before-generation exists. Diagnostic integration and migration remain unapproved.
   Historical journal-less `published_uncommitted` evidence and manually edited third generations
   remain preserved and fail closed.
 

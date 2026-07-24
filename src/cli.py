@@ -73,7 +73,9 @@ from .round_commit_recovery import (
     RoundCommitReadError,
     RoundCommitRecoveryInspection,
     classify_round_commit_recovery,
+    classify_run_finalize_recovery,
     recover_round_commit,
+    recover_run_finalize,
 )
 from .run_analytics import analyze_run
 from .run_compare import compare_runs
@@ -442,26 +444,45 @@ def _recover_pending_round_commit(
     console: Console,
     project_dir: Path,
 ) -> RoundCommitRecoveryInspection:
-    """Recover one valid journal after the caller acquires the project lock."""
+    """Recover valid round and finalization journals under the project lock."""
     inspection = classify_round_commit_recovery(project_dir)
-    if inspection.status == "absent":
-        return inspection
-    if not inspection.can_recover:
+    result = inspection
+    if inspection.status != "absent":
+        if not inspection.can_recover:
+            console.print(
+                "[red]Round commit recovery is blocked; preserved artifacts require inspection.[/red]"
+            )
+            raise SystemExit(_EXIT_STARTUP_ERROR)
+        try:
+            result = recover_round_commit(project_dir)
+        except (OSError, RuntimeError):
+            console.print(
+                "[red]Round commit recovery failed; preserved artifacts require inspection.[/red]"
+            )
+            raise SystemExit(_EXIT_STARTUP_ERROR) from None
         console.print(
-            "[red]Round commit recovery is blocked; preserved artifacts require inspection.[/red]"
+            "[yellow]Recovered pending round commit before starting new runner work.[/yellow]"
+        )
+
+    finalization = classify_run_finalize_recovery(project_dir)
+    if finalization.status == "absent":
+        return result
+    if not finalization.can_recover:
+        console.print(
+            "[red]Run finalization recovery is blocked; preserved artifacts require inspection.[/red]"
         )
         raise SystemExit(_EXIT_STARTUP_ERROR)
     try:
-        recovered = recover_round_commit(project_dir)
+        recovered_finalization = recover_run_finalize(project_dir)
     except (OSError, RuntimeError):
         console.print(
-            "[red]Round commit recovery failed; preserved artifacts require inspection.[/red]"
+            "[red]Run finalization recovery failed; preserved artifacts require inspection.[/red]"
         )
         raise SystemExit(_EXIT_STARTUP_ERROR) from None
     console.print(
-        "[yellow]Recovered pending round commit before starting new runner work.[/yellow]"
+        "[yellow]Recovered pending run finalization before starting new runner work.[/yellow]"
     )
-    return recovered
+    return recovered_finalization
 
 
 def _unsafe_lock_path_message(project_dir: Path) -> str | None:

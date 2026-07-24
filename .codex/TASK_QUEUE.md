@@ -834,6 +834,15 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   `30082575170`/`30082577745` pass Python 3.10/3.13 and every workflow step.
 - Package 5 next command:
   `.venv/bin/python -m pytest -q tests/test_run_finalize_recovery.py`.
+- Package 5 local checkpoint: activation `a6cdd2f` is pushed; strict codec, create-only journal,
+  idempotent summary/config/checkpoint recovery, lock-held entry routing, reader blockers, and
+  runner/UI integration are implemented locally. Focused validation passes `7 passed, 16 subtests`;
+  affected regressions pass `112 passed, 372 subtests`; final `make check` passes `473 passed, 825
+  subtests`. Staged safety, commit, push, dual CI, PR update, and recovery closeout remain.
+- Package 5 resume command: inspect and explicitly stage the 14 task-owned files. If interrupted,
+  first rerun
+  `.venv/bin/python -m pytest -q tests/test_run_finalize_recovery.py
+  tests/test_round_commit_entry.py` and inspect the task-owned diff.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

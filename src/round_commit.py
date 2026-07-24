@@ -30,6 +30,11 @@ ROUND_COMMIT_ARTIFACT_NAMES = (
     "research_state",
     "checkpoint",
 )
+RUN_FINALIZE_ARTIFACT_NAMES = (
+    "run_summary",
+    "run_config",
+    "checkpoint",
+)
 
 _TOP_LEVEL_FIELD_NAMES = (
     "schema_version",
@@ -500,3 +505,187 @@ def decode_round_commit_journal(data: str | bytes) -> dict[str, object]:
         raise RoundCommitCodecError("journal is not valid strict JSON") from exc
     payload = _validate_journal(value)
     return copy.deepcopy(payload)
+
+
+_RUN_FINALIZE_TOP_LEVEL_FIELD_NAMES = (
+    "schema_version",
+    "kind",
+    "state",
+    "transaction_id",
+    "run_id",
+    "run_root",
+    "run_root_identity",
+    "artifacts",
+)
+_RUN_FINALIZE_TOP_LEVEL_FIELDS = set(_RUN_FINALIZE_TOP_LEVEL_FIELD_NAMES)
+_RUN_FINALIZE_ARTIFACT_FIELD_NAMES = (
+    "before_present",
+    "before_sha256",
+    "after_sha256",
+    "after_value",
+)
+_RUN_FINALIZE_ARTIFACT_FIELDS = set(_RUN_FINALIZE_ARTIFACT_FIELD_NAMES)
+
+
+def _validate_run_identity_fields(payload: Mapping[str, object]) -> None:
+    run_id = payload["run_id"]
+    if (
+        not isinstance(run_id, str)
+        or run_id in {".", ".."}
+        or _RUN_ID_PATTERN.fullmatch(run_id) is None
+    ):
+        raise RoundCommitCodecError("run_id is invalid")
+    run_root = payload["run_root"]
+    if not isinstance(run_root, str) or not run_root or len(run_root) > 4096 or "\x00" in run_root:
+        raise RoundCommitCodecError("run_root is invalid")
+    run_root_identity = _require_exact_fields(
+        payload["run_root_identity"],
+        {
+            "configured_storage",
+            "device",
+            "inode",
+            "stat_identity_available",
+        },
+        location="run_root_identity",
+    )
+    configured_storage = run_root_identity["configured_storage"]
+    identity_available = run_root_identity["stat_identity_available"]
+    if type(configured_storage) is not bool:
+        raise RoundCommitCodecError("run_root_identity.configured_storage must be boolean")
+    if type(identity_available) is not bool:
+        raise RoundCommitCodecError("run_root_identity.stat_identity_available must be boolean")
+    for name in ("device", "inode"):
+        identity_value = run_root_identity[name]
+        if identity_available:
+            if type(identity_value) is not int or identity_value < 0:
+                raise RoundCommitCodecError(
+                    f"run_root_identity.{name} must be a non-negative integer "
+                    "when identity is available"
+                )
+        elif identity_value is not None:
+            raise RoundCommitCodecError(
+                f"run_root_identity.{name} must be null when identity is unavailable"
+            )
+
+
+def _validate_run_finalize_artifact_record(
+    artifact_name: str,
+    value: object,
+) -> dict[str, object]:
+    record = _require_exact_fields(
+        value,
+        _RUN_FINALIZE_ARTIFACT_FIELDS,
+        location=f"artifacts.{artifact_name}",
+    )
+    before_present = record["before_present"]
+    if type(before_present) is not bool:
+        raise RoundCommitCodecError(f"artifacts.{artifact_name}.before_present must be boolean")
+    before_digest = record["before_sha256"]
+    if before_present:
+        _validate_digest(before_digest, f"artifacts.{artifact_name}.before_sha256")
+    elif before_digest is not None:
+        raise RoundCommitCodecError(
+            f"artifacts.{artifact_name}.before_sha256 must be null when absent"
+        )
+    after_digest = _validate_digest(
+        record["after_sha256"],
+        f"artifacts.{artifact_name}.after_sha256",
+    )
+    after_value = record["after_value"]
+    if not isinstance(after_value, dict):
+        raise RoundCommitCodecError(f"artifacts.{artifact_name}.after_value must be a JSON object")
+    _validate_json_value(
+        after_value,
+        location=f"artifacts.{artifact_name}.after_value",
+    )
+    if _sha256_text(_serialize_artifact_json(after_value)) != after_digest:
+        raise RoundCommitCodecError(f"artifacts.{artifact_name} after-image digest mismatch")
+    return record
+
+
+def _validate_run_finalize_journal(value: object) -> dict[str, object]:
+    payload = _require_exact_fields(
+        value,
+        _RUN_FINALIZE_TOP_LEVEL_FIELDS,
+        location="journal",
+    )
+    _validate_json_value(payload, location="journal")
+    if type(payload["schema_version"]) is not int or payload["schema_version"] != 1:
+        raise RoundCommitCodecError("schema_version must be 1")
+    if payload["kind"] != "run_finalize":
+        raise RoundCommitCodecError("kind must be run_finalize")
+    if payload["state"] != "prepared":
+        raise RoundCommitCodecError("state must be prepared")
+    transaction_id = payload["transaction_id"]
+    if (
+        not isinstance(transaction_id, str)
+        or _TRANSACTION_ID_PATTERN.fullmatch(transaction_id) is None
+    ):
+        raise RoundCommitCodecError("transaction_id is invalid")
+    _validate_run_identity_fields(payload)
+
+    artifacts = _require_exact_fields(
+        payload["artifacts"],
+        set(RUN_FINALIZE_ARTIFACT_NAMES),
+        location="artifacts",
+    )
+    for artifact_name in RUN_FINALIZE_ARTIFACT_NAMES:
+        _validate_run_finalize_artifact_record(
+            artifact_name,
+            artifacts[artifact_name],
+        )
+    return payload
+
+
+def encode_run_finalize_journal(payload: Mapping[str, object]) -> str:
+    """Validate and deterministically encode a prepared run-finalization journal."""
+    if not isinstance(payload, dict):
+        raise RoundCommitCodecError("journal must be a JSON object")
+    _validate_run_finalize_journal(payload)
+    ordered_payload = {
+        name: copy.deepcopy(payload[name])
+        for name in _RUN_FINALIZE_TOP_LEVEL_FIELD_NAMES
+        if name != "artifacts"
+    }
+    source_artifacts = payload["artifacts"]
+    assert isinstance(source_artifacts, dict)
+    ordered_payload["artifacts"] = {
+        artifact_name: {
+            field_name: copy.deepcopy(source_artifacts[artifact_name][field_name])
+            for field_name in _RUN_FINALIZE_ARTIFACT_FIELD_NAMES
+        }
+        for artifact_name in RUN_FINALIZE_ARTIFACT_NAMES
+    }
+    try:
+        encoded = json.dumps(ordered_payload, indent=2, allow_nan=False)
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise RoundCommitCodecError("journal could not be encoded") from exc
+    if len(encoded.encode("utf-8")) > MAX_ROUND_COMMIT_JOURNAL_BYTES:
+        raise RoundCommitCodecError("journal exceeds maximum encoded size")
+    return encoded
+
+
+def decode_run_finalize_journal(data: str | bytes) -> dict[str, object]:
+    """Decode a strict bounded run-finalization journal."""
+    if isinstance(data, bytes):
+        raw = data
+    elif isinstance(data, str):
+        try:
+            raw = data.encode("utf-8")
+        except UnicodeError as exc:
+            raise RoundCommitCodecError("journal is not valid UTF-8") from exc
+    else:
+        raise RoundCommitCodecError("journal input must be text or bytes")
+    if len(raw) > MAX_ROUND_COMMIT_JOURNAL_BYTES:
+        raise RoundCommitCodecError("journal exceeds maximum encoded size")
+    try:
+        value = json.loads(
+            raw.decode("utf-8", errors="strict"),
+            object_pairs_hook=_unique_object,
+            parse_constant=_reject_constant,
+        )
+    except RoundCommitCodecError:
+        raise
+    except (UnicodeError, json.JSONDecodeError, RecursionError) as exc:
+        raise RoundCommitCodecError("journal is not valid strict JSON") from exc
+    return copy.deepcopy(_validate_run_finalize_journal(value))
