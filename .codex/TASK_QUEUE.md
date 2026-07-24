@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `DONE`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -848,6 +848,24 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   workflow step. Full local validation passes `473 passed, 825 subtests`; staged safety scans 116
   files clean. Package 6 diagnostic recovery and package 7 migration remain separately
   approval-gated.
+- Package 6 approval: after package 5 closeout recommended diagnostic integration, the owner said
+  `批准，继续` on 2026-07-24 after receiving the required long-task assessment.
+- Package 6 authorized scope: fixed strict bounded diagnostic-finalize journal for project score
+  history, run metrics, summary, finalized config, and checkpoint; checkpoint-last recovery under
+  the existing diagnostic entry lock; non-mutating reader guards; package-5 reuse for zero-round
+  quota finalization; internal/configured-external provider-free fault coverage.
+- Package 6 acceptance: every five-artifact write and cleanup `OSError`/`KeyboardInterrupt`
+  boundary converges idempotently; unknown generations fail closed without mutation or path
+  disclosure; recovery precedes provider/client work; existing successful and quota diagnostic
+  artifact bytes/fields remain compatible; focused/related tests, `make check`, staged safety,
+  push, and Python 3.10/3.13 CI pass.
+- Package 6 exclusions: no package 7 migration, dependency/config schema/default change, provider
+  call, ignored-runtime access, experiment change, or historical artifact mutation.
+- Package 6 baseline: exact local/upstream/`ls-remote`/PR-head equality at `ecf9ead`; push/PR runs
+  `30086126360`/`30086129319` pass Python 3.10/3.13 and every workflow step. Focused baseline
+  passes `60 passed, 160 subtests`; recovery state passes `6 passed, 1 subtest`.
+- Package 6 next command:
+  `.venv/bin/python -m pytest -q tests/test_diagnostic_finalize_recovery.py`.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

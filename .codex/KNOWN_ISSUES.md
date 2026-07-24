@@ -573,8 +573,8 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## KI-055 - Published rounds can split history and finalization generations
 
-- Status: fixed and remote-verified for new/fully evidenced round histories and finalization
-  generations through ARA-055 package 5
+- Status: iterative and finalization generations are fixed and remote-verified through package 5;
+  the separately approved diagnostic writer remains active package-6 work
 - Severity: P2 recovery and provenance consistency, high-risk compatibility surface
 - Evidence: 40 provider-free temporary cases covered ten post-publication write boundaries,
   `OSError`/`KeyboardInterrupt`, and internal/configured-external run storage. Failure before the
@@ -599,6 +599,9 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   and checkpoint in that order; iterative entry recovery and reader guards cover pending/conflicting
   generations. Full `make check` passes `473 passed, 825 subtests`; push/PR CI
   `30085545590`/`30085548995` is green on Python 3.10/3.13.
+- Package-6 activation: diagnostic still writes project score history before run-local metrics and
+  metadata. The owner approved one fixed diagnostic-finalize transaction plus lock-held recovery
+  and read-only guards on 2026-07-24; legacy migration remains excluded.
 - Package-1 result: commit `4cd4bf4` adds filesystem-free exact after-image builders and a strict
   bounded journal codec with provider-free regression coverage. No runtime caller creates, reads,
   or applies the journal yet, so this issue remains open.

@@ -145,14 +145,14 @@ passed, 809 subtests` plus formatting, lint, imports, and zero-finding safety sc
 status-2 boundary, valid zero/boundary behavior, unchanged configuration schema/defaults, and
 provider-free scope.
 
-ARA-055 package 5 is complete at exact externally verified implementation
-`5c9f0ced8d45d3aafd406f3e4a84beb46d8d8d5c`; push/PR runs
-`30085545590`/`30085548995` passed Python 3.10/3.13 and every workflow step. Final local
-`make check` passes `473 passed, 825 subtests`, and staged safety scans 116 files clean. There is no
-active implementation task. Package 6 diagnostic routing and package 7 migration require separate
-owner approval; do not infer either from package 5 completion.
-Use `5c9f0ced8d45d3aafd406f3e4a84beb46d8d8d5c` as the conservative exact externally verified
-fallback. There is no unblocked implementation task.
+ARA-055 package 6 is the sole active task after the owner said `批准，继续` on 2026-07-24. Use
+`ecf9ead409e3e72993cade65f69df65b6f2f4269` as the conservative exact externally verified
+fallback; package-5 closeout push/PR runs `30086126360`/`30086129319` passed Python 3.10/3.13 and
+every workflow step. Read the package-6 activation section in `.codex/CURRENT_STATE.md`, the
+diagnostic section in `docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md`, and begin with
+`tests/test_diagnostic_finalize_recovery.py`. Do not modify package-3/5 transaction semantics,
+perform legacy migration, change configuration/dependencies/providers/experiments, read ignored
+runtime, or start package 7.
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 

@@ -4,19 +4,20 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: close out the completed ARA-055 package 5 finalization transaction without
-  inferring approval for package 6 diagnostics or package 7 migration.
+- Current goal: implement the explicitly approved ARA-055 package 6 diagnostic transaction without
+  changing providers, experiments, configuration schemas, legacy artifacts, or package 7 migration.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `5c9f0ced8d45d3aafd406f3e4a84beb46d8d8d5c` (the exact
-  externally verified ARA-055 package 5 implementation retained by the additive recovery schema;
+- State recorded against commit: `ecf9ead409e3e72993cade65f69df65b6f2f4269` (the exact
+  externally verified ARA-055 package 5 closeout retained by the additive recovery schema;
   resolve current `HEAD` live).
-- Last externally verified fallback: `5c9f0ced8d45d3aafd406f3e4a84beb46d8d8d5c` (exact local,
+- Last externally verified fallback: `ecf9ead409e3e72993cade65f69df65b6f2f4269` (exact local,
   remote-tracking, `ls-remote`, GitHub branch, and PR-head equality plus all Python 3.10/3.13
   push/PR jobs passed)
-- Active task at this snapshot: none. ARA-055 package 5 is complete; package 6 diagnostic recovery
-  and package 7 legacy migration remain separately approval-gated.
+- Active task at this snapshot: ARA-055 package 6. Authorization is limited to a fixed
+  diagnostic-finalize transaction, lock-held diagnostic entry recovery, non-mutating reader
+  guards, quota finalization reuse, and provider-free fault/regression coverage.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -305,6 +306,34 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   changes, diagnostic routing, legacy migration, or historical artifact mutation occurred.
 - Package 5 is complete. Package 6 diagnostic inspection/recovery is the next design package but
   requires separate owner approval before activation.
+
+## ARA-055 Package 6 Activation
+
+- Owner approval: `批准，继续` on 2026-07-24 immediately after package 6 was explicitly
+  recommended with a 60–100 minute estimate and package-scoped acceptance criteria.
+- Stable baseline: `ecf9ead409e3e72993cade65f69df65b6f2f4269`, exact local/upstream/
+  `ls-remote`/PR-head equal. Push/PR runs `30086126360`/`30086129319` passed Python 3.10/3.13 and
+  every workflow step; PR 13 is open, draft, and cleanly mergeable.
+- Confirmed remaining defect: diagnostic independently writes project score history before
+  run-local metrics and then final metadata, so an interruption can leave split generations even
+  though iterative and finalization paths are protected.
+- Authorized implementation: one fixed strict bounded `diagnostic_finalize` journal covering
+  score history, diagnostic round metrics, run summary, finalized run config, and checkpoint;
+  checkpoint-last idempotent recovery; lock-held diagnostic entry recovery before provider/client
+  work; read-only pending/conflict guards. Zero-round quota finalization may reuse package 5.
+- Explicit exclusions: no legacy migration, dependencies, configuration schemas/defaults,
+  providers, experiment semantics, ignored runtime, historical artifact mutation, or package 7.
+- Focused baseline passes `60 passed, 160 subtests`; recovery-state baseline passes `6 passed, 1
+  subtest`. No provider or ignored-runtime access occurred.
+- One startup audit command used zsh's special `path` variable inside a read-only loop, which made
+  later commands unavailable in that child shell. The command exited 127 without modifying the
+  repository; a corrected rerun completed fetch, Git, auth, PR, and CI verification successfully.
+- The first activation recovery-state check reported one fallback mismatch because
+  `LAST_VALIDATION.json` still named package 5's implementation rather than its subsequently
+  verified closeout. The additive fallback was advanced to exact closeout `ecf9ead`; the required
+  exact rerun must pass before activation commit.
+- Next command after this activation checkpoint is committed and pushed:
+  `.venv/bin/python -m pytest -q tests/test_diagnostic_finalize_recovery.py`.
 
 ## Completed Steps
 
@@ -2198,7 +2227,7 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 ```bash
 git status --short --branch
 git rev-parse HEAD
-.venv/bin/python -m pytest -q tests/test_recovery_state.py
+.venv/bin/python -m pytest -q tests/test_diagnostic_finalize_recovery.py
 ```
 
 ## Interruption Recovery
@@ -2246,12 +2275,13 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   continuation. Existing canonical partial rounds remain fail-closed and require a separately
   approved explicit migration; do not infer stage truth from placeholders or
   `last_successful_agent`.
-- ARA-055 package 5 is complete at externally verified `5c9f0ce`. Preserve package 3's
+- ARA-055 package 6 is active from the externally verified package-5 closeout `ecf9ead`. Preserve
+  package 3's
   journal-before-ready and checkpoint-last ordering, package 4's lock-held entry recovery and
   non-mutating read-only guards, configured external storage, exact metric semantics, and legacy
-  incomplete-history compatibility and package 5's summary/config/checkpoint transaction. Do not
-  start package 6 diagnostics, package 7 migration, dependency changes, providers, or ignored
-  runtime without separate approval.
+  incomplete-history compatibility and package 5's summary/config/checkpoint transaction. Package
+  6 may change only diagnostic transaction/recovery and approved reader/entry routing. Do not start
+  package 7 migration, dependency changes, providers, or ignored runtime without separate approval.
 - ARA-061 is complete. Reject only invalid numeric CLI override values and inconsistent effective
   delay bounds; preserve valid zero-disable quota behavior, existing configuration-file validation,
   defaults, scheduler policy, provider behavior, and experiment semantics.

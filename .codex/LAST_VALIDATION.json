@@ -2,8 +2,8 @@
   "schema_version": 1,
     "recorded_at": "2026-07-24T18:22:00+08:00",
   "branch": "codex/sol-autonomous-hardening",
-    "head_commit": "5c9f0ced8d45d3aafd406f3e4a84beb46d8d8d5c",
-    "last_known_stable_commit": "5c9f0ced8d45d3aafd406f3e4a84beb46d8d8d5c",
+    "head_commit": "ecf9ead409e3e72993cade65f69df65b6f2f4269",
+    "last_known_stable_commit": "ecf9ead409e3e72993cade65f69df65b6f2f4269",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-    "state_recorded_against_commit": "5c9f0ced8d45d3aafd406f3e4a84beb46d8d8d5c",
+    "state_recorded_against_commit": "ecf9ead409e3e72993cade65f69df65b6f2f4269",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-24T18:22:00+08:00",
-    "commit": "5c9f0ced8d45d3aafd406f3e4a84beb46d8d8d5c",
+    "verified_at": "2026-07-24T18:40:00+08:00",
+    "commit": "ecf9ead409e3e72993cade65f69df65b6f2f4269",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 30085545590,
+        "run_id": 30086126360,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "5c9f0ced8d45d3aafd406f3e4a84beb46d8d8d5c",
+        "head_sha": "ecf9ead409e3e72993cade65f69df65b6f2f4269",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-                "run_id": 30085548995,
+                "run_id": 30086129319,
         "event": "pull_request",
         "workflow": "CI",
-                "head_sha": "5c9f0ced8d45d3aafd406f3e4a84beb46d8d8d5c",
+                "head_sha": "ecf9ead409e3e72993cade65f69df65b6f2f4269",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,35 @@
       }
     }
   },
-    "status": "ara055_package5_complete",
+    "status": "ara055_package6_activated",
     "commands": [
+        {
+            "command": "ARA-055 package 6 activation baseline and recovery audit",
+            "exit_code": 0,
+            "result": "passed_after_shell_variable_correction",
+            "summary": {
+                "owner_approval": "package_6_only",
+                "commit": "ecf9ead409e3e72993cade65f69df65b6f2f4269",
+                "remote_equal": true,
+                "pull_request": 13,
+                "pull_request_state": "open_draft_clean",
+                "push_run_id": 30086126360,
+                "pull_request_run_id": 30086129319,
+                "python_310": "success",
+                "python_313": "success",
+                "focused_pytest_passed": 60,
+                "focused_pytest_subtests_passed": 160,
+                "recovery_pytest_passed": 6,
+                "recovery_pytest_subtests_passed": 1,
+                "initial_recovery_pytest_failed": 1,
+                "initial_recovery_failure": "external fallback still referenced package 5 implementation instead of verified closeout",
+                "initial_audit_exit_code": 127,
+                "initial_audit_failure": "zsh special path variable replaced command search path in child shell",
+                "corrected_audit": "passed",
+                "provider_calls": 0,
+                "ignored_runtime_access": 0
+            }
+        },
         {
             "command": "ARA-055 package 5 local implementation validation",
             "exit_code": 0,

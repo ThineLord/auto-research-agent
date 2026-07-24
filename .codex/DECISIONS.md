@@ -1010,3 +1010,17 @@
   `30085545590`/`30085548995` passed Python 3.10/3.13 and every workflow step.
 - Boundary: package 6 diagnostic recovery and package 7 legacy migration remain separately
   approval-gated. This completion does not authorize either package.
+
+## 2026-07-24 - Approve ARA-055 package 6 diagnostic integration
+
+- Approval: after package 5 completion recommended package 6 with a 60–100 minute estimate, the
+  owner said `批准，继续`.
+- Transaction boundary: use a separate fixed diagnostic-finalize journal because diagnostic has no
+  ARA-054 attempt identity and independently writes project score history plus run-local metrics.
+  A successful diagnostic transaction covers both histories, summary, finalized config, and
+  checkpoint with checkpoint last. Zero-round quota metadata may reuse package 5 finalization.
+- Entry/read policy: recover valid pending diagnostic state under the existing project lock before
+  provider/client construction; readers remain non-mutating and fail closed on mixed or unknown
+  generations.
+- Excluded scope: no legacy migration, dependency/configuration change, provider call, ignored
+  runtime, experiment change, historical artifact mutation, or package 7.
