@@ -1044,3 +1044,15 @@
   3.10/3.13, every isolated-wheel/check step, and zero annotations.
 - Package 6 closes the approved diagnostic split-generation defect. Package 7 remains an explicit
   legacy-migration design/owner decision and is not implied by this completion.
+
+## 2026-07-24 - Approve ARA-055 package 7 design stage only
+
+- Approval: after package 6 closeout recommended a separately gated legacy-migration design, the
+  owner said `批准 继续`.
+- Authorized scope: inspect tracked code, history, tests, and temporary synthetic fixtures; define
+  a read-only legacy classifier, evidence/provenance bundle, dry-run contract, rollback and
+  idempotency rules, explicit execution approval boundary, and future implementation packages.
+- Safety boundary: existing ignored/canonical artifacts remain unread and byte-identical.
+  Ambiguous states must be classified as non-migratable rather than repaired by inference.
+- Excluded scope: no migration implementation/command, schema/default/dependency/provider/
+  experiment change, ignored-runtime inspection, artifact move/delete/rewrite, or package execution.

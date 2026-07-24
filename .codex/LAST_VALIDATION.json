@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-    "recorded_at": "2026-07-24T19:09:23+08:00",
+    "recorded_at": "2026-07-24T19:31:20+08:00",
   "branch": "codex/sol-autonomous-hardening",
-    "head_commit": "24d56ba2a39a6504672d7b42e0f3487707fcf7fc",
-    "last_known_stable_commit": "24d56ba2a39a6504672d7b42e0f3487707fcf7fc",
+    "head_commit": "fe514e073047c10dc84b322225f01db2cb126e83",
+    "last_known_stable_commit": "fe514e073047c10dc84b322225f01db2cb126e83",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-    "state_recorded_against_commit": "24d56ba2a39a6504672d7b42e0f3487707fcf7fc",
+    "state_recorded_against_commit": "fe514e073047c10dc84b322225f01db2cb126e83",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-24T19:09:23+08:00",
-    "commit": "24d56ba2a39a6504672d7b42e0f3487707fcf7fc",
+    "verified_at": "2026-07-24T19:31:20+08:00",
+    "commit": "fe514e073047c10dc84b322225f01db2cb126e83",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 30088147987,
+        "run_id": 30088704158,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "24d56ba2a39a6504672d7b42e0f3487707fcf7fc",
+        "head_sha": "fe514e073047c10dc84b322225f01db2cb126e83",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-                "run_id": 30088150085,
+                "run_id": 30088706374,
         "event": "pull_request",
         "workflow": "CI",
-                "head_sha": "24d56ba2a39a6504672d7b42e0f3487707fcf7fc",
+                "head_sha": "fe514e073047c10dc84b322225f01db2cb126e83",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,31 @@
       }
     }
   },
-    "status": "ara055_package6_complete_remote_verified",
+    "status": "ara055_package7_design_activated",
     "commands": [
+        {
+            "command": "ARA-055 package 7 design activation and recovery audit",
+            "exit_code": 0,
+            "result": "passed_after_empty_marker_loop_correction",
+            "summary": {
+                "owner_approval": "package_7_design_only",
+                "commit": "fe514e073047c10dc84b322225f01db2cb126e83",
+                "remote_equal": true,
+                "ahead": 0,
+                "behind": 0,
+                "pull_request": 13,
+                "pull_request_state": "open_draft_clean",
+                "push_run_id": 30088704158,
+                "pull_request_run_id": 30088706374,
+                "python_310": "success",
+                "python_313": "success",
+                "initial_audit_exit_code": 1,
+                "initial_audit_failure": "empty Git operation marker loop returned false and stopped the combined read-only command",
+                "corrected_audit": "passed",
+                "provider_calls": 0,
+                "ignored_runtime_access": 0
+            }
+        },
         {
             "command": "ARA-055 package 6 implementation remote verification",
             "exit_code": 0,
@@ -4852,6 +4875,17 @@
     }
   ],
   "failures": [
+    {
+      "command": "first ARA-055 package 7 activation recovery-state consistency check",
+      "result": "corrected_before_commit",
+      "summary": {
+        "pytest_failed": 1,
+        "pytest_passed": 5,
+        "pytest_subtests_passed": 1,
+        "cause": "an unscoped status patch marked ARA-001 active while leaving ARA-055 done",
+        "fix": "restored ARA-001 to DONE and marked only ARA-055 IN_PROGRESS using task-title context"
+      }
+    },
     {
       "command": "first ARA-055 package 6 closeout recovery-state consistency check",
       "result": "corrected_before_commit",

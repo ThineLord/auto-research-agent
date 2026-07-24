@@ -609,6 +609,9 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   Implementation `24d56ba` is remote-equal and push/PR CI `30088147987`/`30088150085` is green.
   Legacy journal-less split artifacts remain unchanged; package 7 migration requires separate
   approval.
+- Package-7 design activation: the owner approved tracked-only design work on 2026-07-24. Runtime
+  artifacts remain deliberately uninspected; the design must not infer missing before-generations
+  or authorize mutation. Implementation/execution requires a later explicit approval.
 - Package-1 result: commit `4cd4bf4` adds filesystem-free exact after-image builders and a strict
   bounded journal codec with provider-free regression coverage. No runtime caller creates, reads,
   or applies the journal yet, so this issue remains open.

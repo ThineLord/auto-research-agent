@@ -4,19 +4,20 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: preserve the completed, remotely verified ARA-055 package 6 checkpoint and wait for
-  separate owner approval before any package 7 legacy-migration design.
+- Current goal: complete the explicitly approved ARA-055 package 7 legacy-migration design without
+  reading ignored runtime, mutating historical artifacts, or implementing a migration.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `24d56ba2a39a6504672d7b42e0f3487707fcf7fc` (the exact
-  externally verified ARA-055 package 6 implementation retained by the additive recovery schema;
+- State recorded against commit: `fe514e073047c10dc84b322225f01db2cb126e83` (the exact
+  externally verified ARA-055 package 6 closeout retained by the additive recovery schema;
   resolve current `HEAD` live).
-- Last externally verified fallback: `24d56ba2a39a6504672d7b42e0f3487707fcf7fc` (exact local,
+- Last externally verified fallback: `fe514e073047c10dc84b322225f01db2cb126e83` (exact local,
   remote-tracking, `ls-remote`, GitHub branch, and PR-head equality plus all Python 3.10/3.13
   push/PR jobs passed)
-- Active task at this snapshot: none. ARA-055 package 6 is complete; package 7 legacy migration
-  remains separately approval-gated.
+- Active task at this snapshot: ARA-055 package 7 design stage. Authorization is limited to tracked
+  code/history inspection, temporary synthetic fixtures, legacy-state classification, migration
+  threat modeling, rollback/provenance requirements, and durable documentation.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -366,6 +367,33 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   and exclusions. Package 6 is complete; package 7 remains outside authorization.
 - Next command: verify live Git/CI state, then wait for explicit approval before designing any
   legacy migration.
+
+## ARA-055 Package 7 Design Activation
+
+- Owner approval: `批准 继续` on 2026-07-24 after package 7 legacy-migration design was explicitly
+  recommended as the next separately approval-gated task.
+- Stable baseline: `fe514e073047c10dc84b322225f01db2cb126e83`, exact local/upstream/
+  `ls-remote`/PR-head equal. Closeout push/PR runs `30088704158`/`30088706374` passed Python
+  3.10/3.13, every workflow step, and zero annotations; PR 13 is open, draft, and clean.
+- Authorized work: inventory tracked legacy shapes and current reader/writer contracts; use only
+  temporary synthetic fixtures for characterization; define read-only detection, evidence
+  preservation, provenance, dry-run, explicit execution approval, rollback, idempotency, and
+  compatibility rules; write design and recovery records.
+- Explicit exclusions: no migration implementation or CLI/API, no ignored runtime or canonical
+  artifact inspection/mutation, no provider/network experiment, no schema/default/dependency
+  change, no deletion/quarantine move, and no claim that ambiguous legacy state is repairable.
+- Acceptance: the design enumerates supported/ambiguous/unsafe states, separates diagnosis from
+  mutation, supplies a rollback-safe implementation package plan and validation matrix, passes
+  relevant provider-free tests plus `make check`, and is committed/pushed with green Python
+  3.10/3.13 CI.
+- Initial startup audit was read-only. Its first combined shell command stopped with status 1
+  because an empty Git-marker loop returned false; the corrected audit confirmed no active
+  operation or stash and changed no files.
+- The first activation recovery-state check caught a metadata-only patch targeting error: ARA-001
+  was marked active instead of ARA-055. The task-title-scoped correction restored ARA-001 to
+  `DONE`, marked only ARA-055 `IN_PROGRESS`, and must pass before the activation commit.
+- Next command after the activation checkpoint is pushed: inspect the design document, Git history,
+  legacy compatibility tests, and reader/writer call graph before adding any design text.
 
 ## Completed Steps
 

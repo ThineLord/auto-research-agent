@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `DONE`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -879,6 +879,22 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   3.10/3.13, isolated-wheel validation, every workflow step, and zero annotations. Draft PR 13 is
   open and cleanly mergeable; comment `5069196079` records the evidence. Package 7 legacy migration
   remains separately approval-gated and was not started.
+- Package 7 design approval: after package 6 closeout recommended legacy-migration design, the
+  owner said `批准 继续` on 2026-07-24 after receiving the long-task scope and risk assessment.
+- Package 7 design scope: tracked code/history inspection and temporary synthetic fixtures only;
+  classify legacy states and define evidence preservation, provenance, dry-run, explicit execution
+  approval, rollback, idempotency, compatibility, and a future package plan.
+- Package 7 design acceptance: publish a concrete state/decision/fault matrix that refuses
+  ambiguous repair, leaves all existing artifacts byte-identical, separates read-only discovery
+  from execution, and passes related provider-free tests, `make check`, staged safety, push, and
+  Python 3.10/3.13 CI.
+- Package 7 exclusions: no runtime implementation, migration command, artifact read/write outside
+  temporary fixtures, ignored runtime, provider/experiment/config/dependency change, or automatic
+  cleanup/quarantine.
+- Package 7 baseline: exact local/upstream/`ls-remote`/PR-head equality at `fe514e0`; closeout
+  push/PR runs `30088704158`/`30088706374` pass Python 3.10/3.13 and every workflow step.
+- Package 7 next command: read the ARA-055 design, relevant Git history, compatibility tests, and
+  current readers/writers before drafting the migration design.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

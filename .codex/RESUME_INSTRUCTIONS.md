@@ -145,16 +145,14 @@ passed, 809 subtests` plus formatting, lint, imports, and zero-finding safety sc
 status-2 boundary, valid zero/boundary behavior, unchanged configuration schema/defaults, and
 provider-free scope.
 
-ARA-055 package 6 is complete. Last externally verified fallback:
-`24d56ba2a39a6504672d7b42e0f3487707fcf7fc`. Push/PR runs
-`30088147987`/`30088150085` passed Python 3.10/3.13, every isolated-wheel/check step, and zero
-annotations. Local `make check` passes `481 passed, 849 subtests`; PR 13 is open, draft, and
-cleanly mergeable. Preserve the five-artifact diagnostic transaction, package-5 quota reuse,
-checkpoint-last ordering, and non-mutating reader guards. Do not perform legacy migration, change
-configuration/dependencies/providers/experiments, read ignored runtime, or start package 7 without
-separate approval.
-There is no unblocked implementation task. ARA-055 package 7 legacy-migration design is recommended
-next but remains separately approval-gated.
+ARA-055 package 7 design is the sole active task after the owner said `批准 继续` on 2026-07-24.
+Last externally verified fallback: `fe514e073047c10dc84b322225f01db2cb126e83`. Closeout push/PR
+runs `30088704158`/`30088706374` passed Python 3.10/3.13 and every workflow step. Read the package-7
+activation section in `.codex/CURRENT_STATE.md`, then inspect only tracked code/history/tests and
+temporary synthetic fixtures. Preserve packages 3-6 transactions and all existing artifact bytes.
+Do not inspect ignored runtime, implement or execute migration, add a command/API, change schemas/
+defaults/dependencies/providers/experiments, move/delete/quarantine evidence, or infer missing
+generations.
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 
