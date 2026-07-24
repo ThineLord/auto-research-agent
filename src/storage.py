@@ -55,6 +55,7 @@ PROJECT_RUNTIME_FILE_NAMES = (
     "provider_events.jsonl",
     ".round_commit_transaction.json",
     ".run_finalize_transaction.json",
+    ".diagnostic_finalize_transaction.json",
 )
 PROJECT_RUNTIME_DIRECTORY_NAMES = ("artifacts", "outputs", "logs", "cache", "survey")
 PROJECT_RUNTIME_NESTED_FILE_PATHS = (

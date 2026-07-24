@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-    "recorded_at": "2026-07-24T18:22:00+08:00",
+    "recorded_at": "2026-07-24T18:59:33+08:00",
   "branch": "codex/sol-autonomous-hardening",
     "head_commit": "ecf9ead409e3e72993cade65f69df65b6f2f4269",
     "last_known_stable_commit": "ecf9ead409e3e72993cade65f69df65b6f2f4269",
@@ -54,8 +54,33 @@
       }
     }
   },
-    "status": "ara055_package6_activated",
+    "status": "ara055_package6_local_implementation_checkpoint",
     "commands": [
+        {
+            "command": "ARA-055 package 6 focused and related local validation",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "activation_commit": "3d2a48b8dbd3df10014a7c4a828e4cf818c1e74a",
+                "focused_pytest_passed": 9,
+                "focused_pytest_subtests_passed": 24,
+                "related_pytest_passed": 252,
+                "related_pytest_subtests_passed": 616,
+                "related_duration_seconds": 346.33,
+                "ruff": "passed",
+                "diff_check": "passed",
+                "provider_calls": 0,
+                "ignored_runtime_access": 0,
+                "make_check_pytest_passed": 481,
+                "make_check_subtests_passed": 849,
+                "make_check_duration_seconds": 226.22,
+                "ruff_formatted_files": 72,
+                "imports": "passed",
+                "tracked_files_scanned": 116,
+                "safety_findings": 0,
+                "remaining": "stage_commit_push_ci_pr_closeout"
+            }
+        },
         {
             "command": "ARA-055 package 6 activation baseline and recovery audit",
             "exit_code": 0,
@@ -4806,6 +4831,26 @@
     }
   ],
   "failures": [
+    {
+      "command": "post-validation read-only recovery-state location search",
+      "result": "interrupted_without_file_change",
+      "summary": {
+        "exit_code": 130,
+        "cause": "a backticked make-check token inside a double-quoted search pattern was interpreted by zsh as command substitution",
+        "effect": "an unintended duplicate validation gate started and was immediately interrupted; no file or Git state changed",
+        "fix": "used literal-safe single-quoted search patterns for subsequent state inspection"
+      }
+    },
+    {
+      "command": "first ARA-055 package 6 local recovery-state consistency check",
+      "result": "corrected_before_commit",
+      "summary": {
+        "pytest_failed": 1,
+        "pytest_passed": 5,
+        "cause": "deprecated fallback-only SHA fields were advanced to the pushed activation instead of retaining the last externally verified closeout",
+        "fix": "restored all fallback-only fields to ecf9ead; exact rerun passed 6 tests and 1 subtest"
+      }
+    },
     {
       "command": "first resumed startup marker inspection",
       "result": "corrected_without_file_change",

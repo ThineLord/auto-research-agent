@@ -24,6 +24,7 @@ from src.round_commit import (
     decode_round_commit_journal,
 )
 from src.round_commit_recovery import (
+    DIAGNOSTIC_FINALIZE_JOURNAL_NAME,
     ROUND_COMMIT_JOURNAL_NAME,
     RUN_FINALIZE_JOURNAL_NAME,
     RoundCommitRecoveryError,
@@ -346,9 +347,10 @@ class RoundCommitRecoveryTests(unittest.TestCase):
             ):
                 self._prepare(fixture)
 
-    def test_runtime_inventory_includes_both_fixed_journals(self) -> None:
+    def test_runtime_inventory_includes_all_fixed_journals(self) -> None:
         self.assertIn(ROUND_COMMIT_JOURNAL_NAME, PROJECT_RUNTIME_FILE_NAMES)
         self.assertIn(RUN_FINALIZE_JOURNAL_NAME, PROJECT_RUNTIME_FILE_NAMES)
+        self.assertIn(DIAGNOSTIC_FINALIZE_JOURNAL_NAME, PROJECT_RUNTIME_FILE_NAMES)
 
     def test_prepare_accepts_safe_configured_storage_checkpoint_alias(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

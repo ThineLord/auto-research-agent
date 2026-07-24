@@ -87,6 +87,10 @@ Mock mode 会复用正常 round runner，写入 `run_config.json`、`round_metri
   预检前完成无网络恢复；preview/UI 只报告状态，不会自行写入。恢复完成前，analytics、
   benchmark report 和 UI 中依赖该代 artifact 的视图会拒绝混合读取；若检测到人工编辑或未知
   代际则保留全部证据并 fail closed。
+- Diagnostic 的单轮 history、metrics、summary、final config 和 checkpoint 也使用独立的
+  checkpoint-last transaction；下一次取得项目锁后会在 provider/client 初始化前恢复。
+  配额发生在第一轮完成前时继续复用零轮 finalization transaction。只读界面不会擅自恢复，
+  pending/conflict 状态下会拒绝混合代际的 analytics。
 - resume 会保留并追加同一 run 的既有 metrics/score history、best-round 和上一轮上下文；如果既有
   history 无法安全解析、互相冲突或包含重复/未来轮次，会在写入任何 run artifact 前 fail-safe
   阻塞，并让 CLI 返回非零状态。

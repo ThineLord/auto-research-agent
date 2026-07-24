@@ -294,6 +294,14 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "finalization_conflict": (
             "Run finalization recovery is blocked. Preserve the artifacts and inspect the conflict."
         ),
+        "diagnostic_finalization_pending": (
+            "A pending diagnostic finalization must be recovered before these artifacts can be "
+            "read safely."
+        ),
+        "diagnostic_finalization_conflict": (
+            "Diagnostic finalization recovery is blocked. Preserve the artifacts and inspect the "
+            "conflict."
+        ),
         "analytics_best_score": "Best score",
         "analytics_completed_rounds": "Completed rounds",
         "analytics_timeout_errors": "Timeouts / errors",
@@ -600,6 +608,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "round_commit_recovery_conflict": "轮次提交恢复被冲突阻止。请保留 artifact 并检查冲突。",
         "finalization_pending": "存在待恢复的运行收尾事务；恢复完成前不能安全读取这些 artifact。",
         "finalization_conflict": "运行收尾恢复被冲突阻止。请保留 artifact 并检查冲突。",
+        "diagnostic_finalization_pending": "存在待恢复的诊断收尾事务；恢复完成前不能安全读取这些 artifact。",
+        "diagnostic_finalization_conflict": "诊断收尾恢复被冲突阻止。请保留 artifact 并检查冲突。",
         "analytics_best_score": "最佳分数",
         "analytics_completed_rounds": "已完成轮数",
         "analytics_timeout_errors": "超时 / 错误",

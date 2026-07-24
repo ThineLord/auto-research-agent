@@ -4,6 +4,12 @@
 
 ### Fixed
 
+* Diagnostic finalization now records project history, run metrics, summary, finalized config, and
+  checkpoint in one strict bounded checkpoint-last transaction. Interrupted writes and cleanup
+  converge idempotently with internal or configured external run storage; recovery runs under the
+  project lock before provider/client setup, and read-only consumers fail closed on pending or
+  conflicting generations. A quota stop before round completion reuses the zero-round finalization
+  transaction.
 * Final run summary, finalized run configuration, and checkpoint now use a separate immutable
   finalization journal with summary/config-before-checkpoint recovery. Interrupted final writes
   converge idempotently across configured external run storage; iterative entry recovers valid

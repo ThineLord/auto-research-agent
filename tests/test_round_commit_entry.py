@@ -263,6 +263,82 @@ class RoundCommitEntryTests(unittest.TestCase):
                 ["lock", "recover", "provider", "client", "agents"],
             )
 
+    def test_diagnostic_entry_recovers_before_provider_preflight_and_client(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "projects" / "example"
+            project_dir.mkdir(parents=True)
+            (project_dir / "task.md").write_text("# Diagnostic task\n", encoding="utf-8")
+            args = cli_module.parse_args(["--diagnostic", "--project", "example"])
+            events: list[str] = []
+
+            with (
+                patch.object(cli_module, "parse_args", return_value=args),
+                patch.object(cli_module, "load_app_config", return_value=AppConfig()),
+                patch.object(
+                    cli_module,
+                    "load_project_input",
+                    return_value=SimpleNamespace(
+                        project_name="example",
+                        project_dir=project_dir,
+                        task_path=project_dir / "task.md",
+                        task_text="# Diagnostic task",
+                        project_title="Diagnostic task",
+                        source_kind="example_default",
+                        as_metadata=lambda: {"project_name": "example"},
+                    ),
+                ),
+                patch.object(
+                    cli_module,
+                    "acquire_run_lock",
+                    side_effect=lambda *args, **kwargs: (
+                        events.append("lock") or project_dir / "run.lock",
+                        None,
+                    ),
+                ),
+                patch.object(cli_module, "release_run_lock"),
+                patch.object(
+                    cli_module,
+                    "_recover_pending_round_commit",
+                    side_effect=lambda **kwargs: (
+                        events.append("recover")
+                        or recovery_module.RoundCommitRecoveryInspection(
+                            status="absent",
+                            can_recover=False,
+                            journal_present=False,
+                        )
+                    ),
+                ),
+                patch.object(
+                    cli_module,
+                    "list_installed_ollama_models",
+                    side_effect=lambda: (
+                        events.append("provider") or ["qwen3:8b"],
+                        None,
+                    ),
+                ),
+                patch.object(
+                    cli_module,
+                    "create_llm_client",
+                    side_effect=lambda **kwargs: events.append("client") or object(),
+                ),
+                patch.object(
+                    cli_module.ResearchAgents,
+                    "from_prompt_dir",
+                    side_effect=lambda **kwargs: events.append("agents") or object(),
+                ),
+                patch.object(
+                    cli_module,
+                    "run_diagnostic_mode",
+                    side_effect=lambda **kwargs: events.append("diagnostic"),
+                ),
+            ):
+                cli_module.main()
+
+            self.assertEqual(
+                events,
+                ["lock", "recover", "provider", "client", "agents", "diagnostic"],
+            )
+
     def test_entry_conflict_blocks_without_mutation_or_path_disclosure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

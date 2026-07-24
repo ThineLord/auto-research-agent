@@ -864,8 +864,16 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Package 6 baseline: exact local/upstream/`ls-remote`/PR-head equality at `ecf9ead`; push/PR runs
   `30086126360`/`30086129319` pass Python 3.10/3.13 and every workflow step. Focused baseline
   passes `60 passed, 160 subtests`; recovery state passes `6 passed, 1 subtest`.
-- Package 6 next command:
-  `.venv/bin/python -m pytest -q tests/test_diagnostic_finalize_recovery.py`.
+- Package 6 local checkpoint: activation `3d2a48b` is pushed; the fixed five-artifact diagnostic
+  journal, checkpoint-last recovery, lock-held entry routing, reader blockers, and zero-round
+  package-5 reuse are implemented locally. Static/focused validation passes `9 passed, 24
+  subtests`; related regression passes `252 passed, 616 subtests`; full `make check` passes `481
+  passed, 849 subtests` plus all static/import/safety gates. Staged safety, commit, push, CI, PR
+  update, and closeout remain.
+- Package 6 resume command: inspect and explicitly stage the 19 package-owned paths. If interrupted
+  before commit, first rerun
+  `.venv/bin/python -m pytest -q tests/test_diagnostic_finalize_recovery.py
+  tests/test_diagnostic.py tests/test_round_commit_entry.py`.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

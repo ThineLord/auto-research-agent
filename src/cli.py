@@ -72,8 +72,10 @@ from .resume import run_resume_mode
 from .round_commit_recovery import (
     RoundCommitReadError,
     RoundCommitRecoveryInspection,
+    classify_diagnostic_finalize_recovery,
     classify_round_commit_recovery,
     classify_run_finalize_recovery,
+    recover_diagnostic_finalize,
     recover_round_commit,
     recover_run_finalize,
 )
@@ -465,24 +467,46 @@ def _recover_pending_round_commit(
         )
 
     finalization = classify_run_finalize_recovery(project_dir)
-    if finalization.status == "absent":
-        return result
-    if not finalization.can_recover:
+    if finalization.status != "absent":
+        if not finalization.can_recover:
+            console.print(
+                "[red]Run finalization recovery is blocked; preserved artifacts require "
+                "inspection.[/red]"
+            )
+            raise SystemExit(_EXIT_STARTUP_ERROR)
+        try:
+            result = recover_run_finalize(project_dir)
+        except (OSError, RuntimeError):
+            console.print(
+                "[red]Run finalization recovery failed; preserved artifacts require "
+                "inspection.[/red]"
+            )
+            raise SystemExit(_EXIT_STARTUP_ERROR) from None
         console.print(
-            "[red]Run finalization recovery is blocked; preserved artifacts require inspection.[/red]"
+            "[yellow]Recovered pending run finalization before starting new runner work.[/yellow]"
+        )
+
+    diagnostic = classify_diagnostic_finalize_recovery(project_dir)
+    if diagnostic.status == "absent":
+        return result
+    if not diagnostic.can_recover:
+        console.print(
+            "[red]Diagnostic finalization recovery is blocked; preserved artifacts require "
+            "inspection.[/red]"
         )
         raise SystemExit(_EXIT_STARTUP_ERROR)
     try:
-        recovered_finalization = recover_run_finalize(project_dir)
+        recovered_diagnostic = recover_diagnostic_finalize(project_dir)
     except (OSError, RuntimeError):
         console.print(
-            "[red]Run finalization recovery failed; preserved artifacts require inspection.[/red]"
+            "[red]Diagnostic finalization recovery failed; preserved artifacts require "
+            "inspection.[/red]"
         )
         raise SystemExit(_EXIT_STARTUP_ERROR) from None
     console.print(
-        "[yellow]Recovered pending run finalization before starting new runner work.[/yellow]"
+        "[yellow]Recovered pending diagnostic finalization before starting new runner work.[/yellow]"
     )
-    return recovered_finalization
+    return recovered_diagnostic
 
 
 def _unsafe_lock_path_message(project_dir: Path) -> str | None:
@@ -1080,11 +1104,10 @@ def main() -> None:
             console.print(f"[red]{lock_error}[/red]")
             _print_run_lock_recovery_hint(console, root, project_dir)
             raise SystemExit(_EXIT_STARTUP_ERROR)
-        if requested_mode != "diagnostic":
-            _recover_pending_round_commit(
-                console=console,
-                project_dir=project_dir,
-            )
+        _recover_pending_round_commit(
+            console=console,
+            project_dir=project_dir,
+        )
         _validate_model_provider_startup(
             args=args,
             console=console,

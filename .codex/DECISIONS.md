@@ -1024,3 +1024,16 @@
   generations.
 - Excluded scope: no legacy migration, dependency/configuration change, provider call, ignored
   runtime, experiment change, historical artifact mutation, or package 7.
+
+## 2026-07-24 - Keep diagnostic finalization fixed, checkpoint-last, and provider-free
+
+- Use one project-local diagnostic journal because diagnostic has no ARA-054 attempt identity.
+  Store exact after-values and hashes for its two one-round histories plus summary, config, and
+  checkpoint; apply checkpoint last.
+- Require both histories to contain the same single round and cross-check run identity, completion
+  state, stop/resume metadata, score, and one common finalization timestamp before journal creation
+  or recovery.
+- Reuse package 5 only for a quota stop before a diagnostic round completes. Do not broaden package
+  5 semantics or infer a diagnostic attempt/migration identity.
+- Recover only under the existing entry lock before provider/client work. Preview and readers stay
+  non-mutating and fail closed on unknown generations.

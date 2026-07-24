@@ -331,9 +331,37 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 - The first activation recovery-state check reported one fallback mismatch because
   `LAST_VALIDATION.json` still named package 5's implementation rather than its subsequently
   verified closeout. The additive fallback was advanced to exact closeout `ecf9ead`; the required
-  exact rerun must pass before activation commit.
-- Next command after this activation checkpoint is committed and pushed:
-  `.venv/bin/python -m pytest -q tests/test_diagnostic_finalize_recovery.py`.
+  exact rerun passed before activation commit.
+- Activation commit `3d2a48b8dbd3df10014a7c4a828e4cf818c1e74a` is pushed and is the current
+  local/upstream head.
+
+## ARA-055 Package 6 Local Implementation Checkpoint
+
+- Added one strict bounded `.diagnostic_finalize_transaction.json` covering project score history,
+  diagnostic round metrics, run summary, finalized run config, and checkpoint in that fixed
+  checkpoint-last order.
+- Recovery revalidates the immutable journal, run-root identity, exact before/after generations,
+  and all five correlated after-images before applying. Internal and configured-external storage
+  fault coverage injects both `OSError` and `KeyboardInterrupt` at every write and cleanup
+  boundary, then proves idempotent convergence.
+- Diagnostic entry now performs recovery under the existing project lock before provider
+  preflight/client construction. Preview, UI, analytics, comparison/report shared guards expose or
+  reject pending/conflicting diagnostic generations without mutation or absolute-path disclosure.
+- A zero-round cloud-free quota stop reuses package 5's summary/config/checkpoint finalization
+  transaction. Successful diagnostic artifact fields and metric values remain unchanged; one
+  common finalization timestamp is required by the existing transaction invariant.
+- Static checks and focused diagnostic validation pass `9 passed, 24 subtests`. Related recovery,
+  entry, CLI, runner, UI, analytics, and comparison validation passes `252 passed, 616 subtests`
+  in 346.33 seconds. `git diff --check` passes; no provider or ignored-runtime access occurred.
+- Full `make check` passes formatting over 72 files, Ruff, imports, tracked and staged repository
+  safety over 116 files with zero findings, and `481 passed, 849 subtests` in 226.22 seconds.
+- Current working tree contains only package-6 implementation, tests, documentation, and recovery
+  records. Staged safety, implementation commit/push, dual CI, PR update, and closeout remain.
+- One later read-only state-location command repeated a known shell quoting error: a backticked
+  `make check` token inside a double-quoted pattern started an unintended duplicate gate. It was
+  interrupted immediately with status 130; no file or Git state changed.
+- Next command: explicitly stage the 19 package-owned paths and run staged safety plus cached diff
+  checks.
 
 ## Completed Steps
 

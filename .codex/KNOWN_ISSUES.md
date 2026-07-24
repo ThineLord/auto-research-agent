@@ -602,6 +602,11 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 - Package-6 activation: diagnostic still writes project score history before run-local metrics and
   metadata. The owner approved one fixed diagnostic-finalize transaction plus lock-held recovery
   and read-only guards on 2026-07-24; legacy migration remains excluded.
+- Package-6 local result: the five diagnostic artifacts now use a strict checkpoint-last
+  roll-forward transaction; every internal/external write and cleanup `OSError`/`KeyboardInterrupt`
+  boundary converges in focused tests, and pending/conflicting readers fail closed. Related
+  validation passes `252 passed, 616 subtests`; full `make check` passes `481 passed, 849 subtests`.
+  Remote verification remains.
 - Package-1 result: commit `4cd4bf4` adds filesystem-free exact after-image builders and a strict
   bounded journal codec with provider-free regression coverage. No runtime caller creates, reads,
   or applies the journal yet, so this issue remains open.

@@ -35,6 +35,13 @@ RUN_FINALIZE_ARTIFACT_NAMES = (
     "run_config",
     "checkpoint",
 )
+DIAGNOSTIC_FINALIZE_ARTIFACT_NAMES = (
+    "score_history",
+    "round_metrics",
+    "run_summary",
+    "run_config",
+    "checkpoint",
+)
 
 _TOP_LEVEL_FIELD_NAMES = (
     "schema_version",
@@ -689,3 +696,130 @@ def decode_run_finalize_journal(data: str | bytes) -> dict[str, object]:
     except (UnicodeError, json.JSONDecodeError, RecursionError) as exc:
         raise RoundCommitCodecError("journal is not valid strict JSON") from exc
     return copy.deepcopy(_validate_run_finalize_journal(value))
+
+
+def _validate_diagnostic_finalize_artifact_record(
+    artifact_name: str,
+    value: object,
+) -> dict[str, object]:
+    record = _require_exact_fields(
+        value,
+        _RUN_FINALIZE_ARTIFACT_FIELDS,
+        location=f"artifacts.{artifact_name}",
+    )
+    before_present = record["before_present"]
+    if type(before_present) is not bool:
+        raise RoundCommitCodecError(f"artifacts.{artifact_name}.before_present must be boolean")
+    before_digest = record["before_sha256"]
+    if before_present:
+        _validate_digest(before_digest, f"artifacts.{artifact_name}.before_sha256")
+    elif before_digest is not None:
+        raise RoundCommitCodecError(
+            f"artifacts.{artifact_name}.before_sha256 must be null when absent"
+        )
+    after_digest = _validate_digest(
+        record["after_sha256"],
+        f"artifacts.{artifact_name}.after_sha256",
+    )
+    after_value = record["after_value"]
+    expected_type = list if artifact_name in {"score_history", "round_metrics"} else dict
+    if not isinstance(after_value, expected_type):
+        expected_name = "array" if expected_type is list else "object"
+        raise RoundCommitCodecError(
+            f"artifacts.{artifact_name}.after_value must be a JSON {expected_name}"
+        )
+    _validate_json_value(
+        after_value,
+        location=f"artifacts.{artifact_name}.after_value",
+    )
+    if _sha256_text(_serialize_artifact_json(after_value)) != after_digest:
+        raise RoundCommitCodecError(f"artifacts.{artifact_name} after-image digest mismatch")
+    return record
+
+
+def _validate_diagnostic_finalize_journal(value: object) -> dict[str, object]:
+    payload = _require_exact_fields(
+        value,
+        _RUN_FINALIZE_TOP_LEVEL_FIELDS,
+        location="journal",
+    )
+    _validate_json_value(payload, location="journal")
+    if type(payload["schema_version"]) is not int or payload["schema_version"] != 1:
+        raise RoundCommitCodecError("schema_version must be 1")
+    if payload["kind"] != "diagnostic_finalize":
+        raise RoundCommitCodecError("kind must be diagnostic_finalize")
+    if payload["state"] != "prepared":
+        raise RoundCommitCodecError("state must be prepared")
+    transaction_id = payload["transaction_id"]
+    if (
+        not isinstance(transaction_id, str)
+        or _TRANSACTION_ID_PATTERN.fullmatch(transaction_id) is None
+    ):
+        raise RoundCommitCodecError("transaction_id is invalid")
+    _validate_run_identity_fields(payload)
+
+    artifacts = _require_exact_fields(
+        payload["artifacts"],
+        set(DIAGNOSTIC_FINALIZE_ARTIFACT_NAMES),
+        location="artifacts",
+    )
+    for artifact_name in DIAGNOSTIC_FINALIZE_ARTIFACT_NAMES:
+        _validate_diagnostic_finalize_artifact_record(
+            artifact_name,
+            artifacts[artifact_name],
+        )
+    return payload
+
+
+def encode_diagnostic_finalize_journal(payload: Mapping[str, object]) -> str:
+    """Validate and deterministically encode a diagnostic-finalization journal."""
+    if not isinstance(payload, dict):
+        raise RoundCommitCodecError("journal must be a JSON object")
+    _validate_diagnostic_finalize_journal(payload)
+    ordered_payload = {
+        name: copy.deepcopy(payload[name])
+        for name in _RUN_FINALIZE_TOP_LEVEL_FIELD_NAMES
+        if name != "artifacts"
+    }
+    source_artifacts = payload["artifacts"]
+    assert isinstance(source_artifacts, dict)
+    ordered_payload["artifacts"] = {
+        artifact_name: {
+            field_name: copy.deepcopy(source_artifacts[artifact_name][field_name])
+            for field_name in _RUN_FINALIZE_ARTIFACT_FIELD_NAMES
+        }
+        for artifact_name in DIAGNOSTIC_FINALIZE_ARTIFACT_NAMES
+    }
+    try:
+        encoded = json.dumps(ordered_payload, indent=2, allow_nan=False)
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise RoundCommitCodecError("journal could not be encoded") from exc
+    if len(encoded.encode("utf-8")) > MAX_ROUND_COMMIT_JOURNAL_BYTES:
+        raise RoundCommitCodecError("journal exceeds maximum encoded size")
+    return encoded
+
+
+def decode_diagnostic_finalize_journal(data: str | bytes) -> dict[str, object]:
+    """Decode a strict bounded diagnostic-finalization journal."""
+    if isinstance(data, bytes):
+        raw = data
+    elif isinstance(data, str):
+        try:
+            raw = data.encode("utf-8")
+        except UnicodeError as exc:
+            raise RoundCommitCodecError("journal is not valid UTF-8") from exc
+    else:
+        raise RoundCommitCodecError("journal input must be text or bytes")
+    if len(raw) > MAX_ROUND_COMMIT_JOURNAL_BYTES:
+        raise RoundCommitCodecError("journal exceeds maximum encoded size")
+    try:
+        value = json.loads(
+            raw.decode("utf-8", errors="strict"),
+            object_pairs_hook=_unique_object,
+            parse_constant=_reject_constant,
+        )
+    except RoundCommitCodecError:
+        raise
+    except (UnicodeError, json.JSONDecodeError, RecursionError) as exc:
+        raise RoundCommitCodecError("journal is not valid strict JSON") from exc
+    return copy.deepcopy(_validate_diagnostic_finalize_journal(value))

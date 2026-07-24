@@ -904,6 +904,8 @@ def describe_resume_state(
             "round_commit_recovery_conflict",
             "finalization_pending",
             "finalization_conflict",
+            "diagnostic_finalization_pending",
+            "diagnostic_finalization_conflict",
         }:
             return {
                 "can_resume": False,
@@ -916,6 +918,7 @@ def describe_resume_state(
                     "next_round": preview.get("next_round"),
                     "round_commit_status": preview.get("round_commit_status"),
                     "finalization_status": preview.get("finalization_status"),
+                    "diagnostic_finalization_status": preview.get("diagnostic_finalization_status"),
                 },
             }
         return {
@@ -957,6 +960,8 @@ def describe_resume_state(
         "round_commit_recovery_conflict",
         "finalization_pending",
         "finalization_conflict",
+        "diagnostic_finalization_pending",
+        "diagnostic_finalization_conflict",
     }:
         return {
             "can_resume": False,
@@ -972,6 +977,7 @@ def describe_resume_state(
                 "next_round": preview.get("next_round"),
                 "round_commit_status": preview.get("round_commit_status"),
                 "finalization_status": preview.get("finalization_status"),
+                "diagnostic_finalization_status": preview.get("diagnostic_finalization_status"),
             },
         }
     run_id = str(preview.get("run_id") or checkpoint.get("run_id") or "N/A")
@@ -1372,6 +1378,9 @@ def build_run_analytics_dashboard(project_dir: Path, checkpoint: dict[str, Any])
             "round_commit_status": recovery.status,
             "finalization_status": (
                 recovery.status if recovery_blocker.startswith("finalization_") else None
+            ),
+            "diagnostic_finalization_status": (
+                recovery.status if recovery_blocker.startswith("diagnostic_finalization_") else None
             ),
             "cards": [],
             "score_rows": [],

@@ -202,7 +202,16 @@ def build_resume_preview(
     recovery_blocker, recovery = round_commit_read_blocker(project_dir)
     if recovery_blocker is not None:
         is_finalization = recovery_blocker.startswith("finalization_")
-        if is_finalization:
+        is_diagnostic_finalization = recovery_blocker.startswith("diagnostic_finalization_")
+        if is_diagnostic_finalization:
+            message = (
+                "a pending diagnostic finalization must be recovered under the project lock "
+                "before resume"
+                if recovery.can_recover
+                else "diagnostic finalization recovery is blocked; preserve the artifacts and "
+                "inspect them"
+            )
+        elif is_finalization:
             message = (
                 "a pending run finalization must be recovered under the project lock before resume"
                 if recovery.can_recover
@@ -223,18 +232,33 @@ def build_resume_preview(
             "run_id": recovery.run_id or "",
             "last_completed_round": (
                 recovery.round_index
-                if is_finalization and recovery.round_index is not None
+                if (is_finalization or is_diagnostic_finalization)
+                and recovery.round_index is not None
                 else recovery.round_index - 1
                 if recovery.round_index is not None and recovery.round_index > 0
                 else 0
             ),
-            "next_round": None if is_finalization else recovery.round_index,
-            ("finalization_status" if is_finalization else "round_commit_status"): recovery.status,
+            "next_round": (
+                None if is_finalization or is_diagnostic_finalization else recovery.round_index
+            ),
             (
-                "finalization_can_recover" if is_finalization else "round_commit_can_recover"
+                "diagnostic_finalization_status"
+                if is_diagnostic_finalization
+                else "finalization_status"
+                if is_finalization
+                else "round_commit_status"
+            ): recovery.status,
+            (
+                "diagnostic_finalization_can_recover"
+                if is_diagnostic_finalization
+                else "finalization_can_recover"
+                if is_finalization
+                else "round_commit_can_recover"
             ): recovery.can_recover,
             (
-                "finalization_journal_present"
+                "diagnostic_finalization_journal_present"
+                if is_diagnostic_finalization
+                else "finalization_journal_present"
                 if is_finalization
                 else "round_commit_journal_present"
             ): recovery.journal_present,
