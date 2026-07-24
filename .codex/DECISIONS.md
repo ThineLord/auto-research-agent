@@ -968,3 +968,20 @@
   `5068253242` records the result.
 - Next boundary: ARA-055 package 5 remains separately approval-gated; this completion does not
   authorize finalization journaling or other queued policy work.
+
+## 2026-07-24 - Approve ARA-055 implementation package 5 only
+
+- Approval: after ARA-061 closeout explicitly recommended package 5, the owner said `批准`.
+- Authorized scope: add one fixed create-only finalization journal; capture exact bounded
+  `run_summary.json`, finalized `run_config.json`, and final `checkpoint.json` after-images; apply
+  summary and config before the checkpoint; recover valid pending state under the iterative entry
+  lock; block approved read-only consumers without mutation while generations are mixed.
+- Compatibility requirement: preserve public artifact schemas/bytes, stop decisions, timestamps,
+  resume eligibility, configured external storage, manual-interrupt status 130, cooperative status
+  0, and package 3/4 round-transaction ordering.
+- Failure policy: unknown/malformed/unsafe journals or third-generation artifacts remain preserved
+  and fail closed with path-redacted diagnostics. Recovery is provider-free and idempotent.
+- Excluded scope: diagnostic integration, legacy migration, dependency/configuration changes,
+  provider calls, ignored runtime, experiment changes, and packages 6-7.
+- Checkpoint requirement: commit and push this activation record before production or test changes,
+  then keep implementation and recovery closeout separately verifiable.

@@ -137,18 +137,21 @@ every workflow step. Focused validation passes `9 passed`, related validation pa
 and blocks read-only mixed-generation consumers without mutation. PR 13 comment `5062099962`
 records the result.
 
-ARA-061 is complete. Use `b1c1b6c96aaa46b03ef1e25c30aebc771893e4d9` as the conservative exact
-externally verified fallback. Focused validation passes `4 passed, 18
+ARA-061 is complete; its implementation `b1c1b6c96aaa46b03ef1e25c30aebc771893e4d9` remains
+historical verified evidence rather than the active recovery fallback. Focused validation passes `4 passed, 18
 subtests`, related regression passes `244 passed, 554 subtests`, and full `make check` passes `466
 passed, 809 subtests` plus formatting, lint, imports, and zero-finding safety scans. Push/PR runs
 `30081927773`/`30081930092` passed Python 3.10/3.13 and every workflow step. Preserve the strict
 status-2 boundary, valid zero/boundary behavior, unchanged configuration schema/defaults, and
 provider-free scope.
 
-ARA-055 package 5 finalization journaling remains separately approval-gated. Do not add
-finalization writer/reader behavior, diagnostic routing, migration, configuration schema/default
-changes, dependencies, providers, ignored-runtime access, scheduler-policy changes, or packages
-6-7 without explicit approval. There is no unblocked implementation task.
+ARA-055 package 5 is the sole active task after the owner said `批准` on 2026-07-24. Use
+`11562f61d21040dfb160b2df1f4a491f2b4ecd64` as the conservative exact externally verified
+fallback; push/PR runs `30082575170`/`30082577745` passed Python 3.10/3.13 and every workflow
+step. Read the package-5 section of `docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md`, then
+start with `tests/test_run_finalize_recovery.py`. Do not modify round transaction semantics,
+diagnostic routing, migration, configuration schema/defaults, dependencies, providers, ignored
+runtime, or packages 6-7.
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 

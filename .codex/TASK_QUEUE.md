@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `DONE`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -812,11 +812,28 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Package 4 completion: implementation `efcad88` is exact local/upstream/`ls-remote`/PR-head
   equal. Push/PR runs `30034539432`/`30034542276` pass Python 3.10/3.13 and every workflow step;
   draft PR 13 is open and cleanly mergeable, and comment `5062099962` records the result.
-- Final result: new and fully evidenced rounds have a recoverable checkpoint-last transaction;
+- Package-4 result: new and fully evidenced rounds have a recoverable checkpoint-last transaction;
   normal, continuous, session, resume, and mock entries recover a valid pending round under the
   existing lock before provider/client/agent work; preview/UI/analytics/comparison/report readers
   expose or reject pending/conflicting generations without mutation. Finalization remains the
   separately approval-gated package 5.
+- Package 5 approval: after the ARA-061 closeout explicitly recommended finalization journaling as
+  the next task, the owner said `批准` on 2026-07-24.
+- Package 5 authorized scope: fixed project-local create-only finalization journal; exact bounded
+  run-summary, finalized run-config, and final-checkpoint after-images; summary/config-before-
+  checkpoint recovery; iterative entry recovery under the existing lock; non-mutating
+  finalization-pending/conflict guards for approved readers.
+- Package 5 acceptance: every summary/config/checkpoint/cleanup `OSError` and `KeyboardInterrupt`
+  boundary converges idempotently in internal and configured-external run storage; unknown
+  generations fail closed without writes or path disclosure; resumable/manual-interrupt and
+  non-resumable/cooperative outcomes preserve artifact bytes and exit behavior; related regression,
+  `make check`, staged safety, push, and Python 3.10/3.13 CI pass.
+- Package 5 exclusions: no diagnostic integration, legacy migration, dependency/config schema
+  changes, provider calls, ignored-runtime access, experiment changes, or packages 6-7.
+- Package 5 baseline: exact local/upstream/`ls-remote`/PR-head equality at `11562f6`; push/PR runs
+  `30082575170`/`30082577745` pass Python 3.10/3.13 and every workflow step.
+- Package 5 next command:
+  `.venv/bin/python -m pytest -q tests/test_run_finalize_recovery.py`.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-    "recorded_at": "2026-07-24T17:25:23+08:00",
+    "recorded_at": "2026-07-24T17:50:23+08:00",
   "branch": "codex/sol-autonomous-hardening",
-    "head_commit": "b1c1b6c96aaa46b03ef1e25c30aebc771893e4d9",
-    "last_known_stable_commit": "b1c1b6c96aaa46b03ef1e25c30aebc771893e4d9",
+    "head_commit": "11562f61d21040dfb160b2df1f4a491f2b4ecd64",
+    "last_known_stable_commit": "11562f61d21040dfb160b2df1f4a491f2b4ecd64",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-    "state_recorded_against_commit": "b1c1b6c96aaa46b03ef1e25c30aebc771893e4d9",
+    "state_recorded_against_commit": "11562f61d21040dfb160b2df1f4a491f2b4ecd64",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-24T17:23:24+08:00",
-    "commit": "b1c1b6c96aaa46b03ef1e25c30aebc771893e4d9",
+    "verified_at": "2026-07-24T17:48:26+08:00",
+    "commit": "11562f61d21040dfb160b2df1f4a491f2b4ecd64",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 30081927773,
+        "run_id": 30082575170,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "b1c1b6c96aaa46b03ef1e25c30aebc771893e4d9",
+        "head_sha": "11562f61d21040dfb160b2df1f4a491f2b4ecd64",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-                "run_id": 30081930092,
+                "run_id": 30082577745,
         "event": "pull_request",
         "workflow": "CI",
-                "head_sha": "b1c1b6c96aaa46b03ef1e25c30aebc771893e4d9",
+                "head_sha": "11562f61d21040dfb160b2df1f4a491f2b4ecd64",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,30 @@
       }
     }
   },
-    "status": "ara061_implementation_remote_verified",
+    "status": "ara055_package5_activated",
     "commands": [
+        {
+            "command": "ARA-055 package 5 activation baseline and remote verification",
+            "exit_code": 0,
+            "result": "passed_after_state_correction",
+            "summary": {
+                "owner_approval": "package_5_only",
+                "commit": "11562f61d21040dfb160b2df1f4a491f2b4ecd64",
+                "remote_equal": true,
+                "pull_request": 13,
+                "pull_request_state": "open_draft_clean",
+                "push_run_id": 30082575170,
+                "pull_request_run_id": 30082577745,
+                "python_310": "success",
+                "python_313": "success",
+                "recovery_pytest_passed": 6,
+                "recovery_pytest_subtests_passed": 1,
+                "initial_recovery_pytest_failed": 2,
+                "initial_failure": "active task and unique fallback metadata mismatch",
+                "provider_calls": 0,
+                "ignored_runtime_access": 0
+            }
+        },
         {
             "command": "ARA-061 recovery-state closeout validation",
             "exit_code": 0,

@@ -574,7 +574,7 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 ## KI-055 - Published rounds can split history and finalization generations
 
 - Status: round publication and runner-entry recovery are fixed and remote-verified for new/fully
-  evidenced histories; finalization generations remain approval-blocked
+  evidenced histories; finalization generation repair is active as approved package 5
 - Severity: P2 recovery and provenance consistency, high-risk compatibility surface
 - Evidence: 40 provider-free temporary cases covered ten post-publication write boundaries,
   `OSError`/`KeyboardInterrupt`, and internal/configured-external run storage. Failure before the
@@ -588,6 +588,9 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   project-local journal with bounded deltas/after-images, exact before/after hashes, idempotent
   roll-forward across filesystems, checkpoint-last visibility, and a separate finalization
   transaction.
+- Package-5 activation: the owner approved the fixed finalization journal on 2026-07-24. Scope is
+  exact summary/config/final-checkpoint roll-forward plus approved entry/read-only routing only;
+  diagnostic integration and legacy migration remain excluded.
 - Package-1 result: commit `4cd4bf4` adds filesystem-free exact after-image builders and a strict
   bounded journal codec with provider-free regression coverage. No runtime caller creates, reads,
   or applies the journal yet, so this issue remains open.

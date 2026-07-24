@@ -4,19 +4,20 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: preserve the remotely verified ARA-061 closeout and await explicit approval for
-  the next approval-gated maintenance package.
+- Current goal: implement the explicitly approved ARA-055 package 5 finalization transaction
+  without changing round commits, providers, experiments, configuration schemas, or legacy data.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `b1c1b6c96aaa46b03ef1e25c30aebc771893e4d9` (the exact
-  externally verified ARA-061 implementation retained by the additive recovery schema;
+- State recorded against commit: `11562f61d21040dfb160b2df1f4a491f2b4ecd64` (the exact
+  externally verified ARA-061 closeout retained by the additive recovery schema;
   resolve current `HEAD` live).
-- Last externally verified fallback: `b1c1b6c96aaa46b03ef1e25c30aebc771893e4d9` (exact local,
+- Last externally verified fallback: `11562f61d21040dfb160b2df1f4a491f2b4ecd64` (exact local,
   remote-tracking, `ls-remote`, GitHub branch, and PR-head equality plus all Python 3.10/3.13
   push/PR jobs passed)
-- Active task at this snapshot: none. ARA-061 is complete; ARA-055 package 5 and the owner-blocked
-  release-policy task remain separately approval-gated.
+- Active task at this snapshot: ARA-055 package 5. Authorization is limited to the fixed
+  finalization journal, deterministic summary/config/final-checkpoint roll-forward, lock-held
+  iterative-entry recovery, non-mutating reader guards, and provider-free regression coverage.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -229,6 +230,33 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   command-substitution errors; the literal-safe rerun succeeded and changed no files or Git state.
 - The first closeout recovery-state check rejected a missing explicit fallback label (`1 failed,
   5 passed`); the recovery wording was corrected and the exact rerun passes `6 passed, 1 subtest`.
+
+## ARA-055 Package 5 Activation
+
+- Owner approval: `批准` on 2026-07-24 immediately after package 5 was explicitly recommended.
+- Stable baseline: `11562f61d21040dfb160b2df1f4a491f2b4ecd64`, exact local/upstream/
+  `ls-remote`/PR-head equal. Push/PR runs `30082575170`/`30082577745` passed Python 3.10/3.13 and
+  every workflow step; PR 13 is open, draft, and cleanly mergeable.
+- Confirmed remaining defect: final checkpoint currently writes before `run_summary.json` and
+  finalized `run_config.json`, so interruption can make a non-resumable checkpoint authoritative
+  while run-local reporting/provenance remains stale.
+- Authorized implementation: create and validate one fixed project-local finalization journal;
+  apply exact bounded summary/config after-images before final checkpoint; recover valid pending
+  state under the existing lock before iterative work; expose pending/conflict state to relevant
+  read-only consumers without mutation.
+- Required compatibility: preserve final public artifact bytes/fields, stop reasons, resume
+  eligibility, timestamps selected by the runner, configured external storage, status 130/manual
+  interruption and status 0/cooperative stops, and package 3/4 round recovery ordering.
+- Explicit exclusions: no diagnostic integration (package 6), legacy migration (package 7),
+  dependencies, configuration schemas/defaults, providers, experiment semantics, ignored runtime,
+  or historical artifact mutation.
+- Recovery baseline passes `6 passed, 1 subtest`; no provider or ignored-runtime access occurred.
+- The first activation-state validation exposed two metadata-only corrections: an overly broad
+  patch had marked ARA-001 rather than ARA-055 active, and the historical ARA-061 fallback label
+  conflicted with the new unique fallback. Both were corrected; the exact rerun passes `6 passed,
+  1 subtest`.
+- Next command:
+  `.venv/bin/python -m pytest -q tests/test_run_finalize_recovery.py`.
 
 ## Completed Steps
 
@@ -1084,8 +1112,8 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Remaining Steps
 
-- Await explicit owner approval before activating ARA-055 package 5; do not change finalization
-  writers or readers while it remains approval-gated.
+- Add ARA-055 package-5 failing codec/recovery/runner/reader tests before implementation.
+- Implement only the fixed finalization transaction and approved entry/read-only routing.
 - Preserve packages 3-4 transaction ordering, lock-held entry recovery, and non-mutating read-only
   classification for new and fully evidenced histories.
 - Preserve the legacy incomplete-history compatibility path; do not synthesize a missing
