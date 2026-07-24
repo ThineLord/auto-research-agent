@@ -1186,3 +1186,17 @@ Validation and implementation outcomes will be appended only after they are actu
 - Implementation `bbbea318a30b1d1258b94f0b4ebd01635c70270b` is exact local/upstream/
   `ls-remote`/PR-head equal. Push/PR runs `30112210496`/`30112215230` passed Python 3.10/3.13 and
   every workflow step with zero annotations. Package 7D remains unapproved.
+
+## 2026-07-25 - Final autonomous-hardening baseline validation
+
+- Re-audited the durable queue and confirmed there is no `TODO` or `IN_PROGRESS` task. Package 7D
+  is a never-started destructive extension, not unfinished rollback work.
+- Revalidated the exact package-7C closeout baseline with full `make check` (`519 passed, 979
+  subtests`), isolated wheel installation, recovery-state coverage (`6 passed, 1 subtest`), diff
+  checks, and tracked/index safety scans with zero findings.
+- Confirmed a single Git worktree, no repository-owned runtime/provider process, no active rebase,
+  merge, cherry-pick, or revert, and an exact clean branch/upstream/remote/PR checkpoint before the
+  final publication-only closeout.
+- Corrected stale recovery text that still described package 7B as active and legacy execution as
+  deferred. No runtime code, provider behavior, experiment result, ignored artifact, dependency, or
+  configuration changed.

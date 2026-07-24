@@ -573,9 +573,9 @@ Updated: 2026-07-25 (Asia/Hong_Kong)
 
 ## KI-055 - Published rounds can split history and finalization generations
 
-- Status: new iterative, run-finalization, and diagnostic generations are fixed and remote-verified
-  through package 6; package 7A read-only legacy classification is remote-verified, while migration
-  execution remains deferred
+- Status: resolved for new iterative/finalization/diagnostic generations and for the one
+  evidence-backed `exact_missing_history_twin` legacy case through remote-verified package 7C;
+  ambiguous historical generations remain intentionally preserved and fail closed
 - Severity: P2 recovery and provenance consistency, high-risk compatibility surface
 - Evidence: 40 provider-free temporary cases covered ten post-publication write boundaries,
   `OSError`/`KeyboardInterrupt`, and internal/configured-external run storage. Failure before the
@@ -639,9 +639,9 @@ Updated: 2026-07-25 (Asia/Hong_Kong)
   evidence/transaction/execution/recovery. Push/PR CI `30112210496`/`30112215230` is green on
   Python 3.10/3.13 with zero annotations. Every other legacy state remains preserve-only, and
   package 7D destructive rollback is unapproved.
-- Package-1 result: commit `4cd4bf4` adds filesystem-free exact after-image builders and a strict
-  bounded journal codec with provider-free regression coverage. No runtime caller creates, reads,
-  or applies the journal yet, so this issue remains open.
+- Package-1 historical result: commit `4cd4bf4` added filesystem-free exact after-image builders and
+  a strict bounded journal codec with provider-free regression coverage. Runtime routing was added
+  by the later packages recorded below.
 - Package-2 result: the fixed create-only journal, strict classification, ARA-054 publication
   reconciliation, and checkpoint-last recovery engine pass `75 passed, 162 subtests` across
   internal/configured-external before/after faults. Implementation `faf1791e` is remote-equal and
@@ -655,7 +655,8 @@ Updated: 2026-07-25 (Asia/Hong_Kong)
   guards. Full `make check` passes `462 passed, 791 subtests`; push/PR CI
   `30034539432`/`30034542276` is green.
 - Boundary: incomplete legacy histories retain their prior compatibility path because no exact
-  before-generation exists. General migration and package 7D remain unapproved.
+  before-generation exists. General migration and package 7D are not required to resolve this
+  issue's approved scope and remain unimplemented future work.
   Historical journal-less `published_uncommitted` evidence and manually edited third generations
   remain preserved and fail closed.
 

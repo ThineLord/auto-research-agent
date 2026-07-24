@@ -4,20 +4,21 @@ Updated: 2026-07-25 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: preserve the remotely verified ARA-055 package 7C exact missing-history-twin
-  transaction and await an explicitly approved next task.
-- Current branch: `codex/sol-autonomous-hardening`
+- Current goal: land the fully validated autonomous-hardening baseline through ARA-055 package 7C,
+  close its GitHub pull request, and stop with no active implementation task.
+- Snapshot branch: `codex/sol-autonomous-hardening`; merge target: `master`. Resolve the live branch
+  with `git branch --show-current` because this snapshot is intended to remain valid after merge.
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `bbbea318a30b1d1258b94f0b4ebd01635c70270b` (the exact
-  externally verified ARA-055 package 7C implementation retained by the additive recovery schema;
-  resolve current `HEAD` live).
-- Last externally verified fallback: `bbbea318a30b1d1258b94f0b4ebd01635c70270b` (exact local,
+- State recorded against commit: `13d53c2b2e375878a6efe2155d8c9444c856e1eb` (the exact
+  externally verified ARA-055 package 7C recovery closeout retained by the additive recovery
+  schema; resolve current `HEAD` live).
+- Last externally verified fallback: `13d53c2b2e375878a6efe2155d8c9444c856e1eb` (exact local,
   remote-tracking, `ls-remote`, GitHub branch, and PR-head equality plus all Python 3.10/3.13
   push/PR jobs passed)
-- Active task at this snapshot: none. ARA-055 is complete through package 7C. Package 7D rollback,
-  deletion, quarantine, batch discovery, partial repair, canonical adoption, and general migration
-  remain unapproved.
+- Active task at this snapshot: none. Final publication closeout is administrative only; no code
+  task is active. ARA-055 is complete through package 7C. Package 7D is a never-started destructive
+  extension, not unfinished rollback work and not required for the stable baseline.
 - Uncommitted changes: not persisted as a static claim. Resolve the exact live state with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -26,6 +27,22 @@ Updated: 2026-07-25 (Asia/Hong_Kong)
 - This committed snapshot does not assert a static dirty-file list. Resolve the exact live state
   with `git status --short --branch`; a clean checkout of the commit containing this file has no
   task-owned worktree changes.
+
+## Final Maintenance Closeout
+
+- Owner authorized the final repository/GitHub closeout on 2026-07-25. The scope is stabilization,
+  validation, publication, pull-request landing, and removal of misleading open-work claims; it
+  does not authorize a new migration/rollback feature, real historical artifact mutation, provider
+  work, or a public package release.
+- Fresh validation on the exact package-7C closeout baseline passes full `make check` with `519
+  passed, 979 subtests`, isolated real-wheel installation, and recovery-state coverage with `6
+  passed, 1 subtest`. Format, Ruff, imports, tracked/index safety, and diff checks are clean.
+- No extra Git worktree or repository-owned Streamlit, CLI, or provider process was found. The
+  harmless stale invalid `.git/REBASE_HEAD` remains recorded; no active rebase directories or
+  merge/cherry-pick/revert state exist.
+- The task queue contains no `TODO` or `IN_PROGRESS` entry. ARA-018 remains blocked on the owner's
+  legal/distribution decision; ARA-019, ARA-026, ARA-006, and ARA-007 remain explicitly deferred
+  rather than half-implemented.
 
 ## ARA-055 Package 1 Closeout
 
@@ -2572,11 +2589,10 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   continuation. Existing canonical partial rounds remain fail-closed and require a separately
   approved explicit migration; do not infer stage truth from placeholders or
   `last_successful_agent`.
-- ARA-055 packages 1-6, package 7 design, and package 7A are complete. Package 7B read-only
-  discovery integration and reader guard verification are explicitly approved and active.
-  Preserve every current journal and artifact byte, do not inspect ignored runtime, and do not add
-  migration execution, target or evidence creation, rollback, cleanup, quarantine, batch
-  discovery, or package 7C/7D behavior.
+- ARA-055 packages 1-6 and packages 7A-7C are complete. Preserve every current journal and artifact
+  byte, the explicitly targeted preview/execution boundary, exact-twin-only migration, and
+  checkpoint-last recovery. Package 7D destructive rollback/delete/quarantine and broader migration
+  remain unimplemented future extensions, not unfinished work required for this baseline.
 - ARA-061 is complete. Reject only invalid numeric CLI override values and inconsistent effective
   delay bounds; preserve valid zero-disable quota behavior, existing configuration-file validation,
   defaults, scheduler policy, provider behavior, and experiment semantics.

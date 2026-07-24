@@ -13,7 +13,9 @@ git fetch --prune origin
 git log --oneline --decorate -n 10
 ```
 
-Expected branch: `codex/sol-autonomous-hardening`.
+Before PR 13 is merged, expected branch: `codex/sol-autonomous-hardening`. After the final
+maintenance closeout is merged, use `master`; always resolve the live branch and upstream rather
+than assuming the snapshot predates or postdates the merge.
 
 ## 2. Read the durable state
 
@@ -142,9 +144,9 @@ status-2 boundary, valid zero/boundary behavior, unchanged configuration schema/
 provider-free scope.
 
 ARA-055 package 7C exact missing-history-twin execution is complete.
-Last externally verified fallback: `bbbea318a30b1d1258b94f0b4ebd01635c70270b`. Local HEAD,
-upstream, `ls-remote`, the GitHub branch, and draft PR 13 all resolved to that implementation.
-Push/PR runs `30112210496`/`30112215230` passed Python 3.10/3.13 and every workflow step with zero
+Last externally verified fallback: `13d53c2b2e375878a6efe2155d8c9444c856e1eb`. Local HEAD,
+upstream, `ls-remote`, the GitHub branch, and draft PR 13 all resolved to that closeout.
+Push/PR runs `30113199845`/`30113202445` passed Python 3.10/3.13 and every workflow step with zero
 annotations.
 
 The local package 7B implementation adds only `--legacy-migration-preview PROJECT`, its temporary
@@ -162,8 +164,9 @@ against ignored or real historical runtime, implement rollback/delete/quarantine
 projects, repair partial/sparse/string histories, adopt canonical evidence, rewrite the source,
 infer generations, or change dependencies/defaults/providers/experiments.
 
-There is no unblocked implementation task. ARA-055 package 7D and every destructive/general
-migration extension require separate owner approval.
+There is no unblocked implementation task. Package 7D was never started and is not unfinished
+rollback work. Every destructive/general migration extension remains a future owner decision, not
+a prerequisite for the stable package-7C baseline.
 
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
