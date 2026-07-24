@@ -1123,3 +1123,19 @@
 - Excluded scope: package 7D rollback/delete/quarantine, batch discovery, partial/sparse/string-
   round repair, canonical adoption, source rewrite, inferred generations, real ignored-runtime
   execution, dependency/default/provider/experiment changes, and general migration.
+
+## 2026-07-25 - Publish the missing twin atomically and recover only by roll-forward
+
+- Direct `O_EXCL` target writes are insufficient because an interrupt during content transfer can
+  leave a partial target that is indistinguishable from an independent third generation.
+- Stage exact bytes as a restricted same-directory file, fsync it, and use native atomic
+  no-replace rename. A post-rename interrupt therefore exposes either absence or the complete exact
+  generation, never a partially written target.
+- Keep direct create-only writes for immutable evidence and journals, where partial creation is
+  intentionally preserved as non-authoritative failure evidence. Do not delete a partial,
+  conflicting, or unknown target to retry.
+- Receipt or journal-cleanup failure after exact target publication remains a valid roll-forward
+  state. Existing exact receipt identity is retained; recovery never rewrites it merely to change
+  the `recovered` flag.
+- This reliability correction does not authorize rollback or any deletion, source rewrite,
+  inferred history, canonical adoption, batch scan, or package 7D behavior.

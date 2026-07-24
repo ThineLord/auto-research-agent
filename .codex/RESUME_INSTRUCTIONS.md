@@ -141,10 +141,11 @@ passed, 809 subtests` plus formatting, lint, imports, and zero-finding safety sc
 status-2 boundary, valid zero/boundary behavior, unchanged configuration schema/defaults, and
 provider-free scope.
 
-ARA-055 package 7B read-only discovery integration and reader guard verification are complete.
-Last externally verified fallback: `c87063180ed7623424aa54722dad8a867788902c`. Local HEAD, upstream,
-`ls-remote`, the GitHub branch, and draft PR 13 all resolved to that commit. Push/PR runs
-`30106096013`/`30106101027` passed Python 3.10/3.13 and every workflow step with zero annotations.
+ARA-055 package 7C exact missing-history-twin execution is complete.
+Last externally verified fallback: `bbbea318a30b1d1258b94f0b4ebd01635c70270b`. Local HEAD,
+upstream, `ls-remote`, the GitHub branch, and draft PR 13 all resolved to that implementation.
+Push/PR runs `30112210496`/`30112215230` passed Python 3.10/3.13 and every workflow step with zero
+annotations.
 
 The local package 7B implementation adds only `--legacy-migration-preview PROJECT`, its temporary
 and installed-package tests, documentation, and `.codex` state. Focused tests pass `27 passed, 115
@@ -153,23 +154,16 @@ transaction/UI coverage passes `218 passed, 468 subtests`; full `make check` pas
 970 subtests` plus formatting, lint, imports, and zero-finding safety scans. The isolated real-wheel
 install smoke and final focused/recovery rerun pass. PR comment `5071600457` records the closeout.
 
-ARA-055 package 7C exact missing-history-twin execution is active after the owner confirmed the
-60–100 minute long-task assessment with `确认启动` on 2026-07-25. Its scope is only the strict
-`exact_missing_history_twin` class, an explicit owner-selected restrictive evidence bundle, one
-fixed create-only project transaction, exact-byte target publication, lock-held roll-forward
-recovery, and shared entry/read blockers. Use only synthetic temporary fixtures. Do not execute
+Package 7C supports only `exact_missing_history_twin`, an explicit owner-selected restrictive
+evidence bundle, one fixed project transaction, atomic exact-byte no-replace target publication,
+lock-held roll-forward recovery, and shared entry/read blockers. Final local `make check` passes
+`519 passed, 979 subtests`; implementation push/PR CI is green on Python 3.10/3.13. Do not execute
 against ignored or real historical runtime, implement rollback/delete/quarantine, scan all
 projects, repair partial/sparse/string histories, adopt canonical evidence, rewrite the source,
 infer generations, or change dependencies/defaults/providers/experiments.
 
-The local package 7C worktree now contains the exact-copy engine, evidence/journal/receipt
-transaction, owned-lock execution/recovery, shared reader/entry guards, explicit provider-free
-CLI, documentation, and tests. Focused/CLI/entry/package coverage passes `88 passed, 186
-subtests`; the broader transaction/storage/reader/installed-package layer passes `170 passed, 369
-subtests`; atomic-publication coverage passes `75 passed, 127 subtests`; final `make check` passes
-`519 passed, 979 subtests`; and the final isolated wheel smoke passes. Resume with recovery-state,
-final focused, staged-safety, and cached-diff checks before commit; do not run against real history
-or start package 7D.
+There is no unblocked implementation task. ARA-055 package 7D and every destructive/general
+migration extension require separate owner approval.
 
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
@@ -187,6 +181,6 @@ ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 git status --short --branch
 git rev-parse --verify HEAD
 .venv/bin/python -m json.tool .codex/LAST_VALIDATION.json >/dev/null
-.venv/bin/python -m pytest -q tests/test_recovery_state.py tests/test_legacy_migration_execution.py tests/test_legacy_migration_cli.py
-git diff --check
+.venv/bin/python -m pytest -q tests/test_recovery_state.py
+git status --short --branch
 ```

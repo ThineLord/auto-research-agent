@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -1015,6 +1015,10 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   post-audit atomic-publication coverage passes `75 passed, 127 subtests`; final `make check` passes
   `519 passed, 979 subtests` in 375.88 seconds; and the final isolated wheel smoke passes. Final
   recovery/focused/staged review, commit/push, remote equality, CI, and closeout remain.
+- Package 7C completion: implementation `bbbea318a30b1d1258b94f0b4ebd01635c70270b` is exact
+  local/upstream/`ls-remote`/GitHub branch/PR-head equal. Push/PR runs
+  `30112210496`/`30112215230` passed Python 3.10/3.13 and every workflow step with zero
+  annotations. ARA-055 is complete through package 7C; package 7D remains unapproved.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

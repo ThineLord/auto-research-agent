@@ -1165,3 +1165,24 @@ Validation and implementation outcomes will be appended only after they are actu
 - Implementation `b1c1b6c` is exact local/upstream/`ls-remote`/PR-head equal. Push/PR runs
   `30081927773`/`30081930092` passed Python 3.10/3.13 and every workflow step; PR 13 comment
   `5068253242` records the result and exclusions.
+
+## 2026-07-25 - ARA-055 package-7C exact missing-history-twin execution
+
+- Added one explicit provider-free execution mode for only `exact_missing_history_twin`, with an
+  owner-selected 0700 evidence directory, fixed 0600 source/manifest/receipt leaves, and a strict
+  project-local migration journal.
+- The lock-held engine reclassifies before mutation, records fixed authority digests, publishes
+  exact source bytes through same-directory atomic no-replace rename, verifies the target, writes
+  the receipt, and conditionally removes only the matching journal.
+- Valid interruption states roll forward before provider work. Changed source/checkpoint/metadata,
+  a third-generation target, evidence mismatch, unknown schema, and concurrent transaction state
+  remain preserved and fail closed through the shared reader blocker.
+- Both source directions, internal/configured-external storage, installed packages, evidence
+  collision/failure, target/receipt/cleanup interruption, CLI redaction, and startup recovery are
+  covered with temporary synthetic fixtures only.
+- Final `make check` passes `519 passed, 979 subtests`; the isolated wheel smoke and final
+  `24 passed, 10 subtests` recovery/focused rerun pass; staged safety scans 123 files with zero
+  findings.
+- Implementation `bbbea318a30b1d1258b94f0b4ebd01635c70270b` is exact local/upstream/
+  `ls-remote`/PR-head equal. Push/PR runs `30112210496`/`30112215230` passed Python 3.10/3.13 and
+  every workflow step with zero annotations. Package 7D remains unapproved.

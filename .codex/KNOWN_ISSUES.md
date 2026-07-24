@@ -635,9 +635,10 @@ Updated: 2026-07-25 (Asia/Hong_Kong)
   import, and safety gate, and the isolated wheel smoke passes. Implementation `3a2b62f` is exact
   remote-equal; push/PR runs `30105129908`/`30105131795` passed Python 3.10/3.13 with zero
   annotations.
-- Package-7C activation: exact missing-twin evidence/transaction/execution/recovery is explicitly
-  approved and active against remote-equal fallback `c870631`; every other legacy state remains
-  preserve-only, and package 7D destructive rollback is unapproved.
+- Package-7C result: implementation `bbbea31` adds only exact missing-twin
+  evidence/transaction/execution/recovery. Push/PR CI `30112210496`/`30112215230` is green on
+  Python 3.10/3.13 with zero annotations. Every other legacy state remains preserve-only, and
+  package 7D destructive rollback is unapproved.
 - Package-1 result: commit `4cd4bf4` adds filesystem-free exact after-image builders and a strict
   bounded journal codec with provider-free regression coverage. No runtime caller creates, reads,
   or applies the journal yet, so this issue remains open.
@@ -654,7 +655,7 @@ Updated: 2026-07-25 (Asia/Hong_Kong)
   guards. Full `make check` passes `462 passed, 791 subtests`; push/PR CI
   `30034539432`/`30034542276` is green.
 - Boundary: incomplete legacy histories retain their prior compatibility path because no exact
-  before-generation exists. Diagnostic integration and migration remain unapproved.
+  before-generation exists. General migration and package 7D remain unapproved.
   Historical journal-less `published_uncommitted` evidence and manually edited third generations
   remain preserved and fail closed.
 
