@@ -64,14 +64,14 @@ def _clamp_score(score: float) -> float:
 def _coerce_score(value: Any) -> Optional[float]:
     if isinstance(value, bool):
         return None
-    if isinstance(value, (int, float)):
-        score = float(value)
-    elif isinstance(value, str):
-        try:
+    try:
+        if isinstance(value, (int, float)):
+            score = float(value)
+        elif isinstance(value, str):
             score = float(value.strip())
-        except ValueError:
+        else:
             return None
-    else:
+    except (TypeError, ValueError, OverflowError):
         return None
     if not math.isfinite(score):
         return None
@@ -81,7 +81,7 @@ def _coerce_score(value: Any) -> Optional[float]:
 def _parse_json_score(candidate: str) -> Optional[float]:
     try:
         data = json.loads(candidate)
-    except json.JSONDecodeError:
+    except ValueError:
         return None
     if not isinstance(data, dict):
         return None
@@ -91,7 +91,7 @@ def _parse_json_score(candidate: str) -> Optional[float]:
 def _parse_json_object(candidate: str) -> Optional[Dict[str, Any]]:
     try:
         data = json.loads(candidate)
-    except json.JSONDecodeError:
+    except ValueError:
         return None
     return data if isinstance(data, dict) else None
 

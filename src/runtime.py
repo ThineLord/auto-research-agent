@@ -2,28 +2,68 @@
 
 from __future__ import annotations
 
+import errno
 import os
+import stat
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
+import uuid
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, BinaryIO, Dict, Optional, Sequence, Tuple
 
 from rich.console import Console
 
 from .constants import RUN_LOCK_FILENAME
-from .storage import append_log_line, read_json_file, write_json_file
+from .storage import (
+    append_log_line,
+    artifact_boundary_is_registered,
+    artifact_path_exists,
+    artifact_path_is_safe,
+    ensure_artifact_directory,
+    ensure_artifact_paths_safe,
+    ensure_project_runtime_paths_safe,
+    open_append_text_file,
+    open_binary_update_file,
+    read_json_file,
+    unlink_artifact_file,
+    write_json_file,
+)
 
 RUN_PROCESS_META_FILENAME = "ui_run_process.json"
 MODEL_JOB_PROCESS_META_FILENAME = "ui_model_job_process.json"
+RUN_LOCK_GUARD_FILENAME = "active_run.guard"
+RUN_LOCK_SCHEMA_VERSION = 1
+MAX_PROCESS_ID = (1 << 32) - 1
 
 
 @dataclass(frozen=True)
 class BackgroundProcessResult:
     pid: Optional[int]
     error: Optional[str] = None
+
+
+@dataclass
+class RunLockHandle:
+    """Owner capability that must be passed intact to ``release_run_lock``."""
+
+    path: Path
+    owner_token: str = field(repr=False)
+    pid: int
+    guard_device: int
+    guard_inode: int
+    _guard_file: BinaryIO = field(repr=False, compare=False)
+
+    def __fspath__(self) -> str:
+        return os.fspath(self.path)
+
+    def __str__(self) -> str:
+        return os.fspath(self.path)
+
+    def exists(self) -> bool:
+        return self.path.exists()
 
 
 def shorten_text_by_words(text: str, max_words: int) -> str:
@@ -40,16 +80,34 @@ def log_run(console: Console, log_path: Path, mode: str, message: str) -> None:
 
 
 def stop_requested(stop_signal_path: Path) -> bool:
-    return stop_signal_path.exists()
+    if not artifact_boundary_is_registered(stop_signal_path):
+        try:
+            ensure_project_runtime_paths_safe(
+                stop_signal_path.parent,
+                anchor=stop_signal_path.parent.parent,
+            )
+        except OSError:
+            return False
+    return artifact_path_exists(stop_signal_path, allow_directory=True)
 
 
 def is_pid_running(pid: int) -> bool:
-    if pid <= 0:
+    if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0 or pid > MAX_PROCESS_ID:
         return False
+    if os.name == "nt":
+        return _is_windows_pid_running(pid)
     try:
         os.kill(pid, 0)
-    except OSError:
+    except ProcessLookupError:
         return False
+    except PermissionError:
+        return True
+    except (OverflowError, ValueError):
+        return False
+    except OSError as exc:
+        if exc.errno == errno.ESRCH:
+            return False
+        return True
     try:
         result = subprocess.run(
             ["ps", "-o", "stat=", "-p", str(pid)],
@@ -65,6 +123,33 @@ def is_pid_running(pid: int) -> bool:
     return True
 
 
+def _is_windows_pid_running(pid: int) -> bool:
+    import ctypes
+    from ctypes import wintypes
+
+    process_query_limited_information = 0x1000
+    still_active = 259
+    invalid_parameter = 87
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+
+    process_handle = kernel32.OpenProcess(process_query_limited_information, False, pid)
+    if not process_handle:
+        return ctypes.get_last_error() != invalid_parameter
+    try:
+        exit_code = wintypes.DWORD()
+        if not kernel32.GetExitCodeProcess(process_handle, ctypes.byref(exit_code)):
+            return True
+        return exit_code.value == still_active
+    finally:
+        kernel32.CloseHandle(process_handle)
+
+
 def run_meta_path(project_dir: Path) -> Path:
     return project_dir / RUN_PROCESS_META_FILENAME
 
@@ -74,6 +159,13 @@ def model_job_meta_path(project_dir: Path) -> Path:
 
 
 def get_active_process_meta(meta_path: Path) -> Dict[str, Any]:
+    try:
+        ensure_project_runtime_paths_safe(
+            meta_path.parent,
+            anchor=meta_path.parent.parent,
+        )
+    except OSError:
+        return {}
     meta = read_json_file(meta_path)
     try:
         pid = int(meta.get("pid", 0)) if meta else 0
@@ -81,8 +173,10 @@ def get_active_process_meta(meta_path: Path) -> Dict[str, Any]:
         pid = 0
     if pid and is_pid_running(pid):
         return meta
+    if not artifact_path_is_safe(meta_path, allow_missing=False):
+        return {}
     try:
-        meta_path.unlink(missing_ok=True)
+        unlink_artifact_file(meta_path)
     except OSError:
         pass
     return {}
@@ -106,9 +200,15 @@ def start_background_process(
     extra: Optional[Dict[str, Any]] = None,
     env_overrides: Optional[Dict[str, str]] = None,
 ) -> BackgroundProcessResult:
+    process: subprocess.Popen[str] | None = None
     try:
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        log_file = log_path.open("a", encoding="utf-8")
+        log_parent = Path(os.path.abspath(log_path.parent))
+        meta_parent = Path(os.path.abspath(meta_path.parent))
+        if log_parent != meta_parent:
+            raise OSError("background log and metadata must share one project directory")
+        ensure_project_runtime_paths_safe(log_parent, anchor=log_parent.parent)
+        ensure_artifact_paths_safe((log_path, meta_path))
+        log_file = open_append_text_file(log_path)
         try:
             env = os.environ.copy()
             if env_overrides:
@@ -134,6 +234,18 @@ def start_background_process(
         write_json_file(meta_path, meta)
         return BackgroundProcessResult(pid=process.pid)
     except Exception as exc:  # noqa: BLE001
+        if process is not None:
+            try:
+                process.terminate()
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                try:
+                    process.kill()
+                    process.wait(timeout=5)
+                except (OSError, subprocess.SubprocessError):
+                    pass
+            except (OSError, subprocess.SubprocessError):
+                pass
         return BackgroundProcessResult(
             pid=None,
             error=f"Failed to start {kind} process: {_safe_start_error(exc)}",
@@ -199,47 +311,280 @@ def run_project_tests(
     }
 
 
+def _parse_lock_pid(value: object) -> int:
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int):
+        return value if 0 < value <= MAX_PROCESS_ID else 0
+    if isinstance(value, str):
+        text = value.strip()
+        if not text.isascii() or not text.isdigit():
+            return 0
+        try:
+            parsed = int(text)
+        except ValueError:
+            return 0
+        return parsed if 0 < parsed <= MAX_PROCESS_ID else 0
+    return 0
+
+
+def _lock_metadata(lock_path: Path) -> tuple[Dict[str, Any], bool]:
+    try:
+        lock_stat = lock_path.lstat()
+    except FileNotFoundError:
+        return {}, True
+    except OSError:
+        return {}, False
+    if not stat.S_ISREG(lock_stat.st_mode):
+        return {}, False
+    try:
+        return read_json_file(lock_path), True
+    except Exception:  # noqa: BLE001 - lock metadata is diagnostic and must be total
+        return {}, True
+
+
+def _active_lock_error(lock_data: Dict[str, Any]) -> str:
+    lock_pid = _parse_lock_pid(lock_data.get("pid"))
+    lock_mode = str(lock_data.get("mode", "unknown"))
+    lock_model = str(lock_data.get("model", "unknown"))
+    lock_started = str(lock_data.get("started_at", "unknown"))
+    return (
+        "Another run is already active. "
+        f"pid={lock_pid or 'unknown'} mode={lock_mode} model={lock_model} "
+        f"started_at={lock_started}."
+    )
+
+
+def _try_lock_guard(guard_file: BinaryIO) -> bool:
+    if os.name == "nt":
+        import msvcrt
+
+        guard_file.seek(0)
+        try:
+            msvcrt.locking(guard_file.fileno(), msvcrt.LK_NBLCK, 1)
+        except OSError as exc:
+            if exc.errno in {errno.EACCES, errno.EAGAIN, errno.EDEADLK}:
+                return False
+            raise
+        return True
+
+    import fcntl
+
+    try:
+        fcntl.flock(guard_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return False
+    return True
+
+
+def _open_guard_file(guard_path: Path) -> BinaryIO:
+    return open_binary_update_file(guard_path)
+
+
+def _guard_identity(guard_file: BinaryIO) -> tuple[int, int]:
+    guard_stat = os.fstat(guard_file.fileno())
+    return guard_stat.st_dev, guard_stat.st_ino
+
+
+def _metadata_guard_matches(lock_data: Dict[str, Any], device: int, inode: int) -> bool:
+    stored_device = lock_data.get("guard_device")
+    stored_inode = lock_data.get("guard_inode")
+    return (
+        isinstance(stored_device, int)
+        and not isinstance(stored_device, bool)
+        and isinstance(stored_inode, int)
+        and not isinstance(stored_inode, bool)
+        and stored_device == device
+        and stored_inode == inode
+    )
+
+
+def _unlock_guard(guard_file: BinaryIO) -> None:
+    if os.name == "nt":
+        import msvcrt
+
+        guard_file.seek(0)
+        msvcrt.locking(guard_file.fileno(), msvcrt.LK_UNLCK, 1)
+        return
+
+    import fcntl
+
+    fcntl.flock(guard_file.fileno(), fcntl.LOCK_UN)
+
+
+def _close_guard(guard_file: BinaryIO) -> None:
+    try:
+        _unlock_guard(guard_file)
+    except (OSError, ValueError):
+        pass
+    try:
+        guard_file.close()
+    except (OSError, ValueError):
+        pass
+
+
 def acquire_run_lock(
     project_dir: Path, *, mode: str, model_name: str
-) -> Tuple[Optional[Path], Optional[str]]:
+) -> Tuple[Optional[RunLockHandle], Optional[str]]:
     lock_path = project_dir / RUN_LOCK_FILENAME
-    if lock_path.exists():
-        lock_data = read_json_file(lock_path)
-        lock_pid = int(lock_data.get("pid", 0)) if lock_data else 0
-        if is_pid_running(lock_pid):
-            lock_mode = str(lock_data.get("mode", "unknown"))
-            lock_model = str(lock_data.get("model", "unknown"))
-            lock_started = str(lock_data.get("started_at", "unknown"))
-            return (
-                None,
-                "Another run is already active. "
-                f"pid={lock_pid} mode={lock_mode} model={lock_model} started_at={lock_started}.",
-            )
-        try:
-            lock_path.unlink(missing_ok=True)
-        except OSError:
-            return (
-                None,
-                f"Stale run lock could not be cleared: {RUN_LOCK_FILENAME} is not removable. "
-                "Move it aside manually and retry.",
-            )
+    guard_path = project_dir / RUN_LOCK_GUARD_FILENAME
+    guard_file: BinaryIO | None = None
 
-    write_json_file(
-        lock_path,
-        {
-            "pid": os.getpid(),
-            "mode": mode,
-            "model": model_name,
-            "started_at": datetime.now().isoformat(),
-        },
+    stale_lock_error = (
+        f"Stale run lock could not be cleared: {RUN_LOCK_FILENAME} is not removable. "
+        "Move it aside manually and retry."
     )
-    return lock_path, None
+    try:
+        ensure_artifact_directory(project_dir, anchor=project_dir.parent)
+    except OSError as exc:
+        return None, f"Project runtime artifacts could not be validated: {exc.__class__.__name__}."
+
+    try:
+        ensure_artifact_paths_safe((lock_path,), anchor=project_dir.parent)
+    except OSError:
+        return None, stale_lock_error
+
+    try:
+        ensure_artifact_paths_safe((guard_path,), anchor=project_dir.parent)
+    except OSError as exc:
+        return None, f"Run lock guard could not be acquired: {exc.__class__.__name__}."
+
+    try:
+        ensure_project_runtime_paths_safe(project_dir, anchor=project_dir.parent)
+    except OSError as exc:
+        # Recheck the two lock leaves so an active replacement retains the most
+        # actionable historical diagnosis instead of being mislabeled as a guard error.
+        if not artifact_path_is_safe(
+            lock_path,
+            allow_missing=True,
+            anchor=project_dir.parent,
+        ):
+            return None, stale_lock_error
+        if not artifact_path_is_safe(
+            guard_path,
+            allow_missing=True,
+            anchor=project_dir.parent,
+        ):
+            return None, f"Run lock guard could not be acquired: {exc.__class__.__name__}."
+        return None, f"Project runtime artifacts could not be validated: {exc.__class__.__name__}."
+
+    try:
+        guard_file = _open_guard_file(guard_path)
+        guard_acquired = _try_lock_guard(guard_file)
+    except OSError as exc:
+        if guard_file is not None:
+            try:
+                guard_file.close()
+            except OSError:
+                pass
+        return None, f"Run lock guard could not be acquired: {exc.__class__.__name__}."
+
+    if not guard_acquired:
+        guard_file.close()
+        lock_data, _ = _lock_metadata(lock_path)
+        return None, _active_lock_error(lock_data)
+
+    guard_device, guard_inode = _guard_identity(guard_file)
+    lock_data, regular_or_missing = _lock_metadata(lock_path)
+    if not regular_or_missing:
+        _close_guard(guard_file)
+        return None, stale_lock_error
+
+    existing_pid = _parse_lock_pid(lock_data.get("pid")) if lock_data else 0
+    same_guard = _metadata_guard_matches(lock_data, guard_device, guard_inode)
+    if lock_data and existing_pid and not same_guard and is_pid_running(existing_pid):
+        error = _active_lock_error(lock_data)
+        _close_guard(guard_file)
+        return None, error
+
+    owner_token = uuid.uuid4().hex
+    pid = os.getpid()
+    try:
+        write_json_file(
+            lock_path,
+            {
+                "schema_version": RUN_LOCK_SCHEMA_VERSION,
+                "owner_token": owner_token,
+                "pid": pid,
+                "guard_device": guard_device,
+                "guard_inode": guard_inode,
+                "mode": mode,
+                "model": model_name,
+                "started_at": datetime.now().isoformat(),
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        _close_guard(guard_file)
+        return None, f"Run lock metadata could not be written: {exc.__class__.__name__}."
+
+    return (
+        RunLockHandle(
+            path=lock_path,
+            owner_token=owner_token,
+            pid=pid,
+            guard_device=guard_device,
+            guard_inode=guard_inode,
+            _guard_file=guard_file,
+        ),
+        None,
+    )
 
 
-def release_run_lock(lock_path: Optional[Path]) -> None:
-    if lock_path is None:
+def run_lock_handle_is_current(
+    project_dir: Path,
+    lock_handle: object,
+) -> bool:
+    """Return whether a live capability still owns this project's fixed lock."""
+    if not isinstance(lock_handle, RunLockHandle):
+        return False
+    if lock_handle._guard_file.closed or lock_handle.pid != os.getpid():
+        return False
+    expected_path = Path(project_dir).expanduser().absolute() / RUN_LOCK_FILENAME
+    if lock_handle.path.expanduser().absolute() != expected_path:
+        return False
+    try:
+        lock_data, regular_or_missing = _lock_metadata(lock_handle.path)
+    except OSError:
+        return False
+    return bool(
+        regular_or_missing
+        and lock_data.get("owner_token") == lock_handle.owner_token
+        and _parse_lock_pid(lock_data.get("pid")) == lock_handle.pid
+        and _metadata_guard_matches(
+            lock_data,
+            lock_handle.guard_device,
+            lock_handle.guard_inode,
+        )
+    )
+
+
+def release_run_lock(lock_handle: Optional[RunLockHandle | Path]) -> None:
+    """Release only a live capability owned by the current process; bare paths fail closed."""
+    if not isinstance(lock_handle, RunLockHandle):
+        return
+    guard_file = lock_handle._guard_file
+    if guard_file.closed:
+        return
+    if os.getpid() != lock_handle.pid:
+        try:
+            guard_file.close()
+        except (OSError, ValueError):
+            pass
         return
     try:
-        lock_path.unlink(missing_ok=True)
+        lock_data, regular_or_missing = _lock_metadata(lock_handle.path)
+        if (
+            regular_or_missing
+            and lock_data.get("owner_token") == lock_handle.owner_token
+            and _parse_lock_pid(lock_data.get("pid")) == lock_handle.pid
+            and _metadata_guard_matches(
+                lock_data,
+                lock_handle.guard_device,
+                lock_handle.guard_inode,
+            )
+        ):
+            unlink_artifact_file(lock_handle.path)
     except OSError:
         pass
+    finally:
+        _close_guard(guard_file)

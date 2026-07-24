@@ -27,6 +27,17 @@ auto-research-agent = "src.cli:main"
 
 [tool.setuptools]
 packages = ["src"]
+include-package-data = false
+
+[tool.setuptools.package-data]
+src = [
+    "_bundled/config.example.yaml",
+    "_bundled/prompts/draft.md",
+    "_bundled/prompts/review.md",
+    "_bundled/prompts/revise.md",
+    "_bundled/prompts/judge.md",
+    "_bundled/projects/example/task.md",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

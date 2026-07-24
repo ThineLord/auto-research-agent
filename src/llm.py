@@ -28,13 +28,22 @@ from .config import (
     MODEL_PROVIDER_GEMINI,
     MODEL_PROVIDER_OLLAMA,
     GeminiConfig,
+    format_ollama_endpoint_for_display,
 )
+from .storage import append_file_text
 
 logger = logging.getLogger(__name__)
 
+_GOOGLE_GENAI_REQUIRED_MESSAGE = (
+    "google-genai is required for Gemini provider. Install project dependencies first."
+)
 
-def _redact_provider_message(text: str) -> str:
+
+def _redact_provider_message(text: str, *, secrets: tuple[str, ...] = ()) -> str:
     redacted = str(text or "")
+    known_secrets = {str(secret).strip() for secret in secrets if str(secret).strip()}
+    for secret in sorted(known_secrets, key=len, reverse=True):
+        redacted = redacted.replace(secret, "[redacted-api-key]")
     redacted = re.sub(r"AIza[0-9A-Za-z_\-]{20,}", "[redacted-api-key]", redacted)
     redacted = re.sub(
         r"(?i)(api[_ -]?key|key|token)=['\"]?[^'\"\s,;]+",
@@ -49,9 +58,7 @@ def _write_provider_event(path: Path | None, payload: Dict[str, Any]) -> None:
     if path is None:
         return
     event = {"time": datetime.now().isoformat(), **payload}
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as file:
-        file.write(json.dumps(event, ensure_ascii=False, default=str) + "\n")
+    append_file_text(path, json.dumps(event, ensure_ascii=False, default=str) + "\n")
 
 
 class LLMClientProtocol(Protocol):
@@ -181,6 +188,7 @@ class OllamaClient:
                 "structured_response": response_format is not None,
             },
         )
+        request_failure: tuple[str, str, str] | None = None
         try:
             response = requests.post(
                 url,
@@ -189,42 +197,41 @@ class OllamaClient:
             )
             response.raise_for_status()
             data = response.json()
-        except requests.Timeout as exc:
-            _write_provider_event(
-                self.provider_event_path,
-                {
-                    "event": "request_error",
-                    "provider": MODEL_PROVIDER_OLLAMA,
-                    "model": self.model,
-                    "stage": agent_name,
-                    "round": self.current_round,
-                    "run_id": self.run_id,
-                    "error_type": "timeout",
-                    "message": _redact_provider_message(str(exc)),
-                },
+        except requests.Timeout:
+            endpoint = format_ollama_endpoint_for_display(self.base_url)
+            request_failure = (
+                "timeout",
+                f"Ollama request timed out at {endpoint}.",
+                "Ollama request timed out. Increase timeout_seconds or check model/server health "
+                f"at {endpoint}.",
             )
-            raise RuntimeError(
-                "Ollama request timed out. "
-                f"Increase timeout_seconds or check model/server health at {self.base_url}."
-            ) from exc
-        except requests.RequestException as exc:
-            _write_provider_event(
-                self.provider_event_path,
-                {
-                    "event": "request_error",
-                    "provider": MODEL_PROVIDER_OLLAMA,
-                    "model": self.model,
-                    "stage": agent_name,
-                    "round": self.current_round,
-                    "run_id": self.run_id,
-                    "error_type": "request_error",
-                    "message": _redact_provider_message(str(exc)),
-                },
-            )
-            raise RuntimeError(
+        except requests.RequestException:
+            endpoint = format_ollama_endpoint_for_display(self.base_url)
+            request_failure = (
+                "request_error",
+                f"Ollama request failed at {endpoint}.",
                 "Failed to call Ollama API. Ensure Ollama is running at "
-                f"{self.base_url} and model '{self.model}' is available."
-            ) from exc
+                f"{endpoint} and model '{self.model}' is available.",
+            )
+
+        # Leave the provider's exception handler before raising. Otherwise the raw
+        # request error remains reachable through __context__ even with a sanitized cause.
+        if request_failure is not None:
+            error_type, safe_message, public_message = request_failure
+            _write_provider_event(
+                self.provider_event_path,
+                {
+                    "event": "request_error",
+                    "provider": MODEL_PROVIDER_OLLAMA,
+                    "model": self.model,
+                    "stage": agent_name,
+                    "round": self.current_round,
+                    "run_id": self.run_id,
+                    "error_type": error_type,
+                    "message": safe_message,
+                },
+            )
+            raise RuntimeError(public_message) from RuntimeError(safe_message)
 
         elapsed = time.monotonic() - started
         content = data.get("message", {}).get("content", "").strip()
@@ -262,9 +269,7 @@ def _load_google_genai() -> tuple[Any, Any]:
         from google import genai
         from google.genai import types
     except ImportError as exc:
-        raise RuntimeError(
-            "google-genai is required for Gemini provider. Install project dependencies first."
-        ) from exc
+        raise RuntimeError(_GOOGLE_GENAI_REQUIRED_MESSAGE) from exc
     return genai, types
 
 
@@ -301,6 +306,13 @@ def _read_response_text(response: Any) -> str:
     return "\n".join(parts_text).strip()
 
 
+@dataclass(frozen=True, repr=False)
+class _GeminiCredentialResolution:
+    value: str
+    pass_explicitly: bool
+    known_secrets: tuple[str, ...]
+
+
 @dataclass
 class GeminiClient:
     model: str
@@ -335,46 +347,68 @@ class GeminiClient:
         self.current_round = round_index
         self.current_stage = stage
 
-    def _available_api_key(self) -> str:
+    def _resolve_api_key(self) -> _GeminiCredentialResolution:
         configured_key = self.api_key.strip()
+        configured_env = self.api_key_env.strip()
+        builtin_envs = ("GOOGLE_API_KEY", DEFAULT_GEMINI_API_KEY_ENV)
+        custom_env_key = ""
+        if configured_env and configured_env not in builtin_envs:
+            custom_env_key = os.environ.get(configured_env, "").strip()
+
+        # google-genai resolves its built-in environment variables by raw
+        # truthiness and gives GOOGLE_API_KEY precedence over GEMINI_API_KEY.
+        # Preserve that SDK contract while continuing to pass explicit and
+        # custom-environment credentials directly.
+        google_env_key = os.environ.get("GOOGLE_API_KEY", "")
+        gemini_env_key = os.environ.get(DEFAULT_GEMINI_API_KEY_ENV, "")
+        known_secrets = tuple(
+            value
+            for value in (
+                configured_key,
+                custom_env_key,
+                google_env_key,
+                gemini_env_key,
+            )
+            if value
+        )
+
         if configured_key:
-            return configured_key
+            return _GeminiCredentialResolution(configured_key, True, known_secrets)
+        if custom_env_key:
+            return _GeminiCredentialResolution(custom_env_key, True, known_secrets)
+        if google_env_key:
+            return _GeminiCredentialResolution(google_env_key, False, known_secrets)
+        if gemini_env_key:
+            return _GeminiCredentialResolution(gemini_env_key, False, known_secrets)
+        return _GeminiCredentialResolution("", False, known_secrets)
 
-        for env_name in (
-            self.api_key_env.strip(),
-            DEFAULT_GEMINI_API_KEY_ENV,
-            "GOOGLE_API_KEY",
-        ):
-            if not env_name:
-                continue
-            env_value = os.environ.get(env_name, "").strip()
-            if env_value:
-                return env_value
-        return ""
+    def _available_api_key(self) -> str:
+        return self._resolve_api_key().value
 
-    def _ensure_api_key_available(self) -> None:
-        if self._available_api_key():
+    def _ensure_api_key_available(
+        self,
+        resolution: _GeminiCredentialResolution | None = None,
+    ) -> None:
+        if (resolution or self._resolve_api_key()).value:
             return
         raise RuntimeError(
             "Gemini API key is missing. Set the configured environment variable, "
             "GEMINI_API_KEY, or GOOGLE_API_KEY before using provider 'gemini'."
         )
 
-    def _create_client(self) -> Any:
+    def _create_client(
+        self,
+        resolution: _GeminiCredentialResolution | None = None,
+    ) -> Any:
         genai, _ = _load_google_genai()
-        configured_key = self.api_key.strip()
-        if configured_key:
-            return genai.Client(api_key=configured_key)
+        http_options = {"timeout": self.timeout_seconds * 1000}
+        resolution = resolution or self._resolve_api_key()
+        if resolution.pass_explicitly:
+            return genai.Client(api_key=resolution.value, http_options=http_options)
 
         # Gemini 3 models commonly perform best with temperature around 1.0, but
         # project-level temperature remains the source of truth for compatibility.
-        env_key = os.environ.get(self.api_key_env.strip(), "").strip()
-        if env_key and self.api_key_env.strip() not in {
-            DEFAULT_GEMINI_API_KEY_ENV,
-            "GOOGLE_API_KEY",
-        }:
-            return genai.Client(api_key=env_key)
-        return genai.Client()
+        return genai.Client(http_options=http_options)
 
     def _generation_config(
         self,
@@ -440,14 +474,32 @@ class GeminiClient:
             )
         final_prompt_chars = system_chars + len(user_prompt)
 
-        self._ensure_api_key_available()
-        client = self._create_client()
-        config = self._generation_config(
-            system_prompt=system_prompt,
-            temperature=temperature,
-            top_p=top_p,
-            response_format=response_format,
+        credential = self._resolve_api_key()
+        self._ensure_api_key_available(credential)
+        known_secrets = credential.known_secrets
+        client_failure_message: str | None = None
+        client_failure_public_message = (
+            "Failed to call Gemini API. Check API key, model name, and network access."
         )
+        try:
+            client = self._create_client(credential)
+            config = self._generation_config(
+                system_prompt=system_prompt,
+                temperature=temperature,
+                top_p=top_p,
+                response_format=response_format,
+            )
+        except Exception as exc:  # noqa: BLE001
+            client_failure_message = _redact_provider_message(
+                str(exc),
+                secrets=known_secrets,
+            )
+            if str(exc) == _GOOGLE_GENAI_REQUIRED_MESSAGE:
+                client_failure_public_message = _GOOGLE_GENAI_REQUIRED_MESSAGE
+        if client_failure_message is not None:
+            raise RuntimeError(client_failure_public_message) from RuntimeError(
+                client_failure_message
+            )
 
         started = time.monotonic()
         _write_provider_event(
@@ -483,6 +535,8 @@ class GeminiClient:
                 "structured_response": response_format is not None,
             },
         )
+        cloud_free_failure_message: str | None = None
+        provider_failure: tuple[Any, str, bool] | None = None
         try:
 
             def operation() -> Any:
@@ -494,6 +548,21 @@ class GeminiClient:
 
             response = self._scheduler.call(operation) if self._scheduler else operation()
         except CloudFreeDailyQuotaExhausted as exc:
+            cloud_free_failure_message = _redact_provider_message(
+                str(exc),
+                secrets=known_secrets,
+            )
+        except Exception as exc:  # noqa: BLE001
+            provider_failure = (
+                classify_gemini_error(exc),
+                _redact_provider_message(str(exc), secrets=known_secrets),
+                isinstance(exc, RuntimeError),
+            )
+
+        # Raise only after leaving the provider's exception handler. Otherwise
+        # Python retains the raw provider exception as __context__ even when a
+        # sanitized explicit cause suppresses it from the formatted traceback.
+        if cloud_free_failure_message is not None:
             _write_provider_event(
                 self.provider_event_path,
                 {
@@ -504,42 +573,13 @@ class GeminiClient:
                     "round": self.current_round,
                     "run_id": self.run_id,
                     "error_type": "daily_quota_exhausted",
-                    "message": _redact_provider_message(str(exc)),
+                    "message": cloud_free_failure_message,
                 },
             )
-            raise
-        except RuntimeError as exc:
-            info = classify_gemini_error(exc)
-            error_type = info.error_type
-            _write_provider_event(
-                self.provider_event_path,
-                {
-                    "event": "request_error",
-                    "provider": MODEL_PROVIDER_GEMINI,
-                    "model": self.model,
-                    "stage": agent_name,
-                    "round": self.current_round,
-                    "run_id": self.run_id,
-                    "error_type": error_type,
-                    "retryable": info.retryable,
-                    "rate_limited": info.rate_limited,
-                    "daily_quota_exhausted": info.daily_quota_exhausted,
-                    "retry_after_seconds": info.retry_after_seconds,
-                    "message": _redact_provider_message(str(exc)),
-                },
-            )
-            if info.rate_limited or info.daily_quota_exhausted:
-                raise RuntimeError(
-                    "PROVIDER_QUOTA_EXHAUSTED: Gemini provider quota or rate limit reached. "
-                    f"{info.public_message}"
-                ) from exc
-            if self._scheduler is not None:
-                raise
-            raise RuntimeError(
-                "Failed to call Gemini API. Check API key, model name, and network access."
-            ) from exc
-        except Exception as exc:  # noqa: BLE001
-            info = classify_gemini_error(exc)
+            raise CloudFreeDailyQuotaExhausted(cloud_free_failure_message) from None
+
+        if provider_failure is not None:
+            info, safe_message, was_runtime_error = provider_failure
             _write_provider_event(
                 self.provider_event_path,
                 {
@@ -554,17 +594,21 @@ class GeminiClient:
                     "rate_limited": info.rate_limited,
                     "daily_quota_exhausted": info.daily_quota_exhausted,
                     "retry_after_seconds": info.retry_after_seconds,
-                    "message": _redact_provider_message(str(exc)),
+                    "message": safe_message,
                 },
             )
             if info.rate_limited or info.daily_quota_exhausted:
                 raise RuntimeError(
                     "PROVIDER_QUOTA_EXHAUSTED: Gemini provider quota or rate limit reached. "
                     f"{info.public_message}"
-                ) from exc
+                ) from RuntimeError(safe_message)
+            if info.error_type == "timeout":
+                raise RuntimeError(info.public_message) from RuntimeError(safe_message)
+            if was_runtime_error and self._scheduler is not None:
+                raise RuntimeError(info.public_message) from RuntimeError(safe_message)
             raise RuntimeError(
                 "Failed to call Gemini API. Check API key, model name, and network access."
-            ) from exc
+            ) from RuntimeError(safe_message)
 
         content = _read_response_text(response)
         elapsed = time.monotonic() - started

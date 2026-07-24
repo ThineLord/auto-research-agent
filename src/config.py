@@ -8,6 +8,7 @@ import re
 import subprocess
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
+from http.client import HTTPException
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.error import HTTPError, URLError
@@ -246,6 +247,44 @@ def _validate_ollama_base_url(value: Any) -> str:
     return base_url
 
 
+def format_ollama_endpoint_for_display(base_url: str) -> str:
+    """Return a useful endpoint label without userinfo, path, query, or fragment."""
+
+    try:
+        parsed = urlparse(str(base_url or "").strip())
+        hostname = parsed.hostname
+        port = parsed.port
+    except ValueError:
+        return "<configured Ollama endpoint>"
+    if parsed.scheme not in {"http", "https"} or not hostname:
+        return "<configured Ollama endpoint>"
+    try:
+        display_hostname = hostname.encode("idna").decode("ascii")
+    except UnicodeError:
+        return "<configured Ollama endpoint>"
+    # Percent escapes/scoped IPv6 and delimiter-like characters are ambiguous in a
+    # diagnostic context; keep the request unchanged but fail closed in its label.
+    if not re.fullmatch(r"[A-Za-z0-9._:-]+", display_hostname):
+        return "<configured Ollama endpoint>"
+    display_host = f"[{display_hostname}]" if ":" in display_hostname else display_hostname
+    display_port = f":{port}" if port is not None else ""
+    return f"{parsed.scheme}://{display_host}{display_port}"
+
+
+def _ollama_api_failure_detail(exc: BaseException) -> str:
+    """Classify an API failure without retaining provider- or URL-controlled text."""
+
+    if isinstance(exc, json.JSONDecodeError):
+        return "response was not valid JSON"
+    if isinstance(exc, HTTPError) and isinstance(exc.code, int):
+        return f"HTTP status {exc.code}"
+    if isinstance(exc, TimeoutError) or (
+        isinstance(exc, URLError) and isinstance(exc.reason, TimeoutError)
+    ):
+        return "request timed out"
+    return "request failed"
+
+
 def _validate_float(
     value: Any,
     field_name: str,
@@ -400,8 +439,19 @@ def _read_yaml_mapping(config_path: Path) -> Dict[str, Any]:
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_display_path}")
     try:
-        raw_config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    except YAML_ERROR as exc:
+        config_text = config_path.read_text(encoding="utf-8")
+    except UnicodeError as exc:
+        raise ConfigValidationError(
+            f"{config_display_path}: config file must be valid UTF-8 text"
+        ) from exc
+    except OSError as exc:
+        reason = getattr(exc, "strerror", None) or exc.__class__.__name__
+        raise ConfigValidationError(
+            f"{config_display_path}: config file could not be read: {reason}"
+        ) from exc
+    try:
+        raw_config = yaml.safe_load(config_text)
+    except (YAML_ERROR, ValueError, RecursionError) as exc:
         raise ConfigValidationError(f"{config_display_path}: failed to parse YAML: {exc}") from exc
     if raw_config is None:
         return {}
@@ -824,10 +874,16 @@ def format_topic_context(topic: TopicConfig) -> str:
     return f"Title: {topic.title}\nDescription: {topic.description}\nKeywords: {keywords}"
 
 
+def normalize_ollama_model_name(value: Any) -> str:
+    """Normalize a model name without coercing provider-controlled non-string values."""
+
+    return value.strip() if isinstance(value, str) else ""
+
+
 def normalize_ollama_models(models: Iterable[Mapping[str, Any]]) -> List[Dict[str, str]]:
     normalized: Dict[str, Dict[str, str]] = {}
     for model in models:
-        name = str(model.get("name", "")).strip()
+        name = normalize_ollama_model_name(model.get("name", ""))
         if not name or name in normalized:
             continue
         normalized[name] = {
@@ -873,14 +929,23 @@ def query_ollama_api_models(
     timeout_seconds: int = 10,
 ) -> Tuple[List[Dict[str, str]], Optional[str]]:
     url = f"{base_url.rstrip('/')}/api/tags"
-    request = Request(url, headers={"Accept": "application/json"})
     try:
+        request = Request(url, headers={"Accept": "application/json"})
         with urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-        return [], f"Failed to query Ollama API at {url}: {exc}"
+    except (
+        HTTPError,
+        URLError,
+        HTTPException,
+        TimeoutError,
+        OSError,
+        ValueError,
+    ) as exc:
+        endpoint = format_ollama_endpoint_for_display(base_url)
+        return [], f"Failed to query Ollama API at {endpoint}: {_ollama_api_failure_detail(exc)}"
     if not isinstance(payload, Mapping):
-        return [], f"Failed to query Ollama API at {url}: response was not a JSON object"
+        endpoint = format_ollama_endpoint_for_display(base_url)
+        return [], f"Failed to query Ollama API at {endpoint}: response was not a JSON object"
     return parse_ollama_tags_payload(payload), None
 
 
@@ -899,14 +964,15 @@ def query_ollama_models(
         )
     except FileNotFoundError:
         command_error = "Ollama is not installed or not in PATH."
-    except subprocess.SubprocessError as exc:
-        command_error = f"Failed to query Ollama: {exc}"
+    except subprocess.SubprocessError:
+        command_error = "Failed to run ollama list."
     else:
         if result.returncode == 0:
             return parse_ollama_list_output(result.stdout), None
-        command_error = (
-            result.stderr.strip() or result.stdout.strip() or "Unknown error from ollama list."
-        )
+        if isinstance(result.returncode, int):
+            command_error = f"ollama list failed with status {result.returncode}."
+        else:
+            command_error = "ollama list failed."
 
     api_models, api_error = query_ollama_api_models(
         base_url=base_url,

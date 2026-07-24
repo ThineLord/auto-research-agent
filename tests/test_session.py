@@ -21,6 +21,38 @@ class FakeSessionLLM:
 
 
 class SessionModeTests(unittest.TestCase):
+    def test_session_interrupt_does_not_generate_a_final_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("memory", encoding="utf-8")
+
+            with (
+                patch.object(
+                    session_module,
+                    "run_iterative_rounds",
+                    side_effect=KeyboardInterrupt,
+                ),
+                patch.object(session_module, "generate_final_session_report") as final_report,
+            ):
+                with self.assertRaises(KeyboardInterrupt):
+                    session_module.run_session_mode(
+                        console=Console(file=io.StringIO(), force_terminal=False),
+                        llm=FakeSessionLLM(),
+                        agents=object(),
+                        task_text="task",
+                        project_dir=project_dir,
+                        memory_path=memory_path,
+                        model_name="mock-model",
+                        max_rounds=1,
+                        stop_if_no_improvement_rounds=1,
+                        global_max_runtime_seconds=60,
+                        per_agent_timeout_seconds=60,
+                        repo_root=project_dir,
+                    )
+
+            final_report.assert_not_called()
+
     def test_session_mode_tolerates_stale_research_state_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_dir = Path(tmp)

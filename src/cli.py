@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import os
 from dataclasses import asdict, replace
 from pathlib import Path
@@ -20,6 +21,7 @@ from .benchmarking import (
 from .cloud_free import (
     FREE_RUNNER_MANUAL,
     FREE_RUNNER_PRESETS,
+    build_cached_candidate_pool,
     build_candidate_pool,
     discover_free_cloud_models,
     filter_safe_text_models,
@@ -49,6 +51,18 @@ from .config import (
 )
 from .constants import RUN_LOCK_FILENAME
 from .diagnostic import run_diagnostic_mode
+from .legacy_migration import (
+    classify_legacy_history_migration,
+    format_legacy_migration_report,
+)
+from .legacy_migration_execution import (
+    LegacyMigrationExecutionError,
+    LegacyMigrationExecutionIOError,
+    LegacyMigrationRecoveryError,
+    classify_legacy_migration_recovery,
+    execute_legacy_history_migration,
+    recover_legacy_history_migration,
+)
 from .literature_survey import run_literature_survey_mode
 from .llm import create_llm_client
 from .logging_config import configure_logging
@@ -59,44 +73,130 @@ from .mock_run import (
     build_mock_agents,
     mock_model_parameters,
 )
+from .package_resources import (
+    PackageResourceError,
+    resolve_runtime_layout,
+    seed_default_mock_project,
+    validate_generation_resources,
+)
 from .project_input import ProjectInputError, load_project_input
 from .resume import run_resume_mode
+from .round_commit_recovery import (
+    RoundCommitReadError,
+    classify_diagnostic_finalize_recovery,
+    classify_round_commit_recovery,
+    classify_run_finalize_recovery,
+    recover_diagnostic_finalize,
+    recover_round_commit,
+    recover_run_finalize,
+)
 from .run_analytics import analyze_run
 from .run_compare import compare_runs
-from .runner import run_iterative_rounds
-from .runtime import acquire_run_lock, release_run_lock
+from .runner import ResumeHistoryError, run_iterative_rounds
+from .runtime import RUN_LOCK_GUARD_FILENAME, acquire_run_lock, release_run_lock
 from .session import run_session_mode
-from .storage import write_json_file
+from .storage import (
+    artifact_path_is_safe,
+    ensure_artifact_directory,
+    ensure_project_runtime_paths_safe,
+    write_json_file,
+)
+
+_EXIT_OPERATION_ERROR = 1
+_EXIT_STARTUP_ERROR = 2
+_EXIT_INTERRUPTED = 130
+
+
+class NumericCliOverrideError(ValueError):
+    """Raised when individually valid numeric overrides conflict after config resolution."""
+
+
+def _positive_round_count(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer >= 1") from exc
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be >= 1")
+    return parsed
+
+
+def _non_negative_finite_seconds(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a finite number >= 0") from exc
+    if not math.isfinite(parsed) or parsed < 0:
+        raise argparse.ArgumentTypeError("must be a finite number >= 0")
+    return parsed
+
+
+def _bounded_max_delay_seconds(value: str) -> float:
+    parsed = _non_negative_finite_seconds(value)
+    if parsed > 86400:
+        raise argparse.ArgumentTypeError("must be <= 86400")
+    return parsed
+
+
+def _bounded_retry_count(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer in [0, 20]") from exc
+    if not 0 <= parsed <= 20:
+        raise argparse.ArgumentTypeError("must be in range [0, 20]")
+    return parsed
+
+
+def _minimum_prompt_chars(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer >= 1000") from exc
+    if parsed < 1000:
+        raise argparse.ArgumentTypeError("must be >= 1000")
+    return parsed
+
+
+def _non_negative_count(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer >= 0") from exc
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be >= 0")
+    return parsed
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Local iterative research agent")
-    parser.add_argument(
+    primary_modes = parser.add_mutually_exclusive_group()
+    primary_modes.add_argument(
         "--session",
         action="store_true",
         help="Run focused nightly research session workflow.",
     )
-    parser.add_argument(
+    primary_modes.add_argument(
         "--diagnostic",
         action="store_true",
         help="Run lightweight one-round diagnostic workflow.",
     )
-    parser.add_argument(
+    primary_modes.add_argument(
         "--continuous",
         action="store_true",
         help="Run continuous round-by-round mode with safe stop support.",
     )
-    parser.add_argument(
+    primary_modes.add_argument(
         "--resume",
         action="store_true",
         help="Resume from projects/<project>/checkpoint.json.",
     )
-    parser.add_argument(
+    primary_modes.add_argument(
         "--survey",
         action="store_true",
         help="Run local Literature Survey Mode without provider calls.",
     )
-    parser.add_argument(
+    primary_modes.add_argument(
         "--mock",
         action="store_true",
         help=(
@@ -110,7 +210,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         default=None,
         help="Override survey report path. Relative paths resolve under the selected project.",
     )
-    parser.add_argument(
+    primary_modes.add_argument(
         "--compare-runs",
         nargs="+",
         default=None,
@@ -123,12 +223,36 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         default=None,
         help="Optional JSON output path for --compare-runs. Relative paths resolve from repo root.",
     )
-    parser.add_argument(
+    primary_modes.add_argument(
         "--analyze-run",
         type=str,
         default=None,
         metavar="RUN_DIR",
         help="Analyze one run directory without provider calls.",
+    )
+    primary_modes.add_argument(
+        "--legacy-migration-preview",
+        type=str,
+        default=None,
+        metavar="PROJECT",
+        help=(
+            "Classify one projects/<PROJECT> legacy history without providers, locks, "
+            "migration, or artifact writes."
+        ),
+    )
+    primary_modes.add_argument(
+        "--legacy-migration-execute",
+        type=str,
+        default=None,
+        metavar="PROJECT",
+        help="Execute one explicitly selected exact missing-history-twin migration.",
+    )
+    parser.add_argument(
+        "--legacy-migration-evidence",
+        type=str,
+        default=None,
+        metavar="DIR",
+        help="New owner-selected evidence directory required by --legacy-migration-execute.",
     )
     parser.add_argument(
         "--analyze-output",
@@ -155,17 +279,23 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         help="Environment variable name that contains the Gemini API key.",
     )
     parser.add_argument(
+        "--gemini-api-key-override-env",
+        type=str,
+        default=None,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
         "--project",
         type=str,
         default=None,
         help="Override project folder name under projects/.",
     )
-    parser.add_argument(
+    primary_modes.add_argument(
         "--cloud-free-discover",
         action="store_true",
         help="Discover safe free-run Gemini/Gemma text models and save an ignored artifact.",
     )
-    parser.add_argument(
+    primary_modes.add_argument(
         "--cloud-free-profile",
         action="store_true",
         help="Profile safe free-run Gemini/Gemma candidates and save an ignored artifact.",
@@ -183,39 +313,39 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--min-delay-seconds",
-        type=float,
+        type=_non_negative_finite_seconds,
         default=None,
-        help="Override cloud free scheduler minimum delay.",
+        help="Override cloud free scheduler minimum delay with a finite value >= 0.",
     )
     parser.add_argument(
         "--max-delay-seconds",
-        type=float,
+        type=_bounded_max_delay_seconds,
         default=None,
-        help="Override cloud free scheduler maximum delay.",
+        help="Override cloud free scheduler maximum delay in [0, 86400].",
     )
     parser.add_argument(
         "--max-retries",
-        type=int,
+        type=_bounded_retry_count,
         default=None,
-        help="Override cloud free scheduler retry count.",
+        help="Override cloud free scheduler retry count in [0, 20].",
     )
     parser.add_argument(
         "--prompt-budget-chars",
-        type=int,
+        type=_minimum_prompt_chars,
         default=None,
-        help="Override cloud free prompt budget in characters.",
+        help="Override cloud free prompt budget in characters (>= 1000).",
     )
     parser.add_argument(
         "--max-prompt-chars",
-        type=int,
+        type=_minimum_prompt_chars,
         default=None,
-        help="Override maximum prompt size before an LLM call fails fast.",
+        help="Override maximum prompt size before an LLM call fails fast (>= 1000).",
     )
     parser.add_argument(
         "--max-rounds",
-        type=int,
+        type=_positive_round_count,
         default=None,
-        help="Override round count for normal/session/resume, or cap continuous mode.",
+        help="Override positive round count for normal/session/resume, or cap continuous mode.",
     )
     parser.add_argument(
         "--drafting-mode",
@@ -234,11 +364,41 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--max-provider-quota-failures",
-        type=int,
+        type=_non_negative_count,
         default=2,
         help="Stop after this many consecutive provider quota/rate-limit failed rounds.",
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.compare_runs is not None and len(args.compare_runs) < 2:
+        parser.error("--compare-runs requires at least two RUN_DIR arguments")
+    if (
+        args.min_delay_seconds is not None
+        and args.max_delay_seconds is not None
+        and args.max_delay_seconds < args.min_delay_seconds
+    ):
+        parser.error("--max-delay-seconds must be >= --min-delay-seconds")
+    output_dependencies = (
+        ("--survey-output", args.survey_output, "--survey", args.survey),
+        ("--compare-output", args.compare_output, "--compare-runs", args.compare_runs),
+        ("--analyze-output", args.analyze_output, "--analyze-run", args.analyze_run),
+    )
+    for output_option, output_value, mode_option, mode_value in output_dependencies:
+        if output_value is not None and not mode_value:
+            parser.error(f"{output_option} requires {mode_option}")
+    if args.legacy_migration_execute is not None and args.legacy_migration_evidence is None:
+        parser.error("--legacy-migration-execute requires --legacy-migration-evidence")
+    if args.legacy_migration_evidence is not None and args.legacy_migration_execute is None:
+        parser.error("--legacy-migration-evidence requires --legacy-migration-execute")
+    if args.gemini_api_key_override_env is not None:
+        override_env = args.gemini_api_key_override_env.strip()
+        try:
+            override_value = os.environ.get(override_env, "")
+        except (OSError, ValueError):
+            override_value = ""
+        if not override_env or not override_value.strip():
+            parser.error("--gemini-api-key-override-env must name a populated environment variable")
+        args.gemini_api_key_override_env = override_env
+    return args
 
 
 def _has_gemini_api_key_source(*, api_key_env: str, config_api_key: str = "") -> bool:
@@ -279,15 +439,22 @@ def _apply_cloud_free_arg_overrides(config, args: argparse.Namespace):
     if args.disable_cloud_free_mode:
         updates["cloud_free_mode"] = False
     if args.min_delay_seconds is not None:
-        updates["min_delay_seconds"] = max(0.0, args.min_delay_seconds)
+        updates["min_delay_seconds"] = args.min_delay_seconds
     if args.max_delay_seconds is not None:
-        updates["max_delay_seconds"] = max(0.0, args.max_delay_seconds)
+        updates["max_delay_seconds"] = args.max_delay_seconds
     if args.max_retries is not None:
-        updates["max_retries"] = max(0, args.max_retries)
+        updates["max_retries"] = args.max_retries
     if args.prompt_budget_chars is not None:
-        updates["prompt_budget_chars"] = max(1000, args.prompt_budget_chars)
+        updates["prompt_budget_chars"] = args.prompt_budget_chars
     if updates:
         cloud_free_config = replace(cloud_free_config, **updates)
+    if (
+        cloud_free_config.min_delay_seconds is not None
+        and cloud_free_config.max_delay_seconds < cloud_free_config.min_delay_seconds
+    ):
+        raise NumericCliOverrideError(
+            "--max-delay-seconds must be >= the effective --min-delay-seconds"
+        )
     return cloud_free_config
 
 
@@ -302,6 +469,133 @@ def _display_repo_path(root: Path, value: object) -> str:
         return path.resolve().relative_to(root.resolve()).as_posix()
     except ValueError:
         return f"<repo>/{path.name}"
+
+
+def _print_run_lock_recovery_hint(console: Console, root: Path, project_dir: Path) -> None:
+    metadata_path = _display_repo_path(root, project_dir / RUN_LOCK_FILENAME)
+    guard_path = _display_repo_path(root, project_dir / RUN_LOCK_GUARD_FILENAME)
+    console.print(
+        "[yellow]If no run process is active, inspect and move aside stale lock paths "
+        f"{metadata_path} and {guard_path}, then retry.[/yellow]"
+    )
+
+
+def _recover_pending_round_commit(
+    *,
+    console: Console,
+    project_dir: Path,
+    run_lock_handle: object | None = None,
+) -> object:
+    """Recover valid round and finalization journals under the project lock."""
+    migration = classify_legacy_migration_recovery(project_dir)
+    if migration.status != "absent":
+        if not migration.can_recover:
+            console.print(
+                "[red]Legacy migration recovery is blocked; preserved artifacts require "
+                "inspection.[/red]"
+            )
+            raise SystemExit(_EXIT_STARTUP_ERROR)
+        try:
+            recovered_migration = recover_legacy_history_migration(
+                project_dir,
+                lock_handle=run_lock_handle,
+            )
+        except (OSError, RuntimeError):
+            console.print(
+                "[red]Legacy migration recovery failed; preserved artifacts require "
+                "inspection.[/red]"
+            )
+            raise SystemExit(_EXIT_STARTUP_ERROR) from None
+        console.print(
+            "[yellow]Recovered pending legacy history migration before starting new runner "
+            "work.[/yellow]"
+        )
+        return recovered_migration
+
+    inspection = classify_round_commit_recovery(project_dir)
+    result = inspection
+    if inspection.status != "absent":
+        if not inspection.can_recover:
+            console.print(
+                "[red]Round commit recovery is blocked; preserved artifacts require inspection.[/red]"
+            )
+            raise SystemExit(_EXIT_STARTUP_ERROR)
+        try:
+            result = recover_round_commit(project_dir)
+        except (OSError, RuntimeError):
+            console.print(
+                "[red]Round commit recovery failed; preserved artifacts require inspection.[/red]"
+            )
+            raise SystemExit(_EXIT_STARTUP_ERROR) from None
+        console.print(
+            "[yellow]Recovered pending round commit before starting new runner work.[/yellow]"
+        )
+
+    finalization = classify_run_finalize_recovery(project_dir)
+    if finalization.status != "absent":
+        if not finalization.can_recover:
+            console.print(
+                "[red]Run finalization recovery is blocked; preserved artifacts require "
+                "inspection.[/red]"
+            )
+            raise SystemExit(_EXIT_STARTUP_ERROR)
+        try:
+            result = recover_run_finalize(project_dir)
+        except (OSError, RuntimeError):
+            console.print(
+                "[red]Run finalization recovery failed; preserved artifacts require "
+                "inspection.[/red]"
+            )
+            raise SystemExit(_EXIT_STARTUP_ERROR) from None
+        console.print(
+            "[yellow]Recovered pending run finalization before starting new runner work.[/yellow]"
+        )
+
+    diagnostic = classify_diagnostic_finalize_recovery(project_dir)
+    if diagnostic.status == "absent":
+        return result
+    if not diagnostic.can_recover:
+        console.print(
+            "[red]Diagnostic finalization recovery is blocked; preserved artifacts require "
+            "inspection.[/red]"
+        )
+        raise SystemExit(_EXIT_STARTUP_ERROR)
+    try:
+        recovered_diagnostic = recover_diagnostic_finalize(project_dir)
+    except (OSError, RuntimeError):
+        console.print(
+            "[red]Diagnostic finalization recovery failed; preserved artifacts require "
+            "inspection.[/red]"
+        )
+        raise SystemExit(_EXIT_STARTUP_ERROR) from None
+    console.print(
+        "[yellow]Recovered pending diagnostic finalization before starting new runner work.[/yellow]"
+    )
+    return recovered_diagnostic
+
+
+def _unsafe_lock_path_message(project_dir: Path) -> str | None:
+    """Preserve actionable lock diagnostics when project-wide preflight fails first."""
+    try:
+        ensure_artifact_directory(project_dir, anchor=project_dir.parent)
+    except OSError:
+        return None
+    if not artifact_path_is_safe(
+        project_dir / RUN_LOCK_FILENAME,
+        allow_missing=True,
+        anchor=project_dir.parent,
+    ):
+        return (
+            f"Stale run lock could not be cleared: {RUN_LOCK_FILENAME} is not removable. "
+            "Move it aside manually and retry."
+        )
+    if not artifact_path_is_safe(
+        project_dir / RUN_LOCK_GUARD_FILENAME,
+        allow_missing=True,
+        anchor=project_dir.parent,
+    ):
+        return "Run lock guard could not be acquired: unsafe or unavailable guard path."
+    return None
 
 
 def _privacy_safe_comparison(comparison: dict[str, Any], root: Path) -> dict[str, Any]:
@@ -338,11 +632,22 @@ def _run_compare_cli(args: argparse.Namespace, console: Console, root: Path) -> 
         _resolve_repo_relative_path(root, run_root)
         for run_root in (getattr(args, "compare_runs", None) or [])
     ]
-    comparison = _privacy_safe_comparison(compare_runs(run_roots), root)
+    try:
+        comparison = _privacy_safe_comparison(compare_runs(run_roots), root)
+    except RoundCommitReadError as exc:
+        console.print(f"[red]Run comparison blocked: {exc.code}.[/red]")
+        raise SystemExit(_EXIT_STARTUP_ERROR) from None
     output_arg = getattr(args, "compare_output", None)
     if output_arg:
-        output_path = _resolve_repo_relative_path(root, output_arg)
-        write_json_file(output_path, comparison)
+        try:
+            output_path = _resolve_repo_relative_path(root, output_arg)
+            authorized_output_path = output_path.parent.resolve(strict=False) / output_path.name
+            write_json_file(authorized_output_path, comparison)
+        except (OSError, RuntimeError):
+            console.print(
+                "[red]Run comparison output error: output path is unsafe or unavailable.[/red]"
+            )
+            raise SystemExit(_EXIT_OPERATION_ERROR) from None
         console.print(
             f"[green]Saved run comparison:[/green] {_display_repo_path(root, output_path)}"
         )
@@ -352,46 +657,247 @@ def _run_compare_cli(args: argparse.Namespace, console: Console, root: Path) -> 
 
 def _run_analyze_cli(args: argparse.Namespace, console: Console, root: Path) -> dict[str, object]:
     run_root = _resolve_repo_relative_path(root, str(getattr(args, "analyze_run", "")))
-    analysis = _privacy_safe_run_analysis(analyze_run(run_root), root)
+    try:
+        analysis = _privacy_safe_run_analysis(analyze_run(run_root), root)
+    except RoundCommitReadError as exc:
+        console.print(f"[red]Run analysis blocked: {exc.code}.[/red]")
+        raise SystemExit(_EXIT_STARTUP_ERROR) from None
     output_arg = getattr(args, "analyze_output", None)
     if output_arg:
-        output_path = _resolve_repo_relative_path(root, output_arg)
-        write_json_file(output_path, analysis)
+        try:
+            output_path = _resolve_repo_relative_path(root, output_arg)
+            authorized_output_path = output_path.parent.resolve(strict=False) / output_path.name
+            write_json_file(authorized_output_path, analysis)
+        except (OSError, RuntimeError):
+            console.print(
+                "[red]Run analysis output error: output path is unsafe or unavailable.[/red]"
+            )
+            raise SystemExit(_EXIT_OPERATION_ERROR) from None
         console.print(f"[green]Saved run analysis:[/green] {_display_repo_path(root, output_path)}")
     console.print_json(data=analysis)
     return analysis
+
+
+def _run_legacy_migration_preview_cli(
+    args: argparse.Namespace,
+    console: Console,
+    root: Path,
+) -> None:
+    """Print one fixed read-only report before config or provider setup."""
+    project_name = str(getattr(args, "legacy_migration_preview", "")).strip()
+    project_error = _validate_project_override(project_name)
+    if project_error:
+        console.print(f"[red]{project_error}[/red]")
+        raise SystemExit(_EXIT_STARTUP_ERROR)
+    try:
+        inspection = classify_legacy_history_migration(root / "projects" / project_name)
+        report = format_legacy_migration_report(inspection)
+    except (OSError, RuntimeError, ValueError):
+        console.print(
+            "[red]Legacy migration preview failed: selected project state is unsafe "
+            "or unavailable.[/red]"
+        )
+        raise SystemExit(_EXIT_OPERATION_ERROR) from None
+    console.print(report, markup=False)
+
+
+def _run_legacy_migration_execute_cli(
+    args: argparse.Namespace,
+    console: Console,
+    root: Path,
+) -> None:
+    """Execute or resume one exact-copy migration before config/provider setup."""
+    project_name = str(getattr(args, "legacy_migration_execute", "")).strip()
+    project_error = _validate_project_override(project_name)
+    if project_error:
+        console.print(f"[red]{project_error}[/red]")
+        raise SystemExit(_EXIT_STARTUP_ERROR)
+    evidence_value = str(getattr(args, "legacy_migration_evidence", "")).strip()
+    if not evidence_value:
+        console.print("[red]Legacy migration evidence directory must be non-empty.[/red]")
+        raise SystemExit(_EXIT_STARTUP_ERROR)
+    project_dir = root / "projects" / project_name
+    evidence_dir = _resolve_repo_relative_path(root, evidence_value).expanduser().absolute()
+    try:
+        project_resolved = project_dir.resolve(strict=False)
+        evidence_resolved = evidence_dir.resolve(strict=False)
+        if evidence_resolved == project_resolved or project_resolved in evidence_resolved.parents:
+            console.print(
+                "[red]Legacy migration evidence directory must be outside the selected "
+                "project.[/red]"
+            )
+            raise SystemExit(_EXIT_STARTUP_ERROR)
+        recovery = classify_legacy_migration_recovery(project_dir)
+        if recovery.status == "absent":
+            inspection = classify_legacy_history_migration(project_dir)
+            if (
+                inspection.status != "eligible_candidate"
+                or inspection.classification != "exact_missing_history_twin"
+            ):
+                console.print(format_legacy_migration_report(inspection), markup=False)
+                raise SystemExit(_EXIT_OPERATION_ERROR)
+    except SystemExit:
+        raise
+    except (OSError, RuntimeError, ValueError):
+        console.print(
+            "[red]Legacy migration execution failed: selected project state is unsafe "
+            "or unavailable.[/red]"
+        )
+        raise SystemExit(_EXIT_OPERATION_ERROR) from None
+
+    lock_handle = None
+    try:
+        lock_handle, lock_error = acquire_run_lock(
+            project_dir,
+            mode="legacy_history_migration",
+            model_name="provider-free",
+        )
+        if lock_error or lock_handle is None:
+            console.print(
+                "[red]Legacy migration execution could not acquire the project lock.[/red]"
+            )
+            _print_run_lock_recovery_hint(console, root, project_dir)
+            raise SystemExit(_EXIT_STARTUP_ERROR)
+        recovery = classify_legacy_migration_recovery(project_dir)
+        if recovery.status == "absent":
+            result = execute_legacy_history_migration(
+                project_dir,
+                evidence_dir,
+                lock_handle=lock_handle,
+            )
+        else:
+            result = recover_legacy_history_migration(
+                project_dir,
+                lock_handle=lock_handle,
+                expected_evidence_dir=evidence_dir,
+            )
+    except KeyboardInterrupt:
+        console.print(
+            "[yellow]Legacy migration interrupted; any prepared transaction was preserved "
+            "for recovery.[/yellow]"
+        )
+        raise SystemExit(_EXIT_INTERRUPTED) from None
+    except (
+        LegacyMigrationExecutionError,
+        LegacyMigrationExecutionIOError,
+        LegacyMigrationRecoveryError,
+        OSError,
+        RuntimeError,
+        ValueError,
+    ):
+        console.print(
+            "[red]Legacy migration execution failed; preserved state requires inspection "
+            "or an exact retry.[/red]"
+        )
+        raise SystemExit(_EXIT_OPERATION_ERROR) from None
+    finally:
+        release_run_lock(lock_handle)
+    console.print("[green]Legacy history migration completed.[/green]")
+    console.print(f"status: {result.status}", markup=False)
+    console.print(f"run_id: {result.run_id}", markup=False)
+    console.print(f"source_artifact: {result.source_artifact}", markup=False)
+    console.print(f"target_artifact: {result.target_artifact}", markup=False)
+
+
+def _requires_generation_resources(args: argparse.Namespace) -> bool:
+    return not any(
+        getattr(args, mode, False)
+        for mode in (
+            "compare_runs",
+            "analyze_run",
+            "legacy_migration_preview",
+            "legacy_migration_execute",
+            "survey",
+            "cloud_free_discover",
+            "cloud_free_profile",
+        )
+    )
+
+
+def _validate_model_provider_startup(
+    *,
+    args: argparse.Namespace,
+    console: Console,
+    provider: str,
+    model_name: str,
+    gemini_api_key_env: str,
+    effective_gemini_api_key: str,
+) -> None:
+    if provider == MODEL_PROVIDER_OLLAMA:
+        installed_models, ollama_error = list_installed_ollama_models()
+        if ollama_error:
+            console.print(f"[red]{ollama_error}[/red]")
+            console.print("[yellow]Start Ollama service, then retry.[/yellow]")
+            raise SystemExit(_EXIT_STARTUP_ERROR)
+        if model_name not in installed_models:
+            console.print(
+                f"[red]Model {model_name} is not installed. Run: ollama pull {model_name}[/red]"
+            )
+            if args.model is None and "llama3.1:8b" in installed_models:
+                console.print("[yellow]Suggestion: fallback available -> llama3.1:8b[/yellow]")
+            raise SystemExit(_EXIT_STARTUP_ERROR)
+    elif provider == MODEL_PROVIDER_GEMINI:
+        if not _has_gemini_api_key_source(
+            api_key_env=gemini_api_key_env,
+            config_api_key=effective_gemini_api_key,
+        ):
+            console.print(
+                "[red]Gemini API key is missing. Set the configured environment variable, "
+                "GEMINI_API_KEY, or GOOGLE_API_KEY, then retry.[/red]"
+            )
+            raise SystemExit(_EXIT_STARTUP_ERROR)
+    else:
+        console.print(f"[red]Unsupported model provider: {provider}[/red]")
+        raise SystemExit(_EXIT_STARTUP_ERROR)
 
 
 def main() -> None:
     args = parse_args()
     configure_logging()
     console = Console()
-    root = Path(__file__).resolve().parent.parent
+    try:
+        layout = resolve_runtime_layout(cli_file=__file__)
+    except PackageResourceError as exc:
+        console.print(f"[red]Package resource error: {exc}[/red]")
+        raise SystemExit(_EXIT_STARTUP_ERROR) from None
+    root = layout.workspace_root
+    if getattr(args, "legacy_migration_preview", None) is not None:
+        _run_legacy_migration_preview_cli(args, console, root)
+        return
+    if getattr(args, "legacy_migration_execute", None) is not None:
+        _run_legacy_migration_execute_cli(args, console, root)
+        return
     if getattr(args, "compare_runs", None):
         _run_compare_cli(args, console, root)
         return
     if getattr(args, "analyze_run", None):
         _run_analyze_cli(args, console, root)
         return
+    if _requires_generation_resources(args):
+        try:
+            validate_generation_resources(layout)
+        except PackageResourceError as exc:
+            console.print(f"[red]Package resource error: {exc}[/red]")
+            raise SystemExit(_EXIT_STARTUP_ERROR) from None
 
     config_path = root / "config.yaml"
     try:
         config = load_app_config(config_path)
     except (ConfigValidationError, FileNotFoundError) as exc:
         if getattr(args, "mock", False) and isinstance(exc, FileNotFoundError):
-            config_path = root / "config.example.yaml"
+            config_path = layout.config_example_path
             try:
                 config = load_app_config(config_path)
             except (ConfigValidationError, FileNotFoundError) as fallback_exc:
                 console.print(f"[red]Config error: {fallback_exc}[/red]")
-                return
+                raise SystemExit(_EXIT_STARTUP_ERROR) from None
             console.print(
                 "[yellow]config.yaml not found; mock mode is using config.example.yaml "
                 "without creating local config.[/yellow]"
             )
         else:
             console.print(f"[red]Config error: {exc}[/red]")
-            return
+            raise SystemExit(_EXIT_STARTUP_ERROR) from None
 
     (
         config_provider,
@@ -408,37 +914,49 @@ def main() -> None:
             model_name = DEFAULT_GEMINI_MODEL
     gemini_api_key_env = args.gemini_api_key_env or config_gemini.api_key_env
     gemini_config = replace(config_gemini, api_key_env=gemini_api_key_env)
-    cloud_free_config = _apply_cloud_free_arg_overrides(config, args)
+    gemini_api_key_override = ""
+    gemini_api_key_override_env = getattr(args, "gemini_api_key_override_env", None)
+    if gemini_api_key_override_env:
+        gemini_api_key_override = os.environ.get(
+            gemini_api_key_override_env,
+            "",
+        ).strip()
+    effective_gemini_api_key = gemini_api_key_override or gemini_config.api_key
+    try:
+        cloud_free_config = _apply_cloud_free_arg_overrides(config, args)
+    except NumericCliOverrideError as exc:
+        console.print(f"[red]Argument error: {exc}.[/red]")
+        raise SystemExit(_EXIT_STARTUP_ERROR) from None
     model_label = format_model_label(provider, model_name)
     base_url = config.ollama_base_url
     project_name = args.project.strip() if args.project else config.project_name
     project_error = _validate_project_override(project_name)
     if project_error:
         console.print(f"[red]{project_error}[/red]")
-        return
+        raise SystemExit(_EXIT_STARTUP_ERROR)
     benchmark_preset = getattr(args, "benchmark_preset", None)
     max_rounds_override = getattr(args, "max_rounds", None)
-    max_provider_quota_failures = max(0, getattr(args, "max_provider_quota_failures", 2))
+    max_provider_quota_failures = getattr(args, "max_provider_quota_failures", 2)
     preset_rounds = benchmark_preset_rounds(benchmark_preset)
     max_rounds = config.max_rounds
     if preset_rounds is not None:
         max_rounds = preset_rounds
     if max_rounds_override is not None:
-        max_rounds = max(1, max_rounds_override)
+        max_rounds = max_rounds_override
     if getattr(args, "mock", False) and max_rounds_override is None:
         max_rounds = min(max_rounds, MOCK_DEFAULT_ROUNDS)
     continuous_max_rounds = 9999
     if preset_rounds is not None:
         continuous_max_rounds = preset_rounds
     if max_rounds_override is not None:
-        continuous_max_rounds = max(1, max_rounds_override)
+        continuous_max_rounds = max_rounds_override
     stop_if_no_improvement_rounds = config.stop_if_no_improvement_rounds
     normal_max_runtime_seconds, continuous_max_runtime_seconds = resolve_runtime_limits(config)
     temperature = config_temperature
     top_p = config.top_p
     timeout_seconds = config_timeout
     if args.max_prompt_chars is not None:
-        max_prompt_chars = max(1000, args.max_prompt_chars)
+        max_prompt_chars = args.max_prompt_chars
     elif args.provider and provider != config_provider:
         max_prompt_chars = (
             DEFAULT_GEMINI_MAX_PROMPT_CHARS
@@ -462,9 +980,25 @@ def main() -> None:
         "keywords": list(config.topic.keywords),
     }
 
+    try:
+        project_seeded = seed_default_mock_project(
+            layout,
+            mock_mode=getattr(args, "mock", False),
+            project_name=project_name,
+            explicit_project=args.project is not None,
+        )
+    except PackageResourceError as exc:
+        console.print(f"[red]Project input error: {exc}[/red]")
+        raise SystemExit(_EXIT_STARTUP_ERROR) from None
+    if project_seeded:
+        console.print(
+            "[yellow]Installed mock workspace seeded projects/example/task.md from the "
+            "bundled example; existing files were not changed.[/yellow]"
+        )
+
     project_dir = root / "projects" / project_name
     memory_path = project_dir / "memory.md"
-    prompts_dir = root / "prompts"
+    prompts_dir = layout.prompts_dir
 
     try:
         project_input = load_project_input(
@@ -474,7 +1008,7 @@ def main() -> None:
         )
     except ProjectInputError as exc:
         console.print(f"[red]Project input error: {exc}[/red]")
-        return
+        raise SystemExit(_EXIT_STARTUP_ERROR) from None
     project_dir = project_input.project_dir
     memory_path = project_dir / "memory.md"
     task_text = project_input.task_text
@@ -485,31 +1019,54 @@ def main() -> None:
         f"title={project_input.project_title} | "
         f"task={_display_repo_path(root, project_input.task_path)}"
     )
+    try:
+        ensure_project_runtime_paths_safe(project_dir)
+    except OSError:
+        lock_message = _unsafe_lock_path_message(project_dir)
+        if lock_message:
+            console.print(f"[red]{lock_message}[/red]")
+            _print_run_lock_recovery_hint(console, root, project_dir)
+        else:
+            console.print(
+                "[red]Project artifact error: an automatic project path is unsafe or "
+                "unavailable.[/red]"
+            )
+        raise SystemExit(_EXIT_STARTUP_ERROR) from None
 
     if getattr(args, "survey", False):
         survey_output = getattr(args, "survey_output", None)
         survey_output_path = Path(survey_output).expanduser() if survey_output else None
         if survey_output_path is not None and not survey_output_path.is_absolute():
             survey_output_path = project_dir / survey_output_path
-        run_lock_path, lock_error = acquire_run_lock(
-            project_dir,
-            mode="literature_survey",
-            model_name="local-deterministic",
-        )
-        if lock_error:
-            console.print(f"[red]{lock_error}[/red]")
-            console.print(
-                "[yellow]If this is stale, remove "
-                f"{_display_repo_path(root, project_dir / RUN_LOCK_FILENAME)} and retry.[/yellow]"
-            )
-            return
+        run_lock_path = None
         try:
+            run_lock_path, lock_error = acquire_run_lock(
+                project_dir,
+                mode="literature_survey",
+                model_name="local-deterministic",
+            )
+            if lock_error:
+                console.print(f"[red]{lock_error}[/red]")
+                _print_run_lock_recovery_hint(console, root, project_dir)
+                raise SystemExit(_EXIT_STARTUP_ERROR)
             run_literature_survey_mode(
                 console=console,
                 project_input=project_input,
                 config=config.literature_survey,
                 output_path=survey_output_path,
             )
+        except KeyboardInterrupt:
+            console.print(
+                "[red]Manual interrupt detected in literature survey. "
+                "Stop reason: MANUAL_INTERRUPT[/red]"
+            )
+            raise SystemExit(_EXIT_INTERRUPTED) from None
+        except OSError:
+            console.print(
+                "[red]Survey artifact error: an automatic output path is unsafe or "
+                "unavailable.[/red]"
+            )
+            raise SystemExit(_EXIT_OPERATION_ERROR) from None
         finally:
             release_run_lock(run_lock_path)
         return
@@ -534,20 +1091,23 @@ def main() -> None:
             f"[cyan]Mock mode will write normal run artifacts for {max_rounds} round(s).[/cyan]"
         )
         requested_mode = "mock"
-        run_lock_path, lock_error = acquire_run_lock(
-            project_dir,
-            mode=requested_mode,
-            model_name=model_label,
-        )
-        if lock_error:
-            console.print(f"[red]{lock_error}[/red]")
-            console.print(
-                "[yellow]If this is stale, remove "
-                f"{_display_repo_path(root, project_dir / RUN_LOCK_FILENAME)} and retry.[/yellow]"
-            )
-            return
-        agents = build_mock_agents(topic_context=topic_context)
+        run_lock_path = None
         try:
+            run_lock_path, lock_error = acquire_run_lock(
+                project_dir,
+                mode=requested_mode,
+                model_name=model_label,
+            )
+            if lock_error:
+                console.print(f"[red]{lock_error}[/red]")
+                _print_run_lock_recovery_hint(console, root, project_dir)
+                raise SystemExit(_EXIT_STARTUP_ERROR)
+            _recover_pending_round_commit(
+                console=console,
+                project_dir=project_dir,
+                run_lock_handle=run_lock_path,
+            )
+            agents = build_mock_agents(topic_context=topic_context)
             run_iterative_rounds(
                 console=console,
                 agents=agents,
@@ -567,6 +1127,7 @@ def main() -> None:
                 topic_snapshot=topic_snapshot,
                 prompt_dir=prompts_dir,
                 repo_root=root,
+                git_root=layout.git_root,
                 drafting_mode=drafting_mode,
                 max_consecutive_provider_quota_failures=max_provider_quota_failures,
             )
@@ -574,47 +1135,37 @@ def main() -> None:
             console.print(
                 "[red]Manual interrupt detected in mock loop. Stop reason: MANUAL_INTERRUPT[/red]"
             )
+            raise SystemExit(_EXIT_INTERRUPTED) from None
         finally:
             release_run_lock(run_lock_path)
         return
 
-    if provider == MODEL_PROVIDER_OLLAMA:
-        installed_models, ollama_error = list_installed_ollama_models()
-        if ollama_error:
-            console.print(f"[red]{ollama_error}[/red]")
-            console.print("[yellow]Start Ollama service, then retry.[/yellow]")
-            return
-        if model_name not in installed_models:
-            console.print(
-                f"[red]Model {model_name} is not installed. Run: ollama pull {model_name}[/red]"
-            )
-            if args.model is None and "llama3.1:8b" in installed_models:
-                console.print("[yellow]Suggestion: fallback available -> llama3.1:8b[/yellow]")
-            return
-    elif provider == MODEL_PROVIDER_GEMINI:
-        if not _has_gemini_api_key_source(
-            api_key_env=gemini_api_key_env,
-            config_api_key=gemini_config.api_key,
-        ):
-            console.print(
-                "[red]Gemini API key is missing. Set the configured environment variable, "
-                "GEMINI_API_KEY, or GOOGLE_API_KEY, then retry.[/red]"
-            )
-            return
-    else:
-        console.print(f"[red]Unsupported model provider: {provider}[/red]")
-        return
+    if args.cloud_free_discover or args.cloud_free_profile:
+        _validate_model_provider_startup(
+            args=args,
+            console=console,
+            provider=provider,
+            model_name=model_name,
+            gemini_api_key_env=gemini_api_key_env,
+            effective_gemini_api_key=effective_gemini_api_key,
+        )
 
     if args.cloud_free_discover:
         discovered, error = discover_free_cloud_models(
             api_key_env=gemini_api_key_env,
-            api_key=gemini_config.api_key,
+            api_key=effective_gemini_api_key,
             config=cloud_free_config,
         )
         if error:
             console.print(f"[red]Cloud model discovery failed: {error}[/red]")
-            return
-        artifact = save_discovery_artifact(project_dir, discovered)
+            raise SystemExit(_EXIT_OPERATION_ERROR)
+        try:
+            artifact = save_discovery_artifact(project_dir, discovered)
+        except OSError:
+            console.print(
+                "[red]Cloud artifact error: automatic output is unsafe or unavailable.[/red]"
+            )
+            raise SystemExit(_EXIT_OPERATION_ERROR) from None
         candidates = build_candidate_pool(
             discovered_models=discovered,
             configured_models=gemini_config.models,
@@ -631,7 +1182,7 @@ def main() -> None:
     if args.cloud_free_profile:
         discovered, error = discover_free_cloud_models(
             api_key_env=gemini_api_key_env,
-            api_key=gemini_config.api_key,
+            api_key=effective_gemini_api_key,
             config=cloud_free_config,
         )
         if error:
@@ -640,7 +1191,13 @@ def main() -> None:
             )
             discovered = []
         else:
-            save_discovery_artifact(project_dir, discovered)
+            try:
+                save_discovery_artifact(project_dir, discovered)
+            except OSError:
+                console.print(
+                    "[red]Cloud artifact error: automatic output is unsafe or unavailable.[/red]"
+                )
+                raise SystemExit(_EXIT_OPERATION_ERROR) from None
         candidates = build_candidate_pool(
             discovered_models=discovered,
             configured_models=gemini_config.models,
@@ -650,10 +1207,16 @@ def main() -> None:
         profiles = profile_free_cloud_models(
             candidates=safe_candidates,
             api_key_env=gemini_api_key_env,
-            api_key=gemini_config.api_key,
+            api_key=effective_gemini_api_key,
             timeout_seconds=timeout_seconds,
         )
-        artifact = save_profile_artifact(project_dir, profiles)
+        try:
+            artifact = save_profile_artifact(project_dir, profiles)
+        except OSError:
+            console.print(
+                "[red]Cloud artifact error: automatic output is unsafe or unavailable.[/red]"
+            )
+            raise SystemExit(_EXIT_OPERATION_ERROR) from None
         recommendation = recommend_free_cloud_model(
             candidates=safe_candidates,
             profiles=profiles,
@@ -676,9 +1239,10 @@ def main() -> None:
     ):
         discovered = load_discovery_artifact(project_dir)
         profiles = load_profile_artifact(project_dir)
-        candidates = build_candidate_pool(
+        candidates = build_cached_candidate_pool(
             discovered_models=discovered,
             configured_models=gemini_config.models,
+            profiles=profiles,
             config=cloud_free_config,
         )
         recommendation = recommend_free_cloud_model(
@@ -724,61 +1288,78 @@ def main() -> None:
     if benchmark_preset:
         project_metadata["benchmark_preset"] = benchmark_preset
 
-    run_lock_path, lock_error = acquire_run_lock(
-        project_dir,
-        mode=requested_mode,
-        model_name=model_label,
-    )
-    if lock_error:
-        console.print(f"[red]{lock_error}[/red]")
-        console.print(
-            "[yellow]If this is stale, remove "
-            f"{_display_repo_path(root, project_dir / RUN_LOCK_FILENAME)} and retry.[/yellow]"
-        )
-        return
-
-    llm = create_llm_client(
-        provider=provider,
-        model_name=model_name,
-        ollama_base_url=base_url,
-        timeout_seconds=timeout_seconds,
-        max_prompt_chars=max_prompt_chars,
-        gemini_config=gemini_config,
-        cloud_free_config=cloud_free_config
-        if provider == MODEL_PROVIDER_GEMINI and cloud_free_config.cloud_free_mode
-        else None,
-    )
-    agents = ResearchAgents.from_prompt_dir(
-        llm=llm,
-        prompt_dir=prompts_dir,
-        temperature=temperature,
-        top_p=top_p,
-        topic_context=topic_context,
-    )
-
+    run_lock_path = None
     try:
+        run_lock_path, lock_error = acquire_run_lock(
+            project_dir,
+            mode=requested_mode,
+            model_name=model_label,
+        )
+        if lock_error:
+            console.print(f"[red]{lock_error}[/red]")
+            _print_run_lock_recovery_hint(console, root, project_dir)
+            raise SystemExit(_EXIT_STARTUP_ERROR)
+        _recover_pending_round_commit(
+            console=console,
+            project_dir=project_dir,
+            run_lock_handle=run_lock_path,
+        )
+        _validate_model_provider_startup(
+            args=args,
+            console=console,
+            provider=provider,
+            model_name=model_name,
+            gemini_api_key_env=gemini_api_key_env,
+            effective_gemini_api_key=effective_gemini_api_key,
+        )
+        llm = create_llm_client(
+            provider=provider,
+            model_name=model_name,
+            ollama_base_url=base_url,
+            timeout_seconds=timeout_seconds,
+            max_prompt_chars=max_prompt_chars,
+            gemini_config=gemini_config,
+            explicit_gemini_api_key=gemini_api_key_override,
+            cloud_free_config=cloud_free_config
+            if provider == MODEL_PROVIDER_GEMINI and cloud_free_config.cloud_free_mode
+            else None,
+        )
+        agents = ResearchAgents.from_prompt_dir(
+            llm=llm,
+            prompt_dir=prompts_dir,
+            temperature=temperature,
+            top_p=top_p,
+            topic_context=topic_context,
+        )
+
         if args.resume:
-            run_resume_mode(
-                console=console,
-                agents=agents,
-                task_text=task_text,
-                project_dir=project_dir,
-                memory_path=memory_path,
-                model_name=model_label,
-                max_rounds=max_rounds,
-                stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
-                global_max_runtime_seconds=normal_max_runtime_seconds,
-                per_agent_timeout_seconds=timeout_seconds,
-                topic_keywords=topic_keywords,
-                project_metadata=project_metadata,
-                model_provider=provider,
-                model_parameters=model_parameters,
-                topic_snapshot=topic_snapshot,
-                prompt_dir=prompts_dir,
-                repo_root=root,
-                drafting_mode=drafting_mode,
-                max_consecutive_provider_quota_failures=max_provider_quota_failures,
-            )
+            try:
+                resume_started = run_resume_mode(
+                    console=console,
+                    agents=agents,
+                    task_text=task_text,
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    model_name=model_label,
+                    max_rounds=max_rounds,
+                    stop_if_no_improvement_rounds=stop_if_no_improvement_rounds,
+                    global_max_runtime_seconds=normal_max_runtime_seconds,
+                    per_agent_timeout_seconds=timeout_seconds,
+                    topic_keywords=topic_keywords,
+                    project_metadata=project_metadata,
+                    model_provider=provider,
+                    model_parameters=model_parameters,
+                    topic_snapshot=topic_snapshot,
+                    prompt_dir=prompts_dir,
+                    repo_root=root,
+                    git_root=layout.git_root,
+                    drafting_mode=drafting_mode,
+                    max_consecutive_provider_quota_failures=max_provider_quota_failures,
+                )
+            except ResumeHistoryError:
+                raise SystemExit(2) from None
+            if not resume_started:
+                raise SystemExit(2)
             return
 
         if args.continuous:
@@ -803,6 +1384,7 @@ def main() -> None:
                 topic_snapshot=topic_snapshot,
                 prompt_dir=prompts_dir,
                 repo_root=root,
+                git_root=layout.git_root,
                 drafting_mode=drafting_mode,
                 max_consecutive_provider_quota_failures=max_provider_quota_failures,
             )
@@ -823,6 +1405,7 @@ def main() -> None:
                 topic_snapshot=topic_snapshot,
                 prompt_dir=prompts_dir,
                 repo_root=root,
+                git_root=layout.git_root,
                 drafting_mode=drafting_mode,
             )
             return
@@ -849,6 +1432,7 @@ def main() -> None:
                 topic_snapshot=topic_snapshot,
                 prompt_dir=prompts_dir,
                 repo_root=root,
+                git_root=layout.git_root,
                 drafting_mode=drafting_mode,
                 max_consecutive_provider_quota_failures=max_provider_quota_failures,
             )
@@ -873,6 +1457,7 @@ def main() -> None:
             topic_snapshot=topic_snapshot,
             prompt_dir=prompts_dir,
             repo_root=root,
+            git_root=layout.git_root,
             drafting_mode=drafting_mode,
             max_consecutive_provider_quota_failures=max_provider_quota_failures,
         )
@@ -880,5 +1465,6 @@ def main() -> None:
         console.print(
             "[red]Manual interrupt detected in main loop. Stop reason: MANUAL_INTERRUPT[/red]"
         )
+        raise SystemExit(_EXIT_INTERRUPTED) from None
     finally:
         release_run_lock(run_lock_path)

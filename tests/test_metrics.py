@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import unittest
 
 from src.metrics import (
+    AGENT_STAGES,
     TOKEN_ESTIMATE_METHOD,
     build_agent_io_metrics,
     build_round_evolution_metrics,
@@ -159,6 +161,143 @@ class MetricsTests(unittest.TestCase):
             4,
         )
         self.assertEqual(aggregate["rubric_metric_totals"]["rounds_with_rubric"], 2)
+
+    def test_malformed_legacy_metrics_remain_finite_and_strict_json(self) -> None:
+        summary = summarize_round_metrics(
+            [
+                {
+                    "round": 1,
+                    "agent_timings_seconds": {"draft": 1e308, "review": 1e308},
+                    "estimated_input_tokens": float("nan"),
+                    "estimated_total_tokens": float("inf"),
+                    "evolution_metrics": {"score_delta_vs_previous": 1e308},
+                    "judge_rubric": {"evaluation_design_quality": -1e308},
+                },
+                {
+                    "round": 2,
+                    "agent_timings_seconds": {"draft": 10**400},
+                    "evolution_metrics": {"score_delta_vs_previous": 1e308},
+                    "judge_rubric": {"evaluation_design_quality": 1e308},
+                },
+                {
+                    "round": 3,
+                    "agent_io_metrics": {"draft": []},
+                    "evolution_metrics": {
+                        "draft_to_revised_similarity": float("inf"),
+                        "score_delta_vs_previous": 10**400,
+                    },
+                    "judge_rubric": {
+                        "evaluation_design_quality": 10**400,
+                        "legacy_non_finite": "Infinity",
+                    },
+                },
+                {
+                    "round": 4,
+                    "agent_timings_seconds": {"draft": "Infinity"},
+                },
+            ]
+        )
+
+        json.dumps(summary, allow_nan=False)
+        self.assertIsNone(summary["total_agent_elapsed_seconds"])
+        self.assertEqual(summary["total_estimated_tokens"], 0)
+        self.assertEqual(
+            summary["evolution_metric_totals"]["avg_score_delta_vs_previous"],
+            1e308,
+        )
+        self.assertEqual(
+            summary["evolution_metric_totals"]["low_revision_change_rounds"],
+            [],
+        )
+        self.assertEqual(
+            summary["rubric_metric_totals"]["rubric_averages"]["evaluation_design_quality"],
+            0.0,
+        )
+        self.assertIsNone(
+            summary["rubric_metric_totals"]["rubric_delta_first_to_latest"][
+                "evaluation_design_quality"
+            ]
+        )
+        self.assertNotIn(
+            "legacy_non_finite",
+            summary["rubric_metric_totals"]["rubric_averages"],
+        )
+        self.assertEqual(summary["agent_metric_totals"]["draft"]["called_count"], 0)
+
+    def test_agent_metric_elapsed_overflow_uses_unavailable_total(self) -> None:
+        agent_io_metrics = {
+            agent: {
+                "called": True,
+                "had_error": False,
+                "elapsed_seconds": 1e308,
+                "estimated_input_chars": 0,
+                "output_chars": 0,
+                "estimated_input_tokens": 0,
+                "estimated_output_tokens": 0,
+                "estimated_total_tokens": 0,
+            }
+            for agent in AGENT_STAGES
+        }
+
+        summary = summarize_round_metrics([{"round": 1, "agent_io_metrics": agent_io_metrics}])
+
+        json.dumps(summary, allow_nan=False)
+        self.assertIsNone(summary["total_agent_elapsed_seconds"])
+        for agent in AGENT_STAGES:
+            self.assertEqual(
+                summary["agent_metric_totals"][agent]["elapsed_seconds"],
+                1e308,
+            )
+
+        repeated_summary = summarize_round_metrics(
+            [
+                {"round": 1, "agent_io_metrics": agent_io_metrics},
+                {"round": 2, "agent_io_metrics": agent_io_metrics},
+            ]
+        )
+        json.dumps(repeated_summary, allow_nan=False)
+        self.assertIsNone(repeated_summary["total_agent_elapsed_seconds"])
+        for agent in AGENT_STAGES:
+            self.assertIsNone(repeated_summary["agent_metric_totals"][agent]["elapsed_seconds"])
+
+    def test_evolution_score_delta_overflow_is_unavailable(self) -> None:
+        metrics = build_round_evolution_metrics(
+            current_draft="draft",
+            current_revised="revised",
+            current_judge="judge",
+            current_score=1e308,
+            previous_score=-1e308,
+        )
+
+        json.dumps(metrics, allow_nan=False)
+        self.assertIsNone(metrics["score_delta_vs_previous"])
+
+    def test_legacy_metric_numeric_compatibility_is_preserved(self) -> None:
+        huge_exact_token_count = 10**400
+        summary = summarize_round_metrics(
+            [
+                {
+                    "round": 1,
+                    "agent_timings_seconds": {"draft": "1.25"},
+                    "estimated_total_tokens": 1.9,
+                    "evolution_metrics": {"score_delta_vs_previous": "5.0"},
+                    "judge_rubric": {"legacy_extra": "6"},
+                },
+                {
+                    "round": 2,
+                    "estimated_total_tokens": huge_exact_token_count,
+                },
+            ]
+        )
+
+        json.dumps(summary, allow_nan=False)
+        self.assertEqual(summary["total_agent_elapsed_seconds"], 1.25)
+        self.assertEqual(summary["total_estimated_tokens"], huge_exact_token_count + 1)
+        self.assertIsNone(summary["evolution_metric_totals"]["avg_score_delta_vs_previous"])
+        self.assertEqual(
+            summary["rubric_metric_totals"]["rubric_averages"]["legacy_extra"],
+            6.0,
+        )
 
 
 if __name__ == "__main__":

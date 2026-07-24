@@ -51,6 +51,11 @@ Mock mode 会复用正常 round runner，写入 `run_config.json`、`round_metri
 `run_summary.json`、`checkpoint.json` 和 `score_history.json`，但 provider 记录为 `mock`，
 不会调用 Ollama、Gemini、网络或 API key。默认只跑 2 轮；需要时用 `--max-rounds` 覆盖。
 
+从本仓库构建的 wheel 或 source distribution 做非 editable 安装后，也可以在一个空的可写
+目录运行 `auto-research-agent --mock --max-rounds 1`。首次隐式使用默认 example 项目时，CLI
+会把公开示例 `task.md` 写入当前目录的 `projects/example/`；不会创建 `config.yaml`，也不会
+覆盖已有或显式选择的项目。真实 provider 运行仍需要在该工作目录准备本地配置和项目输入。
+
 ## Stable Workflow
 
 当前稳定里程碑的推荐工作流：
@@ -63,15 +68,59 @@ Mock mode 会复用正常 round runner，写入 `run_config.json`、`round_metri
 6. `make survey`：本地 deterministic 文献综述模式，不调用 Ollama/Gemini/API key。
 7. `.venv/bin/python -m src.main --compare-runs ...`：比较两个或多个 run。
 8. `.venv/bin/python -m src.main --analyze-run ...`：无 provider 调用地检查单个 run。
-9. `make ui`：用 Streamlit 查看输入、进度、latest metadata、analytics dashboard、run comparison 和 outputs。
+9. `.venv/bin/python -m src.main --legacy-migration-preview example`：只读分类一个旧项目的
+   history 状态，不执行迁移。
+10. `.venv/bin/python -m src.main --legacy-migration-execute example
+    --legacy-migration-evidence migration-evidence/example`：只对严格符合条件的缺失 history
+    twin 执行显式 exact-copy。
+11. `make ui`：用 Streamlit 查看输入、进度、latest metadata、analytics dashboard、run comparison 和 outputs。
 
 稳定里程碑的几个边界：
 
 - Mock mode 只是 demo/CI/docs smoke；真实研究结论请用 `make diagnostic` / `make run`。
+- 数值 CLI override 会使用与配置相同的安全边界；`nan`、`inf`、负值、超限重试/延时/
+  prompt 大小，以及最终 `max_delay_seconds < min_delay_seconds` 的组合会在项目或 provider
+  初始化前以状态 2 停止，而不会静默钳制。
 - `estimated_*_tokens` 是基于可见字符数的保守估算，不是 provider 账单 token。
+- `--legacy-migration-preview PROJECT` 只接受 `projects/` 下一个显式项目名，不扫描其他项目，
+  不读取 provider/config，不取得或清理运行锁，也不创建、复制、修复或删除 artifact。报告中的
+  `execution_authorized` 始终为 `false`；`eligible_candidate` 也不是执行授权。
+- `--legacy-migration-execute PROJECT --legacy-migration-evidence DIR` 只接受
+  `exact_missing_history_twin`。它取得项目锁、先创建 owner-only evidence bundle，再以
+  create-only 方式复制精确源 bytes；不会填补 sparse/partial/string-round history，不会改写
+  checkpoint、结果或 source，也不会实现 rollback。中断后的固定 transaction 会在下次取得锁的
+  runner 入口无 provider 地 roll-forward；冲突代际保留原文件并 fail closed。
 - Rubric summaries 只是 Judge 已返回结构化子项的趋势汇总，不是新的 benchmark 分数。
 - `make resume` 会继续 checkpoint 指向的旧 run；`make run` 会新建 run，即使旧 `best_output.md` 可作为上下文。
-- 如果下一轮目录已经存在且非空，resume 会 fail-safe 阻塞，避免覆盖 partial/uncheckpointed 输出。
+- 新运行会把未完成轮次写入 `partial_rounds/` 的只增 attempt；中断或免费层配额暂停后，
+  resume 会保留旧 attempt 并从 draft 重试该轮。没有可信 attempt manifest 的旧式非空
+  `round_NN` 仍会 fail-safe 阻塞，避免覆盖 partial/uncheckpointed 输出。
+- 如果成功轮次在跨文件 history/state 提交中断，项目目录会保留固定的 round transaction
+  journal。下一次 normal/continuous/session/resume/mock 入口会先取得项目锁并在 provider
+  预检前完成无网络恢复；preview/UI 只报告状态，不会自行写入。恢复完成前，analytics、
+  benchmark report 和 UI 中依赖该代 artifact 的视图会拒绝混合读取；若检测到人工编辑或未知
+  代际则保留全部证据并 fail closed。
+- Diagnostic 的单轮 history、metrics、summary、final config 和 checkpoint 也使用独立的
+  checkpoint-last transaction；下一次取得项目锁后会在 provider/client 初始化前恢复。
+  配额发生在第一轮完成前时继续复用零轮 finalization transaction。只读界面不会擅自恢复，
+  pending/conflict 状态下会拒绝混合代际的 analytics。
+- resume 会保留并追加同一 run 的既有 metrics/score history、best-round 和上一轮上下文；如果既有
+  history 无法安全解析、互相冲突或包含重复/未来轮次，会在写入任何 run artifact 前 fail-safe
+  阻塞，并让 CLI 返回非零状态。
+- checkpoint 的 `run_root` 必须是当前项目 `runs/<run_id>` 下既有的绝对目录；相对路径、跨项目路径、
+  路径穿越和普通文件会在扫描该目录前阻塞。resume 会进一步检查它要读取的
+  config/legacy manifest/summary/metrics/history、上一轮上下文和本次计划写入的所有 round 目录，
+  拒绝逃逸符号链接或无效文件类型；UI 使用同一 preview 并禁用不安全 checkpoint 的 Resume 按钮。
+- UI 的 latest metadata、analytics 和 output browser 只从验证后的 checkpoint run root 派生固定
+  artifact 文件名；checkpoint/summary 中冗余的外部路径不会参与选址，不安全的 run/round 文件会显示
+  为不可用而不会被读取。普通运行也会拒绝链接的 project/task、固定 artifact 叶节点、自动输出目录和
+  特殊文件；配置好的 `project/runs` 外部存储链接仍会解析到真实目录后使用。
+- POSIX 上自动 artifact 的读取、追加、替换和目录创建会从可信的 `projects/` 或已解析 run-storage
+  锚点逐层执行不跟随链接的 descriptor-relative 操作，进程内线程/UI rerun 共享该边界，嵌套 run
+  会继承项目锚点。锚点以上的工作区祖先仍属于可信本地文件系统边界；同 UID 恶意进程把一个真实目录
+  entry 换成另一个真实目录、打开后再制造 hard link 等主动攻击不在保证范围内。Windows 会拒绝静态
+  链接/特殊节点，但不承诺抵抗并发恶意路径替换。显式
+  `--analyze-run` / `--compare-runs` 输入和输出仍是用户授权路径。
 
 ## What To Demo First
 
@@ -222,6 +271,26 @@ resume eligibility。
 .venv/bin/python -m src.main --analyze-run projects/example/runs/<run_id> --analyze-output projects/example/run_analysis.json
 ```
 
+如果要检查旧项目的两份 history 是否完整、一致或仅缺少一个可精确复制的 twin，可运行：
+
+```bash
+.venv/bin/python -m src.main --legacy-migration-preview example
+```
+
+该命令只输出固定、路径脱敏的分类报告。它不会扫描其他项目、恢复 transaction、清理 lock
+或执行迁移。确认报告为 `exact_missing_history_twin` 后，可显式运行：
+
+```bash
+.venv/bin/python -m src.main \
+  --legacy-migration-execute example \
+  --legacy-migration-evidence migration-evidence/example
+```
+
+evidence 目录必须尚不存在，并且必须位于所选项目目录之外。命令在 config/provider 初始化前
+运行，只复制现有 history 的精确 UTF-8 bytes 到缺失的固定 twin，并生成
+`source_history.json`、`manifest.json` 和 `receipt.json`。其他分类不会写入 evidence 或项目；
+rollback、批量扫描、partial repair 和 canonical adoption 均不在该命令范围内。
+
 ## 常用命令
 
 - 安装开发与 CI 检查工具
@@ -277,14 +346,17 @@ It does not call Ollama or Gemini. Configure source scanning under `literature_s
 ## CI / 开发检查
 
 GitHub Actions 会在推送到 `master`、`codex/**` 分支以及提交到 `master` 的 PR 时运行。
-CI 使用 Python 3.10 和 3.13，执行和本地完整检查相同的步骤：
+CI 使用 Python 3.10 和 3.13，并在两个版本上执行本地完整检查：
 
 ```bash
 make check
 ```
 
-这个命令会检查 Ruff 格式、Ruff lint、基础导入安全和测试套件。CI 不会启动 Ollama
-或运行需要本地模型的研究流程。
+这个命令会检查 Ruff 格式、Ruff lint、基础导入、Git 跟踪文件中的个人路径/高置信密钥模式，
+以及测试套件。CI 还会运行 `python scripts/check_wheel_install.py`：它只把明确的 Git 跟踪
+打包输入复制到临时目录，构建一个 wheel，在全新虚拟环境中验证导入来源、内置资源、
+console/module help 和一轮确定性 mock，然后删除临时环境。这个附加检查不构建或上传
+source distribution，也不会启动 Ollama、调用 Gemini 或运行需要模型的研究流程。
 
 ## Graphical UI
 
@@ -356,13 +428,19 @@ make check
 
 - 连续运行：`make continuous`
 - 安全停止：
-  - `Ctrl+C`
-  - 或创建 `projects/example/STOP_REQUESTED`（UI 按钮会自动创建）
+  - `Ctrl+C`：进程退出状态为 130；若 runner 在受保护的 agent 执行阶段捕获中断，会先完成
+    可恢复的 checkpoint、run summary/config 和 interrupted report
+  - 或创建 `projects/example/STOP_REQUESTED`（UI 按钮会自动创建）：在安全点正常退出，状态为 0
 - 恢复：`make resume`（读取 `projects/example/checkpoint.json`）
 - `make resume` 会继续 checkpoint 指向的旧 run，从下一轮开始写入同一个 run 目录；已完成轮次文件会保留。
-- 如果下一轮目录已经存在且非空，resume 会 fail-safe 停止，避免覆盖 partial/uncheckpointed 输出；先人工检查、移动或删除该目录后再恢复。
+- checkpoint 如果显式包含 `run_id`，它必须与 canonical run 目录名一致；旧 manifest 的创建期
+  provenance 和未知扩展字段会保留，无法无损读取时 resume 会在写入前停止。
+- 新运行的未完成轮次保存在 `partial_rounds/round_NN/attempt_*`；resume 会验证并保留旧
+  attempt，再从 draft 创建新 attempt。没有可信 manifest 的旧式非空 `round_NN` 仍会
+  fail-safe 停止，且不会自动移动、删除或覆盖。
 - 普通 `make run` 会新建一个 run；如果 `best_output.md` 已存在，默认 drafting mode 可能把它作为 previous-best context，但这不是 resume。
-- 进度不会丢：每轮都会写入 `runs/round_xx`，并更新 checkpoint、run_config 和 run_summary 中的 `resume_metadata`
+- 进度不会丢：进行中的阶段写入只增 attempt，四阶段完整验证后才发布为 `runs/round_xx`；
+  checkpoint、run_config 和 run_summary 会记录恢复诊断
 
 ## 哪些文件不要提交
 

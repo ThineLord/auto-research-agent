@@ -114,7 +114,8 @@ Fresh `projects/example/run.log` diagnostic lines also used repo-relative projec
 * `task_path=projects/example/task.md`
 
 No local absolute path hits were found in the fresh diagnostic `round_01` files or
-`round_metrics.json` when scanning for `/Users/hanzhiyou`, `/private/var`, and `/tmp`.
+`round_metrics.json` when scanning for the local macOS home prefix (account name redacted in this
+report), `/private/var`, and `/tmp`.
 
 Known caveat: the long-lived ignored `projects/example/run.log` still contains older pre-hardening
 absolute paths from historical local runs. The fresh diagnostic lines produced in this smoke are

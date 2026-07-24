@@ -3,23 +3,33 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any, Sequence
 
 from .metrics import JUDGE_RUBRIC_KEYS, summarize_round_metrics
+from .round_commit_recovery import (
+    ensure_round_commit_readable,
+    infer_round_commit_project_dir,
+)
 from .run_config import read_run_config
-from .storage import write_json_file
+from .storage import read_regular_text, write_json_file
 
 
-def _read_json(path: Path) -> Any:
+def _read_json(path: Path, *, safe_artifacts: bool = False) -> Any:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        content = (
+            read_regular_text(path, missing_ok=True)
+            if safe_artifacts
+            else path.read_text(encoding="utf-8")
+        )
+        return json.loads(content) if content else {}
+    except (OSError, UnicodeError, json.JSONDecodeError):
         return {}
 
 
-def _read_json_list(path: Path) -> list[dict[str, Any]]:
-    data = _read_json(path)
+def _read_json_list(path: Path, *, safe_artifacts: bool = False) -> list[dict[str, Any]]:
+    data = _read_json(path, safe_artifacts=safe_artifacts)
     if not isinstance(data, list):
         return []
     return [item for item in data if isinstance(item, dict)]
@@ -28,12 +38,11 @@ def _read_json_list(path: Path) -> list[dict[str, Any]]:
 def _as_float(value: Any) -> float | None:
     if isinstance(value, bool):
         return None
-    if isinstance(value, (int, float)):
-        return float(value)
     try:
-        return float(str(value))
-    except (TypeError, ValueError):
+        numeric = float(value) if isinstance(value, (int, float)) else float(str(value))
+    except (TypeError, ValueError, OverflowError):
         return None
+    return numeric if math.isfinite(numeric) else None
 
 
 def _as_int(value: Any) -> int | None:
@@ -95,28 +104,44 @@ def _error_rounds(summary: dict[str, Any], round_metrics: Sequence[dict[str, Any
     return [entry.get("round") for entry in round_metrics if entry.get("errors")]
 
 
-def load_run_summary(run_root: Path) -> dict[str, Any]:
+def load_run_summary(
+    run_root: Path,
+    *,
+    safe_artifacts: bool = False,
+    project_dir: Path | None = None,
+) -> dict[str, Any]:
     run_root = Path(run_root)
+    selected_project = project_dir or infer_round_commit_project_dir(run_root)
+    if selected_project is not None:
+        ensure_round_commit_readable(selected_project)
     run_summary_path = run_root / "run_summary.json"
     run_config_path = run_root / "run_config.json"
     round_metrics_path = run_root / "round_metrics.json"
-    summary = _read_json(run_summary_path)
+    summary = _read_json(run_summary_path, safe_artifacts=safe_artifacts)
     summary = summary if isinstance(summary, dict) else {}
-    run_config = read_run_config(run_root)
+    run_config = read_run_config(run_root, safe_artifacts=safe_artifacts)
     model_config = run_config.get("model")
     model_config = model_config if isinstance(model_config, dict) else {}
     runtime_config = run_config.get("runtime")
     runtime_config = runtime_config if isinstance(runtime_config, dict) else {}
-    round_metrics = _read_json_list(round_metrics_path)
+    round_metrics = _read_json_list(round_metrics_path, safe_artifacts=safe_artifacts)
     scores = _score_values(round_metrics)
     summary_best_score = _as_float(summary.get("best_score"))
     config_best_score = _as_float(run_config.get("best_score"))
     best_score = summary_best_score
     if best_score is None:
         best_score = max(scores) if scores else config_best_score
-    average_score = (
-        round(sum(scores) / len(scores), 2) if scores else _as_float(summary.get("average_score"))
-    )
+    if scores:
+        total = sum(scores)
+        if math.isfinite(total):
+            average_score = total / len(scores)
+        else:
+            scale = max(abs(score) for score in scores)
+            normalized_average = math.fsum(score / scale for score in scores) / len(scores)
+            average_score = _as_float(normalized_average * scale)
+        average_score = round(average_score, 2) if average_score is not None else None
+    else:
+        average_score = _as_float(summary.get("average_score"))
     completed_rounds = _as_int(summary.get("completed_rounds"))
     if completed_rounds is None:
         completed_rounds = _as_int(run_config.get("completed_rounds"))
@@ -189,6 +214,11 @@ def load_run_summary(run_root: Path) -> dict[str, Any]:
         rubric_averages = rubric_totals.get("rubric_averages", {})
     if not isinstance(rubric_averages, dict):
         rubric_averages = {}
+    rubric_averages = {
+        str(key): numeric
+        for key, value in rubric_averages.items()
+        if (numeric := _as_float(value)) is not None
+    }
     rubric_round_count = _as_int(summary.get("rubric_round_count"))
     if rubric_round_count is None:
         rubric_round_count = _as_int(rubric_totals.get("rounds_with_rubric"))
@@ -255,37 +285,46 @@ def load_run_summary(run_root: Path) -> dict[str, Any]:
     }
 
 
-def compare_runs(run_roots: Sequence[Path]) -> dict[str, Any]:
-    runs = [load_run_summary(Path(run_root)) for run_root in run_roots]
-    ranked = sorted(
-        runs,
-        key=lambda item: (
-            _as_float(item.get("best_score"))
-            if _as_float(item.get("best_score")) is not None
-            else -1.0,
+def compare_runs(
+    run_roots: Sequence[Path],
+    *,
+    safe_artifacts: bool = False,
+) -> dict[str, Any]:
+    runs = [
+        load_run_summary(Path(run_root), safe_artifacts=safe_artifacts) for run_root in run_roots
+    ]
+
+    def rank_key(item: dict[str, Any]) -> tuple[bool, float, int]:
+        score = _as_float(item.get("best_score"))
+        return (
+            score is not None,
+            score if score is not None else 0.0,
             _as_int(item.get("completed_rounds")) or 0,
-        ),
-        reverse=True,
-    )
+        )
+
+    ranked = sorted(runs, key=rank_key, reverse=True)
     best_run = ranked[0] if ranked else {}
     baseline_score = _as_float(runs[0].get("best_score")) if runs else None
     best_score = _as_float(best_run.get("best_score"))
+    best_vs_baseline_delta = (
+        _as_float(best_score - baseline_score)
+        if best_score is not None and baseline_score is not None
+        else None
+    )
     return {
         "run_count": len(runs),
         "best_run_id": best_run.get("run_id", ""),
-        "best_score": best_run.get("best_score"),
+        "best_score": best_score,
         "baseline_run_id": runs[0].get("run_id", "") if runs else "",
-        "best_vs_baseline_delta": round(
-            best_score - baseline_score,
-            2,
-        )
-        if best_score is not None and baseline_score is not None
-        else None,
+        "best_vs_baseline_delta": (
+            round(best_vs_baseline_delta, 2) if best_vs_baseline_delta is not None else None
+        ),
         "runs": runs,
     }
 
 
 def write_run_comparison(run_roots: Sequence[Path], output_path: Path) -> dict[str, Any]:
     comparison = compare_runs(run_roots)
-    write_json_file(output_path, comparison)
+    authorized_output_path = output_path.parent.resolve(strict=False) / output_path.name
+    write_json_file(authorized_output_path, comparison)
     return comparison

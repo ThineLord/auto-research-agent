@@ -1,0 +1,2636 @@
+# Codex Current State
+
+Updated: 2026-07-25 (Asia/Hong_Kong)
+
+## Repository State
+
+- Current goal: land the fully validated autonomous-hardening baseline through ARA-055 package 7C,
+  close its GitHub pull request, and stop with no active implementation task.
+- Snapshot branch: `codex/sol-autonomous-hardening`; merge target: `master`. Resolve the live branch
+  with `git branch --show-current` because this snapshot is intended to remain valid after merge.
+- Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
+  `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
+- State recorded against commit: `13d53c2b2e375878a6efe2155d8c9444c856e1eb` (the exact
+  externally verified ARA-055 package 7C recovery closeout retained by the additive recovery
+  schema; resolve current `HEAD` live).
+- Last externally verified fallback: `13d53c2b2e375878a6efe2155d8c9444c856e1eb` (exact local,
+  remote-tracking, `ls-remote`, GitHub branch, and PR-head equality plus all Python 3.10/3.13
+  push/PR jobs passed)
+- Active task at this snapshot: none. Final publication closeout is administrative only; no code
+  task is active. ARA-055 is complete through package 7C. Package 7D is a never-started destructive
+  extension, not unfinished rollback work and not required for the stable baseline.
+- Uncommitted changes: not persisted as a static claim. Resolve the exact live state with
+  `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
+
+## Live Worktree Interpretation
+
+- This committed snapshot does not assert a static dirty-file list. Resolve the exact live state
+  with `git status --short --branch`; a clean checkout of the commit containing this file has no
+  task-owned worktree changes.
+
+## Final Maintenance Closeout
+
+- Owner authorized the final repository/GitHub closeout on 2026-07-25. The scope is stabilization,
+  validation, publication, pull-request landing, and removal of misleading open-work claims; it
+  does not authorize a new migration/rollback feature, real historical artifact mutation, provider
+  work, or a public package release.
+- Fresh validation on the exact package-7C closeout baseline passes full `make check` with `519
+  passed, 979 subtests`, isolated real-wheel installation, and recovery-state coverage with `6
+  passed, 1 subtest`. Format, Ruff, imports, tracked/index safety, and diff checks are clean.
+- No extra Git worktree or repository-owned Streamlit, CLI, or provider process was found. The
+  harmless stale invalid `.git/REBASE_HEAD` remains recorded; no active rebase directories or
+  merge/cherry-pick/revert state exist.
+- The task queue contains no `TODO` or `IN_PROGRESS` entry. ARA-018 remains blocked on the owner's
+  legal/distribution decision; ARA-019, ARA-026, ARA-006, and ARA-007 remain explicitly deferred
+  rather than half-implemented.
+
+## ARA-055 Package 1 Closeout
+
+- Stable implementation commit: `4cd4bf4fde5051edc3f50cb19983ddeba23c2113`; exact local,
+  upstream, `ls-remote`, and PR-head equality was verified before this recovery closeout.
+- Added pure storage builders, deterministic after-image wrappers, a fixed round-artifact enum, and
+  a strict in-memory codec with exact schema and run-root identity validation.
+- The codec rejects duplicate keys, non-finite values, invalid UTF-8, unknown fields/artifacts,
+  invalid IDs/digests, journals over 2 MiB, and JSON deeper than 128 levels. Embedded after-images
+  are content-addressed and preserve the existing artifact byte format.
+- Focused validation passes `14 passed, 55 subtests`; related storage/round-loop/run-config
+  regression passes `111 passed, 277 subtests`; final `make check` passes `431 passed, 688
+  subtests`; staged safety scans 111 files with no findings.
+- Push/PR runs `30020697130`/`30020701903` passed Python 3.10/3.13 and every isolated-wheel/check
+  step. Provider calls and ignored-runtime access were zero.
+- No runtime journal file, path registration, recovery/apply engine, runner/preview/UI/diagnostic
+  routing, dependency, migration, provider, canonical artifact, or experiment behavior changed.
+- Next command after owner approval of package 2:
+  `.venv/bin/python -m pytest -q tests/test_round_commit.py`.
+- Interruption recovery: read `docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md`, this section,
+  and `.codex/TASK_QUEUE.md`; do not infer approval for packages 2-7.
+
+## ARA-055 Package 2 Activation
+
+- Owner approval: `批准下一个任务` on 2026-07-24 after package 2 was explicitly recommended.
+- Stable fallback: `064f5bdde5dd5e2e14d12c0ce5b48277cb87cd18`, exact local/upstream/
+  `ls-remote`/PR-head equal with green push/PR runs `30021141942`/`30021145878`.
+- Baseline: `make check` passes formatting, lint, imports, repository safety, and `431 passed, 688
+  subtests` over 111 tracked files in 33.38 seconds.
+- Authorized implementation: fixed project-local create-only journal; secure read/remove;
+  project/run/attempt/config/canonical revalidation; before/after/conflict dry-run classification;
+  ARA-054 publication reconciliation; idempotent apply with checkpoint last; path-redacted
+  diagnostics; internal/configured-external provider-free fault tests.
+- Explicit exclusions: no runner/resume-preview/UI/analytics/report/diagnostic routing, no
+  finalization journal, no migration, no dependencies/config changes, no providers, no ignored
+  runtime, and no packages 3-7.
+- Next command after this activation checkpoint is committed and pushed:
+  `.venv/bin/python -m pytest -q tests/test_round_commit_recovery.py`.
+- Interruption recovery: verify the activation commit and CI first, then read the package-2 tests
+  and engine module before continuing. Never synthesize a missing journal from canonical output.
+
+## ARA-055 Package 2 Closeout
+
+- Activation commit `e89926869db86eadf5e68115fdc9d7f943073651` is exact local/upstream/
+  `ls-remote` equal; push/PR runs `30024767388`/`30024770453` passed.
+- Implementation commit `faf1791ee44aacc1f64f8987903a848d2fa62f93` is exact local/upstream/
+  `ls-remote`/PR-head equal. Push/PR runs `30026934582`/`30026936443` passed Python 3.10/3.13 and
+  every install, isolated-wheel, format, lint, import, safety, and test step.
+- The implementation adds a fixed create-only project journal, bounded no-follow/single-link reads,
+  exact conditional cleanup, run/config/attempt/canonical revalidation, read-only classification,
+  ARA-054 publication reconciliation, and checkpoint-last idempotent roll-forward.
+- The internal/configured-external fault matrix covers journal creation, ready/publication
+  handoffs, all six artifact writes, cleanup, `OSError`, and `KeyboardInterrupt`, before and after
+  each boundary. It also covers retry after partial application, first-round old-run replacement,
+  third-generation conflicts, changed storage/config, and unsafe journal leaves.
+- Focused and related validation passes `75 passed, 162 subtests` in 56.57 seconds. Full
+  `make check` passes formatting over 68 files, Ruff, imports, repository-safety self-test/scans,
+  and `449 passed, 787 subtests` in 146.24 seconds. Direct `python` was unavailable in the shell, so
+  focused validation used the repository `.venv/bin/python`; this is an environment correction,
+  not a code failure.
+- Explicit staging scanned 113 tracked/index files with zero safety findings. Draft PR 13 is open,
+  cleanly mergeable, and updated with comment `5061117056`. No provider or ignored-runtime access
+  occurred.
+- Package 2 is complete. The engine deliberately has no runner caller, so KI-055's live runner
+  exposure remains until separately approved package 3.
+- Next command after owner approval of package 3: rerun the live Git/CI recovery checks, read
+  `docs/ARA_055_CROSS_FILESYSTEM_ROUND_COMMIT_DESIGN.md`, and activate only package 3 before any
+  runner edit.
+- If interrupted, inspect the live worktree, rerun
+  `.venv/bin/python -m pytest -q tests/test_round_commit_recovery.py tests/test_storage.py
+  tests/test_round_attempts.py tests/test_round_commit.py`; the latest full `make check` and
+  implementation CI are green. Do not start package 3 or treat the dormant engine as runner
+  integration without owner approval.
+
+## ARA-055 Package 3 Activation
+
+- Owner approval: `批准 ARA-055 package 3` on 2026-07-24.
+- Stable baseline: `9d04f46f3f8b173e8d2b3045870ea212ce9a08b6`, exact local/upstream/
+  `ls-remote`/PR-head equal with successful push/PR runs `30027550772`/`30027556705`.
+- Authorized implementation: successful iterative rounds create the immutable journal before the
+  ready transition and use `prepare_round_commit` plus `recover_round_commit`; the checkpoint stays
+  the last transaction artifact and ordinary outputs, stop logic, and public schemas remain
+  compatible.
+- Required validation: runner-order regression, internal/configured-external storage, provider-free
+  interruption and retry checks, related round/recovery suites, full `make check`, staged safety,
+  exact remote equality, and Python 3.10/3.13 CI.
+- Explicit exclusions: packages 4-7; resume-preview, UI, analytics, reports, and diagnostic routing;
+  finalization journal; legacy migration; dependency/config changes; real provider calls; ignored
+  runtime data.
+- Next command after this activation checkpoint is committed and pushed:
+  `.venv/bin/python -m pytest -q tests/test_round_commit_runner.py`.
+- Interruption recovery: verify the activation commit and CI, then read the package-3 focused tests,
+  `src/runner.py`, and the package-2 engine before continuing. Do not widen recovery to runner entry
+  or finalization.
+
+## ARA-055 Package 3 Closeout
+
+- Activation commit `6c33d27300a0569167a1dfec87f67647e6fe98ff` is exact remote-equal;
+  push/PR runs `30028438750`/`30028441516` passed Python 3.10/3.13 and every workflow step.
+- Implementation commit `54c223bb920c07abe23c019ef44c7761f8a98102` is exact local/upstream/
+  `ls-remote`/PR-head equal. Push/PR runs `30030145901`/`30030150062` passed Python 3.10/3.13,
+  isolated-wheel validation, formatting, lint, imports, safety, and all tests.
+- New and fully evidenced iterative histories now prepare the immutable project-local journal
+  before the ready transition and recover publication plus best output, both histories, memory,
+  research state, and checkpoint in fixed checkpoint-last order.
+- Legacy resumes without a complete paired history retain the prior compatibility path because
+  their missing before-generation cannot be reconstructed safely. Once that path produces a
+  complete integer-round pair, the next round switches to the transaction engine.
+- Safety-validated equivalent checkpoint root spellings, including configured external-storage
+  aliases and macOS canonical aliases, remain compatible without accepting an external run.
+- Focused/related validation passes `142 passed, 382 subtests`; runner re-audit passes `67 passed,
+  220 subtests`; full `make check` passes all gates with `453 passed, 791 subtests` in 271.12
+  seconds. Staged safety scans 114 tracked/index files with zero findings.
+- Draft PR 13 is open, cleanly mergeable, and updated with comment `5061533413`. Provider calls and
+  ignored-runtime access were zero.
+- Package 3 is complete. Package 4 recovery-required preview/entry/read integration is recommended
+  next but requires separate owner approval; packages 5-7 remain unapproved.
+- If interrupted, verify `54c223b` and its CI, then rerun
+  `.venv/bin/python -m pytest -q tests/test_round_commit_runner.py
+  tests/test_round_commit_recovery.py tests/test_round_loop.py`. Do not start package 4 without
+  explicit approval.
+
+## ARA-055 Package 4 Activation
+
+- Owner approval: `批准，继续` on 2026-07-24 after package 4 was explicitly recommended.
+- Stable fallback: `9457a25b4b4310c0220662447d10413808478a21`, exact local/upstream/
+  `ls-remote`/PR-head equal with successful closeout push/PR runs `30030747254`/`30030751034`.
+- Authorized implementation: classify the fixed round journal without mutation in preview/UI/
+  report/analytics paths; fail closed on conflict or mixed generations; and recover a valid pending
+  journal under the existing project lock before a runner entry starts new round/provider work.
+- Compatibility requirement: preserve public artifact schemas, completed and journal-less legacy
+  artifacts, configured external storage, provider ordering, experiment semantics, and package 3's
+  checkpoint-last transaction order.
+- Explicit exclusions: no finalization journal, finalization reader behavior, diagnostic command,
+  legacy migration, dependency/config change, provider call, ignored-runtime access, or packages
+  5-7.
+- Next command after this ARA-055 activation checkpoint is committed and pushed:
+  `.venv/bin/python -m pytest -q tests/test_round_commit_entry.py`.
+- Interruption recovery: verify the activation commit and CI, then inspect the runner lock
+  lifecycle and the existing preview/UI/report/analytics readers before adding tests or routing.
+
+## ARA-055 Package 4 Local Validation
+
+- Activation commit `c2a7af598fabaadf16b0dc1363a1615b365d5aa0` is exact local/upstream/
+  `ls-remote`/PR-head equal. Push/PR runs `30031800668`/`30031802489` passed Python 3.10/3.13,
+  isolated-wheel validation, formatting, lint, imports, safety, and all tests.
+- Normal, continuous, session, resume, and mock entry now recover a valid pending round commit
+  under the existing project lock before provider preflight, client construction, or agent work.
+  Diagnostic and finalization behavior remain outside this package.
+- Preview/UI expose fixed recovery-required or conflict states without mutation. Single-run
+  analytics, comparison, benchmark reports, UI metadata/history/analytics/comparison, and
+  transaction-sensitive output browsing fail closed while the round journal is present.
+- The reader guard first checks only the fixed round-journal leaf. Projects with no round journal
+  retain prior handling of unrelated unsafe legacy metadata; a finalization-only file remains
+  outside package-4 routing.
+- Pre-fix focused evidence was `5 failed`; final package coverage passes `9 passed`. The first
+  related regression found one no-journal metadata-symlink false conflict; the root cause was fixed
+  and the exact regression plus package suite passed.
+- Final related validation passes `256 passed, 540 subtests`; the cross-filesystem recovery matrix
+  passes `16 passed, 99 subtests`; final `make check` passes all gates with `462 passed, 791
+  subtests` in 293.46 seconds. No provider or ignored-runtime access occurred.
+- Implementation commit `efcad88f1214060835d65b9e8f41c3fe78bc84aa` is exact local/upstream/
+  `ls-remote`/PR-head equal. Push/PR runs `30034539432`/`30034542276` passed Python 3.10/3.13,
+  isolated-wheel validation, formatting, lint, imports, safety, and all tests.
+- Draft PR 13 is open and cleanly mergeable. Comment `5062099962` records package 4's result,
+  validation, and exclusions. Package 4 is complete with no provider calls or ignored-runtime
+  access.
+- Package 5's separate finalization transaction is recommended next but requires explicit owner
+  approval before activation or implementation.
+
+## ARA-061 Closeout
+
+- Owner approval: `批准ARA061` on 2026-07-24 after the required 45–60 minute long-task checkpoint.
+- Stable baseline: `00a488dce12f7be548ce00d1980d97fd4883e4ff`, exact local/upstream/
+  `ls-remote`/PR-head equal. Closeout push/PR runs `30035438824`/`30035441752` passed Python
+  3.10/3.13 and every install, isolated-wheel, format, lint, import, safety, and test step.
+- Reproduced behavior: inconsistent `--min-delay-seconds 100 --max-delay-seconds 1`, non-finite
+  `nan`/`inf` delays, negative retry/quota values, and subminimum prompt budget/limit values are
+  accepted. Several are silently clamped; the inconsistent and infinite delays reach the effective
+  cloud-free configuration.
+- Authorized implementation: reject invalid values at the argument/startup boundary, enforce the
+  effective delay relation after config resolution, preserve documented valid boundary values,
+  and prove failure occurs before project writes or provider work.
+- Explicit exclusions: no config-file schema or default changes, scheduler-policy redesign,
+  dependencies, providers, ignored runtime, experiment changes, or ARA-055 package 5.
+- Local implementation now rejects non-finite/out-of-range values at parsing, rejects an invalid
+  effective delay relation after configuration merge, and removes the previous silent CLI clamps.
+  Existing valid boundaries and `--max-rounds` validation remain covered.
+- Focused validation passes `4 passed, 18 subtests`; related CLI/cloud/config/runner/project/UI
+  regression passes `244 passed, 554 subtests`. Ruff check/format and `git diff --check` pass.
+  Activation push/PR runs `30080995141`/`30080997040` both completed successfully.
+- Full `make check` passes formatting over 70 files, Ruff, imports, repository safety in tracked
+  and staged modes over 115 files with zero findings, and `466 passed, 809 subtests` in 180.21
+  seconds. After explicit eight-path staging, staged safety and cached diff checks pass; recovery
+  state passes `6 passed, 1 subtest`, and the focused CLI guard passes `4 passed, 18 subtests`.
+- Implementation `b1c1b6c96aaa46b03ef1e25c30aebc771893e4d9` is exact local/upstream/
+  `ls-remote`/PR-head equal. Push/PR runs `30081927773`/`30081930092` passed Python 3.10/3.13 and
+  every workflow step; PR comment `5068253242` records the evidence and scope.
+- ARA-061 is complete. No provider or ignored-runtime access occurred. A bounded GitHub watcher
+  query encountered one `unexpected EOF`; querying the same run IDs proved both workflows green.
+  One read-only status search also used backticks inside double quotes, causing harmless zsh
+  command-substitution errors; the literal-safe rerun succeeded and changed no files or Git state.
+- The first closeout recovery-state check rejected a missing explicit fallback label (`1 failed,
+  5 passed`); the recovery wording was corrected and the exact rerun passes `6 passed, 1 subtest`.
+
+## ARA-055 Package 5 Activation
+
+- Owner approval: `批准` on 2026-07-24 immediately after package 5 was explicitly recommended.
+- Stable baseline: `11562f61d21040dfb160b2df1f4a491f2b4ecd64`, exact local/upstream/
+  `ls-remote`/PR-head equal. Push/PR runs `30082575170`/`30082577745` passed Python 3.10/3.13 and
+  every workflow step; PR 13 is open, draft, and cleanly mergeable.
+- Confirmed remaining defect: final checkpoint currently writes before `run_summary.json` and
+  finalized `run_config.json`, so interruption can make a non-resumable checkpoint authoritative
+  while run-local reporting/provenance remains stale.
+- Authorized implementation: create and validate one fixed project-local finalization journal;
+  apply exact bounded summary/config after-images before final checkpoint; recover valid pending
+  state under the existing lock before iterative work; expose pending/conflict state to relevant
+  read-only consumers without mutation.
+- Required compatibility: preserve final public artifact bytes/fields, stop reasons, resume
+  eligibility, timestamps selected by the runner, configured external storage, status 130/manual
+  interruption and status 0/cooperative stops, and package 3/4 round recovery ordering.
+- Explicit exclusions: no diagnostic integration (package 6), legacy migration (package 7),
+  dependencies, configuration schemas/defaults, providers, experiment semantics, ignored runtime,
+  or historical artifact mutation.
+- Recovery baseline passes `6 passed, 1 subtest`; no provider or ignored-runtime access occurred.
+- The first activation-state validation exposed two metadata-only corrections: an overly broad
+  patch had marked ARA-001 rather than ARA-055 active, and the historical ARA-061 fallback label
+  conflicted with the new unique fallback. Both were corrected; the exact rerun passes `6 passed,
+  1 subtest`.
+- Next command:
+  `.venv/bin/python -m pytest -q tests/test_run_finalize_recovery.py`.
+
+## ARA-055 Package 5 Local Implementation Checkpoint
+
+- Activation commit `a6cdd2f0924edeea64f43717533bb09a6a940f56` is pushed on the maintenance
+  branch. The implementation worktree is intentionally uncommitted until explicit staged safety
+  validation and the implementation commit.
+- Added a strict bounded finalization codec and fixed create-only journal for exact
+  `run_summary.json`, finalized `run_config.json`, and final `checkpoint.json` after-images.
+- Recovery classifies only before/after generations, applies summary then config then checkpoint,
+  verifies each write, and conditionally removes the unchanged journal. Unknown generations remain
+  read-only conflicts.
+- Iterative entry recovers valid finalization state under the existing lock. Resume and
+  analytics-related readers now block pending/conflicting finalization state without mutation.
+- The runner prepares the journal before any final artifact write and uses the recovery engine;
+  package 3/4 round transactions and diagnostic routing are unchanged.
+- Pre-fix focused evidence failed at collection because the approved API was absent. The first full
+  check then exposed 21 failures caused by an over-strict equality check between config and
+  checkpoint resume metadata. Comparing only the four established recovery-core fields preserves
+  allowed config session metadata; the affected rerun passes `112 passed, 372 subtests`.
+- Final focused validation passes `7 passed, 16 subtests`; UI/entry/finalization coverage passes `97
+  passed, 133 subtests`; final `make check` passes formatting over 71 files, Ruff, imports, repository
+  safety, and `473 passed, 825 subtests` in 318.12 seconds. Tracked safety scans 115 files with zero
+  findings.
+- Next command: explicitly stage the 16 task-owned code/test/documentation/state files, run staged
+  safety and cached-diff validation, then commit.
+- If interrupted: inspect the seven task-owned source/test files plus this state, rerun
+  `.venv/bin/python -m pytest -q tests/test_run_finalize_recovery.py
+  tests/test_round_commit_entry.py`, then inspect the latest `make check` record. Do not commit if
+  either fails.
+
+## ARA-055 Package 5 Closeout
+
+- Implementation commit `5c9f0ced8d45d3aafd406f3e4a84beb46d8d8d5c` is exact local/upstream/
+  `ls-remote`/GitHub branch/PR-head equal.
+- Push run `30085545590` and pull-request run `30085548995` both passed Python 3.10/3.13,
+  installation, isolated-wheel smoke, formatting, lint, import, repository safety, and all tests.
+- Finalization now uses one strict bounded create-only journal with exact before/after generations.
+  Recovery applies and verifies run summary, finalized run config, then final checkpoint; exact
+  cleanup is retryable and third generations remain preserved conflicts.
+- Internal and configured-external storage fault coverage includes all three writes and cleanup
+  under `OSError` and `KeyboardInterrupt`. Runner interruption/status behavior and compatible config
+  session metadata are covered by the full regression suite.
+- Iterative entry recovery remains under the existing lock. Resume, UI, analytics, comparison,
+  report, and artifact readers expose or reject pending/conflicting finalization without mutation.
+- Final local `make check` passes `473 passed, 825 subtests`; staged safety scans 116 files with zero
+  findings. No provider calls, ignored-runtime access, dependency/configuration changes, experiment
+  changes, diagnostic routing, legacy migration, or historical artifact mutation occurred.
+- Package 5 is complete. Package 6 diagnostic inspection/recovery is the next design package but
+  requires separate owner approval before activation.
+
+## ARA-055 Package 6 Activation
+
+- Owner approval: `批准，继续` on 2026-07-24 immediately after package 6 was explicitly
+  recommended with a 60–100 minute estimate and package-scoped acceptance criteria.
+- Stable baseline: `ecf9ead409e3e72993cade65f69df65b6f2f4269`, exact local/upstream/
+  `ls-remote`/PR-head equal. Push/PR runs `30086126360`/`30086129319` passed Python 3.10/3.13 and
+  every workflow step; PR 13 is open, draft, and cleanly mergeable.
+- Confirmed remaining defect: diagnostic independently writes project score history before
+  run-local metrics and then final metadata, so an interruption can leave split generations even
+  though iterative and finalization paths are protected.
+- Authorized implementation: one fixed strict bounded `diagnostic_finalize` journal covering
+  score history, diagnostic round metrics, run summary, finalized run config, and checkpoint;
+  checkpoint-last idempotent recovery; lock-held diagnostic entry recovery before provider/client
+  work; read-only pending/conflict guards. Zero-round quota finalization may reuse package 5.
+- Explicit exclusions: no legacy migration, dependencies, configuration schemas/defaults,
+  providers, experiment semantics, ignored runtime, historical artifact mutation, or package 7.
+- Focused baseline passes `60 passed, 160 subtests`; recovery-state baseline passes `6 passed, 1
+  subtest`. No provider or ignored-runtime access occurred.
+- One startup audit command used zsh's special `path` variable inside a read-only loop, which made
+  later commands unavailable in that child shell. The command exited 127 without modifying the
+  repository; a corrected rerun completed fetch, Git, auth, PR, and CI verification successfully.
+- The first activation recovery-state check reported one fallback mismatch because
+  `LAST_VALIDATION.json` still named package 5's implementation rather than its subsequently
+  verified closeout. The additive fallback was advanced to exact closeout `ecf9ead`; the required
+  exact rerun passed before activation commit.
+- Activation commit `3d2a48b8dbd3df10014a7c4a828e4cf818c1e74a` is pushed and is the current
+  local/upstream head.
+
+## ARA-055 Package 6 Local Implementation Checkpoint
+
+- Added one strict bounded `.diagnostic_finalize_transaction.json` covering project score history,
+  diagnostic round metrics, run summary, finalized run config, and checkpoint in that fixed
+  checkpoint-last order.
+- Recovery revalidates the immutable journal, run-root identity, exact before/after generations,
+  and all five correlated after-images before applying. Internal and configured-external storage
+  fault coverage injects both `OSError` and `KeyboardInterrupt` at every write and cleanup
+  boundary, then proves idempotent convergence.
+- Diagnostic entry now performs recovery under the existing project lock before provider
+  preflight/client construction. Preview, UI, analytics, comparison/report shared guards expose or
+  reject pending/conflicting diagnostic generations without mutation or absolute-path disclosure.
+- A zero-round cloud-free quota stop reuses package 5's summary/config/checkpoint finalization
+  transaction. Successful diagnostic artifact fields and metric values remain unchanged; one
+  common finalization timestamp is required by the existing transaction invariant.
+- Static checks and focused diagnostic validation pass `9 passed, 24 subtests`. Related recovery,
+  entry, CLI, runner, UI, analytics, and comparison validation passes `252 passed, 616 subtests`
+  in 346.33 seconds. `git diff --check` passes; no provider or ignored-runtime access occurred.
+- Full `make check` passes formatting over 72 files, Ruff, imports, tracked and staged repository
+  safety over 116 files with zero findings, and `481 passed, 849 subtests` in 226.22 seconds.
+- Current working tree contains only package-6 implementation, tests, documentation, and recovery
+  records. Staged safety, implementation commit/push, dual CI, PR update, and closeout remain.
+- One later read-only state-location command repeated a known shell quoting error: a backticked
+  `make check` token inside a double-quoted pattern started an unintended duplicate gate. It was
+  interrupted immediately with status 130; no file or Git state changed.
+- Implementation `24d56ba2a39a6504672d7b42e0f3487707fcf7fc` is exact local/upstream/
+  `ls-remote`/PR-head equal. Push/PR runs `30088147987`/`30088150085` passed Python 3.10/3.13,
+  isolated-wheel validation, every workflow step, and zero annotations.
+- Draft PR 13 is open and cleanly mergeable. Comment `5069196079` records package 6's evidence
+  and exclusions. Package 6 is complete; package 7 remains outside authorization.
+- Next command: verify live Git/CI state, then wait for explicit approval before designing any
+  legacy migration.
+
+## ARA-055 Package 7 Design Activation
+
+- Owner approval: `批准 继续` on 2026-07-24 after package 7 legacy-migration design was explicitly
+  recommended as the next separately approval-gated task.
+- Stable baseline: `fe514e073047c10dc84b322225f01db2cb126e83`, exact local/upstream/
+  `ls-remote`/PR-head equal. Closeout push/PR runs `30088704158`/`30088706374` passed Python
+  3.10/3.13, every workflow step, and zero annotations; PR 13 is open, draft, and clean.
+- Authorized work: inventory tracked legacy shapes and current reader/writer contracts; use only
+  temporary synthetic fixtures for characterization; define read-only detection, evidence
+  preservation, provenance, dry-run, explicit execution approval, rollback, idempotency, and
+  compatibility rules; write design and recovery records.
+- Explicit exclusions: no migration implementation or CLI/API, no ignored runtime or canonical
+  artifact inspection/mutation, no provider/network experiment, no schema/default/dependency
+  change, no deletion/quarantine move, and no claim that ambiguous legacy state is repairable.
+- Acceptance: the design enumerates supported/ambiguous/unsafe states, separates diagnosis from
+  mutation, supplies a rollback-safe implementation package plan and validation matrix, passes
+  relevant provider-free tests plus `make check`, and is committed/pushed with green Python
+  3.10/3.13 CI.
+- Initial startup audit was read-only. Its first combined shell command stopped with status 1
+  because an empty Git-marker loop returned false; the corrected audit confirmed no active
+  operation or stash and changed no files.
+- The first activation recovery-state check caught a metadata-only patch targeting error: ARA-001
+  was marked active instead of ARA-055. The task-title-scoped correction restored ARA-001 to
+  `DONE`, marked only ARA-055 `IN_PROGRESS`, and must pass before the activation commit.
+- Next command after the activation checkpoint is pushed: inspect the design document, Git history,
+  legacy compatibility tests, and reader/writer call graph before adding any design text.
+
+## ARA-055 Package 7 Design Local Checkpoint
+
+- `docs/ARA_055_LEGACY_MIGRATION_DESIGN.md` defines 21 fixed legacy classifications, preserves
+  every ambiguous/unsafe generation, and rejects general repair, canonical-Markdown inference,
+  placeholder histories, stale-finalization reconstruction, automatic rollback, quarantine, or
+  cleanup.
+- The only future execution candidate is `exact_missing_history_twin`: exactly one history is
+  absent and the other is strict integer `1..N`, bounded, safe, checkpoint-correlated, and
+  uncontested. Even this candidate permits only a future create-only exact-byte copy after a
+  restricted evidence bundle and fixed roll-forward transaction; discovery, execution, and
+  rollback each require later independent approval.
+- Current paired histories and journals need no migration. Partial/sparse/string-round histories,
+  divergent histories, journal-less `published_uncommitted`, canonical-without-provenance,
+  journal-less finalization/diagnostic splits, legacy manifest fallback, and unsafe/unknown states
+  are explicitly non-migratable.
+- Focused compatibility/recovery validation passes `51 passed, 50 subtests` across round commit,
+  attempt, entry, run-finalization, diagnostic-finalization, and run-config suites.
+- Full `make check` passes formatting over 72 files, Ruff, imports, repository safety over 117
+  tracked files with zero findings, and `481 passed, 849 subtests` in 225.44 seconds.
+- No provider, network experiment, ignored runtime, canonical artifact, dependency, schema,
+  default, CLI/API, migration implementation, execution, deletion, or quarantine was used.
+- Remaining design-stage work: review and explicitly stage the two design documents plus recovery
+  records, run staged safety/recovery-state checks, commit/push, verify Python 3.10/3.13 push and PR
+  CI, update draft PR 13, and create the final recovery closeout.
+
+## ARA-055 Package 7 Design Closeout
+
+- Design commit `e5f35715279c76b38b2250ef6ba8fcf4c9e79890` is exact local/upstream/
+  `ls-remote`/GitHub branch/PR-head equal.
+- Push run `30090592035` and pull-request run `30090595366` passed Python 3.10/3.13, installation,
+  isolated-wheel validation, formatting, lint, imports, repository safety, and all tests. All four
+  check runs have zero annotations.
+- Draft PR 13 is open and cleanly mergeable. Comment `5069543857` records the design, evidence,
+  validation, and separate approval boundaries.
+- Package 7 design is complete. No discovery implementation, execution command/API, runtime
+  migration transaction, evidence bundle, rollback, artifact mutation, provider call, ignored
+  runtime read, schema/default/dependency change, cleanup, or quarantine was performed.
+- Recommended next task is package 7A: read-only, explicitly targeted legacy classification and
+  report schema using synthetic fixtures only. It requires separate owner approval.
+
+## ARA-055 Package 7A Activation
+
+- Owner approval: `批准，继续` on 2026-07-24 after package 7A was explicitly recommended as the
+  next task with its read-only scope and separate execution boundary.
+- Stable baseline: `f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0`, exact local/upstream/
+  `ls-remote`/PR-head equal. Closeout push/PR runs `30091187286`/`30091190516` passed Python
+  3.10/3.13, isolated-wheel validation, and every workflow step; PR 13 is open, draft, and clean.
+- Local baseline `make check` passes formatting over 72 files, Ruff, imports, repository safety
+  over 118 tracked files with zero findings, and `481 passed, 849 subtests` in 226.22 seconds.
+- Authorized implementation: one pure, explicitly targeted, provider-free classifier with fixed
+  L00-L20 state/reason enums, strict additive result schema, bounded no-follow reads, safe
+  internal/configured-external run identity checks, and path/value-redacted human/JSON reporting.
+- Required behavior: classify one selected project snapshot without mutation, recursive project
+  scans, provider/client construction, stale-lock deletion, or implicit execution. Unsafe and
+  ambiguous states must remain non-migratable.
+- Explicit exclusions: no `--execute`, missing-twin creation, evidence/provenance bundle write,
+  migration journal/receipt, runtime artifact update, rollback/delete/quarantine, CLI/doctor/UI
+  integration beyond a filesystem-free report builder, dependency/default/schema changes outside
+  the new additive report schema, provider/network work, or ignored-runtime inspection.
+- Next checkpoint: commit and push this activation state before adding failing classifier tests or
+  production code.
+
+## ARA-055 Package 7A Local Implementation Checkpoint
+
+- Activation `80f24b6702e0fe78675a277047a77923b45de24e` was committed and pushed before
+  implementation. The conservative externally verified fallback remains `f8b770d`.
+- `src/legacy_migration.py` now provides fixed L00-L20 and reason enums, one explicitly targeted
+  read-only classifier, a strict JSON-compatible report builder, and bounded path-redacted human
+  output. There is no CLI/doctor/UI caller and no migration execution path.
+- Synthetic internal/configured-external fixtures cover all 21 design rows, both history-source
+  directions, current journals, attempt/canonical ownership, live/stale/malformed locks, bounded
+  and unsafe serialization, unsafe source/target identities, path redaction, no recursive scan,
+  and no mutation/network primitive use.
+- Focused validation passes `17 passed, 114 subtests` in 1.16 seconds. Related attempt, transaction,
+  runner, storage, run-config, mock, and CLI regression passes `224 passed, 642 subtests` in 154.31
+  seconds.
+- Recovery-state validation passes `6 passed, 1 subtest`. The isolated source-excluded wheel smoke
+  passes. Final `make check` passes formatting over
+  74 files, Ruff, imports including `src.legacy_migration`, repository-safety self-test/scans over
+  120 tracked/index files with zero findings, and `498 passed, 963 subtests` in 355.43 seconds.
+- All nine task-owned paths are explicitly staged. Final staged safety scans 120 tracked/index
+  files with zero findings; cached whitespace and scope review pass.
+- Recent non-code command corrections: `python` was unavailable (use `.venv/bin/python`); the first
+  red test failed at collection because the new module did not yet exist, as intended; one related
+  regression command named a nonexistent `tests/test_resume_safety.py`, ran zero tests, and was
+  replaced with the repository's actual test files.
+- This local checkpoint was subsequently committed and remotely verified as recorded in the
+  package 7A closeout below.
+
+## ARA-055 Package 7A Closeout
+
+- Implementation `f9b29f8fb324c1c07805128071b69aa978324a5f` is exact local/upstream/
+  `ls-remote`/GitHub branch/PR-head equal.
+- Push run `30098547791` and pull-request run `30098553022` passed Python 3.10 and 3.13, every
+  install, isolated-wheel, format, lint, import, safety, and test step. All four job annotation
+  sets are empty.
+- Draft PR 13 is open and mergeable. Comment `5070698572` records the implementation, validation,
+  exact scope, and remaining approval boundaries.
+- Package 7A is complete. It adds no runtime caller or execution authority, so every inspected
+  project remains byte-identical. Package 7B discovery integration is the next possible package,
+  but it requires a new approval and long-task checkpoint.
+
+## ARA-055 Package 7B Activation
+
+- Owner approval: after package 7A closeout recommended package 7B, the owner said `批准，继续`
+  and then confirmed the 60–90 minute long-task assessment with `确认，启动` on 2026-07-24.
+- Stable fallback: `fd5ca1083985027909c05dfc4e2e7a442fb88f50`, exact local/upstream/
+  `ls-remote`/GitHub branch/PR-head equal. Push/PR runs `30099699707`/`30099701936`
+  passed Python 3.10/3.13 and every workflow step with zero annotations.
+- Baseline: recovery plus package 7A focused tests pass `23 passed, 115 subtests`; the worktree is
+  clean and draft PR 13 is open and mergeable.
+- Authorized scope: expose the existing explicitly targeted classifier through one owner-approved
+  read-only doctor/preview surface and verify every legacy-sensitive reader either remains
+  byte-compatible or fails closed on unsafe transaction state.
+- Acceptance: no provider/client construction, recursive project scan, lock theft, recovery,
+  migration execution, target/evidence/journal/receipt creation, or artifact mutation; preserve
+  internal/configured-external storage and path-redacted output; run focused/related tests,
+  `make check`, isolated wheel, staged safety, push, and Python 3.10/3.13 CI.
+- Exclusions: no package 7C exact-copy execution, rollback/delete/quarantine, batch discovery,
+  dependency/default/config schema change, provider/network call, ignored runtime access, or
+  experiment/result interpretation change.
+- Activation checkpoint `605e3881494f9f83578f91a4bb3570541a71b39b` is exact
+  local/upstream/`ls-remote`/PR-head equal. Push/PR runs `30102888080`/`30102891454` passed Python
+  3.10/3.13 and every workflow step; all four annotation sets are empty.
+
+## ARA-055 Package 7B Closeout
+
+- Added one mutually exclusive `--legacy-migration-preview PROJECT` mode. It selects exactly
+  `projects/<PROJECT>`, dispatches before generation resources/config/project input/provider/lock,
+  and prints only the fixed path-redacted human report.
+- The mode has no output-file option, mutation primitive, recursive discovery, automatic caller,
+  migration execution, or package 7C transaction. Every report keeps
+  `execution_authorized: false`.
+- Reader audit confirms resume, analytics, compare, benchmark, and Streamlit consumers already
+  converge on shared current-transaction blockers. A future package 7C transaction must extend
+  those shared entry/read boundaries rather than add per-reader heuristics.
+- Focused classifier/CLI/recovery tests pass `27 passed, 115 subtests`; CLI and installed-package
+  coverage passes `79 passed, 291 subtests`; related reader/transaction/UI coverage passes `218
+  passed, 468 subtests`. Full `make check` passes formatting over 75 files, Ruff, imports,
+  repository-safety self-test/scans over 120 tracked files with zero findings, and `503 passed,
+  970 subtests` in 355.04 seconds. The isolated real-wheel install smoke, final focused/recovery
+  rerun (`27 passed, 115 subtests`), and `git diff --check` also pass.
+- Expected corrections: four red tests initially failed because the CLI option did not exist; the
+  first installed-package fixture caused three subtest failures by pre-creating `projects/` inside
+  an older no-project-creation test and was split into an independent fixture; Ruff then identified
+  two new files needing format and one unused test import, all corrected before this checkpoint.
+- Task-owned changes are `src/cli.py`, `tests/test_legacy_migration_cli.py`,
+  `tests/test_cli_exit_codes.py`, `tests/test_package_resources.py`, `CHANGELOG.md`, `README.md`,
+  `docs/ARA_055_LEGACY_MIGRATION_DESIGN.md`, `docs/DEVELOPER_GUIDE.md`,
+  `docs/quickstart_zh.md`, and the package 7B `.codex/` state updates.
+- Implementation `3a2b62f8e31d3ade0271b50df5f98da14fc8621c` is exact
+  local/upstream/`ls-remote`/GitHub branch/PR-head equal. Push/PR runs
+  `30105129908`/`30105131795` passed Python 3.10/3.13 and every workflow step; all four job
+  annotation sets are empty.
+- Draft PR 13 remains open and mergeable. Comment `5071600457` records the implementation,
+  validation, safety boundary, and package 7C exclusion. No provider or ignored-runtime access
+  occurred.
+
+## ARA-055 Package 7C Activation
+
+- Owner approval: after package 7B closeout recommended exact missing-twin execution, the owner
+  said `批准` and confirmed the 60–100 minute long-task assessment with `确认启动` on 2026-07-25.
+- Stable fallback: `c87063180ed7623424aa54722dad8a867788902c`, exact local/upstream/
+  `ls-remote`/GitHub branch/PR-head equal. Push/PR runs `30106096013`/`30106101027` passed Python
+  3.10/3.13 and every workflow step with zero annotations.
+- Baseline: classifier/preview/recovery coverage passes `27 passed, 115 subtests`; the worktree is
+  clean and draft PR 13 is open and mergeable.
+- Authorized scope: support only `exact_missing_history_twin`; require an explicit owner-selected
+  evidence destination; create a restrictive bounded evidence bundle before a fixed immutable
+  project transaction; copy exact source bytes into the safely absent twin with no replacement;
+  recover only by lock-held roll-forward; and extend shared entry/read blockers.
+- Acceptance: internal/configured-external storage, either source direction, changed-generation
+  conflicts, interruption/retry boundaries, byte preservation, provider-free CLI, full layered
+  regression, wheel, staged safety, push, and Python 3.10/3.13 CI.
+- Exclusions: no package 7D rollback/delete/quarantine, batch discovery, partial/sparse/string-round
+  repair, canonical adoption, source rewrite, inferred field/round generation, dependency/default/
+  provider/experiment change, real historical execution, or ignored-runtime access.
+
+## ARA-055 Package 7C Red-Test Checkpoint
+
+- Added `tests/test_legacy_migration_execution.py` with strict codec, both source directions,
+  internal/configured-external storage, owned-lock, evidence-before-journal, interruption/recovery,
+  third-generation conflict, byte-preservation, and shared-reader-blocker expectations.
+- Expected pre-implementation result: `6 failed`; every failure is
+  `ModuleNotFoundError: src.legacy_migration_execution`, proving the approved execution surface is
+  absent before implementation.
+- No production code, real history, provider, ignored runtime, target, evidence bundle, journal, or
+  receipt was changed or accessed by this red run. The test uses only temporary synthetic fixtures.
+- If interrupted, inspect the untracked test and implement only its fixed exact-copy contract; do
+  not commit a known-failing production state or broaden into package 7D.
+
+## ARA-055 Package 7C Local Implementation Checkpoint
+
+- Added the strict `.legacy_history_migration_transaction.json` codec and exact-copy engine,
+  restricted create-only evidence bundle, owned-lock capability check, target/receipt
+  roll-forward, conditional journal cleanup, and fixed path-redacted failures.
+- Added `--legacy-migration-execute PROJECT --legacy-migration-evidence DIR` before generation
+  resources, config, project input, provider/client, or network work. Noneligible states report and
+  create no evidence; the evidence destination must be new and outside the selected project.
+- Shared entry recovery and `round_commit_read_blocker()` now cover the migration transaction.
+  Round, run-finalize, diagnostic-finalize, and migration journals are mutually exclusive.
+- Focused/CLI/entry/package coverage passes `88 passed, 186 subtests`; the broader transaction,
+  storage, analytics, comparison, benchmark, classifier, CLI, and installed-package layer passes
+  `170 passed, 369 subtests` in 189.84 seconds. Ruff formatting/lint and `git diff --check` pass.
+- Full `make check` passes all gates with `516 passed, 977 subtests` in 370.48 seconds. The first
+  isolated-wheel attempt failed at the installed-layout probe because the helper exports only
+  indexed tracked inputs and the new module was intentionally still untracked; this is a staging
+  precondition, not an accepted wheel result. Explicit package-only staging and an exact rerun are
+  required next.
+- Explicit staging scanned 123 indexed files with zero findings and the immediate wheel rerun
+  passed. A subsequent transaction re-audit found that direct `O_EXCL` target writes could leave a
+  partial third generation if interrupted mid-write. The target now uses same-directory,
+  fsync-before-publish, atomic no-replace rename; post-rename interruption, receipt failure, and
+  cleanup interruption all roll forward in tests. Updated storage/execution coverage passes `75
+  passed, 127 subtests`.
+- Because the atomic-publication correction followed the first green full/wheel runs, both gates
+  were rerun. Final `make check` passes every gate with `519 passed, 979 subtests` in 375.88
+  seconds, and the final isolated source-excluded wheel smoke passes.
+- Final explicit staging contains only the 17 ARA-055 package 7C code/test/documentation/state
+  paths, including `CHANGELOG.md`; staged repository safety scans 123 indexed files with zero
+  findings after the final state update.
+- All execution tests use temporary synthetic fixtures. No provider, network, ignored runtime,
+  real historical artifact, dependency, default, experiment, rollback, deletion, quarantine,
+  batch scan, partial repair, canonical adoption, or source rewrite was used.
+- The worktree intentionally remains uncommitted until full `make check`, isolated-wheel,
+  recovery-state, explicit staged safety, and scope review pass. Next command: `make check`.
+
+## ARA-055 Package 7C Closeout
+
+- Implementation `bbbea318a30b1d1258b94f0b4ebd01635c70270b` is exact local/upstream/
+  `ls-remote`/GitHub branch/PR-head equal. Push/PR runs `30112210496`/`30112215230` passed Python
+  3.10/3.13, every install, isolated-wheel, format, lint, import, safety, and test step.
+- All four job annotation sets are empty. Draft PR 13 remains open and mergeable.
+- Final local validation passes `make check` with `519 passed, 979 subtests`, the isolated wheel
+  smoke, `24 passed, 10 subtests` in final recovery/focused checks, and staged safety over 123
+  indexed files with zero findings.
+- The exact-copy command remains explicit and provider-free. It supports only the strict missing
+  twin, uses owner-selected evidence and atomic no-replace target publication, and recovers valid
+  pending state under the project lock. All ambiguous or conflicting generations remain preserved.
+- No provider, network, ignored runtime, real historical artifact, package 7D behavior, rollback,
+  deletion, quarantine, batch scan, partial repair, canonical adoption, source rewrite,
+  dependency/default, or experiment change occurred.
+
+## Completed Steps
+
+- Confirmed repository root, branch, remotes, recent history, upstream, and ahead/behind state.
+- Fetched `origin`; `master` matched `origin/master` at `a94c4e2` before branching.
+- Confirmed there is no active merge, rebase, cherry-pick, revert, sequencer, or stash.
+- Identified a stale invalid `.git/REBASE_HEAD` file; no active rebase directories exist, so it was left untouched.
+- Created `codex/sol-autonomous-hardening` from the synchronized `master` head.
+- Reviewed the tracked workflow, CI, packaging, release, test, and maintenance documentation.
+- Classified ignored project runs, logs, local configuration, and research artifacts as out of scope for cleanup or commit.
+- Ran the current canonical baseline: `make check` passed with 137 tests and 43 subtests.
+- Added the ARA-030 CI workflow contract and reproduced the intended pre-fix failure: no
+  `Build and smoke-test isolated wheel` step exists yet (`1 failed, 4 passed`).
+- Added a standard-library wheel helper that exports only explicit tracked packaging inputs into a
+  safe temporary tree, builds exactly one wheel, installs it into a fresh venv, and verifies import
+  origin, exact bundled resource/RECORD bytes, console/module help, one deterministic mock round,
+  null foreign-Git provenance, and an unchanged installed package tree.
+- Rebuilt pip, runtime, and Git subprocess environments from minimal allowlists after independent
+  review reproduced ambient redirect and child-output risks. The helper rejects checkout-local
+  temp roots, ignores pip/Git/user-site redirects, uses isolated Git config/hooks/signing, blocks
+  runtime proxy access, emits fixed failure categories, and shares a 600-second overall deadline.
+- Verified the corrected helper under deliberately poisoned pip/Git/provider environment variables;
+  it passed and created none of the external guard paths. Targeted regression, final `make check`,
+  and three independent final reviews are green.
+- Committed ARA-030 as `4cda430`, pushed with exact local/upstream/`ls-remote` equality, and verified
+  push/PR runs `29232341316`/`29232344581`: Python 3.10/3.13, all four wheel smoke steps, and every
+  annotation set passed cleanly.
+- Reproduced the single-path compare CLI mismatch with exit code 0 and `run_count: 1`.
+- Added a regression test that failed before the fix and passed after it.
+- Added CLI-boundary validation while preserving the single-run internal helper behavior.
+- Verified the two-or-more path with a three-path parser test and a two-path CLI smoke.
+- Committed recovery state as `a1fec51` and the compare-runs fix as `033ed01`.
+- Pushed `codex/sol-autonomous-hardening` and verified the remote SHA matches local HEAD.
+- Opened draft PR 13 for continued maintenance checkpoints.
+- Reproduced exact-key leakage in provider events and formatted exception tracebacks.
+- Added failing regression coverage for explicit and custom-environment credentials.
+- Redacted known configured secrets before event persistence and before constructing displayed exception chains.
+- Committed the credential-redaction fix as `bb26c6d`.
+- Committed the security state checkpoint as `c8d6c17`, pushed both commits, and updated draft PR 13.
+- Reproduced failed provider rounds and invalid Judge output replacing a trusted best file.
+- Added focused regression coverage for both failure classes.
+- Reused the existing successful-round predicate to gate best-score and best-output updates.
+- Committed the best-output integrity fix as `198f9ec`.
+- Committed the integrity state checkpoint as `7e9a1f5`, pushed both commits, and updated draft PR 13.
+- Reproduced zero and negative CLI values being silently normalized to one round.
+- Added failing parser and direct-runner tests before implementation.
+- Added positive-integer argument validation and a runner guard before any run artifact creation.
+- Committed the round-limit validation fix as `e6bffa6`.
+- Committed the round-limit state checkpoint as `5c5bdc0`, pushed both commits, and updated the remote branch.
+- Added failing fault-injection coverage for `fsync` and atomic-replace failures.
+- Centralized replacement writes through same-directory temp files with flush, fsync, atomic replace, and cleanup.
+- Preserved append-only best-effort logging behavior outside the atomic replacement helper.
+- Committed the atomic state-write fix as `7d226f8`.
+- Committed state checkpoint `5ab7119`, pushed both commits, verified local/remote equality, and confirmed all Python 3.10/3.13 push and PR checks passed.
+- Reproduced resume truncating both history files to the newly completed round, losing best-round metadata and previous-round context.
+- Added fail-before-write validation for malformed, divergent, misattributed, or internally inconsistent histories and best-score metadata.
+- Preserved prior history records byte-semantically, cumulative aggregates, best score/round, no-improvement state, last successful agent, and drafting-mode context.
+- Added strict round-number validation and nonzero CLI status for any blocked resume preview/history condition.
+- Verified normal, legacy fallback, partial-history, stop-before-round, stale/outlier metadata, recursive JSON-conflict, and analytics/compare paths.
+- Committed the implementation, tests, and docs as `6d56d09`.
+- Committed the ARA-010 recovery-state checkpoint as `b8b629b`, pushed both commits, and verified the local, remote-tracking, and GitHub branch SHAs match.
+- Updated draft PR 13 with the resume-integrity scope and evidence.
+- Verified all Python 3.10 and Python 3.13 GitHub Actions jobs passed for both push and pull-request triggers.
+- Reproduced checkpoint roots escaping to arbitrary/cross-project paths and direct runner overrides writing outside the selected project.
+- Added shared canonical root, round, state-artifact, accessibility, and privacy-safe error checks before resume inspection or writes.
+- Preflighted every planned resume round and rechecked each current round, including future-round, previous-context, manifest, NUL, permission, and symlink cases.
+- Reused the backend preview in the UI so unsafe checkpoints disable Resume; verified CLI exit status 2 and run-lock release.
+- Preserved canonical legacy absolute roots and user-configured resolved `runs/` storage symlinks.
+- Committed the implementation, tests, and public docs as `e47ba44`.
+- Committed the ARA-012 recovery-state checkpoint as `31db3f8`, pushed both commits, and verified local, remote-tracking, and GitHub branch SHAs match.
+- Updated draft PR 13 with the path boundary, validation matrix, and explicitly queued residual risks.
+- Verified all Python 3.10 and Python 3.13 GitHub Actions jobs passed for both push and pull-request triggers.
+- Reproduced UI metadata, analytics, and output-catalog reads from external checkpoint config,
+  summary, metrics, run-root, and latest-round references; the initial focused regression failed
+  in all three expected cases.
+- Added a read-only canonical run-root validator while preserving the resume runner's read/write
+  requirement and configured `runs/` storage symlink compatibility.
+- Made UI run-local consumers ignore redundant path fields, derive fixed artifact names, reject
+  unsafe/non-regular config/summary/metrics/manifest and round-output leaves before reads, and
+  return partial/unavailable state without propagating unsafe catalog paths.
+- Added guarded no-read, external-root, checkpoint/summary redirect, config/summary/metrics/manifest
+  symlink, non-regular file, latest-round link, configured-storage, and read-only access coverage.
+- Focused UI tests passed (`35 passed, 4 subtests passed`); UI/resume/analytics/compare regression
+  passed (`83 passed, 47 subtests passed`). Ruff checks and `git diff --check` passed.
+- Independent post-fix review reproduced one remaining selected-run read through project-level
+  `score_history.json`; added a no-read regression and limited that fallback to no-`run_root`
+  legacy projects.
+- Re-ran the focused consumer suite (`84 passed, 47 subtests passed`) and final `make check`
+  (`172 passed, 91 subtests passed`).
+- Independent adversarial re-review reported green across selected, invalid, and legacy run scopes.
+- Staged scans found no personal absolute path, credential pattern, or private-key material.
+- Committed the ARA-021 implementation, tests, changelog, and public docs as `98ea4a3`.
+- Committed recovery state as `3624385`, pushed both commits, and verified local,
+  remote-tracking, and GitHub branch SHA equality.
+- Updated draft PR 13 and confirmed all four Python 3.10/3.13 push and pull-request checks passed.
+- Pushed final ARA-021 verified-state closeout `538d0be`, verified exact remote SHA equality, and
+  confirmed all four Python 3.10/3.13 push and pull-request checks passed again.
+- Reproduced malformed PID exceptions, two simultaneous acquisition successes, and an old release
+  deleting replacement-owner metadata before implementing ARA-013.
+- Replaced check/write/delete locking with a long-held cross-process OS guard, per-acquisition
+  owner capability, atomic metadata replacement, guard device/inode provenance, and owner-checked
+  release. Crash recovery now relies on kernel lock release instead of racy stale deletion.
+- Moved the persistent guard to project-root `active_run.guard`, added its exact ignore rule, and
+  rejected static symlink/FIFO/directory guards and metadata without following them.
+- Hardened malformed metadata for invalid UTF-8, oversized/deep JSON, invalid/oversized PID values,
+  POSIX permission probes, and non-destructive Windows process liveness checks.
+- Prevented a fork child from unlocking its parent, prevented a recreated guard inode from
+  displacing a live owner, and made bare paths fail closed while preserving path string/fspath use.
+- Moved mock, client, and agent construction inside the lock-owning `try/finally` boundary.
+- Added synchronized thread and multi-process contention, process crash, legacy live/dead,
+  non-regular node, metadata failure, replacement/repeated release, fork, and constructor-failure
+  regressions.
+- Related runtime/UI/mock/round suites passed (`94 passed, 68 subtests passed`); the synchronized
+  thread race passed 25 consecutive executions.
+- Independent design, compatibility, adversarial, platform, and post-fix reviews reproduced interim
+  gaps; all reported P1/P2 implementation issues were corrected, and the platform re-review is green.
+- Final `make check` passed with Ruff format/lint, import smoke, and pytest (`189 passed, 110
+  subtests passed`). Staged diff and sensitive-pattern scans passed.
+- Committed the owner-safe lock implementation, regression matrix, ignore policy, changelog, and
+  developer documentation as `55e7287`.
+- Committed recovery state as `e93aa77`, pushed both commits, and verified exact local,
+  remote-tracking, and GitHub branch SHA equality.
+- Updated draft PR 13; all four Python 3.10/3.13 push and pull-request checks passed.
+- Pushed the final ARA-013 state-only closeout as `4269056`, verified exact remote SHA equality,
+  updated draft PR 13, and confirmed all four Python 3.10/3.13 checks passed again.
+- Marked ARA-017 in progress and started parallel read-only CLI return-path and regression-matrix
+  audits from a clean, synchronized branch.
+- Reproduced module, editable console, and isolated missing-config/project failures printing errors
+  while returning status 0; the success controls remained status 0 and argparse/resume refusals 2.
+- Replaced every handled config/project/provider/lock startup return with status 2 and made explicit
+  cloud discovery failure status 1, while preserving help, analysis, and profile fallback success.
+- Normalized unreadable/non-UTF-8 config and task input into privacy-safe startup errors.
+- Hardened tolerant checkpoint/cloud-cache JSON reads for invalid UTF-8, oversized integers, deep
+  nesting, invalid top-level or record schema, non-finite/negative/oversized cached numbers, and
+  missing/unknown fields without breaking valid cached defaults.
+- Added an iterative resume-history nesting limit so semantic comparison and later persistence
+  cannot overflow after parsing a deeply nested but otherwise valid JSON history.
+- Added subprocess and direct-main coverage across both entrypoints, config/project/provider/lock,
+  cloud discovery/profile, malformed resume/history/cache data, constructor boundaries, and success
+  controls. Direct interrupt process status remains separately queued as ARA-023.
+- Independent pre-fix and post-fix audits reproduced decoding, parser, schema, numeric overflow, and
+  depth gaps; the final delta-only review reported green.
+- Final `make check` passed with Ruff format/lint, import smoke, and pytest (`203 passed, 128
+  subtests passed`). Focused startup/input/cache/resume regression passed (`103 passed, 103
+  subtests passed`).
+- `git diff --check`, staged diff checks, and staged personal-path/credential/private-key scans passed.
+- Committed implementation, tests, changelog, and developer documentation as `8845adf`.
+- Committed recovery state as `a513e4d`, pushed both commits, and verified exact local,
+  remote-tracking, and GitHub branch SHA equality.
+- Updated draft PR 13; all four Python 3.10/3.13 push and pull-request checks passed.
+- Confirmed the installed `google-genai 2.7.0` public Client API accepts client-wide
+  `http_options`, and its `timeout` value is milliseconds. A provider-free construction smoke
+  preserved `37000` for a configured 37-second timeout.
+- Reproduced all three Gemini credential branches omitting timeout before the fix; the new focused
+  assertions and timeout-classification checks failed for the expected reasons.
+- Passed `http_options={"timeout": timeout_seconds * 1000}` through explicit-key, custom-environment,
+  and SDK-default credential paths without changing generation content or configuration.
+- Classified transport timeouts as the privacy-safe `timeout` error while preserving the existing
+  retry policy: native timeout/HTTP 408 remain non-retrying and HTTP 504 retains its existing 5xx
+  retryability.
+- Independent review found a generic `timeout` option error could be misclassified; narrowed the
+  text heuristic to explicit `timed out` wording and added a negative regression.
+- Replaced arbitrary timeout-like exception-name substring matching with exact timeout base-class
+  matching after the final adversarial review reproduced misleading configuration-class names.
+- Final focused regression passed with `46 passed, 44 subtests passed`; final `make check` passed
+  with Ruff format/lint, import smoke, and pytest (`206 passed, 134 subtests passed`).
+- Independent final delta-only review reported green, and the scoped staged path/key/private-key
+  scan passed.
+- Committed implementation, tests, and changelog as `817b8a1`.
+- Committed recovery state as `be37216`, pushed both commits, and verified exact local,
+  remote-tracking, and GitHub branch SHA equality.
+- Updated draft PR 13 after bounded GitHub API retries; all four Python 3.10/3.13 push and
+  pull-request checks passed, and the PR remains open, draft, and mergeable.
+- Exported clean HEAD and independently built wheel and sdist with isolated PEP 517 tooling.
+  Wheel/module and sdist/module/console `--help` controls returned 0 without source-tree imports.
+- Verified the wheel contains only package modules plus distribution metadata and the sdist adds
+  tests/basic metadata; both omit `config.example.yaml`, prompts, example project, UI, and scripts.
+- Reproduced wheel and sdist console/module mock startup exiting 2 with
+  `Config file not found: config.example.yaml` in empty neutral working directories before project
+  or provider work; the safe reproduction wrote no artifacts.
+- Confirmed the root cause is a combined source/resource/workspace root: installed `src/cli.py`
+  resolves its package parent as `site-packages`, while runtime requires immutable repository assets
+  and writable project output.
+- Scoped the safe implementation to bundled public config/prompts/example assets, an
+  `importlib.resources` resolver, CWD as installed writable workspace, and mock-only example seeding.
+  Source/editable behavior, provider semantics, prompt bytes, UI/scripts distribution, versions,
+  licenses, dependencies, and other projects remain unchanged/out of scope.
+- Committed and pushed the audit/blocker recovery checkpoint as `89e95bf`, verified exact local,
+  remote-tracking, and GitHub SHA equality, updated draft PR 13, and confirmed Python 3.10/3.13
+  passed for both push and pull-request workflows.
+- Committed and pushed the verified ARA-004 audit-state closeout as `3d77729`; exact remote SHA and
+  all four Python 3.10/3.13 push/pull-request jobs passed. Draft PR 13 points at this clean HEAD.
+- Enumerated 89 tracked blobs without opening ignored artifacts; the only confirmed privacy hits
+  were four historical local-account fragments in two tracked reports, with no high-confidence
+  provider token or private-key hit.
+- Added an initially failing scanner regression and then a stdlib-only byte scanner for the tracked
+  worktree and complete stage-0 index. Findings expose only relative path, line, and category.
+- Covered partial staging, untracked files, NUL/invalid UTF-8 content, static and parent-directory
+  symlinks, missing tracked files, operational errors, safe placeholders, and provider/key shapes.
+- Independent review reproduced an outside-repository read through a replaced symlinked parent;
+  secure `dir_fd`/no-follow traversal now blocks it. A second review proved the portable fallback
+  retained a swap race, so unsupported platforms now fail closed and have dedicated regression.
+- Reworded the four historical findings so the account is explicitly redacted in the report without
+  pretending that the redaction placeholder was the original scan input or changing conclusions.
+- Added `make repo-safety`, wired worktree/index/self-test checks into `make check` and CI, and
+  documented the tracked-only, ignored-artifact, symlink, and privacy-safe output boundaries.
+- Final independent quality review confirmed the no-follow path walk, unsupported-platform
+  fail-closed behavior, staged-index path, tests, and local/CI/documentation wiring with no blocker.
+- Committed the reviewed implementation, tests, report redaction, Make/CI wiring, changelog, and
+  public documentation as `2b6523c` with no unrelated or ignored artifacts.
+- Committed recovery state as `975559d`, pushed both commits, and verified exact local,
+  remote-tracking, and GitHub branch SHA equality.
+- Updated draft PR 13 with the ARA-016 scope, validation, compatibility boundary, commits, and
+  pending-status evidence while preserving its open draft state.
+- Verified push run `29140074284` and pull-request run `29140075306`: Python 3.10 and 3.13 all
+  passed, including the new repository-safety step in each of the four jobs.
+- Committed and pushed final ARA-016 verified-state closeout `9192df8`, verified exact SHA equality,
+  and confirmed all four Python 3.10/3.13 closeout jobs passed. Draft PR 13 was updated and remains
+  open, draft, and mergeable.
+- Reproduced ARA-014 with a temp historical run: its summary said `USER_STOP_REQUESTED`, while the
+  latest project checkpoint belonged to another run and incorrectly made the report show `MAX_ROUNDS`.
+- Added a regression that failed pre-fix (`1 failed, 4 passed`) for that exact mismatch.
+- Implemented target-run stop-reason precedence: summary, config, legacy manifest, then only a
+  checkpoint whose normalized run root and any supplied run ID match the target; otherwise unknown.
+- Made metadata reads reject symlink/non-regular leaves and descriptor-verify regular files before
+  reading, and restricted rendered stop reasons to the official `STOP_*` constant values.
+- Added absolute/repo/project/runs-relative identity, ID/path conflict, malformed/nonobject JSON,
+  config/manifest fallback, external symlink, directory/FIFO, and Markdown/private-text coverage.
+- Independent delta reviews reproduced external metadata reads, Markdown/private-text injection,
+  and a credential-shaped stop reason surviving the first sanitizer; fixed all three with no-follow
+  regular-file reads and a dynamic official `STOP_*` allowlist. Final review reported green.
+- Committed the scoped implementation, tests, changelog, and developer guidance as `588e32c` with
+  no ignored artifacts, experiment values, providers, prompts, metrics, or unrelated files.
+- Committed recovery state as `c893e63`, pushed both commits, and verified exact local,
+  remote-tracking, and GitHub branch SHA equality.
+- Updated draft PR 13 with ARA-014 scope, validation, safety/compatibility boundaries, and commits;
+  it remains open, draft, and mergeable.
+- Verified push run `29140847860` and pull-request run `29140848882`: Python 3.10 and 3.13 all
+  passed, including repository-safety and test steps in each of the four jobs.
+- Committed and pushed final ARA-014 verified-state closeout `2dd56f9`, verified exact SHA equality,
+  and confirmed all four Python 3.10/3.13 closeout jobs passed. Draft PR 13 was updated and remains
+  open, draft, and mergeable.
+- Reproduced both CLI interrupt handlers printing `MANUAL_INTERRUPT`, releasing the lock, and then
+  returning process status 0; reproduced runner-consumed interrupts completing resumable artifacts
+  but likewise returning success.
+- Added red regressions for mock/provider interrupt status and runner propagation before changing
+  implementation; the expected pre-fix run failed all three new interrupt assertions.
+- Made runner-caught manual interrupts propagate only after checkpoint, run summary/config, and
+  interrupted report finalization; both CLI boundaries translate them to `SystemExit(130)`.
+- Kept cooperative `STOP_REQUESTED` as successful status 0 with `USER_STOP_REQUESTED`, resumable
+  artifacts, signal cleanup, and no reclassification from shared `can_resume`/report fields.
+- Moved survey/mock/provider lock acquisition and error evaluation inside their lifecycle
+  `try/finally` blocks after review found an interrupt cleanup window; a real-lock regression proves
+  metadata removal before temporary-directory cleanup.
+- Added an end-to-end module subprocess fault injection, direct handler controls, runner artifact
+  assertions, session final-report suppression, and an actual provider-free safe-stop subprocess.
+- Documented statuses 0/1/2/130 and limited artifact-completeness wording to the runner's protected
+  agent-execution phase.
+- Related regression passed (`63 passed, 61 subtests passed`); final `make check` passed with Ruff,
+  imports, self/worktree/staged safety, and pytest (`231 passed, 154 subtests passed`).
+- Two independent post-fix audits reported GO after the lock-lifecycle and documentation-boundary
+  corrections; `git diff --check` passed and ignored project artifacts were not touched.
+- Staged only the 11 reviewed code/test/public-documentation paths, passed staged diff and repository
+  safety checks, and committed implementation `4cae84e398821763a4680b99faa2aacb37550bfe`
+  (`fix: propagate manual interrupt status`).
+- Committed recovery checkpoint `37b3749`, pushed both commits, and verified exact local,
+  remote-tracking, `ls-remote`, and GitHub PR head SHA equality.
+- Verified push run `29141545223` and pull-request run `29141546331`: Python 3.10 and 3.13 all
+  passed, including formatting, lint, import, repository-safety, and test steps in all four jobs.
+- Updated and read back draft PR 13 with ARA-023 scope/evidence; it remains open, draft, and mergeable.
+- Committed and pushed final ARA-023 verified-state closeout `48f5639`, verified exact SHA equality,
+  and confirmed all four Python 3.10/3.13 closeout jobs passed. Draft PR 13 was updated and remains
+  open, draft, and mergeable.
+- Reproduced resume replacing original legacy manifest mode/model/drafting/start/project and unknown
+  extension fields while preview accepted checkpoint IDs that disagreed with the canonical root.
+- Added red provenance, direct/leaf-alias/non-string ID, missing-ID compatibility, malformed/UTF-8/
+  nonobject/deep/mismatched/unmergeable manifest, and fail-before-write regressions.
+- Made canonical `run_root.name` the identity, rejecting an explicit mismatch while deriving a
+  missing ID; configured storage and canonical-ID leaf aliases remain compatible.
+- Strictly snapshots an existing raw manifest before the first write, retains creation-time and
+  unknown fields, canonicalizes ID/root/config pointers, and merges old-then-current resume metadata.
+- Made unpreservable existing manifests fail with privacy-safe errors before config/checkpoint/round/
+  summary writes; current session operational fields remain in `run_config.json`.
+- Independent review found a sparse-manifest provenance gap; separated existing sparse, missing with
+  persisted config, and new-run branches so current resume fields are never invented as creation data.
+- Added two-consecutive-resume coverage proving a first resume's run_config cannot backfill absent
+  provenance into the sparse manifest on a later resume.
+- Focused new regression passed (`4 passed, 10 subtests passed`); related resume/config/consumer/UI
+  regression passed (`119 passed, 100 subtests passed`). Final `make check` passed with Ruff,
+  imports, both safety scans, and pytest (`235 passed, 164 subtests passed`).
+- Independent code and adversarial reviews reported GO after the sparse provenance correction;
+  `git diff --check` passed and ignored project artifacts were not touched.
+- Staged only the nine reviewed code/test/public-documentation paths, passed staged diff and safety
+  checks, and committed implementation `3b98c61d7cd7531266144d1d46d3c5aad29220c4`
+  (`fix: preserve run manifest provenance on resume`).
+- Committed recovery checkpoint `c1e8c57`, pushed both commits, and verified exact local,
+  remote-tracking, `ls-remote`, and GitHub PR head SHA equality.
+- Verified push run `29142234694` and pull-request run `29142235674`: Python 3.10 and 3.13 all
+  passed, including formatting, lint, import, repository-safety, and test steps in all four jobs.
+- Updated and read back draft PR 13 with ARA-020 scope/evidence; it remains open, draft, and mergeable.
+- Committed and pushed final ARA-020 verified-state closeout `4d77a8c`, verified exact SHA equality,
+  and confirmed all four Python 3.10/3.13 closeout jobs passed. Draft PR 13 was updated and remains
+  open, draft, and mergeable.
+- Reproduced direct builder and real repeated zero-round resumes leaving `resume_sessions` empty,
+  while the new round-1 control correctly remained empty.
+- Added direct lifecycle and two-consecutive-resume regressions before changing implementation; both
+  failed exactly on the missing round-1 session entry.
+- Changed session append to use `start_round > 1` or explicit `resume_existing_run` lifecycle,
+  preserving old higher-round compatibility and new-run round-1 behavior.
+- Related run-config/round-loop tests passed (`47 passed, 59 subtests passed`); final `make check`
+  passed with Ruff, imports, both safety scans, and pytest (`236 passed, 164 subtests passed`).
+- Independent focused review reported GO across new round 1, zero-round repeated resume, and
+  start-round-greater-than-1 compatibility; no provider or ignored artifact was used.
+- Staged only the five reviewed code/test/public-doc paths, passed staged diff/safety checks, and
+  committed implementation `b961070a848c2cf67269b8c081c32641fd6990b5`
+  (`fix: record zero-round resume sessions`).
+- Committed recovery checkpoint `a3bef4d`, pushed both commits, and verified exact local,
+  remote-tracking, `ls-remote`, and GitHub branch SHA equality.
+- Verified push run `29142505314` and pull-request run `29142506476`: Python 3.10 and 3.13 all
+  passed, including formatting, lint, import, repository-safety, and test steps in all four jobs.
+- Verified ARA-024 final closeout `0112e108292847ddde864150331db4c3b05a9aed`: local,
+  remote-tracking, and GitHub branch SHAs match; push run `29142573684` and pull-request run
+  `29142574570` passed on Python 3.10 and 3.13, and draft PR 13 is updated.
+- Started ARA-005 and independently cross-checked `docs/quickstart_zh.md` against the comparison,
+  analytics, UI, and test implementations. README, CHANGELOG, and dated historical audit/gap
+  reports remain unchanged.
+- Reclassified completed CLI comparison, UI comparison, agent timing, estimated-token, Streamlit
+  width, resume-preview, and drafting-mode work as implemented while retaining explicit boundaries
+  around research quality, true cost, causal claims, and advanced cross-run analysis.
+- A targeted stale-wording search returned no remaining ARA-005 phrases, and `git diff --check`
+  passed.
+- Independent final review first identified three fact-precision blockers: comparison rubric fields,
+  already-implemented resume lifecycle distinctions, and the session report filename. All were
+  corrected, the named drafting modes were made explicit, and the final re-review reported GO.
+- Final `make check` after all wording corrections passed with Ruff, imports, both safety scans,
+  and pytest (`236 passed, 164 subtests passed`).
+- Staged only `docs/quickstart_zh.md`, verified its cached diff and staged safety scan, and committed
+  implementation `15d99351ebef8fc7cccb38acd4205f8cc7e23917`
+  (`docs: align implemented analytics roadmap`).
+- Committed recovery checkpoint `6b590918b6ad7fc0e0ce4a83e4d011b7b479f0c8`, pushed both
+  ARA-005 commits, and verified exact local, remote-tracking, `ls-remote`, and GitHub branch SHA
+  equality with ahead/behind `0/0` and a clean worktree.
+- Verified push run `29142879222` and pull-request run `29142880135`: Python 3.10 and 3.13 passed
+  every formatting, lint, import, repository-safety, and test step in all four jobs.
+- Confirmed four prior closeout commits permanently embedded their parent checkpoint and stale
+  pending/dirty authoring state because a tracked file cannot contain its own final commit SHA.
+- Confirmed no tracked runtime code, scripts, or tests consume the recovery JSON fields; unknown
+  external readers remain protected through unchanged schema-v1 legacy 40-hex fields.
+- Added authoritative semantic `current_head.ref`, fixed no-shell resolution argv, live worktree
+  source, exact snapshot-base SHA, and exact external verification evidence for ARA-005 closeout
+  `3fa33a7` including event/workflow/head/job conclusions.
+- Updated recovery instructions and decisions so state snapshots never request another recursive
+  closeout merely to embed their own SHA. ARA-025 consistency assertions and final `make check`
+  passed; independent review's four synchronization blockers were corrected.
+- Received explicit owner approval for ARA-004, reverified clean branch/upstream equality, GitHub
+  authentication, the absence of active Git operations, and successful Python 3.10/3.13 CI at
+  `08994be`.
+- Restored the verified ARA-004 audit instead of repeating the unsafe harness: wheel and sdist omit
+  config/prompts/example assets, installed mock exits 2 before provider work, and neutral temporary
+  workspaces remain empty.
+- Preserved KI-023 exactly as-is. Approval covers the packaging/resource implementation, not
+  cleanup or reconstruction of ignored `projects/example` state.
+- Reproduced the installed failure before the fix in both neutral and foreign-Git temporary
+  workspaces: both subtests exited 2 because `config.example.yaml` was absent.
+- Added an exact six-file package-data allowlist, byte-parity regression, source/editable layout
+  compatibility, installed CWD workspace, bundled-prompt provenance, no-clobber default mock seed,
+  and explicit source Git-root separation.
+- Proved the installed mock path writes only its temporary workspace, does not create
+  `config.yaml`, ignores untrusted CWD prompt files, leaves copied package files unchanged, and
+  records no foreign workspace commit.
+- Passed focused package/config/CLI/mock/diagnostic/session/runner tests, Ruff lint, and
+  `git diff --check`.
+- Corrected two independent-review findings before commit: interrupted staging-file creation now
+  cleans up on `BaseException`, and final publication uses native no-replace primitives so a racing
+  target directory is never overwritten.
+- Passed final `make check` with Ruff, import smoke, repository-safety scans, and pytest (`246
+  passed, 172 subtests passed in 3.79s`).
+- Built wheel and sdist from the final worktree, verified their exact six-resource allowlists and
+  canonical bytes, installed both into isolated environments, and passed console/module help/mock
+  plus missing-config controls without source imports or package-directory writes.
+- Verified four installed mock runs recorded no foreign CWD Git commit and used the canonical
+  bundled prompts. A separate foreign-Git wheel smoke also retained a null run-config commit.
+- Repeated eight-way seed concurrency 50 times with exactly one publisher each time; Darwin's
+  native no-replace path was exercised locally, Linux ran in Python 3.10/3.13 CI, and Windows was
+  statically/mocked reviewed.
+- Committed the implementation as `0aee55e1a48dab3d56f0475f789c2134c548ddc5`, pushed it, verified
+  local/upstream/`ls-remote` equality with ahead/behind `0/0`, and confirmed both GitHub Actions
+  triggers passed every Python 3.10/3.13 job.
+- Kept all validation artifacts under `/tmp`; none were committed or uploaded. The temporary sdist
+  is explicitly not publication-ready because its tar headers expose the local builder owner/group
+  and generated metadata timestamps are not reproducible. Follow-up ARA-026 records that boundary.
+
+## ARA-022 Implementation Checkpoint
+
+- Reproduced static leaf links, nested/ancestor link swaps, UI validation/read swaps, fresh-context
+  metadata/log/stop-signal paths, and cross-thread boundary loss only in temporary fixtures.
+- Added a process-wide trusted-boundary registry. Nested run roots inherit/rebase to the project
+  anchor; only configured storage outside the project receives a separate physical anchor.
+- Added POSIX component-by-component no-follow descriptor operations for automatic reads, appends,
+  atomic replacement, unlink, coordination files, directory creation, and pruned recursive survey
+  source traversal. Static hard links and special nodes fail closed.
+- Preserved configured external `runs/` storage, stale real-directory tolerance, explicit
+  analyze/compare aliases, and explicit export-parent behavior. Survey source helpers intentionally
+  retain lexical `abspath` spelling so safe reads cannot be redirected by canonicalization.
+- Hardened CLI, resume, survey/cloud, run lock, background-process, cooperative stop, and Streamlit
+  direct-entry boundaries; preserved actionable lock/guard recovery classification.
+- Independent implementation and state-consistency reviews report GO. The documented exclusions are
+  same-UID replacement with another real directory, post-open/new-temp hard-link races, trusted
+  ancestors above the anchor, and Windows active replacement.
+- Committed the implementation as `544b26a` and pushed it with exact local/upstream/`ls-remote`
+  equality. Python 3.13 CI passed, while both Python 3.10 runs exposed a test-only portability bug:
+  the test constructed `Path` after mocking `os.name="nt"` on Linux.
+- Moved `Path` construction before the mock, reran `make check` (`294 passed, 176 subtests passed`),
+  committed the portable regression as `93026ca`, pushed, and verified exact remote equality.
+
+## ARA-028 Recovery-State Regression
+
+- Recovered a clean branch at `ca3a2e8`, verified exact local/upstream/`ls-remote` equality, and
+  confirmed closeout push/PR runs `29153184085`/`29153185119` passed Python 3.10 and 3.13.
+- Reproduced four stale-state failures: the queue and active-task snapshot disagreed, the worktree
+  section claimed files remained uncommitted, remaining steps requested the already-completed
+  ARA-022 closeout, and a JSON note named an obsolete fallback commit.
+- Added a tracked recovery-state consistency regression covering live worktree sourcing,
+  recursive-closeout instructions, active-task synchronization, semantic HEAD structure, and the
+  single conservative external fallback contract.
+
+## ARA-032 Finite Score Normalization
+
+- Reproduced malformed numeric artifacts making `nan`/`Infinity` dominate ranking, create a false
+  flat trend, and escape analysis/comparison output as non-standard JSON.
+- Rejected boolean, non-finite numeric/string, and unrepresentably large numeric score values while
+  preserving finite legacy numeric strings.
+- Ranked score presence ahead of value so any valid negative score remains preferable to a missing
+  score; within scored runs, score and completed-round ordering remains unchanged.
+- Normalized overflowed trend and baseline deltas to `null` while retaining the direction inferred
+  from their finite endpoints.
+- Preserved the historical `sum(scores) / count` average whenever its total is finite. Only an
+  overflowed total uses max-absolute scaling plus `math.fsum`, keeping representable finite-extreme
+  averages such as three maximum floats finite without changing ordinary two-decimal results.
+- Added strict-JSON, negative-ranking, huge-integer, finite-extreme, and ordinary-rounding
+  regressions. Two independent adversarial reviews returned GO after the extreme-average fallback
+  and finite-total compatibility path were added.
+
+## ARA-033 Privacy-Safe Output Failure Boundary
+
+- Reproduced analysis and comparison output parents implemented as ordinary files: both module
+  commands returned 1 but emitted full tracebacks containing temporary and repository absolute
+  paths. An unresolved `~user` output path exposed the same boundary through `RuntimeError`.
+- Limited normalization to the explicit output argument branch: user expansion, parent resolution,
+  and JSON writing catch `OSError`/`RuntimeError`, print a fixed path-free message, and raise the
+  existing operation-error status 1 without exception chaining.
+- Left analysis/comparison computation, storage propagation, final console rendering, successful
+  JSON output, and explicitly authorized output-parent symlinks unchanged.
+- Added real module subprocess regressions for both modes and both failure classes. Two independent
+  reviews returned GO after checking exit semantics, failed writes, success paths, and symlink
+  compatibility.
+
+## ARA-034 Explicit Resume Eligibility Boundary
+
+- Reproduced `"false"`, `"true"`, and integer `1` checkpoint flags entering the iterative runner;
+  the end-to-end control invoked all agent stages, wrote a new round, and replaced checkpoint state.
+- Reproduced a 400-digit preview score raising `OverflowError` and Infinity/NaN passing through the
+  previous float conversion.
+- Required identity with literal boolean `true`; all other types return the existing
+  `not_resume_eligible` result before the runner or any agent stage. Preview score conversion now
+  catches overflow and accepts only finite non-boolean values, preserving finite numeric strings.
+- Direct byte-snapshot and real module CLI tests prove no project artifact write, no agent access,
+  status 2, no traceback, and lock release. Two independent reviews returned GO.
+
+## ARA-038 Cloud Discovery And Artifact Error Boundaries
+
+- Reproduced SDK pagers that yielded one model and then raised, allowing lazy iteration exceptions
+  to escape the discovery tuple and preventing profile mode's configured-seed fallback.
+- Reproduced `OSError` at explicit discovery save, profile discovery-cache save, successful profile
+  result save, and discovery-error fallback profile save; each emitted traceback and absolute paths.
+- Kept initial client/list-call compatibility while consuming lazy iterators inside a safe boundary.
+  Iterator and model-conversion failures now return an empty discovery result plus the existing
+  classified public message; only iterator acquisition may use the legacy non-iterable `.models`
+  wrapper fallback.
+- Mapped the four automatic artifact-write stages to the existing operation-error status 1 with one
+  fixed path-free diagnostic. Explicit discovery failure remains status 1, while a discovery error
+  in profile mode still uses configured seeds and returns status 0 when profiling and saving succeed.
+- Provider-free focused, related, full-gate, and two independent adversarial reviews passed. The
+  separate discovery/profile provenance-cohort risk remains queued as ARA-040.
+
+## ARA-039 Prior-Round Resume Context Boundary
+
+- Reproduced invalid UTF-8 and injected read errors in an existing previous Judge artifact becoming
+  silent empty context only after startup metadata writes; the draft agent was still invoked.
+- Replaced tolerant reads with one pre-write read of each fixed draft/review/revised/Judge artifact.
+  Missing leaves or an entirely missing legacy round directory remain empty, while other I/O/Unicode
+  failures raise a basename-only error with exception chaining suppressed.
+- A four-file by two-error matrix proves byte preservation, no new round directory, no agent access,
+  and path-safe exception/console behavior. Valid complete context and missing legacy compatibility
+  controls pass; two independent reviews returned GO.
+
+## ARA-040 Cached Cloud Membership Guard
+
+- Reproduced a later process selecting stale `gemma-3-high-tpm` after discovery failed and saved a
+  new default-seed-only profile beside the old discovery artifact.
+- Added one CLI/UI cached-candidate helper that reclassifies discovery under current policy, trusts
+  discovery only for exact unique canonical profile membership, and otherwise ignores discovery in
+  favor of current configured/profiled membership. Empty profile compatibility remains unchanged.
+- Covered exact, absent, partial, unsafe, duplicate, legacy-prefixed, blocked, and current-policy
+  cases plus a real two-process disk round trip. No artifact schema, file, deletion, or migration
+  changed. Two independent reviews returned GO.
+
+## ARA-043 All-Blocked Recommendation Contract
+
+- Reproduced four blocking profile classes being skipped during scoring and then selected again by
+  the no-scored seed fallback.
+- Centralized blocking checks across Quality, ordinary scoring, and runtime fallback. All-blocked
+  pools return no selection; mixed unprofiled, healthy, missing-profile, and ordinary rate-limit
+  behavior remains compatible.
+- UI now distinguishes Manual from non-manual no-eligible results while retaining picker/manual
+  effective selection. Extended property probes and two independent reviews returned GO.
+
+## ARA-029 CI Least-Privilege And Runtime Contract
+
+- Reproduced the missing permission/timeout and deprecated action-major contract as three expected
+  test failures while the existing triggers and Python matrix control passed.
+- Added workflow-level `contents: read`, no job-level override, a documented 15-minute job timeout,
+  and official Node 24 `checkout@v7`/`setup-python@v6` majors. Push/PR branch filters, Python
+  3.10/3.13, pip cache, install, and validation commands are unchanged.
+- Official release/action metadata and two independent reviews confirmed the action runtimes,
+  hosted-runner compatibility, cache permission boundary, and timeout headroom. No dependency,
+  release, artifact, provider, experiment, or application behavior changed.
+
+## ARA-042 Project And Artifact Scoped UI Cloud Cache
+
+- Reproduced cross-project and same-ID external metadata staleness before adding a shared session
+  cache identity for both discovery and profile lists.
+- The identity combines validated canonical project path/device/inode with safe content hashes for
+  both artifacts. It distinguishes missing/unreadable/unsafe states, clears legacy or torn values on
+  a miss, rechecks after loading, retries once, and returns uncached empty lists if still unstable.
+- UI saves invalidate identity before updating their in-memory value. Equal inode/size/mtime content
+  rewrites, blocked-to-healthy recommendation changes, unreadable recovery, and unsafe symlinks are
+  covered without provider calls or artifact/schema changes.
+
+## ARA-044 Target-Scoped UI Health Snapshots
+
+- Reproduced provider-global raw health state describing an old effective model/endpoint. Added a
+  strict wrapper keyed by normalized provider/model and non-secret connection/source identity.
+- Ollama identity/error display excludes userinfo, query values, arbitrary path text, and exception
+  text; Gemini identity records only session/config/environment source labels and follows actual SDK
+  fallback order. No credential is stored or hashed.
+- Legacy, mismatched, malformed, missing-argument, and unsafe error payloads are evicted or
+  sanitized. Same-target snapshots remain compatible, and UI input/model-refresh changes clear the
+  appropriate health key.
+
+## ARA-045 Gemini Effective-Credential Redaction
+
+- Reproduced a dual-built-in mismatch where google-genai used Google while the wrapper selected
+  Gemini for redaction, plus a raw provider exception still reachable through `__context__`.
+- Added one request-scoped credential snapshot across explicit/custom/Google/Gemini sources while
+  preserving SDK built-in delegation and raw environment truthiness. Every captured nonempty
+  candidate is redacted longest-first.
+- Detached raw provider exceptions before raising sanitized public/cause/context messages and
+  covered client initialization, runtime/value/quota paths, discovery redaction before truncation,
+  short/overlapping values, and the existing missing-dependency diagnostic.
+
+## ARA-046 Ollama Endpoint Credential Redaction
+
+- Reconfirmed a clean, remote-equal dedicated branch and reran `make check`: Ruff, imports,
+  repository safety, and pytest passed (`359 passed, 277 subtests passed`).
+- Reproduced without network access that a credential-bearing Ollama URL survives in
+  `OllamaClient` public/cause errors and `query_ollama_api_models` fallback output.
+- Scope is redaction only: keep accepted endpoint forms and request targets unchanged, make no real
+  provider call, and do not access ignored runtime artifacts.
+- Added one shared diagnostic endpoint formatter: unambiguous hosts retain scheme/host/port, IDNs
+  become ASCII, and ambiguous authority/port/encoded forms fail to a fixed label without changing
+  the request target or URL acceptance.
+- Detached requests exceptions before raising fixed safe causes; urllib Request construction,
+  transport/HTTP, decoding, and invalid-URL failures now share fixed classified output. Failed
+  `ollama list` stdout/stderr and exception text no longer enter the combined API fallback.
+- Provider-free regressions cover timeout/request event types and fields, public/cause/traceback
+  graphs, ambiguous authority, InvalidURL, non-object responses, command/API fallback, exact request
+  targets/timeouts, ordinary endpoint compatibility, and IDN/scoped/invalid endpoint labels.
+- Two independent final reviews report GO with no remaining P1/P2 blocker.
+
+## ARA-047 Unrepresentable Resume-History Scores
+
+- Reproduced positive and negative 400-digit JSON scores escaping dual-history resume as raw
+  `OverflowError`; the single `round_metrics.json` legacy path then exposed a second failure mode
+  where the same values were silently ignored and the run continued.
+- Numeric conversion now treats overflow as invalid, and history loading rejects explicit native
+  numeric scores that cannot become finite floats for any round not explicitly marked
+  unsuccessful. Missing scores, finite values, legacy numeric strings, bools, and explicitly
+  unsuccessful rounds keep their prior read behavior.
+- Provider-free regressions cover dual and `round_metrics.json`-only positive/negative values,
+  complete project-tree byte preservation, no agent or new-round activity, path-safe diagnostics,
+  CLI status 2 and lock release, plus explicit unsuccessful-round compatibility.
+- Three independent final reviews report GO with no P1/P2 blocker.
+
+## ARA-048 Conflicting Primary CLI Modes
+
+- Reproduced every pair of the ten primary selectors being accepted in either argument order, plus
+  direct/module/temporary-installed entrypoints continuing past argument parsing (`93 failed, 1
+  passed`). A concrete temporary `--mock --resume` probe selected mock mode and replaced its
+  temporary checkpoint instead of rejecting the command.
+- Placed only the ten primary selectors in one optional `argparse` mutually exclusive group.
+  Normal mode, each individual selector, and ordinary output/runtime modifiers remain accepted;
+  no dispatch, default, provider, artifact, or experiment behavior changed.
+- Added all 45 selector pairs in both orders (90 subtests), representative compatible modifiers,
+  a direct `main()` pre-runtime guard, a real module-entry guard, and a copied-installed-package
+  no-write/hash-preservation regression.
+- Focused and related tests, real source module/console help and conflict smokes, full `make check`,
+  and three independent read-only reviews are green. ARA-057 separately owns orphan
+  mode-specific output options and was not folded into this fix.
+
+## ARA-049 Authoritative UI Session Credential
+
+- Reproduced the launched child selecting an explicit config key or inherited `GOOGLE_API_KEY`
+  after Streamlit health/discovery had selected the password-box key (`6 failed, 1 passed, 1
+  subtest passed` across the initial boundary set).
+- Added a fixed child-only environment transport and a hidden activation option containing only
+  that environment variable's name. A nonempty session value now feeds preflight, cloud helper,
+  and actual client creation as the explicit key; empty sessions clear stale transport state and
+  omit activation, preserving config/custom/Google/Gemini precedence.
+- Added provider-free Popen/metadata, parse-time fail-closed, real client-factory/fake-SDK
+  competition, stale-unactivated transport, and argv-substring regressions. No actual credential,
+  provider, ignored runtime, config, experiment, or research artifact was accessed.
+- Focused, related, recovery, and full checks pass. Security, compatibility, and test-quality
+  reviews all report GO after strengthening the argv and no-activation assertions.
+
+## ARA-050 Installed Generation Resource Preflight
+
+- Reproduced an installed deterministic mock succeeding after a generation prompt was removed,
+  then writing a run whose prompt provenance silently omitted that resource (`8 failed, 1 passed`
+  in the initial installed-layout matrix).
+- Added one fail-before-write validator for `draft.md`, `review.md`, `revise.md`, and `judge.md`.
+  It uses anchored no-follow reads, regular-file and open-identity checks, valid UTF-8, and nonblank
+  content before config, seeding, provider startup, locks, or artifacts.
+- Normal, mock, continuous, diagnostic, session, and resume require the prompts. Analysis,
+  comparison, survey, cloud discovery, and cloud profile retain their prompt-independent paths.
+- Preserved hardlink-based package installation compatibility with an explicit package-resource
+  exception; all automatic artifact reads keep the existing single-link default. Symlinks and
+  special nodes remain rejected.
+- Focused tests pass `5 passed, 23 subtests`; related package/CLI/storage/config/mock/recovery tests
+  pass `92 passed, 71 subtests`; isolated real-wheel smoke and full `make check` pass. Three
+  independent final reviews report GO after the hardlink compatibility correction.
+
+## ARA-051 Conflicting Duplicate Cloud Profiles
+
+- Reproduced both duplicate orders across cached pooling, auto/quality/volume recommendation, and
+  fallback. The initial matrix failed `6` subtests: cached pooling retained the target in both
+  orders, while a healthy last record re-enabled recommendation and fallback.
+- Added one exact-ID profile index that preserves value-equivalent duplicates and marks any
+  non-identical parsed record pair as conflicted. All three selection surfaces explicitly exclude
+  only those IDs, so omission cannot reinterpret them as unprofiled candidates.
+- Added both-order controls proving a unique healthy cohort member survives cached reconciliation,
+  an unprofiled safe alternative remains recommendable/selectable, and two distinct but
+  value-equal duplicate instances retain historical behavior.
+- Focused tests pass `4 passed, 22 subtests`; cloud/CLI/UI/recovery tests pass `139 passed, 127
+  subtests`; full `make check` passes `383 passed, 459 subtests`. Three independent final reviews
+  report GO.
+
+## ARA-052 Malformed Ollama Health Response Normalization
+
+- Reproduced top-level list, string, number, boolean, and null JSON raising `AttributeError` after
+  successful `/api/tags` transport and decode.
+- Added one top-level `Mapping` guard that returns fixed `InvalidResponse` unhealthy state through
+  the existing i18n/cache contract without retaining provider-controlled response content.
+- Added direct private-endpoint redaction, exact URL/timeout, empty-object, valid-object, and scoped
+  snapshot controls. Mapping behavior, ARA-044 identity, and ARA-046 display redaction are intact.
+- Focused tests pass `3 passed, 14 subtests`; related config/UI/recovery tests pass `96 passed, 92
+  subtests`; full `make check` passes `384 passed, 465 subtests`. Three independent final reviews
+  report GO.
+- Confirmed nested `models` null/numeric values remain a separate `TypeError` boundary and queued
+  it as ARA-058 rather than widening this fix.
+
+## ARA-057 Mode-Specific Output Dependencies
+
+- Reproduced all three output flags across normal mode and every non-owner primary selector in both
+  argument orders. All invalid combinations parsed, and direct/module/copied-installed entrypoints
+  proceeded beyond argument handling; temporary installed mock mismatches completed real writes.
+- Added one post-parse dependency table requiring `--survey`, `--compare-runs`, or `--analyze-run`
+  whenever its corresponding output option is explicitly present. Errors contain only fixed option
+  names and occur before logging, layout, configuration, project, provider, or artifact work.
+- Preserved ARA-048 primary-mode mutual exclusion, compare arity error precedence, `--help`, correct
+  output pairs in either order, empty output values with a valid owner, and all output-free modes.
+  A falsey empty analyze selector plus output is rejected because main would otherwise dispatch the
+  normal/provider path; output-free blank analyze parsing remains compatible.
+- Focused tests pass `4 passed, 90 subtests`; related CLI/runner/package/survey/compare/recovery tests
+  pass `141 passed, 352 subtests`; full `make check` passes `388 passed, 555 subtests`. Three
+  independent final reviews report GO.
+
+## ARA-053 Private Ollama Health Path Identity
+
+- Reproduced `/alpha` and `/bravo`, two equal-shape multi-segment pairs, and a reordered pair sharing
+  the same length-only identity. A valid `/alpha` result was consequently returned for `/bravo`.
+- Added a normally imported helper that creates one random 256-bit process-local key and computes a
+  domain-separated full HMAC-SHA256 over only the existing normalized private path. The key, raw
+  path, userinfo, query, fragment, and reversible encodings never enter session state or files.
+- Preserved explicit allowlisted path identities, origin/default-port/trailing-slash normalization,
+  credential/query presence markers, fragment omission, request behavior, and same-target reuse.
+  Ordinary `ui.app` reloads retain the helper key; process/helper reload safely invalidates evidence.
+- The expected pre-fix regression produced `4 failed, 1 passed`. Focused final coverage passes `4
+  passed, 14 subtests`; UI/recovery tests pass `84 passed, 69 subtests`; package/wheel helper tests
+  pass `20 passed, 41 subtests`; full `make check` passes `392 passed, 569 subtests`. Three independent
+  final reviews report GO.
+
+## ARA-058 Nested Ollama Models Shape
+
+- Pre-fix provider-free probes confirmed null, boolean, integer, and float containers raised
+  `TypeError`, while string and object containers could silently report healthy when the
+  installed-model fallback matched.
+- Keep this task limited to requiring an omitted/default or actual list container and reusing the
+  fixed ARA-052 `InvalidResponse` result. Per-record name typing is queued separately as ARA-059.
+- Added one raw-container binding and list guard before installed-model union. The fixed matrix
+  includes null, zero, other numbers, booleans, string, and mapping containers plus omitted, empty,
+  mixed-valid, whitespace-name, and installed-fallback list controls.
+- Focused tests pass `3 passed, 18 subtests`; UI/config/recovery tests pass `101 passed, 120 subtests`;
+  full `make check` passes `393 passed, 581 subtests`. Three independent final reviews report GO
+  after the recovery-wording correction.
+
+## ARA-059 Ollama Model Name Typing
+
+- Provider-free probes confirmed null, boolean, numeric, list, and object `name` values are coerced
+  with `str(...)` by both UI health and shared tags parsing; selecting that text can report healthy.
+- Limit the task to accepting only nonblank strings while preserving valid trimming, de-duplication,
+  request/redaction behavior, list-container compatibility, and installed-model fallback.
+- Add a cross-boundary pre-fix regression before implementation; do not call a provider or inspect
+  ignored runtime.
+- Added one shared scalar helper that trims only strings, then used it in both inventory
+  normalization and UI health. Non-string records are ignored before de-duplication or matching;
+  the pre-existing verbatim installed-name fallback remains unchanged.
+- Strengthened the regression with parent-level aggregate assertions after the first pytest 9 run
+  exposed subtest-only failures returning status 0. The accepted pre-fix run exits 1 with `18
+  failed`; focused final tests pass `2 passed, 37 subtests`, and related UI/config/recovery tests pass
+  `103 passed, 157 subtests`.
+- Before initial review, the intermediate full `make check` passed Ruff format/lint over 61 files,
+  imports, both repository-safety modes over 104 tracked/index files with zero findings, and pytest
+  (`395 passed, 617 subtests` in 17.98 seconds).
+- Initial final reviews found that several compatibility assertions still depended only on pytest
+  subtest status, installed-name whitespace had changed unintentionally, two recovery claims were
+  stale, and ARA-060 undercounted parenthesized call sites. Every new loop now has a complete
+  parent-level aggregate, installed fallback is verbatim again, state/count claims are corrected,
+  and the first post-correction full gate passed `395 passed, 617 subtests` in 17.67 seconds.
+- A final delta review found that the invalid-parser aggregate did not distinguish `[]` from every
+  other falsey result and that installed-name whitespace compatibility lacked a direct regression.
+  Both controls are now exact. Focused and related tests pass `2 passed, 37 subtests` and `103
+  passed, 157 subtests`; `make check` passes `395 passed, 618 subtests` in 17.85 seconds. Mutation
+  probes that swallow subtest assertion errors confirm both parent-level failure paths remain live.
+- Committed ARA-059 as `a7d00a6`, pushed it with exact local/upstream/`ls-remote`/PR-head equality,
+  and verified push/PR runs `29266119109`/`29266121277`: Python 3.10/3.13, all four isolated-wheel
+  steps, and every annotation set passed cleanly. Draft PR 13 remains open, draft, and mergeable.
+- Re-verified the ARA-059 closeout `b196af9` on 2026-07-23: local/upstream/`ls-remote`/PR-head are
+  exact, closeout push/PR runs `29266539401`/`29266544263` remain successful, and PR 13 remains
+  open, draft, and mergeable.
+- Received explicit owner approval for ARA-060 test-configuration work on 2026-07-23 and activated
+  it as the sole `IN_PROGRESS` task without changing dependencies.
+- Ran the current baseline `make check`: Ruff, imports, both repository-safety modes, and pytest
+  passed with `395 passed, 618 subtests` in 20.45 seconds.
+- Reproduced one and 16 subtest-only failures with direct pytest 9.0.3 invocations; both returned
+  status 1. Archived ARA-059 evidence showed the apparent zero came from an outer parallel script
+  that printed nested command output without propagating nested exit codes.
+- Added a no-new-dependency subprocess sentinel for failing and passing `unittest.subTest` behavior.
+  It disables third-party plugin autoload, removes inherited pytest injection options, uses a
+  temporary isolated root, and has a 30-second child timeout.
+- Focused sentinel tests pass `2 passed`; the pre-existing 14-file subtest cohort passes `321
+  passed, 618 subtests`. No pytest configuration, production code, provider, or ignored runtime was
+  changed.
+- Indexed ARA-060 `make check` passes Ruff format/lint over 62 files, imports, repository-safety
+  self/worktree/staged scans over 105 tracked files, and pytest (`397 passed, 618 subtests` in
+  21.54 seconds).
+- Committed ARA-060 as `0a0036f`, pushed it with exact local/upstream/`ls-remote`/PR-head equality,
+  and verified push/PR runs `30002348583`/`30002350589`: Python 3.10/3.13, all four isolated-wheel
+  steps, and every annotation set passed cleanly. Draft PR 13 remains open, draft, and mergeable.
+- Re-verified ARA-060 closeout `b064a93` before ARA-056: local/upstream/`ls-remote`/PR-head equality
+  is exact, closeout runs `30002850097`/`30002852693` remain successful, and PR 13 remains open,
+  draft, and mergeable.
+- Received explicit owner approval for ARA-056 on 2026-07-23 and activated it as the sole
+  `IN_PROGRESS` task.
+- Ran the ARA-056 baseline `make check`: Ruff, imports, repository-safety self/worktree/staged
+  scans, and pytest pass with `397 passed, 618 subtests` in 25.76 seconds.
+- Committed and pushed the ARA-056 activation checkpoint as `66d8a4f`; push/PR runs
+  `30003426104`/`30003428837` passed Python 3.10/3.13.
+- Reproduced all three pre-agent interrupt gaps after round-directory creation, round-entry logging,
+  and memory loading: each propagated `KeyboardInterrupt` without `checkpoint.json`, producing the
+  expected `3 failed`.
+- Moved only those pre-agent operations under a `KeyboardInterrupt` boundary shared with the
+  existing manual-interrupt marker. Ordinary exceptions, cooperative stops, agent behavior,
+  startup ordering, and schemas remain unchanged.
+- Added a three-stage unit fault matrix that verifies standard checkpoint/summary/config/report
+  finalization and successful reuse of the empty pending round, plus a module-entrypoint regression
+  for status 130, lock release, empty-round state, and traceback suppression.
+- Focused coverage passes `2 passed, 3 subtests`; CLI process coverage passes `3 passed`; related
+  runner/CLI/session/storage/recovery coverage passes `135 passed, 339 subtests`.
+- Indexed `make check` passes Ruff, imports, both repository-safety scans, and pytest with `399
+  passed, 621 subtests` in 19.85 seconds.
+- Committed ARA-056 as `795665d`, pushed it with exact local/upstream/`ls-remote`/PR-head equality,
+  and verified push/PR runs `30004044807`/`30004047971`: Python 3.10/3.13, all four isolated-wheel
+  steps, and every annotation set passed cleanly. PR 13 remains open, draft, and mergeable.
+- Reverified the ARA-056 closeout `d60a7a1` with exact local/upstream/`ls-remote`/PR-head equality;
+  closeout push/PR runs `30004494316`/`30004498366` passed Python 3.10/3.13.
+- Received explicit owner approval for the ARA-054 design stage on 2026-07-23. This authorization
+  covers provider-free characterization in temporary workspaces and durable design/recovery
+  documentation only.
+- Ran the ARA-054 design baseline `make check`: Ruff, imports, both repository-safety scans, and
+  pytest pass with `399 passed, 621 subtests` over 105 tracked files in 20.90 seconds.
+- Reproduced an eight-case post-persistence matrix covering draft/review/revise/Judge with manual
+  interrupt and cloud daily quota. Every case wrote a resumable checkpoint for zero completed
+  rounds, but preview and actual resume rejected the four-file canonical directory as
+  `complete_uncheckpointed`; rejected attempts preserved every round and checkpoint byte.
+- Confirmed the root cause: every stage persistence rewrites all four canonical output files and
+  serializes future-stage empty values as one newline, while checkpoint eligibility uses only the
+  stop reason and both resume guards reject every nonempty pending canonical round.
+- Added `docs/ARA_054_PARTIAL_ROUND_RECOVERY_DESIGN.md`. It selects append-only per-round attempts,
+  whole-round retry, create-only stage outputs, immutable stopped evidence, shared preview/runner
+  eligibility, fail-closed legacy handling, bounded retries, and an explicit ARA-055 boundary.
+- Verified the design contract and indexed `make check`: `399 passed, 621 subtests` over 106
+  tracked/staged files in 21.00 seconds with zero provider calls or safety findings.
+- Committed the design as `946f40f`, pushed it with exact local/upstream/`ls-remote` equality, and
+  verified push/PR runs `30007167214`/`30007170465`: Python 3.10/3.13 and every isolated-wheel step
+  passed.
+- Indexed recovery-closeout `make check` passes Ruff, imports, both repository-safety scans, and
+  pytest with `399 passed, 621 subtests` over 106 tracked/staged files in 22.27 seconds.
+- Implemented create-only anchored text/JSON writes and exclusive
+  `partial_rounds/round_NN/attempt_<id>/output` allocation. Failed writes remain immutable evidence;
+  existing leaves and attempt identifiers cannot be overwritten or path-expanded.
+- Added the provider-free `src.round_attempts` foundation: strict identity/schema/hash validation,
+  deterministic stopped-attempt discovery, fail-closed canonical/attempt conflict handling, an
+  initial 32-attempt cap, and a path-redacted shared recovery classification result.
+- Added nine focused tests plus fault, collision, identifier, count, hash, malformed-manifest,
+  canonical-conflict, link, and byte-preservation coverage.
+- Indexed `make check` passes Ruff, imports, both repository-safety scans, and pytest with `408
+  passed, 625 subtests` over 108 tracked/staged files in 19.49 seconds.
+- Committed the foundation as `e4e784e`, pushed it with exact local/upstream/`ls-remote`/PR-head
+  equality, and verified push/PR runs `30012047804`/`30012050777`: Python 3.10/3.13, every
+  isolated-wheel step, and all CI jobs passed. Draft PR 13 remains open and mergeable.
+- Added strict manifest stage/stop/ready/published transitions, retained-byte and free-space
+  budgets, no-replace atomic publication, and interruption-safe create-only publication into a
+  preserved historical empty canonical directory.
+- Switched the runner to create append-only attempts, persist each completed or skipped stage once,
+  stop active attempts on manual interrupt, cloud quota, cooperative stop, or exception, and publish
+  only a verified four-stage attempt before scoring or history updates.
+- Routed preview, final checkpoint eligibility, and resume preflight through the shared classifier;
+  additive diagnostics report preserved-attempt count, latest verified stage, safety action, and
+  budget state without persisting arbitrary attempt paths.
+- Verified the four-stage by two-fault interrupt/quota matrix, publication collision and both crash
+  windows, legacy partial fail-closed behavior, immediate retry, CLI status 130, and unchanged
+  completed-round semantics. Related coverage passes `232 passed, 468 subtests`; full pytest passes
+  `417 passed, 633 subtests`.
+- Committed publication as `87f37d3` and runtime integration as `75f3d9a`; both are pushed.
+  Exact local/upstream/`ls-remote`/PR-head equality holds at `75f3d9a`. Push/PR runs
+  `30016026758`/`30016026741` passed Python 3.10/3.13 and every isolated-wheel step.
+- Harmless command corrections during this package: bare `python` was unavailable and was replaced
+  with `.venv/bin/python`; an initially named nonexistent `tests/test_recovery.py` was corrected to
+  `tests/test_recovery_state.py`; two read-only searches used backticks inside double quotes and
+  caused zsh `command not found` messages. None changed files or Git state, and literal-safe
+  validation reruns passed.
+
+## Remaining Steps
+
+- There is no unblocked implementation task. Recheck live Git/CI state before any later work.
+- Preserve all journal-less, partial, ambiguous, unsafe, and unknown legacy evidence byte-for-byte;
+  do not broaden package 7C beyond the sole exact missing-twin class.
+- Do not activate ARA-018 without an owner license/distribution decision.
+
+## Test Status
+
+- ARA-061 focused validation passes `4 passed, 18 subtests`; related CLI/cloud/config/runner/
+  project/UI regression passes `244 passed, 554 subtests`. Ruff and diff checks pass, and the real
+  module entrypoint proves invalid input exits 2 without project creation. No provider or ignored
+  runtime was accessed.
+- ARA-061 activation `2ac99e0` is exact local/upstream/`ls-remote`/PR-head equal; push/PR runs
+  `30080995141`/`30080997040` passed.
+- ARA-061 full `make check` passes formatting over 70 files, Ruff, imports, tracked/staged safety
+  over 115 files with zero findings, and `466 passed, 809 subtests` in 180.21 seconds. Recovery
+  state passes `6 passed, 1 subtest`.
+- ARA-061 implementation `b1c1b6c` is exact local/upstream/`ls-remote`/PR-head equal. Push/PR
+  runs `30081927773`/`30081930092` passed Python 3.10/3.13, isolated-wheel validation, formatting,
+  lint, imports, repository safety, and all tests.
+- ARA-055 package-4 closeout `00a488d` is exact local/upstream/`ls-remote`/PR-head equal.
+  Closeout push/PR runs `30035438824`/`30035441752` passed Python 3.10/3.13 and every workflow
+  step.
+- ARA-055 package-4 implementation `efcad88` is exact local/upstream/`ls-remote`/PR-head equal.
+  Push/PR runs `30034539432`/`30034542276` passed Python 3.10/3.13 and every workflow step; draft
+  PR 13 is open and cleanly mergeable.
+- ARA-055 package-4 focused coverage passes `9 passed`; related coverage passes `256 passed, 540
+  subtests`; the full recovery matrix passes `16 passed, 99 subtests`; final `make check` passes
+  formatting, lint, imports, both safety modes, and `462 passed, 791 subtests`.
+- ARA-055 package-4 activation `c2a7af5` is exact local/upstream/`ls-remote`/PR-head equal.
+  Push/PR runs `30031800668`/`30031802489` passed Python 3.10/3.13 and every workflow step.
+- ARA-055 package-3 closeout `9457a25` is exact local/upstream/`ls-remote`/PR-head equal.
+  Closeout push/PR runs `30030747254`/`30030751034` passed Python 3.10/3.13 and every workflow
+  step.
+- ARA-055 package-3 focused/related validation passes `142 passed, 382 subtests`; the final runner
+  layer passes `67 passed, 220 subtests`; full `make check` passes formatting, lint, imports,
+  repository safety, and `453 passed, 791 subtests` over 114 staged files.
+- ARA-055 package-3 implementation `54c223b` is exact local/upstream/`ls-remote`/PR-head equal.
+  Push/PR runs `30030145901`/`30030150062` passed Python 3.10/3.13 and every workflow step.
+- ARA-055 package-2 baseline `make check` passes formatting, lint, imports, safety scans, and `431
+  passed, 688 subtests` over 111 tracked files in 33.38 seconds. Exact local/upstream/
+  `ls-remote`/PR-head equality holds at `064f5bd`; push/PR runs
+  `30021141942`/`30021145878` pass Python 3.10/3.13 and every isolated-wheel/check step.
+- ARA-055 package-1 focused tests pass `14 passed, 55 subtests`; related regression passes `111
+  passed, 277 subtests`; final `make check` passes formatting, lint, imports, safety scans, and
+  `431 passed, 688 subtests` over 111 staged files.
+- ARA-055 package-1 commit `4cd4bf4` is exact local/upstream/`ls-remote`/PR-head equal. Push/PR runs
+  `30020697130`/`30020701903` passed Python 3.10/3.13 and every isolated-wheel/check step. PR 13
+  remains open, draft, and mergeable.
+- ARA-054 runtime publication/integration focused coverage passes `232 passed, 468 subtests`.
+  Provider-free full pytest passes `417 passed, 633 subtests`; `make check` passes formatting,
+  lint, imports, both repository-safety scans, and the same full suite over 108 tracked files.
+- ARA-054 runtime commit `75f3d9a` is exact local/upstream/`ls-remote`/PR-head equal. Push/PR runs
+  `30016026758`/`30016026741` passed Python 3.10/3.13 and every isolated-wheel step.
+- ARA-058 initial nested-container regression produced `7 failed, 1 passed, 3 subtests passed`:
+  five scalar/null cases raised `TypeError`, while string and object containers returned false
+  healthy state through the installed-model fallback. The expanded fixed matrix also covers zero.
+- ARA-058 focused outer/nested/valid/request/redaction coverage passes `3 passed, 18 subtests`;
+  related UI/config/recovery tests pass `101 passed, 120 subtests`.
+- ARA-058 local `make check` passes Ruff format/lint over 61 files, imports, repository-safety
+  self/worktree/staged scans, and pytest (`393 passed, 581 subtests passed` in 17.81 seconds; 104
+  tracked/index files and zero findings). Three independent final reviews report GO.
+- ARA-058 indexed `make check` again passes all gates (`393 passed, 581 subtests passed` in 18.49
+  seconds); both safety modes scan 104 tracked/index files with zero findings.
+- ARA-058 implementation `0511a47` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Push run `29263804804` and pull-request run `29263808869` passed Python 3.10/3.13, all four
+  isolated-wheel steps, and zero annotations. Draft PR 13 remains open, draft, and mergeable.
+- ARA-058 recovery-closeout `make check` passes all gates again (`393 passed, 581 subtests passed`
+  in 18.05 seconds) after queue, completion, known-issue, validation, and resume records were synced.
+- ARA-058 closeout `1419d5e` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Closeout push/PR runs `29264305133`/`29264308515` passed Python 3.10/3.13, all four wheel steps,
+  and zero annotations; final PR body normalized readback is exact at SHA-256
+  `c474e3c5bf254dd6faf5095cc36d60c4fd3fdd0bd780cb30f5bb0c4ef15a4923`.
+- ARA-059 strengthened pre-fix matrix exited 1 with `18 failed`: eight invalid name types were
+  accepted by each of the shared parser and UI health entrypoints. The initial subtest-only form
+  reported 16 failures but exited 0, now queued separately as ARA-060.
+- ARA-059 focused final matrix passes `2 passed, 37 subtests`; related UI/config/recovery coverage
+  passes `103 passed, 157 subtests`.
+- Before initial review, ARA-059's intermediate local `make check` passed all gates with `395
+  passed, 617 subtests` in 17.98 seconds; both safety modes scanned 104 tracked/index files with zero
+  findings.
+- The first post-review-correction ARA-059 `make check` again passed all gates with `395 passed, 617
+  subtests` in 17.67 seconds; focused and related reruns passed `2 passed, 36 subtests` and `103
+  passed, 156 subtests` respectively.
+- ARA-059 final-delta correction passes focused `2 passed, 37 subtests`, related `103 passed, 157
+  subtests`, and full `make check` at `395 passed, 618 subtests` in 17.85 seconds. Parent-aggregate
+  mutation probes catch both a falsey non-list parser result and whitespace-normalizing installed
+  fallback even when subtest assertion errors are swallowed.
+- Three independent ARA-059 reviews report GO for security/state, test quality, and final
+  code/minimality/recovery consistency after both review-found controls and the historical wording
+  correction.
+- The explicit ten-path index passes cached-diff validation, staged repository safety over 104
+  files, recovery `6 passed, 1 subtest`, and full `make check` with `395 passed, 618 subtests` in
+  17.68 seconds.
+- ARA-059 implementation `a7d00a6` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Push run `29266119109` and pull-request run `29266121277` passed Python 3.10/3.13, all four
+  isolated-wheel steps, and zero annotations.
+- ARA-059 recovery closeout `make check` passes Ruff format/lint, imports, repository-safety
+  self/worktree/staged scans, and pytest (`395 passed, 618 subtests` in 17.76 seconds).
+- ARA-059 closeout `b196af9` is the live verified fallback: closeout push/PR runs
+  `29266539401`/`29266544263` remain successful on Python 3.10/3.13 with all four isolated-wheel
+  steps and zero annotations.
+- ARA-060 baseline `make check` passes `395 passed, 618 subtests` in 20.45 seconds.
+- ARA-060 direct one-failure and 16-failure subprocess probes both return 1; the passing sentinel
+  returns 0. Focused tracked sentinel tests pass `2 passed` in 0.46 seconds.
+- The 14 existing files containing 102 real `self.subTest(...)` call sites pass `321 passed, 618
+  subtests` in 34.30 seconds; the sentinel source uses dynamic method lookup so audit counts remain
+  102 call sites across those same 14 files.
+- ARA-060 indexed `make check` passes all gates with `397 passed, 618 subtests` in 21.54 seconds;
+  Ruff covers 62 files and both repository-safety modes scan 105 tracked files with zero findings.
+- ARA-060 implementation `0a0036f` is remote-equal; push/PR runs
+  `30002348583`/`30002350589` passed Python 3.10/3.13, all four isolated-wheel steps, and zero
+  annotations.
+- ARA-060 indexed recovery closeout `make check` passes Ruff format/lint, imports,
+  repository-safety self/worktree/staged scans, and pytest (`397 passed, 618 subtests` in 22.80
+  seconds).
+- ARA-056 baseline `make check` passes all gates with `397 passed, 618 subtests` in 25.76 seconds;
+  both safety modes scan 105 tracked files with zero findings.
+- ARA-056 pre-fix matrix produces the expected `3 failed`: round-directory, round-log, and
+  memory-load interrupts leave no checkpoint.
+- ARA-056 focused final coverage passes `2 passed, 3 subtests`; CLI status/lock compatibility passes
+  `3 passed`; related runner/CLI/session/storage/recovery coverage passes `135 passed, 339
+  subtests`.
+- ARA-056 indexed `make check` passes `399 passed, 621 subtests` in 19.85 seconds with 62
+  formatted files, 105 tracked files, and zero safety findings.
+- ARA-056 implementation `795665d` is remote-equal; push/PR runs
+  `30004044807`/`30004047971` passed Python 3.10/3.13, all four isolated-wheel steps, and zero
+  annotations.
+- ARA-056 indexed recovery closeout `make check` passes Ruff format/lint, imports,
+  repository-safety self/worktree/staged scans, and pytest (`399 passed, 621 subtests` in 20.74
+  seconds).
+- ARA-053 pre-fix collision/cache regression produced the expected `4 failed, 1 passed`: all three
+  equal-shape path pairs shared an identity and `/bravo` loaded `/alpha` health evidence.
+- ARA-053 focused final coverage passes `4 passed, 14 subtests`; UI/recovery tests pass `84 passed,
+  69 subtests`; package-resource/wheel-helper tests pass `20 passed, 41 subtests`; the import smoke
+  includes `src.ui_health_identity` and `ui.app`.
+- ARA-053 local `make check` passes Ruff format/lint over 61 files, imports, repository-safety
+  self/worktree/staged scans, and pytest (`392 passed, 569 subtests passed` in 18.61 seconds; 103
+  tracked/index files and zero findings before the new helper is staged). Three independent reviews
+  report GO; the later indexed and remote results are recorded below.
+- After explicit staging, ARA-053 `make check` again passes all gates (`392 passed, 569 subtests`
+  in 18.08 seconds); both safety modes scan 104 tracked/index files with zero findings.
+- ARA-053 implementation `98dffb5` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Push run `29262351625` and pull-request run `29262353455` passed Python 3.10/3.13, all four
+  isolated-wheel steps, and zero annotations. Draft PR 13 remains open, draft, and mergeable.
+- ARA-053 recovery-closeout `make check` again passes all gates (`392 passed, 569 subtests passed`
+  in 17.75 seconds) after queue, completion, known-issue, validation, and resume records were synced.
+- ARA-053 closeout `5cea1e2` is pushed with exact local/upstream/`ls-remote`/PR-head equality. Closeout
+  push/PR runs `29262706161`/`29262718135` passed Python 3.10/3.13, all four wheel steps, and zero
+  annotations; final PR body normalized readback is exact at SHA-256
+  `af5c7ef5a9d798fedcdc1ab7e4194f47daa6535706902d9fab93c7da2c7a657d`.
+- ARA-057 pre-fix provider-free matrix produced `79 failed, 3 passed, 6 subtests passed`: every
+  dependency context parsed, direct/module entrypoints reached runtime layout, and temporary
+  copied-installed mock mismatches completed ordinary writes.
+- ARA-057 focused final coverage passes `4 passed, 90 subtests`; related CLI/runner/package/survey/
+  compare/recovery coverage passes `141 passed, 352 subtests`.
+- ARA-057 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
+  self/worktree/staged scans, and pytest (`388 passed, 555 subtests passed` in 17.98 seconds; 103
+  tracked/index files and zero findings). Three independent final reviews report GO.
+- ARA-057 implementation `eabedff` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Push run `29260853734` and pull-request run `29260855184` passed Python 3.10/3.13, including all
+  four isolated-wheel steps; all four job annotation sets are empty. Draft PR 13 remains open,
+  draft, and mergeable.
+- ARA-057 recovery-closeout `make check` again passes all gates (`388 passed, 555 subtests passed`
+  in 17.70 seconds) after the queue, completion log, decision, known-issue, validation JSON, and
+  resume instructions were synchronized.
+- ARA-057 remote-verification closeout `cc8519e` is pushed with exact local/upstream/`ls-remote`/
+  PR-head equality. Closeout push run `29261174469` and pull-request run `29261177283` passed Python
+  3.10/3.13, all four isolated-wheel steps, and zero annotations; final draft PR body normalized
+  readback is exact at SHA-256 `f5df1d618bece0aeb2881655ce651670e4fc36db88e8370e361b3a95501c1bce`.
+- ARA-052 pre-fix provider-free response matrix produced the expected five shape failures before
+  boolean coverage was added: list, string, number, and null values reached `.get` and raised
+  `AttributeError` (`5 failed, 1 passed`).
+- ARA-052 focused final coverage passes `3 passed, 14 subtests`; related config/UI/recovery coverage
+  passes `96 passed, 92 subtests`.
+- ARA-052 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
+  self/worktree/staged scans, and pytest (`384 passed, 465 subtests passed` in 16.38 seconds; 103
+  tracked/index files and zero findings). Three independent final reviews report GO.
+- ARA-052 implementation `2141b7d` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Push run `29259494746` and pull-request run `29259495850` passed Python 3.10/3.13, including all
+  four isolated-wheel steps; all four job annotation sets are empty. Draft PR 13 remains open,
+  draft, and mergeable.
+- ARA-052 recovery-closeout `make check` again passes all gates (`384 passed, 465 subtests passed`
+  in 16.21 seconds) after the queue, completion log, decision, known-issue, validation JSON, and
+  resume instructions were synchronized.
+- ARA-052 remote-verification closeout `5e0d1ab` is pushed with exact local/upstream/`ls-remote`/
+  PR-head equality. Closeout push run `29259960658` and pull-request run `29259966810` passed Python
+  3.10/3.13, all four isolated-wheel steps, and zero annotations; final draft PR body normalized
+  readback is exact at SHA-256 `64be15ecb4b273cf0a48b24ff57a4b299e4a6ad79d1267ddcac08544675a507c`.
+- ARA-051 pre-fix duplicate-profile matrix produced `6 failed, 2 passed, 4 subtests passed`: both
+  cached orders retained the conflict, and healthy-last order re-enabled all presets plus fallback.
+- ARA-051 focused final coverage passes `4 passed, 22 subtests`; related cloud/CLI/UI/recovery
+  coverage passes `139 passed, 127 subtests`.
+- ARA-051 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
+  self/worktree/staged scans, and pytest (`383 passed, 459 subtests passed` in 16.27 seconds; 103
+  tracked/index files and zero findings). Three independent final reviews report GO.
+- ARA-051 implementation `ab7d6fe` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Push run `29258640040` and pull-request run `29258641820` passed Python 3.10/3.13, including all
+  four isolated-wheel steps; all four job annotation sets are empty. Draft PR 13 remains open,
+  draft, and mergeable.
+- ARA-051 remote-closeout `make check` again passes all gates (`383 passed, 459 subtests passed` in
+  16.05 seconds) after the queue, completion log, validation JSON, and resume instructions were
+  synchronized.
+- ARA-051 remote-verification closeout `a346c61` is pushed with exact local/upstream/`ls-remote`/
+  PR-head equality. Closeout push run `29258900953` and pull-request run `29258904138` passed Python
+  3.10/3.13, all four isolated-wheel steps, and zero annotations; final draft PR body normalized
+  readback is exact.
+- ARA-050 pre-fix installed-layout coverage produced the expected `8 failed, 1 passed`: generation
+  proceeded with a missing prompt and wrote incomplete provenance.
+- ARA-050 focused final coverage passes `5 passed, 23 subtests`; related package/CLI/storage/config/
+  mock/recovery coverage passes `92 passed, 71 subtests`.
+- The final isolated real-wheel install smoke passes with exact resource/RECORD checks, source-
+  excluded imports, console/module help, healthy installed mock, and prompt provenance validation.
+- ARA-050 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
+  self/worktree/staged scans, and pytest (`381 passed, 449 subtests passed` in 16.23 seconds; 103
+  tracked/index files and zero findings). Three independent final reviews report GO.
+- ARA-050 implementation `be3bc04` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Push run `29257476266` and pull-request run `29257478876` passed Python 3.10/3.13, including all
+  four isolated-wheel steps; all four job annotation sets are empty. Draft PR 13 remains open,
+  draft, and mergeable.
+- ARA-050 remote-closeout `make check` again passes all gates (`381 passed, 449 subtests passed` in
+  18.57 seconds) after the queue, completion log, validation JSON, and resume instructions were
+  synchronized.
+- ARA-050 remote-verification closeout `45d17db` is pushed with exact local/upstream/`ls-remote`/
+  PR-head equality. Closeout push run `29257853754` and pull-request run `29257863381` passed Python
+  3.10/3.13, all four isolated-wheel steps, and zero annotations; final draft PR body normalized
+  readback is exact.
+- ARA-049 pre-fix focused regressions produced the expected `6 failed, 1 passed, 1 subtest passed`.
+  After implementation and review strengthening, the focused layer passes `4 passed, 10 subtests`
+  and the UI/CLI/LLM/cloud/recovery layer passes `157 passed, 127 subtests`.
+- ARA-049 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
+  self/worktree/staged scans, and pytest (`376 passed, 426 subtests passed` in 14.27 seconds; 103
+  tracked/index files and zero findings). Three independent reviews report GO.
+- ARA-049 implementation `d75fe11` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Push run `29255525721` and pull-request run `29255530241` passed Python 3.10/3.13, including all
+  four isolated-wheel steps; all four annotation sets are empty. Draft PR 13 remains open, draft,
+  mergeable, and its normalized body readback is exact.
+- ARA-049 remote-closeout `make check` again passes all gates (`376 passed, 426 subtests passed` in
+  14.09 seconds) after the queue, completion log, validation JSON, and resume instructions were
+  synchronized.
+- ARA-049 remote-verification closeout `5121290` is pushed with exact local/upstream/`ls-remote`/
+  PR-head equality. Closeout push run `29255910391` and pull-request run `29255916384` passed Python
+  3.10/3.13, all four isolated-wheel steps, and zero annotations; final draft PR body readback is
+  exact.
+- ARA-048 pre-fix conflict regression failed as expected (`93 failed, 1 passed`): 90 pair/order
+  subtests plus direct, module, and copied-installed entrypoint boundaries all exposed the missing
+  parser rejection. The post-fix focused layer passes `6 passed, 100 subtests`; related
+  parser/entrypoint/package/compare/recovery tests pass `122 passed, 238 subtests`.
+- ARA-048 real source module and editable console `--help` smokes return 0; both `--mock --resume`
+  smokes return 2 with an argparse conflict and no traceback. Final local `make check` passes Ruff
+  format/lint over 60 files, imports, repository-safety self/worktree/staged scans, and pytest
+  (`373 passed, 416 subtests passed` in 13.97 seconds; 103 tracked/index files and zero findings).
+  Three independent reviews report GO with no P0/P1/P2/P3 finding.
+- ARA-048 implementation `1ab338a` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Pull-request run `29253180079` passed Python 3.10/3.13. Push run `29253175885` passed Python 3.10;
+  its first Python 3.13 setup attempt failed before checkout when GitHub could not download actions,
+  and the failed-job rerun then passed every step. All four final wheel-smoke steps passed, all four
+  final annotation sets are empty, and the draft PR body normalized readback is exact.
+- ARA-048 remote-verification closeout `a740344` is pushed with exact local/upstream/`ls-remote`/
+  PR-head equality. Closeout push run `29253912508` and pull-request run `29253915360` passed Python
+  3.10/3.13, all four isolated-wheel steps, and zero annotations; draft PR body readback is exact.
+- ARA-047 focused unsafe-history/CLI/compatibility tests pass `4 passed, 20 subtests`; related
+  round-loop/CLI-exit/recovery tests pass `95 passed, 130 subtests`.
+- ARA-047 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
+  self/worktree/staged scans, and pytest (`368 passed, 316 subtests passed` in 13.62 seconds; 103
+  tracked/index files and zero findings). Three independent reviews report GO with no P1/P2.
+- ARA-047 implementation `d7708b3` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Push run `29251545910` and pull-request run `29251548644` passed Python 3.10/3.13, including all
+  four isolated-wheel steps, and all four job annotation sets are empty. Draft PR 13 remains open,
+  draft, and mergeable.
+- ARA-047 remote-verification closeout `be23031` is pushed with exact local/upstream/`ls-remote`/
+  PR-head equality. Closeout push run `29251987247` and pull-request run `29251990247` passed Python
+  3.10/3.13, all four isolated-wheel steps, and zero annotations; draft PR body readback is exact.
+- ARA-046 implementation `3f3826b` is pushed with exact local/upstream/`ls-remote`/PR-head equality.
+  Push run `29250140431` and pull-request run `29250143238` passed Python 3.10/3.13, including all
+  four isolated-wheel steps, and all four job annotation sets are empty. Draft PR 13 remains open,
+  draft, and mergeable with a normalized-exact body readback.
+- ARA-046 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
+  self/worktree/staged scans, and pytest (`366 passed, 310 subtests passed` in 13.17 seconds; 103
+  tracked/index files and zero findings). Related config/LLM/UI/CLI tests pass `138 passed, 129
+  subtests`; both independent final reviews report GO with no P1/P2 blocker.
+- ARA-046 startup baseline: `make check` passes Ruff format/lint over 60 files, imports,
+  repository-safety self/worktree/staged scans, and pytest (`359 passed, 277 subtests passed`).
+- The provider-free ARA-046 reproduction completed without network access and exposed both fixture
+  credential values in all three pre-fix diagnostic strings; this is expected pre-fix evidence,
+  not a passing security result.
+- ARA-030's expected pre-fix CI contract failed only on the absent wheel step (`1 failed, 4 passed`).
+  The implemented CI/package/safety regression passes `19 passed, 23 subtests passed`; Ruff and
+  `git diff --check` pass.
+- Two complete temporary wheel install smokes passed without an sdist, upload, provider call, cache
+  reuse, or repository runtime write. The final run injected pip install redirects, Git repository/
+  index/object redirects, provider credentials, and a foreign config path; the helper still passed
+  and did not create the guard path.
+- ARA-030 final local `make check` passes Ruff format/lint over 60 files, imports, repository-safety
+  self/worktree/staged scans, and pytest (`359 passed, 277 subtests passed` in 14.21 seconds; 103
+  tracked/index files and zero findings). Three independent final reviews report no P0/P1/P2
+  blocker.
+- ARA-030 implementation `4cda430` is pushed with exact local/upstream/`ls-remote` equality. Push
+  run `29232341316` and pull-request run `29232344581` passed Python 3.10/3.13; every one of the
+  four `Build and smoke-test isolated wheel` steps passed and all four annotation sets are empty.
+- ARA-030 pre-change baseline at clean `db38fb0`: local `make check` passes Ruff format/lint,
+  imports, repository-safety self/worktree/staged scans, and pytest (`353 passed, 262 subtests
+  passed`; 101 tracked files and zero findings). No provider call or ignored runtime access occurred.
+- ARA-041 pre-fix manifest-write regression failed as expected before production changes. The
+  implemented fault matrix now passes `8 passed, 50 deselected, 20 subtests passed`, covering
+  journal prepare, config/manifest replacement, `KeyboardInterrupt`, cleanup failure before and
+  after unlink, interrupted rollback, journal-only/config-only/pair crash snapshots, legacy missing
+  artifacts, invalid/conflicting journals, an unsafe transaction symlink, and unchanged new-run
+  startup ordering.
+- ARA-041 related runner/config/storage regression passes `90 passed, 103 subtests passed`. Ruff on
+  both changed Python files and `git diff --check` pass. No agent/provider was invoked.
+- ARA-041 final local `make check` passes Ruff format/lint, imports, repository-safety self/worktree/
+  staged scans, and pytest (`353 passed, 262 subtests passed`; 101 tracked files and zero findings).
+  Two independent final reviews and their focused re-reviews report no blockers.
+- ARA-041 implementation `2480a61` and validation checkpoint `877562e` are pushed with exact
+  local/upstream/`ls-remote` equality. Push run `29187626378` and pull-request run `29187628011`
+  passed Python 3.10/3.13; all four annotation sets are empty. Draft PR 13 remains open, draft, and
+  mergeable.
+- One attempted related-suite command named nonexistent `tests/test_resume.py` and exited 4 before
+  collection; the corrected command used the repository's actual three test files and passed.
+- ARA-041 startup baseline: local `make check` passed Ruff format/lint, imports, repository-safety
+  self/worktree/staged scans, and pytest (`346 passed, 246 subtests passed`; 101 tracked files and
+  zero findings). No provider call or ignored runtime access occurred.
+- ARA-045 final closeout verification: exact local/upstream/`ls-remote` equality at `510ef84`,
+  ahead/behind `0/0`; push run `29182427059` and pull-request run `29182428029` passed Python
+  3.10/3.13 with zero annotations; draft PR 13 is open, mergeable, and exactly updated.
+- ARA-045 remote verification: exact local/upstream/`ls-remote` equality at `47c0c26`, ahead/behind
+  `0/0`; push run `29182280005` and pull-request run `29182281056` passed Python 3.10/3.13. All four
+  annotation sets are empty and draft PR 13 is open, mergeable, and updated with exact body readback.
+- ARA-045 pre-fix provider-free controls failed in the expected dual-built-in event, effective-key,
+  hidden-context, client-construction, whitespace-source, and discovery-redaction cases.
+- ARA-045 focused LLM/cloud/security tests pass `53 passed, 33 subtests passed`; related
+  UI/LLM/cloud/recovery tests pass `116 passed, 61 subtests passed`. The final local `make check`
+  passed Ruff format/lint, imports, repository-safety self/worktree/staged scans, and pytest (`346
+  passed, 246 subtests passed`; 101 tracked files and zero findings). Two independent final reviews
+  returned GO.
+- ARA-044 remote verification: exact local/upstream/`ls-remote` equality at `dbf8e24`, ahead/behind
+  `0/0`; push run `29181528872` and pull-request run `29181529568` passed Python 3.10/3.13. All four
+  annotation sets are empty and draft PR 13 is open, mergeable, and updated.
+- ARA-044 pre-fix scoped health-session regression failed as expected; target/source normalization,
+  legacy/malformed/missing-argument eviction, source precedence, and secret-free error cases now
+  pass `3 passed, 8 subtests passed` provider-free.
+- ARA-044 related UI/recovery tests passed `75 passed, 30 subtests passed`; local `make check` passed
+  Ruff format/lint, imports, repository-safety self-test, worktree/staged scans, and pytest (`340
+  passed, 235 subtests passed`; 101 tracked files and zero findings). Two independent final reviews
+  returned GO.
+- ARA-042 remote verification: exact local/upstream/`ls-remote` equality at `609de6c`, ahead/behind
+  `0/0`; push run `29180830633` and pull-request run `29180831707` passed Python 3.10/3.13. All four
+  annotation sets are empty and draft PR 13 is open, mergeable, and updated.
+- ARA-042 pre-fix two-project and external same-ID cache controls failed as expected; five focused
+  project/content/race/malformed/unsafe regressions now pass provider-free.
+- ARA-042 related UI/cloud-free/recovery tests passed `97 passed, 44 subtests passed`; local `make
+  check` passed Ruff format/lint, imports, repository-safety self-test, worktree/staged scans, and
+  pytest (`339 passed, 227 subtests passed`; 101 tracked files and zero findings). Two independent
+  final reviews returned GO.
+- ARA-029 remote verification: exact local/upstream/`ls-remote` equality at `6f03ec8`, ahead/behind
+  `0/0`; push run `29180344621` and pull-request run `29180345488` passed Python 3.10/3.13. All four
+  annotation sets are empty and draft PR 13 is open, mergeable, and updated.
+- ARA-029 pre-fix contract failed three checks as expected; the fixed CI/recovery contract passed
+  `10 passed, 1 subtest passed`, YAML parsed with the expected fields, and Ruff/diff checks passed.
+- ARA-029 local `make check` passed Ruff format/lint, imports, repository-safety self-test,
+  worktree/staged scans, and pytest (`334 passed, 227 subtests passed`; zero findings). Two
+  independent reviews returned GO. `actionlint` was unavailable and not installed; all four real
+  GitHub jobs subsequently passed without annotations.
+- ARA-043 remote verification: exact local/upstream/`ls-remote` equality at `685a36c`, ahead/behind
+  `0/0`; push run `29166629408` and pull-request run `29166630511` passed Python 3.10/3.13. Draft
+  PR 13 is open, mergeable, and updated.
+- ARA-043 all-blocked Auto/Quality/Volume, runtime fallback, mixed/unprofiled, healthy, no-profile,
+  UI/i18n, and recovery regression passed `121 passed, 68 subtests passed`.
+- ARA-043 local `make check` passed Ruff format/lint, imports, repository-safety self-test,
+  worktree/staged scans, and pytest (`330 passed, 227 subtests passed`; 100 tracked files and zero
+  findings). Two independent final reviews returned GO after recommendation/fallback property
+  matrices and CLI/UI effective-model checks. No provider call was made.
+- ARA-040 remote verification: exact local/upstream/`ls-remote` equality at `ba4b2c1`, ahead/behind
+  `0/0`; push run `29166208230` and pull-request run `29166209758` passed Python 3.10/3.13. Draft
+  PR 13 is open, mergeable, and updated.
+- ARA-040 two-process and exact/no-profile/partial/unsafe/duplicate/legacy/current-policy controls
+  plus cloud-free/CLI/UI/recovery regression passed `120 passed, 56 subtests passed`.
+- ARA-040 local `make check` passed Ruff format/lint, imports, repository-safety self-test,
+  worktree/staged scans, and pytest (`329 passed, 215 subtests passed`; 100 tracked files and zero
+  findings). Two independent final reviews returned GO after checking CLI/UI integration, explicit
+  profile-flow compatibility, current policy, real disk round trip, and no schema/file mutation. No
+  provider call was made.
+- ARA-039 remote verification: exact local/upstream/`ls-remote` equality at `9191a35`, ahead/behind
+  `0/0`; push run `29165593346` and pull-request run `29165594723` passed Python 3.10/3.13. Draft
+  PR 13 is open, mergeable, and updated.
+- ARA-039 focused four-context invalid-UTF8/read-failure and missing-parent compatibility regression
+  passed `4 passed, 8 subtests passed`; related round-loop/CLI regression passed `80 passed, 107
+  subtests passed`.
+- ARA-039 local `make check` passed Ruff format/lint, imports, repository-safety self-test,
+  worktree/staged scans, and pytest (`328 passed, 215 subtests passed`; 100 tracked files and zero
+  findings). Two independent final reviews returned GO after checking fail-before-write ordering,
+  byte/directory preservation, no agent calls, missing legacy compatibility, and path/cause privacy.
+  No provider call was made.
+- ARA-038 remote verification: exact local/upstream/`ls-remote` equality at `25ae39b`, ahead/behind
+  `0/0`; push run `29165142777` and pull-request run `29165143905` passed Python 3.10/3.13. Draft
+  PR 13 is open, mergeable, and updated.
+- ARA-038 focused lazy-iteration/artifact-write/profile-fallback regression passed `3 passed, 6
+  subtests passed`; related cloud-free/CLI regression passed `50 passed, 34 subtests passed`.
+- ARA-038 local `make check` passed Ruff format/lint, imports, repository-safety self-test,
+  worktree/staged scans, and pytest (`326 passed, 207 subtests passed`; 100 tracked files and zero
+  findings). Two independent final reviews returned GO after checking iterator-time `TypeError`,
+  legacy wrapper compatibility, model conversion, all four write stages, status semantics, and
+  key/path privacy. No provider call was made.
+- ARA-037 remote verification: exact local/upstream/`ls-remote` equality at `cd21143`, ahead/behind
+  `0/0`; push run `29164609427` and pull-request run `29164610776` passed Python 3.10/3.13. Draft
+  PR 13 is open, mergeable, and updated.
+- ARA-037 focused direct/real-module interrupt tests passed `2 passed`; survey/CLI regression passed
+  `36 passed, 20 subtests passed`; local `make check` passed Ruff/import/safety and pytest (`324
+  passed, 201 subtests passed`; 100 tracked files and zero findings).
+- Independent ARA-037 review returned GO after verifying status 130, fixed path-safe diagnostic,
+  real and mocked lock release, real `src.main` compatibility, unchanged OSError status 1, and
+  unchanged successful survey behavior.
+- ARA-036 remote verification: exact local/upstream/`ls-remote` equality at `3d13b2f`, ahead/behind
+  `0/0`; push run `29164348550` and pull-request run `29164349968` passed Python 3.10/3.13. Draft
+  PR 13 is open, mergeable, and updated.
+- ARA-036 focused parser/round-loop and related regression passed `52 passed, 75 subtests passed`;
+  local `make check` passed Ruff format/lint, imports, both repository-safety modes, and pytest (`323
+  passed, 201 subtests passed`; 100 tracked files and zero findings).
+- Independent ARA-036 final review returned GO after checking 400-digit float overflow, 5000-digit
+  JSON decoder limits on Python 3.11+, Python 3.10 fallback behavior, valid numeric strings,
+  finite/clamp semantics, legacy score fallback, valid rubric siblings, and raw payload compatibility.
+- ARA-035 remote verification: exact local/upstream/`ls-remote` equality at `a99723c`, ahead/behind
+  `0/0`; push run `29164052624` and pull-request run `29164053862` passed Python 3.10/3.13. Draft
+  PR 13 is open, mergeable, and updated.
+- ARA-035 focused strict-JSON metric/API/CLI regression passed `59 passed, 20 subtests passed`;
+  broader runner/diagnostic/UI regression passed `172 passed, 116 subtests passed`.
+- ARA-035 local `make check` passed Ruff format/lint, imports, repository-safety self-test,
+  worktree/staged scans, and pytest (`321 passed, 201 subtests passed`; 100 tracked files and zero
+  findings).
+- Two independent ARA-035 final reviews returned GO after checking numeric/string NaN/Infinity,
+  `10**400`, cross-agent/cross-round overflow, non-object agent leaves, raw legacy summary rubric,
+  strict API/writer/CLI output, and ordinary-value compatibility. No provider call was made.
+- ARA-034 remote verification: exact local/upstream/`ls-remote` equality at `bdbd9d5`, ahead/behind
+  `0/0`; push run `29163467415` and pull-request run `29163468552` passed Python 3.10/3.13. Draft
+  PR 13 is open, mergeable, and updated.
+- ARA-034 focused preview/end-to-end/CLI regressions passed `3 passed, 11 subtests passed`; the
+  pre-fix run had failed for truthy strings/integer, huge/non-finite scores, agent access, writes,
+  and CLI status exactly as expected.
+- ARA-034 related resume/CLI/UI regression passed `137 passed, 114 subtests passed`; final local
+  `make check` passed Ruff format/lint, imports, repository-safety self-test, worktree/staged scans,
+  and pytest (`314 passed, 199 subtests passed`; 100 tracked files and zero findings).
+- Two independent ARA-034 reviews returned GO. They verified identity-true semantics, finite-score
+  compatibility, no runner/agent-stage invocation, byte preservation, CLI status 2, no traceback,
+  and run-lock release. No real provider call was made.
+- ARA-034 pre-fix provider-free probe: checkpoint `can_resume: "false"` produced
+  `preview.can_resume=True`, `run_resume_mode=True`, and invoked the runner; a 400-digit integer
+  `best_score` raised `OverflowError`.
+- ARA-033 remote verification: exact local/upstream/`ls-remote` equality at `f44687e`, ahead/behind
+  `0/0`; push run `29162704235` and pull-request run `29162705572` passed Python 3.10/3.13. Draft PR
+  13 is open, mergeable, and updated.
+- ARA-033 focused failure boundary passed `2 passed, 23 deselected, 4 subtests passed`; related
+  CLI/analysis/comparison/storage regression passed `72 passed, 22 subtests passed`.
+- ARA-033 full provider-free gate passed Ruff format/lint, imports, repository-safety self-test,
+  worktree/staged safety scans, and pytest after explicit staging (`311 passed, 188 subtests passed
+  in 9.48s`; 100 tracked files and zero findings).
+- Two independent ARA-033 reviews returned GO. They verified status 1, no traceback/path disclosure,
+  unchanged blocker bytes, successful provider-free output, and explicit parent-symlink support.
+- ARA-032 remote verification: exact local/upstream/`ls-remote` equality at `21fea11`, ahead/behind
+  `0/0`; push run `29162165065` and pull-request run `29162166082` passed Python 3.10/3.13. Draft PR
+  13 is open, mergeable, and updated.
+- ARA-032 final provider-free gate: Ruff format/lint, imports, repository-safety self-test,
+  worktree/staged safety scans, and pytest passed after explicit staging (`309 passed, 184 subtests
+  passed in 8.96s`; 100 tracked files and zero findings).
+- ARA-032 related analytics/compare/metrics suite passed `26 passed`; six focused non-finite,
+  negative-ranking, finite-extreme, and finite-total compatibility regressions passed together.
+- Two independent final reviews returned GO. One exercised 300,000 ordinary score groups against
+  the historical rounded-average path plus 1–512 maximum-float matrices; the other checked mixed
+  extreme signs, zero, negative scores, legacy strings, trend direction, and strict JSON.
+- ARA-032 pre-fix reproduction: malformed score strings produced `nan`/`Infinity`, a false `flat`
+  trend, selected the malformed run over a valid score-75 run, and raised `ValueError` under strict
+  JSON serialization.
+- ARA-031 recovery baseline: `make check` passed with Ruff, imports, both safety modes, and pytest
+  (`300 passed, 177 subtests passed in 9.02s`; 100 tracked files, zero findings).
+- ARA-031 pre-fix reproduction: provider-free zero-round resume returned success and overwrote the
+  malformed config while invoking no agent; the regenerated `started_at` replaced original
+  provenance instead of blocking before writes.
+- ARA-031 focused reader/resume validation: `7 passed, 46 deselected, 14 subtests passed`; complete
+  run-config/round-loop regression: `53 passed, 66 subtests passed`.
+- ARA-031 full provider-free gate: Ruff format/lint, imports, repository-safety self-test, worktree
+  and staged safety scans, and pytest passed (`303 passed, 184 subtests passed in 9.11s`; 100 tracked
+  files and zero findings before final metadata staging).
+- Two independent reviews returned GO after one reviewer reproduced the JSON `null`/missing-sentinel
+  collision; the sentinel and unit/end-to-end `null` cases were added before the final gate.
+- ARA-028 recovery baseline: `make check` passed with Ruff, imports, both safety modes, and pytest
+  (`294 passed, 176 subtests passed in 9.52s`; 99 tracked files, zero findings).
+- ARA-028 pre-fix regression: `4 failed, 1 passed`; each failure maps to a confirmed stale or
+  contradictory recovery-state claim, with no runtime code exercised.
+- ARA-028 focused post-fix regression: `6 passed, 1 subtest passed`; independent review exposed two
+  omitted cross-file checks and two classifier counterexamples, each added before final validation.
+- ARA-028 final provider-free gate: Ruff format/lint, imports, repository-safety self-test, worktree
+  and staged safety scans, and pytest passed after explicit staging (`300 passed, 177 subtests passed
+  in 9.07s`; 100 tracked files and zero safety findings).
+- Independent final staged-diff review: GO; both classifier counterexamples are rejected, explicit
+  fallback labels agree, shallow CI is supported, and no remaining blocker or P1/P2 was found.
+- ARA-022 start baseline: `make check` passed with Ruff, imports, both safety modes, and pytest
+  (`246 passed, 172 subtests passed in 3.72s`; 99 tracked files, zero findings).
+- ARA-022 focused final layer passed (`181 passed, 104 subtests passed`); independent full pytest
+  passed (`294 passed, 176 subtests passed in 9.43s`).
+- Final local `make check` passed with Ruff format/lint, imports, repository-safety self-test,
+  worktree/staged safety scans of 99 tracked files with zero findings, and pytest (`294 passed, 176
+  subtests passed in 9.44s`). `git diff --check` also passed.
+- Corrected before the final gate: early project preflight temporarily changed stale lock/FIFO
+  diagnostics (`2 failed, 278 passed, 170 subtests`); a misplaced test caused round-loop collection
+  `IndentationError`; canonical survey path spelling caused one compatibility assertion failure
+  (`1 failed, 282 passed, 172 subtests`). None remains in the final result.
+- Initial implementation CI runs `29152939334` (push) and `29152940413` (PR) failed only on Python
+  3.10: `Path("automatic-directory")` was constructed while `os.name` was mocked to `nt`, causing
+  Linux Python 3.10 to instantiate unsupported `WindowsPath`. Python 3.13 passed both runs. The
+  test-only fix is `93026ca`; local full validation remained green and replacement CI passed.
+- Replacement runs `29153023802` (push) and `29153024964` (PR) passed all Python 3.10/3.13 format,
+  lint, import, repository-safety, and test jobs at `93026ca`.
+- ARA-004 recovery checkpoint `094446f`: push run `29148953536` and pull-request run `29148955113`
+  passed on Python 3.10 and 3.13; local/upstream/`ls-remote` equality is `0/0`.
+- ARA-004 pre-fix regression: two installed-layout subtests failed with status 2 and missing
+  `config.example.yaml`, covering neutral and unrelated-Git CWDs.
+- ARA-004 final package-resource suite: `9 passed, 8 subtests passed`; final combined package/
+  run-config/CLI/mock suite: `35 passed, 20 subtests passed`.
+- Related package, CLI, mock, run-config, diagnostic, session, and round-loop layers passed; the
+  run-config/round-loop result was `47 passed, 59 subtests passed`. Ruff and `git diff --check`
+  passed.
+- Final ARA-004 `make check`: Ruff formatted 56 files, lint/import/safety passed, and pytest passed
+  (`246 passed, 172 subtests passed in 3.79s`). The staged safety scan covered 99 tracked files with
+  zero findings.
+- The same full gate rerun after the recovery-state updates passed (`246 passed, 172 subtests passed
+  in 3.68s`; 99 tracked files and zero safety findings).
+- Final wheel SHA-256: `02462324be35135d2b875b4e6cd3d29ae06b71790ea65e55e72814260eb8050d`;
+  final sdist SHA-256: `3e5917f7b2e80be550a563b29a1ae856bc9a2e38488ccf793b5281d5f9d2afd4`.
+- Wheel/sdist isolated install matrix passed eight help/mock entrypoint controls, two expected
+  missing-config status-2 controls, exact RECORD verification, canonical resource-byte checks,
+  source/editable compatibility, no package-directory mutation, and no foreign Git provenance.
+- Independent artifact, compatibility, code, and adversarial reviews are GO for the code change.
+  Publication of the temporary sdist is NO-GO until ARA-026 normalizes owner/group and generated
+  timestamp metadata.
+- GitHub Actions at `0aee55e`: push run `29148635379` and pull-request run `29148637631` passed on
+  Python 3.10 and 3.13, including install, formatting, lint, imports, safety, and tests in all jobs.
+- Independent recovery-state review: GO after replacing truncated read commands with full-file
+  reads; all seven staged state files, task/issue identifiers, CI evidence, and NO-GO publication
+  boundary are consistent.
+- ARA-025 JSON parsing and semantic consistency assertions: passed; fixed argv resolves current
+  `HEAD`, all legacy/fallback fields remain 40-hex, verified commit exists and is an ancestor, and
+  recorded CI events/workflow/head/jobs match live GitHub evidence.
+- ARA-025 final `make check`: Ruff format passed (54 files), Ruff lint passed, imports passed, both
+  safety scans passed, and pytest passed (`236 passed, 164 subtests passed in 2.70s`).
+- ARA-025 independent review: core design GO; its four final state-synchronization blockers were
+  corrected before the completed semantic snapshot, and no recursive closeout is required.
+- ARA-005 targeted stale-wording search: passed; no known-completed comparison, analytics,
+  dashboard, drafting-mode, timing, or estimated-token item remains described as future work in the
+  current-state quickstart roadmap.
+- ARA-005 `git diff --check`: passed. Final `make check`: Ruff format passed (54 files), Ruff lint
+  passed, imports passed, both safety scans passed, and pytest passed (`236 passed, 164 subtests
+  passed in 2.69s`).
+- ARA-005 independent read-only evidence audit and final corrected-diff review: GO; README,
+  CHANGELOG, and dated historical reports remain unchanged.
+- GitHub Actions at `6b59091`: push run `29142879222` and pull-request run `29142880135` passed on
+  Python 3.10 and 3.13, including repository-safety and test steps in all four jobs.
+- ARA-024 pre-fix regression: `2 failed`; direct and real zero-round resume both omitted the session.
+- ARA-024 related regression: `47 passed, 59 subtests passed`.
+- Final ARA-024 `make check`: Ruff format passed (54 files), Ruff lint passed, imports passed, both
+  safety scans passed, and pytest passed (`236 passed, 164 subtests passed in 2.69s`).
+- Independent review: GO; new run round 1 remains empty, each zero-round resume adds exactly one,
+  and existing start-round-greater-than-1 behavior passes. No provider-backed test was needed.
+- GitHub Actions at `a3bef4d`: Python 3.10/3.13 passed for both push and pull-request events;
+  formatting, lint, imports, repository safety, and tests passed in all four jobs.
+- ARA-020 pre-fix regression: `8 failed, 2 passed, 39 deselected`; manifest provenance was replaced,
+  explicit direct/alias IDs were accepted, and five unpreservable manifest cases were overwritten.
+- ARA-020 focused regression after the final sparse correction: `4 passed, 10 subtests passed`.
+- ARA-020 resume/config/compare/analytics/benchmark/UI regression: `119 passed, 100 subtests passed`.
+- Final ARA-020 `make check`: Ruff format passed (54 files), Ruff lint passed, import smoke passed,
+  both repository-safety scans passed, and pytest passed (`235 passed, 164 subtests passed in 2.68s`).
+- Two independent reviewers reported GO after reproducing and correcting sparse-manifest current-
+  session contamination. Provider calls and ignored project artifacts were not used.
+- GitHub Actions at `c1e8c57`: Python 3.10/3.13 passed for both push and pull-request events;
+  formatting, lint, imports, repository safety, and tests passed in all four jobs.
+- Final ARA-020 closeout `4d77a8c`: exact remote SHA verified and Python 3.10/3.13 passed for push
+  run `29142308598` and pull-request run `29142309509`, including all safety/test steps.
+- ARA-023 pre-fix interrupt regression: `3 failed, 1 passed, 50 deselected`; both CLI boundaries
+  returned normally and runner did not re-propagate after safe artifact finalization.
+- ARA-023 final related regression: `63 passed, 61 subtests passed in 1.49s` across CLI exit,
+  round-loop, mock, and session modules.
+- ARA-023 final `make check`: Ruff format passed (54 files), Ruff lint passed, import smoke passed,
+  both repository-safety scans passed, and pytest passed (`231 passed, 154 subtests passed in 2.64s`).
+- End-to-end temporary-project subprocesses proved manual status 130 plus three finalized resumable
+  artifacts/report/lock cleanup, and cooperative safe-stop status 0 plus signal cleanup. No provider
+  call, real credential, ignored repository artifact, prompt, score, metric, or experiment changed.
+- Independent implementation and test/docs reviews reran focused tests and reported GO after the
+  protected-phase wording and acquisition-lifecycle fixes; `git diff --check` passed.
+- GitHub Actions at `37b3749`: Python 3.10/3.13 passed for both push and pull-request events;
+  formatting, lint, imports, repository safety, and tests passed in all four jobs.
+- Final ARA-023 closeout `48f5639`: exact remote SHA verified and Python 3.10/3.13 passed for both
+  push run `29141633704` and pull-request run `29141634930`, including all safety/test steps.
+- ARA-014 pre-fix regression: `1 failed, 4 passed`; the report borrowed the unrelated checkpoint's
+  `MAX_ROUNDS` instead of the target summary's `USER_STOP_REQUESTED`.
+- ARA-014 final focused regression: Ruff passed and `tests/test_benchmark_report.py` passed
+  (`11 passed, 20 subtests passed`). Related benchmark/config/storage/analytics tests passed
+  (`33 passed, 14 subtests passed`) before the final metadata hardening additions.
+- Final local `make check`: Ruff format/lint, import smoke, self/worktree/staged safety, and pytest
+  passed (`224 passed, 154 subtests passed in 2.36s`). Final focused rerun after strengthening the
+  symlink fixture remained `11 passed, 20 subtests passed`.
+- Current worktree and staged-index repository-safety scans passed with 91 tracked files and zero
+  findings; `git diff --check` passed. Real provider tests were not needed or run.
+- GitHub Actions at `c893e63`: Python 3.10/3.13 passed for both push and pull-request events; safety
+  and test steps passed in all four jobs.
+- Final ARA-014 closeout `2dd56f9`: exact remote SHA verified and Python 3.10/3.13 passed for both
+  push and pull-request events, including all safety and test steps.
+- ARA-016 focused regression: Ruff lint passed and `tests/test_repo_safety.py` passed (`11 passed`).
+- Scanner controls: self-test, tracked worktree, and full staged-index scans passed with 91 tracked
+  files, including the scanner and test; no tracked binary/NUL file or gitlink is currently present.
+- Final local ARA-016 `make check`: Ruff format passed (54 files), Ruff lint passed, import smoke
+  passed, both safety scans passed, and pytest passed (`217 passed, 134 subtests passed in 2.55s`).
+- `git diff --check` and staged diff checks passed. Native Python 3.10 execution remains for CI;
+  the current local environment is Python 3.13.14.
+- Python 3.10 AST parsing passed for the scanner and its test module. Final independent review reran
+  the 11 focused tests plus self/worktree/staged scans and reported no release blocker.
+- GitHub Actions at `975559d`: Python 3.10/3.13 passed for both push and pull-request events; the
+  repository-safety step passed in all four jobs.
+- Final ARA-016 closeout `9192df8`: exact remote SHA verified and Python 3.10/3.13 passed for both
+  push and pull-request events, including all four safety steps.
+- Real provider smoke was not run because this task only changes repository validation and report
+  wording; it makes no provider, prompt, metric, experiment, or runtime behavior change.
+- Final ARA-015 focused regression: `46 passed, 44 subtests passed`; focused Ruff lint and
+  `git diff --check` passed.
+- Final ARA-015 `make check`: Ruff format passed (52 files), Ruff lint passed, import smoke passed,
+  and pytest passed (`206 passed, 134 subtests passed in 2.18s`).
+- Provider-free SDK construction smoke: `google-genai 2.7.0` accepted
+  `http_options={"timeout": 37000}` without making a request.
+- Independent compatibility review: three credential branches, Python 3.10 syntax parsing,
+  HTTP 408/504 policy, and model/prompt/generation-config preservation passed. Native Python 3.10
+  execution remains for GitHub Actions.
+- Final ARA-015 state-only closeout `e202dfb`: exact remote SHA verified; Python 3.10/3.13 passed
+  for both push and pull-request workflows.
+- ARA-004 safe isolated build inventory: wheel/sdist built successfully; four console/module help
+  controls passed, and four mock controls failed at missing bundled config with status 2. Neutral
+  workspaces remained empty.
+- ARA-004 implementation tests were initially withheld because the verified fix exceeded 30
+  minutes; owner approval was later received, and current progress is recorded at the top of this
+  file.
+- ARA-004 audit checkpoint `89e95bf`: all four Python 3.10/3.13 push/pull-request CI jobs passed.
+- ARA-004 verified-state closeout `3d77729`: all four Python 3.10/3.13 push/pull-request CI jobs
+  passed; its Node.js 20 action deprecation annotation remains deferred under ARA-019.
+- Current branch validation: `make check` passed at 2026-07-10T16:27:39+08:00.
+- Results: Ruff format passed (50 files), Ruff lint passed, import smoke passed, pytest passed (`139 passed, 43 subtests passed`).
+- Compare-runs targeted validation: module suite passed (`7 passed`).
+- Single-path CLI reproduction after the fix: rejected with exit code 2 and the expected argument error.
+- Two-path CLI smoke after the fix: exit code 0 and `run_count: 2`.
+- GitHub sync: local and remote `033ed01638965d873a08da05d3ad02dc3529b162` match; PR 13 is draft.
+- Credential-redaction targeted suite: `tests/test_llm.py` passed (`11 passed`).
+- Full regression after the security fix: `make check` passed (`141 passed, 43 subtests passed`).
+- `git diff --check` passed.
+- GitHub sync: local and remote `7e9a1f5839d75a2056810a619919886560bddb97` match; PR 13 is draft and updated.
+- Round-limit target suites: `22 passed, 7 subtests passed`.
+- Zero and negative provider-free CLI smoke paths both exited 2 before startup.
+- Full regression after the round-limit fix: `make check` passed (`144 passed, 47 subtests passed`).
+- `git diff --check` passed and no silent round-limit clamp remains.
+- GitHub sync: local and remote `5c5bdc0a22c47b466356be8005b9b27882622f7f` match.
+- Atomic-write related regression: `63 passed, 9 subtests passed`.
+- Fault injection preserved the prior JSON and cleaned temp files for both `fsync` and `replace` failures.
+- Full regression after the atomic-write fix: `make check` passed (`145 passed, 49 subtests passed`).
+- `git diff --check` passed and storage replacement paths no longer call `Path.write_text` directly.
+- GitHub Actions: Python 3.10 and Python 3.13 both passed for push and pull-request triggers on the remote checkpoint.
+- GitHub sync: local and remote `5ab7119b925b7c9c1281c7d942c9da6b0b410463` match; PR 13 is draft and updated.
+- Runner target validation: `17 passed, 3 subtests passed`.
+- Full regression after the integrity fix: `make check` passed (`142 passed, 43 subtests passed`).
+- `git diff --check` passed.
+- ARA-010 focused resume/consumer regression passed (`70 passed, 23 subtests passed`).
+- Final ARA-010 `make check` passed: Ruff format (50 files), Ruff lint, import smoke, and pytest (`153 passed, 67 subtests passed`).
+- Independent adversarial and code reviews reproduced the pre-fix failures, challenged cross-artifact conflicts, and reported no remaining confirmed P1/P2 issue after the final corrections.
+- Final `git diff --check` and staged sensitive-pattern scans passed.
+- GitHub Actions for the pushed ARA-010 checkpoint: Python 3.10 and Python 3.13 passed for both push and pull-request triggers.
+- GitHub sync: local, remote-tracking, and GitHub branch SHAs match at `b8b629baa728ec30279bce55bb86e039ef31c2c3`; draft PR 13 is updated and mergeable.
+- ARA-012 focused resume/UI/config/analytics/compare regression passed (`80 passed, 43 subtests passed`).
+- Final ARA-012 `make check` passed: Ruff format (51 files), Ruff lint, import smoke including `src.resume_safety`/`ui.app`, and pytest (`165 passed, 87 subtests passed`).
+- CLI unsafe-resume smoke exited 2 and removed the run lock without agent calls, run-log creation, or external writes.
+- Independent bounded adversarial review confirmed canonical/legacy, cross-project/traversal/relative, root/round/state symlink, future-round, NUL, access-permission, no-write, UI, and CLI behavior; no confirmed issue remains in the static ARA-012 scope.
+- Final `git diff --check`, staged diff check, and personal-path/credential/private-key scans passed.
+- GitHub Actions for the pushed ARA-012 checkpoint: Python 3.10 and Python 3.13 passed for both push and pull-request triggers.
+- GitHub sync: local, remote-tracking, and GitHub branch SHAs match at `31db3f8286b3cbe0874d6ab0e938bd496e5d3730`; draft PR 13 is updated and mergeable.
+- ARA-021 pre-fix focused reproduction: `3 failed, 29 deselected`; external provider/model and
+  run paths reached metadata/dashboard/catalog as expected before the fix.
+- ARA-021 focused UI regression after final correction: `36 passed, 4 subtests passed`.
+- ARA-021 UI/resume/analytics/compare regression: `84 passed, 47 subtests passed`.
+- Final ARA-021 `make check`: Ruff format (51 files), Ruff lint, import smoke, and pytest
+  (`172 passed, 91 subtests passed`).
+- Independent post-fix re-review: green after the project score-history correction.
+- `git diff --check`, staged diff check, and staged personal-path/credential/private-key scans passed.
+- GitHub Actions for ARA-021: Python 3.10 and Python 3.13 passed for both push and pull-request triggers.
+- GitHub sync: local, remote-tracking, and GitHub branch SHAs match at
+  `3624385fe368c4593b452418e4b000463933a87c`; draft PR 13 is updated and mergeable.
+- Final ARA-021 state-only closeout: local and remote match at
+  `538d0bef9d75f8794fe2793bba89e16e9eb16e4f`; all four GitHub checks passed.
+- ARA-013 pre-fix focused regression: `3 failed, 1 passed, 35 deselected`; each failure matched a
+  reproduced acquisition/ownership defect.
+- Final related ARA-013 module regression before the full gate: `94 passed, 68 subtests passed`.
+- PID/lock focused matrix: `17 passed, 17 subtests passed`.
+- Final ARA-013 `make check`: Ruff format (51 files), Ruff lint, import smoke, and pytest
+  (`189 passed, 110 subtests passed in 0.87s`).
+- Ruff format/lint, `git diff --check`, staged diff check, and staged personal-path/credential/
+  private-key scans passed on the committed implementation.
+- Independent final adversarial and platform re-review: green; native Windows was not available,
+  so Windows-specific process probes were covered by mocked/static tests.
+- Provider-backed tests: not planned; locking and constructor cleanup require no model/network call.
+- GitHub Actions for pushed ARA-013 checkpoint `e93aa77`: Python 3.10 and Python 3.13 passed for
+  both push and pull-request triggers.
+- GitHub sync: local, remote-tracking, and GitHub branch SHAs match at
+  `e93aa773daafaae690a3e25737b04c27752e5519`; draft PR 13 is updated and mergeable.
+- ARA-017 pre-fix process probes: missing/invalid config, invalid/missing project, provider
+  prerequisites, and all three lock entrypoints printed a diagnostic but returned status 0.
+- Final ARA-017 focused startup/input/cache/resume regression: `103 passed, 103 subtests passed`.
+- Final ARA-017 `make check`: Ruff format (52 files), Ruff lint, import smoke, and pytest
+  (`203 passed, 128 subtests passed in 2.18s`).
+- Process smoke after the fix: module and editable console invalid-project paths returned 2;
+  isolated missing/invalid UTF-8/huge/deep config and invalid task/checkpoint paths returned 2
+  without traceback; `--help` and provider-free analysis returned 0.
+- Malformed cloud caches returned empty safe records for invalid UTF-8, huge/deep JSON, wrong
+  top-level/record types, non-finite/negative/over-64-bit numeric values, and the valid-cache
+  compatibility controls passed.
+- Independent final delta-only review: green; no remaining non-interrupt ARA-017 startup
+  false-success or traceback gap was confirmed.
+- Real provider smoke: not run; all changes are provider-free startup/input boundary behavior.
+- GitHub Actions for pushed ARA-017 checkpoint `a513e4d`: Python 3.10 and Python 3.13 passed for
+  both push and pull-request triggers.
+- GitHub sync: local, remote-tracking, and GitHub branch SHAs match at
+  `a513e4dfd4bb99f6b24a12195c0c40bf55feb274`; draft PR 13 is updated and mergeable.
+
+## Recent Failed Command
+
+- The first ARA-055 package-4 related regression reported one failure: a project with no round
+  journal but an unrelated unsafe checkpoint symlink was mislabeled as a round-commit conflict.
+  The reader guard now checks the fixed round-journal leaf first; the exact benchmark regression,
+  focused suite, related suite, and two full `make check` runs pass.
+- A read-only queue search used a backticked status token in a double-quoted shell command, so zsh
+  attempted to execute that token and printed `command not found`. It changed no file; the search
+  was rerun with a literal-safe single-quoted pattern.
+- The first package-2 recovery-state command named a nonexistent
+  `tests/test_recovery_state_consistency.py`, so pytest collected no tests. Repository discovery
+  found the tracked `tests/test_recovery_state.py`; the corrected run passed `6 passed, 1 subtest`.
+- The first focused lint/test command used unavailable bare `python`. It changed no file and was
+  rerun with the repository `.venv/bin/python`, passing all requested gates.
+- The first ARA-056 closeout recovery check required the exact no-TODO sentinel sentence
+  `There is no unblocked implementation task`; equivalent prose was replaced with the tested phrase
+  before staging.
+- The first ARA-056 post-implementation recovery check found CURRENT/RESUME still naming the older
+  `b064a93` fallback after LAST_VALIDATION advanced to remote-verified activation `66d8a4f`; the
+  named fallback fields were synchronized before staging.
+- The ARA-056 pre-fix fault matrix failed all three subtests as expected because no checkpoint was
+  written after round-directory, round-log, or memory-load interruption.
+- The first corrected ARA-056 focused command passed its tests and Ruff lint, then stopped because
+  Ruff format would reflow the new test; the file was formatted and the full focused command passed.
+- The first ARA-060 closeout recovery check rejected a recursive Remaining Steps bullet that asked
+  to finalize a task already marked `DONE`; the invalid bullet was removed before staging.
+- The first ARA-060 focused command passed both sentinel tests, then stopped at Ruff's import-order
+  check with `I001`; imports were reordered and the complete focused command passed.
+- The first representative-cohort invocation ran through an outer orchestration call that yielded
+  before the nested pytest result was returned, so its exit status was not accepted as evidence.
+  A direct session-aware rerun completed with `321 passed, 618 subtests`.
+- The historical ARA-059 parallel review similarly printed 16 nested `SUBFAILED` reports while its
+  outer JavaScript returned 0; direct reproduction proves pytest itself returned 1. ARA-060 corrects
+  that record rather than changing working pytest configuration.
+- The first ARA-059 closeout recovery run failed one contract assertion because the resume section
+  heading was renamed while its exact historical text is a tested lookup key. The original heading
+  is restored; the body still states that no task is active.
+- The first ARA-059 pre-stage recovery gate rejected an unattributed commit/push bullet; because
+  the checks were chained with `&&`, no staging occurred. The bullet now names the sole active task
+  explicitly before the gate is rerun.
+- An ARA-059 focused rerun first used the unavailable unqualified `python` command and exited 127;
+  the repository `.venv/bin/python` interpreter was used afterward. The next rerun used the wrong
+  unittest class selector and exited 4 with no tests collected; corrected selectors passed `2
+  passed, 37 subtests`. Neither failed invocation changed files or exercised a provider.
+- The first ARA-059 regression used only `subTest` assertions; pytest 9.0.3 reported 16
+  `SUBFAILED` cases but returned status 0. Parent-level aggregate assertions were added, and the
+  strengthened unchanged pre-fix behavior returned status 1 with `18 failed`. ARA-060 separately
+  owns the repository-wide test-gate correction.
+- The strengthened ARA-059 pre-fix matrix exited 1 with all eight non-string name types accepted at
+  each of the parser and health boundaries. The same two tests now pass with 36 compatibility
+  subtests.
+- The first ARA-058 locally-complete remaining-step bullet mentioned both active ARA-058 and
+  untouched ARA-056 while requesting commit/push, so one recovery consistency assertion failed.
+  The unrelated-task prohibition is now a separate non-finalization bullet.
+- The first ARA-058 activation patch matched ARA-056's earlier generic `TODO` line, so one recovery
+  consistency test reported ARA-056 active while CURRENT_STATE named ARA-058. The queue statuses
+  were corrected explicitly by task heading before any code work.
+- The first ARA-053 completion snapshot used the reserved finalization word `checkpoint` in a
+  remaining-step bullet while no task was active, so one recovery consistency assertion failed.
+  The instruction now uses `snapshot`; the other five tests and one subtest had passed.
+- The initial ARA-053 regression produced the expected `4 failed, 1 passed`: length-only private
+  path identities collided and reused stale health state. The same focused layer now passes.
+- Two initial test invocations used unavailable interpreters: unqualified `python` was absent and
+  the Xcode `python3` lacked pytest. Both changed no files; `.venv/bin/python` ran all accepted tests.
+- The initial ARA-057 parser/entrypoint/installed regression produced the expected `79 failed, 3
+  passed, 6 subtests passed`: invalid output/mode combinations were accepted, entrypoints reached
+  layout, and temporary installed mock cases wrote ordinary temporary workspace artifacts. The
+  same expanded matrix now passes before runtime work.
+- A post-ARA-052 stale-wording search placed backticked `IN_PROGRESS` inside a double-quoted zsh
+  pattern, so zsh emitted `command not found` for that token. The read-only search changed no file;
+  a literal-safe single-quoted rerun returned only the intended no-active-task records.
+- The initial ARA-052 response-shape regression produced the expected five failures while retaining
+  one collected parent test: list, string, number, and null payloads raised `AttributeError` at
+  `payload.get(...)` (`5 failed, 1 passed`). The expanded list/string/number/boolean/null matrix now
+  returns one fixed unhealthy result.
+- The initial ARA-051 regression produced the expected six subtest failures: cached pooling kept a
+  conflicted ID in both orders, and blocked-then-healthy ordering selected it in auto, quality,
+  volume, and fallback paths (`6 failed, 2 passed, 4 subtests passed`). The same strengthened matrix
+  now passes while retaining unique healthy and unprofiled alternatives.
+- The first ARA-050 related regression run failed five subprocess tests because their synthetic
+  `RuntimeLayout` incorrectly used an empty workspace as a healthy resource root (`5 failed, 60
+  passed, 67 subtests`). The fixtures now separate the temporary workspace/Git root from the real
+  healthy test resource root; the expanded related layer passes `92 passed, 71 subtests`.
+- Independent ARA-050 review reproduced a valid hardlinked prompt being rejected by the initial
+  reuse of the automatic-artifact single-link reader. The reader now keeps single-link enforcement
+  by default and only package prompts opt out; hardlink-acceptance and default-rejection regressions
+  pass, and all three final re-reviews report GO.
+- One read-only state inspection ended with unavailable unqualified `python`; `.venv/bin/python`
+  remains the required interpreter and no file was changed by the failed command.
+- The first ARA-049 completion snapshot used the reserved finalization word `closeout` in a
+  remaining-step bullet while no task was active, so one recovery consistency assertion failed.
+  The instruction now asks only for live remote synchronization before starting ARA-050.
+- The first ARA-049 local-validation recovery snapshot used an unrecognized fallback label, so one
+  recovery consistency assertion failed while the other five passed. The resume wording now uses
+  the schema's explicit conservative externally verified fallback form.
+- ARA-049's initial focused regression failed as expected (`6 failed, 1 passed, 1 subtest passed`):
+  the UI command/helper lacked child-only transport activation and CLI rejected the new option.
+- The first ARA-049 related run failed only two cloud CLI tests because their legacy
+  `SimpleNamespace` fixtures lacked the new optional field (`2 failed, 155 passed, 126 subtests`).
+  A backward-compatible `getattr` corrected the fixture boundary; the same related layer now passes
+  `157 passed, 127 subtests`.
+- Test-quality review initially returned NO-GO because list membership would miss a secret embedded
+  inside an argv item and no CLI-level stale-unactivated transport case existed. Substring scanning
+  and the missing fake-SDK control were added; focused re-review returned GO.
+- ARA-048 push run `29253175885` initially failed only Python 3.13 during `Set up job`, before
+  checkout or any project step, after three GitHub HTTP 503 `Service Unavailable` responses while
+  resolving action downloads. The authorized failed-job rerun passed setup, wheel smoke, and the
+  full job; final run attempt 2 is successful with zero annotations.
+- The first ARA-048 conflict regression failed exactly the 90 primary-mode pair/order subtests and
+  the direct, module, and copied-installed entrypoint guards (`93 failed, 1 passed`) because
+  argparse accepted every conflicting combination and execution continued. This is expected
+  pre-fix evidence; the same focused layer now passes `6 passed, 100 subtests`.
+- The first ARA-047 recovery-state validation correctly rejected a remaining-step bullet that
+  named both active ARA-047 and inactive ARA-048 while requesting push finalization. The wording now
+  attributes the publish work only to ARA-047.
+- The first ARA-047 unsafe-history regression failed only the positive and negative 400-digit
+  dual-history cases because raw `OverflowError` escaped `_history_float()` (`2 failed, 14 subtests
+  passed`). After conversion handling was added, a new `round_metrics.json`-only regression failed
+  only its positive and negative cases because the invalid scores were silently ignored and resume
+  continued (`2 failed, 16 subtests passed`). Both are expected pre-fix evidence and now pass.
+- The first post-fix Ruff format check exited 1 only because the newly added test file required
+  mechanical formatting; Ruff formatted that file, and all subsequent lint/format/diff checks pass.
+- An initial ARA-046 queue-count command put backticked state labels inside a double-quoted shell
+  pattern, causing harmless command-not-found/regex errors. A literal single-quoted `rg` rerun
+  returned 40 DONE, 8 TODO, 6 DEFERRED, 1 BLOCKED, and no IN_PROGRESS; no file changed.
+- The first final ARA-046 `make check` after marking its queue entry complete correctly failed only
+  two recovery-state consistency assertions because `CURRENT_STATE.md` still described ARA-046 as
+  active and requested finalization work. All 364 other tests and 310 subtests passed; this snapshot
+  removes that cross-file mismatch before the corrected full rerun.
+- The provider-free ARA-046 pre-fix probe exposed URL userinfo and query values in the public
+  Ollama request error, its chained cause, and the model-list API fallback error. No provider or
+  ignored repository runtime was accessed.
+- ARA-045's initial both-built-in regression failed because the fake SDK selected Google while the
+  wrapper selected Gemini; explicit/custom exception-graph controls exposed the raw provider error
+  through implicit context, and client-construction/discovery controls exposed unsanitized values.
+- Independent ARA-045 reviews found short cloud-discovery credentials, overlapping candidate
+  fragments, secret-bearing assertion reprs, an incomplete explicit-precedence fixture, and a
+  degraded missing-dependency diagnostic. Exact all-length longest-first replacement, fixed-message
+  assertions, a populated custom control, and fixed diagnostic preservation closed each issue
+  before the final full gate.
+- The first ARA-045 recovery-state validation correctly rejected a completed task described as
+  active, recursive closeout wording without an active task, and legacy SHA fields pointing away
+  from the unique externally verified fallback. The remote closeout validation also rejected a
+  negated completion sentence containing a reserved finalization term; both state-contract wording
+  issues were corrected before staging.
+- The initial ARA-043 blocking-profile regression failed four subtests as expected because each
+  excluded candidate was immediately returned by the no-scored seed fallback.
+- Independent ARA-043 review found the Quality fast path and `choose_fallback_model` could bypass the
+  initial fix, and UI mislabeled a non-manual no-eligible result as Manual. One shared blocking
+  predicate plus explicit UI messaging closed all three before final validation.
+- One independent review command referenced nonexistent `tests/test_i18n.py` and collected no tests;
+  the reviewer reran the real cloud-free/CLI/UI suites and a direct i18n fallback probe successfully.
+  No repository file or accepted validation result was affected.
+- The ARA-040 pre-fix two-process probe loaded a new seed-only fallback profile beside stale
+  discovery and recommended `gemma-3-high-tpm`; this was the confirmed silent selection failure.
+- Independent ARA-040 review found that normalizing legacy `models/...` profile IDs could falsely
+  match membership while downstream lookup did not normalize, and that cached safe flags could
+  bypass current block policy. Strict canonical membership plus current-policy reclassification
+  closed both before the final related/full gates.
+- The initial ARA-039 invalid-UTF8 and injected-read controls both failed as expected because no
+  `ResumeHistoryError` was raised; resume wrote startup artifacts and invoked an agent with empty
+  previous Judge context.
+- The first related ARA-039 regression found that a missing previous-round directory was incorrectly
+  classified as unreadable, causing 2 test failures and 14 subtest failures. `FileNotFoundError` now
+  retains the legacy empty-context path, while other I/O/Unicode failures remain fail-closed; the
+  final related and full suites pass.
+- The initial ARA-038 fake lazy pager raised after its first item and escaped with a traceback; four
+  injected artifact-write `OSError` stages also escaped with paths. These were the expected pre-fix
+  failures. Independent review then found an iterator-time `TypeError` could be mistaken for a
+  legacy `.models` wrapper; separating iterator acquisition from consumption closed that edge.
+- The first post-fix targeted Ruff format check requested formatting in `tests/test_cloud_free.py`;
+  the file was formatted and the related tests plus full gate then passed.
+- The first recovery-state consistency run rejected a Remaining Steps bullet that named a completed
+  task together with publication work; it was rewritten as live semantic-HEAD verification, and the
+  final recovery-state suite passed `6 passed, 1 subtest passed`.
+- The initial ARA-034 regressions failed two tests and seven subtests as expected: truthy malformed
+  flags entered the runner, huge/non-finite scores raised or propagated, and the module control
+  exited 1 after agent access and writes. The final focused and full gates pass.
+- One post-fix `rg` audit put a backticked task-state token inside a double-quoted zsh pattern, so
+  zsh attempted the token as a command. It had no file or Git impact and was immediately rerun with
+  a literal single-quoted pattern.
+- ARA-033 pre-fix provider-free subprocesses for analysis and comparison each returned 1 but emitted
+  a traceback containing both temporary and repository absolute paths. The first regression failed
+  two subtests as expected; an additional unresolved-`~user` regression also failed two subtests
+  until output argument expansion moved inside the normalized boundary.
+- ARA-032's initial strict-JSON tests failed twice as expected because score-derived output still
+  contained `NaN`; a later huge-integer extension exposed uncaught `OverflowError` before the
+  conversion boundary was widened.
+- Three adversarial regressions then failed as expected: an unscored run outranked a valid `-5.0`
+  run, and finite-extreme average/delta operations escaped as `Infinity`.
+- The first overflow-resistant average passed two `1e308` values but failed three maximum floats;
+  max-absolute scaling corrected that case. Independent review then found the scaled path changed a
+  historical ordinary average from `46.48` to `46.47`; the final implementation preserves the old
+  finite-total path and uses scaling only after overflow.
+- One metadata inspection used unavailable unqualified `python` and returned command-not-found; it
+  was rerun with the repository `.venv/bin/python` without modifying files.
+- `git show --no-patch --format='%H %P %s' REBASE_HEAD` failed with `fatal: bad object REBASE_HEAD` because the stale file references an unavailable object. This is not an active Git operation.
+- The first unproxied push hung without output and was interrupted safely; the command-scoped proxy retry succeeded.
+- One post-push GitHub API verification hit a TLS handshake timeout; scoped `git ls-remote` independently verified the exact remote SHA.
+- The new resume-integrity regression initially failed because both histories were truncated to the new round; this was the expected pre-fix reproduction.
+- An interim `make check` stopped at Ruff formatting while implementation was still in progress; formatting was applied and the final full gate passed.
+- The initial ARA-012 regression accepted absolute, traversal, symlink, and `runs/` container roots and allowed a direct runner override to write externally; these were the expected pre-fix failures.
+- Interim adversarial probes found future-round symlink, malformed NUL, unreadable directory, legacy-manifest, non-file artifact, and permission-error gaps; each received a focused regression before the final full gate.
+- The initial ARA-021 focused regression failed all three new tests by reading an external root,
+  explicit checkpoint config/summary references, and a config/round symlink; this was the expected
+  pre-fix reproduction.
+- The first post-fix focused run had one path-equality failure because macOS canonicalized `/var`
+  to `/private/var`; the assertion now compares canonical paths and the security behavior passed.
+- An interim Ruff format check requested formatting in `ui/app.py`; formatting was applied and the
+  subsequent focused Ruff check passed.
+- The first independent ARA-021 review found selected runs still loading project score history; a
+  dedicated no-read test failed before the correction and passed afterward. The second review was green.
+- Initial ARA-013 tests failed on malformed PID, dual acquisition, and replacement deletion as
+  expected. Interim reviews then found invalid bytes/deep JSON, oversized PID, fork release,
+  disposable/symlink guard, POSIX EPERM, and Windows probe gaps; each now has code and regression
+  coverage.
+- The first post-push `fetch` and one independent `ls-remote` verification hit transient GitHub TLS
+  handshake errors; command-scoped proxy retries succeeded without changing commits or Git config.
+- The first `gh pr checks --watch` poll hit a TLS handshake timeout; a non-watching retry returned
+  all four completed successful jobs.
+- Initial ARA-017 subprocess probes and new regression assertions failed because handled startup
+  errors returned 0; these were the expected pre-fix reproductions.
+- The first post-fix `make check` found two existing project-input tests that still expected the old
+  normal-return contract; they now assert status 2 while preserving path-masking/order checks.
+- Independent adversarial probes successively found invalid UTF-8/OSError input, huge/deep parser,
+  cloud-cache schema/numeric, and deep semantic-history gaps; each received a focused regression
+  before the final green review and full gate.
+- The first ARA-015 pytest selector used the wrong test class name and collected no tests; the
+  corrected selector then produced the intended pre-fix failures.
+- Initial ARA-015 regressions failed because all Gemini Client branches omitted `http_options` and
+  timeout exceptions were classified as `unknown`; these were the expected pre-fix reproductions.
+- Independent ARA-015 review found the initial generic `timeout` text match also classified an
+  unsupported timeout option as a network timeout; the heuristic is now narrowed and the negative
+  regression passes.
+- The first non-interactive PR body update closed stdin and temporarily produced an empty body;
+  subsequent GraphQL/REST attempts hit EOF/TLS handshake errors. A bounded REST retry restored a
+  verified 2260-character ARA-015 body without changing the draft state or branch.
+- The first local ARA-004 harness tried to call an unavailable `.venv` build backend, then failed to
+  stop after that error. Editable-path leakage imported the source checkout and completed one
+  deterministic mock run (`20260711_031915_776385`) in ignored `projects/example` state.
+- That incident created one run directory, atomically replaced `best_output.md`, `checkpoint.json`,
+  `memory.md`, `research_state.json`, and `score_history.json`, and appended `run.log`. No provider,
+  secret, tracked file, or canonical research artifact was involved. No cleanup was attempted.
+- The first audit-checkpoint GitHub run-list query returned EOF; a bounded retry succeeded and both
+  workflow runs plus all four version jobs were verified successful.
+- The initial ARA-016 test import failed before the scanner existed, and the first staged-index scan
+  reported the four original report hits while the worktree scan was already clean; both were the
+  expected pre-fix controls.
+- One shell wrapper used zsh's read-only `status` parameter after a scanner probe; the scanner itself
+  correctly returned four categorized findings, and subsequent wrappers avoided that variable.
+- Independent ARA-016 review reproduced a tracked nested path reading an external file through a
+  replaced parent-directory symlink. A no-follow directory-descriptor walk and regression now make
+  that state an operational failure before external content is read.
+- The final ARA-016 audit proved the first non-`dir_fd` compatibility fallback retained an active
+  parent-swap race. The fallback was removed; unsupported platforms now fail closed before reading
+  the worktree, while the complete staged-index mode remains available.
+- The initial ARA-014 mismatch regression failed as expected because `write_benchmark_report`
+  unconditionally used the newer project checkpoint. Independent post-fix review then reproduced
+  external metadata symlink reads and Markdown/private-text injection through stop reason; both now
+  have focused regressions and fail-closed handling.
+- A final ARA-014 review showed the enum-style sanitizer still accepted credential-shaped text;
+  rendering is now restricted to official `STOP_*` constants, with every current constant and a
+  synthetic credential-shaped rejection covered.
+- Initial ARA-023 regressions failed because the mock/provider handlers swallowed `KeyboardInterrupt`
+  and the runner returned after recording `MANUAL_INTERRUPT`; these were expected pre-fix failures.
+- The first two ARA-023 subprocess fixtures embedded unescaped newlines and failed with a local
+  `SyntaxError`; the fixture strings were corrected before any behavioral result was accepted.
+- Independent ARA-023 review found acquisition/error checks outside the lock lifecycle and docs
+  overstating the protected interrupt window; both received focused corrections and green re-review.
+- The first post-fix ARA-020 provenance assertion compared macOS `/var` with canonical
+  `/private/var`; the assertion now compares the canonical run-config path and all behavior passed.
+- Independent ARA-020 review found valid sparse manifests would inherit current resume fields and
+  preserve them falsely; the three-way provenance source policy and repeated-resume regression fixed it.
+- Initial ARA-024 direct and runner-level regressions both failed because `start_round == 1` was the
+  only session-append gate; these were expected pre-fix failures.
+- The ARA-004 pre-fix installed-layout regression failed in both neutral and unrelated-Git
+  workspaces with status 2 because `config.example.yaml` was absent; this was the expected defect
+  reproduction.
+- The first ARA-004 full `make check` stopped only at Ruff formatting for the new package-resource
+  module. Formatting was applied and the complete gate then passed.
+- Independent adversarial review first reproduced partial staging residue after an interrupt and
+  weak source-layout detection; the implementation and focused regressions corrected both.
+- A second review found that POSIX rename could replace a concurrently created empty target and
+  identified a cleanup-flag interruption window. Native no-replace publication and unconditional
+  owned-staging cleanup closed both before commit; final reviews were green.
+- The first isolated build emitted a setuptools package-data discovery warning. Setting
+  `include-package-data = false` and retaining the exact package-data allowlist removed implicit
+  discovery without broadening artifact contents.
+- Two clean `SOURCE_DATE_EPOCH=0` builds produced identical wheels but non-identical sdists because
+  generated directories/metadata retained build timestamps. The sdist tar headers also recorded
+  local owner/group identity; the artifact was kept in `/tmp` and was not uploaded.
+- The initial ARA-028 regression produced the expected four failures for stale worktree,
+  active-task, recursive-closeout, and fallback claims. Independent review then exposed two omitted
+  resume-state checks; the strengthened test failed until both cross-file inconsistencies were fixed.
+- One stale-wording audit placed a backticked task-state token inside a double-quoted zsh pattern,
+  causing a harmless `command not found`. A literal-safe rerun completed; no file or Git state changed.
+- The first synthetic recursive-closeout classifier run had one incorrect expected string with an
+  extra leading newline; the classifier output was correct, the fixture was fixed, and all six
+  focused tests passed.
+- The ARA-031 pre-fix regression failed all five invalid-config subcases as expected because resume
+  did not raise and replaced the existing file. The first independent review then found JSON
+  `null` still shared the missing-file sentinel; an identity-only sentinel and `null` regressions
+  corrected that gap before final validation.
+
+## Next Command
+
+```bash
+git status --short --branch
+git rev-parse --verify HEAD
+.venv/bin/python -m pytest -q tests/test_legacy_migration.py tests/test_recovery_state.py
+```
+
+## Interruption Recovery
+
+Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --short --branch` and `git log --oneline -n 10`. Do not touch ignored runtime artifacts or the local `config.yaml`.
+
+## Current Risks And Prohibitions
+
+- ARA-048 covers only conflicts between primary selectors. ARA-057 owns orphan mode-specific
+  output arguments and must remain a separate follow-up; neither task authorizes provider or
+  ignored-runtime validation.
+- Keep ARA-049 provider-free and credential-value-safe: use synthetic secrets in patched child
+  environments, never print or inspect actual key values, and preserve ARA-045 redaction behavior.
+- ARA-049 changes only Streamlit child-run credential transport and its internal CLI activation
+  path. It does not change no-session config/custom/Google/Gemini precedence or authorize real
+  provider validation.
+- Keep ARA-050 confined to installed generation resource presence/readability/UTF-8/content
+  preflight before writes. Do not validate ignored repository runtime or change prompt content,
+  generation semantics, package data inventory, analysis/comparison behavior, or provider setup.
+- Keep ARA-051 confined to duplicate profile conflict handling. Preserve ARA-040 cached-membership
+  reconciliation, ARA-043 all-blocked behavior, unique healthy profiles, and unprofiled candidates.
+- Keep ARA-052 confined to Ollama health response-shape normalization. Preserve ARA-044 scoped
+  snapshots, the exact `/api/tags` request target, mapping response behavior, and redaction.
+- Keep ARA-057 at the argument boundary. Correct mode/output pairs and output-free primary modes
+  must remain compatible; do not dispatch, call a provider, or touch ignored runtime during tests.
+- Keep ARA-053 confined to non-secret Ollama health identity. Do not retain raw private path,
+  userinfo, query, fragments, credentials, or reversible encodings; same target must remain stable.
+- Keep ARA-058 confined to the nested `models` container shape. ARA-059 separately owns non-string
+  record names; do not broaden this fix into shared model-record normalization.
+- Keep ARA-059 confined to raw Ollama model-name typing. Preserve literal string lookalikes,
+  metadata coercion, case-sensitive de-duplication/sorting, installed fallback, exact requests, and
+  endpoint redaction; do not blacklist name text or reinterpret legacy artifacts.
+- ARA-060 is complete through remote-equal implementation `0a0036f`. Preserve the working
+  pytest/unittest behavior and isolated contract sentinel; the historically reported zero belonged
+  to the outer command wrapper, not pytest.
+- ARA-056 is complete through remote-equal implementation `795665d`. Preserve its shared
+  pre-agent/agent manual-interrupt marker, status 130, reusable empty pending rounds, ARA-041 startup
+  ordering, cooperative status-0 stops, schemas, ordinary exception behavior, and legacy resume
+  compatibility; do not broaden into ARA-054/055 transaction design.
+- ARA-054 is complete through runtime integration `75f3d9a`. Preserve append-only stopped attempts,
+  strict disk/attempt budgets, shared preview/runner classification, no-replace publication, and
+  legacy nonempty canonical fail-closed behavior. Do not move, delete, truncate, replace, or
+  overwrite partial-round evidence.
+- The selected ARA-054 design is append-only attempt staging with whole-round retry, not mid-stage
+  continuation. Existing canonical partial rounds remain fail-closed and require a separately
+  approved explicit migration; do not infer stage truth from placeholders or
+  `last_successful_agent`.
+- ARA-055 packages 1-6 and packages 7A-7C are complete. Preserve every current journal and artifact
+  byte, the explicitly targeted preview/execution boundary, exact-twin-only migration, and
+  checkpoint-last recovery. Package 7D destructive rollback/delete/quarantine and broader migration
+  remain unimplemented future extensions, not unfinished work required for this baseline.
+- ARA-061 is complete. Reject only invalid numeric CLI override values and inconsistent effective
+  delay bounds; preserve valid zero-disable quota behavior, existing configuration-file validation,
+  defaults, scheduler policy, provider behavior, and experiment semantics.
+- Do not delete or rewrite ignored experiment artifacts, local logs, or private configuration.
+- Do not remove the stale `.git/REBASE_HEAD` without an explicit cleanup decision; it is harmless while no rebase directory exists.
+- Do not run paid-provider workflows without credential presence checks, a dry run, and an explicit cost cap.
+- Do not change prompts, scoring semantics, provider behavior, benchmark results, or artifact interpretation as part of a maintenance-only fix.
+- ARA-032 normalizes overall score selection, ranking, trend, average, delta, and their exported
+  fields. It does not claim to sanitize arbitrary non-score metadata embedded in legacy artifacts.
+- ARA-033 catches only explicit output argument expansion, parent resolution, and JSON-write
+  failures. Analysis/comparison computation and terminal rendering errors remain visible runtime
+  failures rather than being mislabeled as output-path problems.
+- ARA-022 blocks static link/hard-link/special-node escapes and link-based active replacement within
+  its registered boundary. It is not a hostile same-UID sandbox: real-directory entry replacement,
+  post-open/new-temp hard-link races, trusted-anchor ancestors, and Windows active replacement are
+  explicitly outside the guarantee.
+- Keep ARA-023 scoped to manual-interrupt propagation, cooperative stop status, and the associated
+  lock lifecycle; the separately completed ARA-004 packaging behavior must not be folded into it.
+- Do not publish ARA-004's temporary sdist: its tar metadata contains the local builder owner/group
+  and generated timestamps are not reproducible. ARA-026 owns that release-hardening work.
+- A pip build review created one cache entry under the user's pip cache containing a pre-fix wheel.
+  It is not tracked and was not deleted because cleanup was not authorized; never treat it as a
+  release artifact.
+- ARA-022 changes the filesystem trust/write policy and is high risk. Owner approval was received;
+  preserve configured `runs/` storage-link compatibility and fail closed on unsupported no-follow
+  primitives rather than silently widening the trust boundary.
+- ARA-029 received explicit CI-configuration approval on 2026-07-12. Do not start ARA-030 without
+  its separate greater-than-30-minute approval checkpoint; keep release policy out of both scopes.
+- ARA-045 preserves google-genai's built-in environment delegation. A theoretical same-process
+  thread that mutates `os.environ` between snapshot and SDK construction remains outside this
+  provider-free fix; changing that boundary would require a separate compatibility decision.
+- ARA-041 received explicit owner approval on 2026-07-12. Preserve existing run IDs, manifest
+  provenance, resume histories, atomic single-file writes, and fail-before-agent behavior; do not
+  introduce a silent schema migration or treat a partially started session as completed work.
+- ARA-041's journal covers only the existing-run startup pair `run_config.json` and
+  `run_manifest.json`. It deliberately does not claim sudden-power-loss durability or transactional
+  checkpoint/history/per-round writes; do not widen that scope during closeout.
+- ARA-030 received explicit approval on 2026-07-13. Build only a wheel into fresh temporary
+  directories, exclude the checkout from installed smoke imports, never upload artifacts, and do
+  not touch the recorded KI-023 ignored state or KI-027 pip-cache residue.
+- Do not stage with `git add -A`; stage only reviewed paths.

@@ -1,18 +1,92 @@
 from __future__ import annotations
 
 import json
+import sys
 import tempfile
 import unittest
 from argparse import Namespace
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 
 from rich.console import Console
 
-from src.cli import _run_compare_cli
+from src.cli import _run_compare_cli, parse_args
 from src.run_compare import compare_runs, load_run_summary, write_run_comparison
 
 
 class RunCompareTests(unittest.TestCase):
+    @staticmethod
+    def _reject_json_constant(value: str) -> None:
+        raise ValueError(f"non-standard JSON constant: {value}")
+
+    def test_safe_run_loading_treats_invalid_utf8_as_missing_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "run"
+            run_root.mkdir()
+            (run_root / "run_summary.json").write_bytes(b"\xff\xfe")
+
+            summary = load_run_summary(run_root, safe_artifacts=True)
+
+            self.assertEqual(summary["metadata_status"], "missing")
+            self.assertIsNone(summary["best_score"])
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_explicit_run_alias_and_output_parent_symlink_remain_authorized(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            physical_run = root / "physical-run"
+            physical_run.mkdir()
+            (physical_run / "run_config.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "canonical-run",
+                        "model": {"provider": "mock", "name": "expected-model"},
+                        "runtime": {"max_rounds": 3},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (physical_run / "run_summary.json").write_text(
+                json.dumps({"run_id": "canonical-run", "best_score": 77}),
+                encoding="utf-8",
+            )
+            run_alias = root / "run-alias"
+            run_alias.symlink_to(physical_run, target_is_directory=True)
+            outside_output = root / "outside-output"
+            outside_output.mkdir()
+            linked_output = root / "linked-output"
+            linked_output.symlink_to(outside_output, target_is_directory=True)
+
+            summary = load_run_summary(run_alias)
+            comparison = write_run_comparison(
+                [run_alias],
+                linked_output / "comparison.json",
+            )
+
+            self.assertEqual(summary["run_id"], "canonical-run")
+            self.assertEqual(summary["provider"], "mock")
+            self.assertEqual(summary["model"], "expected-model")
+            self.assertEqual(summary["max_rounds"], 3)
+            self.assertEqual(
+                json.loads((outside_output / "comparison.json").read_text(encoding="utf-8")),
+                comparison,
+            )
+
+    def test_cli_rejects_a_single_compare_run(self) -> None:
+        stderr = StringIO()
+
+        with redirect_stderr(stderr), self.assertRaises(SystemExit) as raised:
+            parse_args(["--compare-runs", "runs/only"])
+
+        self.assertEqual(raised.exception.code, 2)
+        self.assertIn("--compare-runs requires at least two RUN_DIR arguments", stderr.getvalue())
+
+    def test_cli_accepts_two_or_more_compare_runs(self) -> None:
+        args = parse_args(["--compare-runs", "runs/a", "runs/b", "runs/c"])
+
+        self.assertEqual(args.compare_runs, ["runs/a", "runs/b", "runs/c"])
+
     def test_compare_runs_ranks_by_best_score_and_writes_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -148,6 +222,25 @@ class RunCompareTests(unittest.TestCase):
         self.assertEqual(summary["rubric_avg_evaluation"], 12.0)
         self.assertEqual(comparison["best_run_id"], "legacy-run")
 
+    def test_average_score_preserves_existing_rounding_for_finite_totals(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "rounding-compatible-run"
+            run_root.mkdir()
+            scores = [78.89, 65.6, 10.19, 31.22]
+            (run_root / "round_metrics.json").write_text(
+                json.dumps(
+                    [
+                        {"round": round_number, "score": score}
+                        for round_number, score in enumerate(scores, start=1)
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            summary = load_run_summary(run_root)
+
+        self.assertEqual(summary["average_score"], 46.48)
+
     def test_missing_metadata_is_reported_without_failing_comparison(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             missing_run = Path(tmp) / "missing-run"
@@ -177,6 +270,122 @@ class RunCompareTests(unittest.TestCase):
         self.assertIsNone(summary["best_score"])
         self.assertIsNone(summary["average_score"])
         self.assertIsNone(comparison["best_score"])
+
+    def test_non_finite_scores_do_not_win_ranking_or_escape_strict_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            malformed_run = root / "malformed-run"
+            valid_run = root / "valid-run"
+            malformed_run.mkdir()
+            valid_run.mkdir()
+            (malformed_run / "run_summary.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "malformed-run",
+                        "best_score": "nan",
+                        "average_score": "Infinity",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (malformed_run / "round_metrics.json").write_text(
+                json.dumps(
+                    [
+                        {"round": 1, "score": float("nan")},
+                        {"round": 2, "score": "Infinity"},
+                        {"round": 3, "score": 10**400},
+                        {"round": 4, "score": "-Infinity"},
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (valid_run / "run_summary.json").write_text(
+                json.dumps({"run_id": "valid-run", "best_score": 75}),
+                encoding="utf-8",
+            )
+            output_path = root / "comparison.json"
+
+            comparison = write_run_comparison(
+                [malformed_run, valid_run],
+                output_path,
+            )
+            strict_payload = json.loads(
+                output_path.read_text(encoding="utf-8"),
+                parse_constant=self._reject_json_constant,
+            )
+
+        self.assertEqual(comparison["best_run_id"], "valid-run")
+        self.assertEqual(comparison["best_score"], 75.0)
+        self.assertIsNone(comparison["best_vs_baseline_delta"])
+        self.assertIsNone(comparison["runs"][0]["best_score"])
+        self.assertIsNone(comparison["runs"][0]["average_score"])
+        self.assertEqual(strict_payload, comparison)
+
+    def test_missing_score_does_not_outrank_a_finite_negative_score(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            negative_run = root / "negative-run"
+            missing_run = root / "missing-run"
+            negative_run.mkdir()
+            missing_run.mkdir()
+            (negative_run / "run_summary.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "negative-run",
+                        "best_score": "-5.0",
+                        "completed_rounds": 1,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (missing_run / "run_summary.json").write_text(
+                json.dumps({"run_id": "missing-run", "completed_rounds": 99}),
+                encoding="utf-8",
+            )
+
+            comparison = compare_runs([negative_run, missing_run])
+
+        self.assertEqual(comparison["best_run_id"], "negative-run")
+        self.assertEqual(comparison["best_score"], -5.0)
+
+    def test_finite_extreme_derived_scores_do_not_escape_strict_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            max_score = sys.float_info.max
+            baseline_run = root / "baseline-run"
+            best_run = root / "best-run"
+            baseline_run.mkdir()
+            best_run.mkdir()
+            (baseline_run / "run_summary.json").write_text(
+                json.dumps({"run_id": "baseline-run", "best_score": -1e308}),
+                encoding="utf-8",
+            )
+            (best_run / "round_metrics.json").write_text(
+                json.dumps(
+                    [
+                        {"round": 1, "score": max_score},
+                        {"round": 2, "score": max_score},
+                        {"round": 3, "score": max_score},
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            output_path = root / "comparison.json"
+
+            comparison = write_run_comparison(
+                [baseline_run, best_run],
+                output_path,
+            )
+            strict_payload = json.loads(
+                output_path.read_text(encoding="utf-8"),
+                parse_constant=self._reject_json_constant,
+            )
+
+        self.assertEqual(comparison["best_run_id"], "best-run")
+        self.assertEqual(comparison["best_score"], max_score)
+        self.assertEqual(comparison["runs"][1]["average_score"], max_score)
+        self.assertIsNone(comparison["best_vs_baseline_delta"])
+        self.assertEqual(strict_payload, comparison)
 
     def test_cli_compare_wrapper_resolves_repo_relative_paths_and_writes_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,5 +1,261 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+* `--legacy-migration-execute PROJECT --legacy-migration-evidence DIR` now performs only the
+  explicitly approved `exact_missing_history_twin` migration. It creates an owner-only fixed-leaf
+  evidence bundle, publishes exact source bytes with atomic no-replace semantics under the project
+  lock, and rolls valid interrupted transactions forward before provider work. Every partial,
+  sparse, conflicting, unsafe, or unknown legacy state remains unchanged and fail-closed.
+* `--legacy-migration-preview PROJECT` now exposes the fixed ARA-055 legacy-history
+  classification for one explicitly selected project. The command runs before configuration,
+  generation-resource, provider, project-input, and lock setup; prints only the bounded
+  path-redacted human report; and never authorizes migration or writes an artifact.
+
+### Fixed
+
+* Diagnostic finalization now records project history, run metrics, summary, finalized config, and
+  checkpoint in one strict bounded checkpoint-last transaction. Interrupted writes and cleanup
+  converge idempotently with internal or configured external run storage; recovery runs under the
+  project lock before provider/client setup, and read-only consumers fail closed on pending or
+  conflicting generations. A quota stop before round completion reuses the zero-round finalization
+  transaction.
+* Final run summary, finalized run configuration, and checkpoint now use a separate immutable
+  finalization journal with summary/config-before-checkpoint recovery. Interrupted final writes
+  converge idempotently across configured external run storage; iterative entry recovers valid
+  pending state under the existing lock, while preview, UI, analytics, comparison, and report
+  readers fail closed on pending or conflicting generations.
+* Numeric CLI overrides now reject non-finite, out-of-range, and inconsistent values with startup
+  status 2 instead of silently clamping them or carrying an invalid effective delay range into a
+  run. Documented boundary values, including a zero quota-failure threshold, remain supported.
+* A pending round transaction is now recovered under the project run lock before provider
+  preflight, client construction, or new runner work. Resume preview and UI expose recoverable and
+  conflicting states without mutating artifacts; analytics, benchmark reports, comparison rows,
+  score history, metadata, and transaction-sensitive output browsing refuse mixed generations
+  until recovery completes. Unknown or edited generations remain preserved and fail closed.
+* New iterative rounds with complete history evidence now prepare one immutable project-local
+  transaction before canonical publication, then recover best output, both history files, memory,
+  research state, and checkpoint in a fixed checkpoint-last order. Interrupted writes can be
+  retried without duplicating a round even when run storage is on another configured filesystem.
+  Legacy resumes missing one history or earlier metric evidence retain their existing compatibility
+  path because a trustworthy transaction before-generation cannot be reconstructed or migrated
+  implicitly.
+* Interrupted and free-tier-quota-paused rounds now use append-only staged attempts instead of
+  writing placeholders into canonical `round_NN` directories. Resume preserves every stopped
+  attempt, revalidates hashes and disk/attempt budgets with the same classifier used by preview,
+  and retries the round from draft. A complete attempt publishes without replacing an existing
+  canonical directory; legacy nonempty canonical partials remain fail-closed and unchanged.
+* Manual interrupts during pending round-directory creation, round-entry logging, or project-memory
+  loading now follow the same resumable checkpoint, run-summary, run-config, and interrupted-report
+  finalization as interrupts raised by an agent. The empty pending round remains safe to reuse on
+  resume, while cooperative stops and non-interrupt exceptions keep their existing behavior.
+
+### Testing
+
+* The test suite now verifies pytest's native `unittest.subTest` exit-code contract in isolated
+  subprocesses: subtest-only failures must return status 1, while passing subtests return 0. An
+  earlier apparent zero exit was traced to an orchestration wrapper that printed nested command
+  output without propagating its exit status; no pytest configuration or dependency change was
+  needed.
+
+### Security
+
+* Ollama request, timeout, and model-list fallback failures now render only the configured
+  scheme/host/port. URL userinfo, private paths, query values, and provider-controlled exception
+  text no longer reach provider events, public errors, or linked exception causes; request targets
+  and accepted endpoint forms remain unchanged.
+* CI now explicitly grants `GITHUB_TOKEN` only read access to repository contents; all unspecified
+  workflow permissions remain disabled.
+* Tracked reports now replace real local account names with explicit redaction wording. Local and
+  CI validation scan only files reported by `git ls-files` for personal home paths, high-confidence
+  provider/token shapes, and private-key headers without echoing matched values or reading ignored
+  runtime artifacts.
+* Gemini credential handling now resolves one request-scoped source across explicit configuration,
+  custom environment variables, and the SDK's `GOOGLE_API_KEY`-before-`GEMINI_API_KEY` precedence.
+  Provider events, public exception messages, linked cause/context messages,
+  client-construction failures, and cloud discovery diagnostics redact every captured candidate
+  before persistence or truncation, including keys that do not match a known token pattern.
+* Resume now accepts only canonical absolute per-run directories directly under the selected
+  project's `runs/` directory. Cross-project, relative, traversal, non-directory, and escaping
+  root paths fail closed before inspecting that directory. Resume-consumed run config, legacy
+  manifest, summary, metrics/history, previous-round context, and all planned round directories
+  also reject escaping symlinks, invalid file types, or inaccessible paths before those paths are
+  read or written; the UI disables Resume for the same unsafe checkpoints.
+* Latest-run UI metadata, analytics, and output browsing now derive fixed artifact names from the
+  validated canonical checkpoint run root. Redundant external checkpoint/summary references and
+  unsafe run or round artifact links become unavailable without being read; configured `runs/`
+  storage symlinks and safe legacy in-run metadata remain supported.
+* Automatic project runtime I/O now rejects linked project/task inputs, linked or hard-linked fixed
+  artifact leaves, blocking special files, and linked automatic output directories before provider
+  or background-process startup. POSIX reads, appends, coordination files, directory traversal and
+  creation, unlink, and atomic replacement walk from a process-wide registered `projects/` or
+  resolved external run-storage anchor with no-follow descriptor-relative operations and identity
+  checks; worker threads share boundaries and nested run roots inherit the project anchor. Survey
+  discovery uses descriptor-rooted, pruned traversal and retains lexical source paths for safe reads.
+  Background log and
+  process-metadata leaves are both preflighted before `Popen`, and a post-start metadata failure
+  terminates the child. The configured external `runs/` storage-link contract and stale-directory
+  tolerance remain. Windows performs component-level static rejection but retains a documented
+  active-swap limitation; hostile same-UID replacement with another real directory is also outside
+  the POSIX guarantee.
+* UI project discovery and comparison skip linked project/run directories and securely reopen fixed
+  run metadata leaves, closing validation/read replacement windows. Explicit CLI analysis,
+  comparison, run-directory aliases, and export parents remain user-authorized paths.
+
+### Fixed
+
+* Ollama API inventories and UI health checks now ignore records whose `name` is not a string
+  instead of coercing null, boolean, numeric, list, or object values into false model identifiers.
+  Nonblank string lookalikes, trimming, de-duplication, metadata compatibility, installed-model
+  fallback, exact requests, and endpoint redaction remain unchanged.
+* Ollama health checks now reject a non-list nested `models` value with the same fixed,
+  credential-safe `InvalidResponse` result used for a malformed outer response. Missing and
+  list-valued fields, valid records, installed-model fallback, and exact request behavior remain
+  compatible.
+* Private Ollama endpoint paths now receive a process-local keyed opaque identity for target-scoped
+  health snapshots instead of being reduced to segment lengths. Equal-length path changes evict
+  stale results without retaining raw or reversible path material; allowlisted paths, normalized
+  origins, and credential/query presence behavior remain compatible.
+* `--survey-output`, `--compare-output`, and `--analyze-output` now require their matching primary
+  mode during argument parsing. Orphan and mismatched options exit before logging, runtime layout,
+  project, provider, or artifact work; correct pairs and output-free modes remain compatible.
+* Ollama health checks now reject valid non-object JSON responses with one fixed, credential-safe
+  unhealthy result instead of raising `AttributeError`. Mapping responses, exact `/api/tags`
+  request targets and timeouts, endpoint redaction, and target-scoped health snapshots retain their
+  existing behavior.
+* Conflicting duplicate cloud-model profiles now fail closed by model ID in cached candidate
+  reconciliation, automatic recommendation, and runtime fallback regardless of record order.
+  Value-equivalent duplicates, unique healthy profiles, and safe unprofiled alternatives retain
+  their existing behavior.
+* Prompt-consuming CLI modes now verify that all four generation prompts are safe, readable,
+  nonempty UTF-8 files before configuration, project seeding, provider startup, locks, or run
+  artifacts can be touched. Installed mock runs can no longer succeed with incomplete prompt
+  provenance; provider-free analysis/comparison and prompt-independent survey/cloud helpers retain
+  their existing startup paths.
+* A nonempty Gemini key entered in the Streamlit password box now remains the launched child
+  run's authoritative credential even when configuration or inherited Google/Gemini variables
+  contain competing keys. The value travels only through a child-only environment entry, never
+  through argv or process metadata; an empty session explicitly clears stale transport state and
+  preserves the existing configuration/custom/Google/Gemini precedence.
+* The CLI now rejects any combination of two primary execution modes during argument parsing,
+  before runtime layout, configuration, project, provider, or artifact access. Normal mode, every
+  individual selector, and their existing output/runtime modifiers remain compatible.
+* Existing-run resume startup now journals `run_config.json` and `run_manifest.json` as one
+  recoverable generation before replacing either file. Pre-commit I/O failures, interrupts, and
+  interrupted rollback restore the exact prior pair; a surviving journal is recovered before
+  logging or agent work, while malformed or conflicting state fails closed. Legacy missing/sparse
+  metadata and new-run startup ordering remain compatible.
+* UI health results are now displayed only for the provider, effective model, and non-secret
+  connection/credential source that was checked. Target changes and malformed or legacy snapshots
+  clear stale results; endpoint/provider errors are sanitized before session storage, and a
+  whitespace-only Gemini password no longer masks a valid configured key.
+* Streamlit cloud-free discovery/profile session values are now scoped to the validated canonical
+  project and safe content state of both artifacts. Project switches, legacy global session values,
+  and external same-model-ID metadata updates reload together; unstable or unsafe snapshots fail
+  empty instead of reusing stale recommendation inputs.
+* Automatic cloud-free recommendation and runtime fallback now return no selection when every safe
+  candidate has a profile blocked by reachability, quota, billing/safety, token-context, or unsafe-
+  text results. Mixed unprofiled and healthy candidates remain eligible, Quality uses the same guard,
+  and the UI distinguishes Manual mode from “no eligible automatic recommendation.”
+* Cached cloud-free recommendation now distrusts discovery metadata when its current safe candidate
+  membership differs from a non-empty profile artifact. CLI and UI ignore stale discovery in that
+  case, retain only currently allowed configured/profiled candidates, and re-evaluate cached model
+  safety under current policy without deleting or migrating existing artifacts.
+* Resume now reads all four previous-round draft/review/revised/Judge context files before changing
+  startup metadata. Existing unreadable or invalid-UTF-8 context blocks without agent invocation or
+  artifact writes and reports only the fixed artifact name; genuinely missing legacy context remains
+  compatible as empty input.
+* Cloud-free model discovery now contains SDK lazy-pager iteration and model-conversion failures in
+  its existing safe error result, so explicit discovery exits 1 while profile mode can retain its
+  configured-seed fallback. Automatic discovery/profile artifact write failures now use a fixed,
+  path-free status-1 diagnostic instead of traceback or local path disclosure.
+* Literature Survey Mode manual interrupts now emit the standard `MANUAL_INTERRUPT` diagnostic and
+  exit 130 without traceback or path disclosure, while preserving release of the real run lock.
+  Successful surveys and artifact-I/O status 1 behavior remain unchanged.
+* Structured Judge scores and rubric values that cannot be represented as floats, including numeric
+  literals beyond Python's JSON integer digit limit, now follow existing invalid-output handling
+  instead of raising a traceback. Valid numeric strings, clamping, legacy `SCORE:` fallback, valid
+  rubric siblings, and the raw payload API remain compatible.
+* Provider-free analysis and comparison now tolerate malformed, non-finite, and unrepresentably
+  large legacy timing, token, evolution, rubric, and per-agent metric values without traceback or
+  non-standard JSON. Unrepresentable elapsed totals and deltas become unavailable, representable
+  extreme averages remain finite, raw legacy rubric averages are normalized, and ordinary finite
+  aggregation plus historical token/evolution compatibility remains unchanged.
+* Resume now treats only the JSON boolean `true` as an eligible checkpoint flag; strings, numbers,
+  and container values fail closed before the runner or any agent stage can write artifacts. Huge,
+  boolean, NaN, and infinite preview scores use the existing safe default instead of crashing or
+  propagating non-finite state, while finite legacy numeric strings remain compatible.
+* Analysis and comparison exports now report unavailable or unresolvable explicit output paths as
+  privacy-safe operation failures (status 1) instead of emitting tracebacks and local paths;
+  successful output and explicitly selected parent symlinks remain supported.
+* Analysis and comparison now ignore boolean, non-finite, and unrepresentably large overall scores;
+  missing scores cannot outrank valid negative scores, overflowed deltas serialize as `null`, and
+  finite-extreme averages remain strict JSON without changing ordinary historical rounding.
+* Clean wheel and source-distribution installs now bundle the public sample configuration, four
+  canonical prompts, and default example task. Installed mock runs use the current directory as a
+  writable workspace, atomically seed only a wholly missing implicit example project without overwriting
+  existing input, and do not record an unrelated workspace Git commit as source provenance.
+* Resuming an existing zero-round checkpoint now appends a round-1 entry to run-config
+  `resume_sessions`; a genuinely new round-1 run still has no resume-session entry.
+* Resuming a legacy run now preserves its original manifest provenance and unknown extension fields
+  while merging current resume metadata. Existing manifests that cannot be preserved fail before
+  writes, and an explicit checkpoint run ID must match the canonical run-directory identity;
+  missing IDs continue to derive safely from that directory.
+* Manual `Ctrl+C` now exits CLI and module entrypoints with status 130. Interrupts caught during the
+  runner's protected agent-execution phase still finalize resumable checkpoint, summary/config,
+  and interruption-report artifacts before propagation, while cooperative `STOP_REQUESTED` stops
+  remain successful status 0 exits.
+* Historical benchmark reports now take recognized stop reasons from the selected run's summary,
+  config, or legacy manifest. The mutable project checkpoint is used only when its run path/ID
+  proves it belongs to that target; unknown/private text renders safely instead of relabeling or
+  leaking through an older report.
+* Gemini now passes the configured `model.timeout_seconds` to the Google Gen AI client's HTTP
+  transport in milliseconds for every supported API-key source. Transport timeouts are reported as
+  a privacy-safe `timeout` provider error without adding retries or changing generation settings.
+* The `--compare-runs` CLI now rejects fewer than two run directories with a clear argument error,
+  matching its documented contract. The internal comparison helper still accepts one run for
+  compatibility with existing UI, analytics, and legacy-metadata callers.
+* Failed agent rounds and invalid Judge outputs no longer replace a trusted `best_output.md` with
+  synthetic zero-score or placeholder content; their artifacts and error metrics remain available.
+* Non-positive `--max-rounds` values now fail at argument parsing, and direct runner calls reject
+  them before creating run artifacts, instead of silently running one round or emitting a zero-round run.
+* State and artifact replacement writes now use same-directory temporary files, file flush/fsync,
+  and atomic replace so a pre-commit failure preserves the previous valid checkpoint.
+* Resuming an existing run now retains and appends prior round metrics and score history, preserves
+  best-round and cumulative runtime metadata, restores previous-round drafting context, and fails
+  closed before writes when an existing history file is malformed or unsafe to append to.
+* Resume now distinguishes a genuinely missing `run_config.json` from an existing file that is
+  unreadable, malformed, non-object, or excessively nested. Invalid existing config blocks before
+  any automatic artifact write instead of being replaced with newly generated provenance; missing
+  config retains the legacy-manifest compatibility path.
+* Run acquisition now holds a cross-process OS guard for the full run lifecycle and records an
+  owner token plus guard identity in `active_run.json`. Concurrent cooperating contenders cannot
+  both acquire, crashed owners are recoverable without stale-file deletion races, malformed legacy
+  PID metadata no longer raises, recreated guard inodes cannot displace a live recorded owner, and
+  an old or fork-inherited handle cannot delete replacement/parent metadata. CLI constructor
+  failures also release the guard before propagating.
+* CLI configuration, project-input, provider-prerequisite, and run-lock startup refusals now exit
+  with status 2 instead of printing an error and reporting success. Explicit cloud model discovery
+  failure exits 1, while `--help`, successful provider-free commands, and documented profile
+  fallback behavior remain status 0.
+* Unreadable or non-UTF-8 configuration/task input now produces a privacy-safe startup diagnostic.
+  Tolerant checkpoint and optional cloud-cache readers also treat invalid UTF-8, oversized numeric
+  values, and excessively nested JSON as malformed input instead of leaking a traceback.
+
+### Maintenance
+
+* Python 3.10/3.13 CI now builds one wheel from a temporary tracked-source snapshot and installs it
+  into a fresh virtual environment. The smoke verifies source-excluded imports, the exact bundled
+  resource allowlist and RECORD entries, console/module help, and one deterministic provider-free
+  mock round without building or uploading an sdist.
+* CI jobs now have a 15-minute timeout and use the supported Node 24 releases of
+  `actions/checkout` and `actions/setup-python`, while retaining the Python 3.10/3.13 push and
+  pull-request matrix.
+* Added tracked `.codex/` recovery state, task queue, validation evidence, decisions, known issues,
+  and resume instructions for interruption-safe autonomous maintenance.
+
 ## v0.1.1-hardening - Post-Audit Hardening Release
 
 Date: 2026-06-25

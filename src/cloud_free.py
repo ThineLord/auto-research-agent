@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import random
 import re
 import time
@@ -13,7 +14,12 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from .judge_output import JUDGE_OUTPUT_SCHEMA
-from .storage import parse_score, write_json_file
+from .storage import (
+    ensure_project_runtime_paths_safe,
+    parse_score,
+    read_file_text,
+    write_json_file,
+)
 
 FREE_RUNNER_AUTO = "auto_long_run"
 FREE_RUNNER_QUALITY = "quality_free"
@@ -348,8 +354,83 @@ def build_candidate_pool(
     return sorted(candidates, key=lambda item: item.model_id.casefold())
 
 
-def _safe_error_message(exc: BaseException) -> str:
-    text = str(exc) or exc.__class__.__name__
+def _index_profiles(
+    profiles: Sequence[CloudModelProfile],
+) -> tuple[dict[str, CloudModelProfile], set[str]]:
+    """Index profiles while marking non-identical duplicate IDs as conflicting."""
+    profile_by_id: dict[str, CloudModelProfile] = {}
+    conflicting_ids: set[str] = set()
+    for profile in profiles:
+        existing = profile_by_id.get(profile.model_id)
+        if existing is None:
+            profile_by_id[profile.model_id] = profile
+        elif existing != profile:
+            conflicting_ids.add(profile.model_id)
+    return profile_by_id, conflicting_ids
+
+
+def build_cached_candidate_pool(
+    *,
+    discovered_models: Sequence[CloudModelInfo] = (),
+    configured_models: Sequence[str] = (),
+    profiles: Sequence[CloudModelProfile] = (),
+    config: CloudFreeConfig | None = None,
+) -> list[CloudModelInfo]:
+    """Reconcile independently loaded discovery and profile artifacts fail-closed."""
+    config = config or CloudFreeConfig()
+    current_discovery = [
+        classify_model(
+            model_id=model.model_id,
+            display_name=model.display_name,
+            supported_generation_methods=model.supported_generation_methods,
+            input_token_limit=model.input_token_limit,
+            output_token_limit=model.output_token_limit,
+            description=model.description,
+            source=model.source,
+            available=model.available,
+            allowed_patterns=config.allowed_model_patterns,
+            blocked_patterns=config.blocked_model_patterns,
+        )
+        for model in discovered_models
+    ]
+    candidates = build_candidate_pool(
+        discovered_models=current_discovery,
+        configured_models=configured_models,
+        config=config,
+    )
+    if not profiles:
+        return candidates
+
+    _, conflicting_profile_ids = _index_profiles(profiles)
+    profiled_id_list = [
+        profile.model_id.strip()
+        for profile in profiles
+        if profile.safe_text_generation
+        and profile.model_id.strip()
+        and profile.model_id not in conflicting_profile_ids
+    ]
+    profiled_ids = set(profiled_id_list)
+    candidate_ids = {candidate.model_id for candidate in candidates}
+    profile_membership_is_exact = (
+        len(profiled_id_list) == len(profiles) == len(profiled_ids)
+        and candidate_ids == profiled_ids
+    )
+    if profile_membership_is_exact:
+        return candidates
+
+    configured_candidates = build_candidate_pool(
+        configured_models=configured_models,
+        config=config,
+    )
+    return [candidate for candidate in configured_candidates if candidate.model_id in profiled_ids]
+
+
+def _safe_error_message(
+    exc: BaseException,
+    *,
+    secrets: Sequence[str] = (),
+) -> str:
+    text = _redact_known_secrets(str(exc) or exc.__class__.__name__, secrets)
     text = re.sub(r"AIza[0-9A-Za-z_\-]{20,}", "[redacted-api-key]", text)
     text = re.sub(r"(?i)(api[_ -]?key|key|token)=['\"]?[^'\"\s,;]+", r"\1=[redacted]", text)
     text = re.sub(r"\s+", " ", text).strip()
@@ -358,10 +439,9 @@ def _safe_error_message(exc: BaseException) -> str:
 
 def _redact_known_secrets(text: str, secrets: Sequence[str]) -> str:
     redacted = text
-    for secret in secrets:
-        secret = str(secret or "").strip()
-        if len(secret) >= 4:
-            redacted = redacted.replace(secret, "[redacted-api-key]")
+    known_secrets = {str(secret or "").strip() for secret in secrets}
+    for secret in sorted(known_secrets - {""}, key=len, reverse=True):
+        redacted = redacted.replace(secret, "[redacted-api-key]")
     return redacted
 
 
@@ -403,6 +483,16 @@ def classify_gemini_error(exc: BaseException) -> GeminiErrorInfo:
     status = _status_code_from_exception(exc)
     message = _safe_error_message(exc)
     text = message.lower()
+    timeout_type_names = {"timeout", "timeouterror", "timeoutexception"}
+    timeout_exception_type = any(
+        base.__name__.lower() in timeout_type_names for base in type(exc).__mro__
+    )
+    timeout_error = (
+        status in {408, 504}
+        or isinstance(exc, TimeoutError)
+        or timeout_exception_type
+        or bool(re.search(r"\btimed[ -]?out\b", text, flags=re.I))
+    )
     rate_limited = (
         status == 429
         or "429" in text
@@ -438,6 +528,9 @@ def classify_gemini_error(exc: BaseException) -> GeminiErrorInfo:
     elif rate_limited:
         public = "Gemini free-tier rate limit reached; backing off before retry."
         error_type = "rate_limited"
+    elif timeout_error:
+        public = "Gemini request timed out."
+        error_type = "timeout"
     elif token_context:
         public = "Gemini prompt or context limit was reached."
         error_type = "token_context"
@@ -665,23 +758,39 @@ def _model_score_capacity_bonus(model: CloudModelInfo | None) -> float:
     return bonus
 
 
+def _profile_blocks_recommendation(profile: CloudModelProfile) -> bool:
+    return (
+        not profile.safe_text_generation
+        or not profile.reachable
+        or profile.safety_tool_billing_error
+        or profile.daily_quota_exhausted
+        or profile.token_context_error
+    )
+
+
 def recommend_free_cloud_model(
     *,
     candidates: Sequence[CloudModelInfo],
     profiles: Sequence[CloudModelProfile] = (),
     preset: str = FREE_RUNNER_AUTO,
 ) -> CloudModelRecommendation | None:
-    safe_candidates = [item for item in candidates if item.safe_text_generation]
+    profile_by_id, conflicting_profile_ids = _index_profiles(profiles)
+    safe_candidates = [
+        item
+        for item in candidates
+        if item.safe_text_generation and item.model_id not in conflicting_profile_ids
+    ]
     if not safe_candidates:
         return None
     by_id = {candidate.model_id: candidate for candidate in safe_candidates}
-    profile_by_id = {profile.model_id: profile for profile in profiles}
 
     if preset == FREE_RUNNER_MANUAL:
         return None
     if preset == FREE_RUNNER_QUALITY and "gemini-3.5-flash" in by_id:
         profile = profile_by_id.get("gemini-3.5-flash")
-        if profile is None or (profile.reachable and profile.structured_output_works):
+        if profile is None or (
+            not _profile_blocks_recommendation(profile) and profile.structured_output_works
+        ):
             return CloudModelRecommendation(
                 model_id="gemini-3.5-flash",
                 preset=preset,
@@ -692,12 +801,7 @@ def recommend_free_cloud_model(
     scored: list[CloudModelRecommendation] = []
     for candidate in safe_candidates:
         profile = profile_by_id.get(candidate.model_id)
-        if profile and (
-            not profile.reachable
-            or profile.safety_tool_billing_error
-            or profile.daily_quota_exhausted
-            or profile.token_context_error
-        ):
+        if profile and _profile_blocks_recommendation(profile):
             continue
         score = 0.0
         reasons = []
@@ -742,17 +846,7 @@ def recommend_free_cloud_model(
         )
 
     if not scored:
-        fallback_id = (
-            "gemini-2.5-flash-lite"
-            if "gemini-2.5-flash-lite" in by_id
-            else safe_candidates[0].model_id
-        )
-        return CloudModelRecommendation(
-            model_id=fallback_id,
-            preset=preset,
-            reason="No profiled winner; using safe fallback candidate.",
-            score=1.0,
-        )
+        return None
     return max(scored, key=lambda item: (item.score, item.model_id))
 
 
@@ -772,10 +866,17 @@ def choose_fallback_model(
         if not candidate.safe_text_generation or candidate.blocked_reason
     ]
     blocked_ids = {candidate.model_id for candidate in blocked}
+    profile_by_id, conflicting_profile_ids = _index_profiles(profiles)
     available = [
         candidate
         for candidate in candidates
-        if candidate.safe_text_generation and candidate.model_id != current_model
+        if candidate.safe_text_generation
+        and candidate.model_id != current_model
+        and candidate.model_id not in conflicting_profile_ids
+        and (
+            (profile := profile_by_id.get(candidate.model_id)) is None
+            or not _profile_blocks_recommendation(profile)
+        )
     ]
     recommendation = recommend_free_cloud_model(
         candidates=available,
@@ -801,6 +902,7 @@ def _serialize_profiles(profiles: Sequence[CloudModelProfile]) -> list[dict[str,
 
 
 def save_discovery_artifact(project_dir: Path, models: Sequence[CloudModelInfo]) -> Path:
+    ensure_project_runtime_paths_safe(project_dir)
     path = project_dir / "artifacts" / DISCOVERY_ARTIFACT_NAME
     write_json_file(
         path,
@@ -813,6 +915,7 @@ def save_discovery_artifact(project_dir: Path, models: Sequence[CloudModelInfo])
 
 
 def save_profile_artifact(project_dir: Path, profiles: Sequence[CloudModelProfile]) -> Path:
+    ensure_project_runtime_paths_safe(project_dir)
     path = project_dir / "artifacts" / PROFILE_ARTIFACT_NAME
     write_json_file(
         path,
@@ -824,37 +927,157 @@ def save_profile_artifact(project_dir: Path, profiles: Sequence[CloudModelProfil
     return path
 
 
+_MAX_CACHED_INTEGER = 2**63 - 1
+
+
+def _validated_cached_record(
+    item: Mapping[str, Any],
+    *,
+    string_fields: frozenset[str],
+    boolean_fields: frozenset[str],
+    optional_integer_fields: frozenset[str] = frozenset(),
+    optional_number_fields: frozenset[str] = frozenset(),
+    string_list_fields: frozenset[str] = frozenset(),
+) -> dict[str, Any] | None:
+    allowed_fields = (
+        string_fields
+        | boolean_fields
+        | optional_integer_fields
+        | optional_number_fields
+        | string_list_fields
+    )
+    values: dict[str, Any] = {}
+    for key, value in item.items():
+        if key not in allowed_fields:
+            continue
+        if key in string_fields:
+            if not isinstance(value, str):
+                return None
+        elif key in boolean_fields:
+            if not isinstance(value, bool):
+                return None
+        elif key in optional_integer_fields:
+            if value is not None:
+                if (
+                    isinstance(value, bool)
+                    or not isinstance(value, int)
+                    or value < 0
+                    or value > _MAX_CACHED_INTEGER
+                ):
+                    return None
+        elif key in optional_number_fields:
+            if value is not None:
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    return None
+                if isinstance(value, int) and abs(value) > _MAX_CACHED_INTEGER:
+                    return None
+                numeric_value = float(value)
+                if (
+                    not math.isfinite(numeric_value)
+                    or numeric_value < 0
+                    or numeric_value > _MAX_CACHED_INTEGER
+                ):
+                    return None
+        elif key in string_list_fields:
+            if not isinstance(value, list) or not all(isinstance(part, str) for part in value):
+                return None
+            value = tuple(value)
+        values[key] = value
+    model_id = values.get("model_id")
+    if not isinstance(model_id, str) or not model_id.strip():
+        return None
+    values["model_id"] = model_id.strip()
+    return values
+
+
 def load_profile_artifact(project_dir: Path) -> list[CloudModelProfile]:
     path = project_dir / "artifacts" / PROFILE_ARTIFACT_NAME
-    if not path.exists():
-        return []
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        ensure_project_runtime_paths_safe(project_dir)
+        content = read_file_text(path)
+        if not content:
+            return []
+        payload = json.loads(content)
+    except (OSError, ValueError, RecursionError):
         return []
     profiles = payload.get("profiles", []) if isinstance(payload, Mapping) else []
+    if not isinstance(profiles, list):
+        return []
     result: list[CloudModelProfile] = []
     for item in profiles:
         if isinstance(item, Mapping):
-            fields = {field.name for field in CloudModelProfile.__dataclass_fields__.values()}
-            result.append(CloudModelProfile(**{key: item.get(key) for key in fields}))
+            values = _validated_cached_record(
+                item,
+                string_fields=frozenset(
+                    {"model_id", "error_type", "error_message", "attempted_at"}
+                ),
+                boolean_fields=frozenset(
+                    {
+                        "reachable",
+                        "structured_output_works",
+                        "score_parsing_works",
+                        "rate_limited",
+                        "daily_quota_exhausted",
+                        "token_context_error",
+                        "safety_tool_billing_error",
+                        "safe_text_generation",
+                    }
+                ),
+                optional_integer_fields=frozenset(
+                    {"estimated_prompt_tokens", "estimated_output_tokens"}
+                ),
+                optional_number_fields=frozenset({"latency_seconds", "diagnostic_score"}),
+            )
+            if values is not None:
+                result.append(CloudModelProfile(**values))
     return result
 
 
 def load_discovery_artifact(project_dir: Path) -> list[CloudModelInfo]:
     path = project_dir / "artifacts" / DISCOVERY_ARTIFACT_NAME
-    if not path.exists():
-        return []
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        ensure_project_runtime_paths_safe(project_dir)
+        content = read_file_text(path)
+        if not content:
+            return []
+        payload = json.loads(content)
+    except (OSError, ValueError, RecursionError):
         return []
     models = payload.get("models", []) if isinstance(payload, Mapping) else []
+    if not isinstance(models, list):
+        return []
     result: list[CloudModelInfo] = []
     for item in models:
         if isinstance(item, Mapping):
-            fields = {field.name for field in CloudModelInfo.__dataclass_fields__.values()}
-            result.append(CloudModelInfo(**{key: item.get(key) for key in fields}))
+            values = _validated_cached_record(
+                item,
+                string_fields=frozenset(
+                    {"model_id", "display_name", "description", "blocked_reason", "source"}
+                ),
+                boolean_fields=frozenset(
+                    {
+                        "appears_gemini",
+                        "appears_gemma",
+                        "appears_flash",
+                        "appears_flash_lite",
+                        "appears_pro",
+                        "appears_preview",
+                        "appears_live",
+                        "appears_tts",
+                        "appears_grounding",
+                        "appears_search",
+                        "appears_maps",
+                        "appears_tool",
+                        "appears_high_tpm",
+                        "safe_text_generation",
+                        "available",
+                    }
+                ),
+                optional_integer_fields=frozenset({"input_token_limit", "output_token_limit"}),
+                string_list_fields=frozenset({"supported_generation_methods"}),
+            )
+            if values is not None:
+                result.append(CloudModelInfo(**values))
     return result
 
 
@@ -871,27 +1094,41 @@ def discover_free_cloud_models(
     config: CloudFreeConfig | None = None,
 ) -> tuple[list[CloudModelInfo], str]:
     config = config or CloudFreeConfig()
+    known_secrets = (api_key,)
     try:
         client_wrapper = _create_genai_client(api_key_env=api_key_env, api_key=api_key)
-        client_wrapper._ensure_api_key_available()  # noqa: SLF001 - shared internal key resolver.
-        client = client_wrapper._create_client()  # noqa: SLF001 - keeps API key handling centralized.
+        credential = client_wrapper._resolve_api_key()  # noqa: SLF001 - shared key snapshot.
+        known_secrets = credential.known_secrets
+        client_wrapper._ensure_api_key_available(  # noqa: SLF001 - shared key resolver.
+            credential
+        )
+        client = client_wrapper._create_client(  # noqa: SLF001 - centralized key handling.
+            credential
+        )
         raw_models = client.models.list()
     except Exception as exc:  # noqa: BLE001
-        return [], _redact_known_secrets(_safe_error_message(exc), (api_key,))
+        return [], _safe_error_message(exc, secrets=known_secrets)
 
-    discovered: list[CloudModelInfo] = []
     try:
-        iterator = list(raw_models)
-    except TypeError:
-        iterator = list(getattr(raw_models, "models", []) or [])
-    for raw_model in iterator:
-        discovered.append(
-            model_info_from_sdk_model(
-                raw_model,
-                allowed_patterns=config.allowed_model_patterns,
-                blocked_patterns=config.blocked_model_patterns,
+        try:
+            model_iterator = iter(raw_models)
+        except TypeError:
+            nested_models = getattr(raw_models, "models", None)
+            if nested_models is None:
+                raise
+            model_iterator = iter(nested_models or ())
+
+        discovered: list[CloudModelInfo] = []
+        for raw_model in model_iterator:
+            discovered.append(
+                model_info_from_sdk_model(
+                    raw_model,
+                    allowed_patterns=config.allowed_model_patterns,
+                    blocked_patterns=config.blocked_model_patterns,
+                )
             )
-        )
+    except Exception as exc:  # noqa: BLE001
+        return [], classify_gemini_error(exc).public_message
     return discovered, ""
 
 

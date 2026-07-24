@@ -16,19 +16,36 @@ from .constants import STOP_CLOUD_DAILY_QUOTA, STOP_MAX_ROUNDS
 from .judge_output import parse_judge_rubric
 from .llm import LLMClientProtocol
 from .metrics import build_agent_io_metrics, summarize_agent_io_metrics, summarize_round_metrics
-from .run_config import build_initial_run_config, finalize_run_config
+from .round_commit import (
+    build_checkpoint_after_image,
+    build_history_after_image,
+    build_run_config_after_image,
+    build_run_summary_after_image,
+)
+from .round_commit_recovery import (
+    prepare_diagnostic_finalize,
+    prepare_run_finalize,
+    recover_diagnostic_finalize,
+    recover_run_finalize,
+)
+from .run_config import (
+    INHERIT_GIT_ROOT,
+    GitRootSetting,
+    build_initial_run_config,
+    finalize_run_config,
+)
 from .runtime import log_run as _log
 from .runtime import shorten_text_by_words as _shorten_text_by_words
 from .storage import (
     append_log_line,
     display_path,
+    ensure_project_runtime_paths_safe,
     get_memory_for_prompt,
     make_round_dir,
     make_run_root,
     parse_score,
     save_round_outputs,
     write_json_file,
-    write_score_history,
 )
 
 
@@ -74,8 +91,10 @@ def run_diagnostic_mode(
     topic_snapshot: Dict[str, object] | None = None,
     prompt_dir: Path | None = None,
     repo_root: Path | None = None,
+    git_root: GitRootSetting = INHERIT_GIT_ROOT,
     drafting_mode: str = DEFAULT_DRAFTING_MODE,
 ) -> None:
+    ensure_project_runtime_paths_safe(project_dir)
     run_started = time.monotonic()
     started_at_iso = datetime.now().astimezone().isoformat()
     log_path = project_dir / "run.log"
@@ -141,6 +160,7 @@ def run_diagnostic_mode(
         project_metadata=project_metadata,
         prompt_dir=prompt_dir,
         repo_root=repo_root,
+        git_root=git_root,
         started_at=started_at_iso,
         resume_metadata=_diagnostic_resume_metadata(
             completed_rounds=0,
@@ -266,32 +286,30 @@ def run_diagnostic_mode(
             can_resume=True,
             stop_reason=STOP_CLOUD_DAILY_QUOTA,
         )
-        write_json_file(
-            project_dir / "checkpoint.json",
-            {
-                "run_id": run_root.name,
-                "run_root": str(run_root),
-                "run_config": str(run_config_path),
-                "run_summary": str(run_root / "run_summary.json"),
-                "last_completed_round": 0,
-                "last_successful_agent": "none",
-                "best_score": 0.0,
-                "best_round_path": "",
-                "stop_reason": STOP_CLOUD_DAILY_QUOTA,
-                "can_resume": True,
-                "updated_at": datetime.now().isoformat(),
-                "mode": "diagnostic",
-                "model": model_name,
-                "drafting_mode": drafting_mode,
-                "project": project_metadata or {},
-                "status": "paused_until_reset",
-                "paused_until_reset": True,
-                "pause_message": message,
-                "reset_heuristic": next_pacific_reset_heuristic(),
-                "resume_metadata": resume_metadata,
-            },
-        )
-        run_config = finalize_run_config(
+        finalized_at = datetime.now().isoformat()
+        checkpoint_final = {
+            "run_id": run_root.name,
+            "run_root": str(run_root),
+            "run_config": str(run_config_path),
+            "run_summary": str(run_root / "run_summary.json"),
+            "last_completed_round": 0,
+            "last_successful_agent": "none",
+            "best_score": 0.0,
+            "best_round_path": "",
+            "stop_reason": STOP_CLOUD_DAILY_QUOTA,
+            "can_resume": True,
+            "updated_at": finalized_at,
+            "mode": "diagnostic",
+            "model": model_name,
+            "drafting_mode": drafting_mode,
+            "project": project_metadata or {},
+            "status": "paused_until_reset",
+            "paused_until_reset": True,
+            "pause_message": message,
+            "reset_heuristic": next_pacific_reset_heuristic(),
+            "resume_metadata": resume_metadata,
+        }
+        finalized_run_config = finalize_run_config(
             run_config,
             stop_reason=STOP_CLOUD_DAILY_QUOTA,
             can_resume=True,
@@ -299,44 +317,49 @@ def run_diagnostic_mode(
             best_score=0.0,
             best_round=None,
             total_runtime_seconds=time.monotonic() - run_started,
+            ended_at=finalized_at,
         )
-        write_json_file(run_config_path, run_config)
         metrics_totals = summarize_round_metrics([])
         total_runtime_seconds = round(time.monotonic() - run_started, 3)
-        write_json_file(
-            run_root / "run_summary.json",
-            {
-                "run_id": run_root.name,
-                "run_root": str(run_root),
-                "mode": "diagnostic",
-                "model": model_name,
-                "drafting_mode": drafting_mode,
-                "completed_rounds": 0,
-                "best_round": None,
-                "best_score": 0.0,
-                "stop_reason": STOP_CLOUD_DAILY_QUOTA,
-                "can_resume": True,
-                "total_runtime_seconds": total_runtime_seconds,
-                "total_elapsed_seconds": total_runtime_seconds,
-                "total_agent_elapsed_seconds": metrics_totals["total_agent_elapsed_seconds"],
-                "total_estimated_input_tokens": metrics_totals["total_estimated_input_tokens"],
-                "total_estimated_output_tokens": metrics_totals["total_estimated_output_tokens"],
-                "total_estimated_tokens": metrics_totals["total_estimated_tokens"],
-                "total_estimated_input_chars": metrics_totals["total_estimated_input_chars"],
-                "total_output_chars": metrics_totals["total_output_chars"],
-                "token_estimate_method": metrics_totals["token_estimate_method"],
-                "agent_metric_totals": metrics_totals["agent_metric_totals"],
-                "timeout_count": metrics_totals["timeout_count"],
-                "error_count": metrics_totals["error_count"],
-                "resume_metadata": resume_metadata,
-                "round_count": 0,
-                "successful_rounds": [],
-                "timeout_rounds": [],
-                "error_rounds": [],
-                "provider_failure_rounds": [],
-                "invalid_score_rounds": [],
-            },
+        run_summary = {
+            "run_id": run_root.name,
+            "run_root": str(run_root),
+            "mode": "diagnostic",
+            "model": model_name,
+            "drafting_mode": drafting_mode,
+            "completed_rounds": 0,
+            "best_round": None,
+            "best_score": 0.0,
+            "stop_reason": STOP_CLOUD_DAILY_QUOTA,
+            "can_resume": True,
+            "total_runtime_seconds": total_runtime_seconds,
+            "total_elapsed_seconds": total_runtime_seconds,
+            "total_agent_elapsed_seconds": metrics_totals["total_agent_elapsed_seconds"],
+            "total_estimated_input_tokens": metrics_totals["total_estimated_input_tokens"],
+            "total_estimated_output_tokens": metrics_totals["total_estimated_output_tokens"],
+            "total_estimated_tokens": metrics_totals["total_estimated_tokens"],
+            "total_estimated_input_chars": metrics_totals["total_estimated_input_chars"],
+            "total_output_chars": metrics_totals["total_output_chars"],
+            "token_estimate_method": metrics_totals["token_estimate_method"],
+            "agent_metric_totals": metrics_totals["agent_metric_totals"],
+            "timeout_count": metrics_totals["timeout_count"],
+            "error_count": metrics_totals["error_count"],
+            "resume_metadata": resume_metadata,
+            "round_count": 0,
+            "successful_rounds": [],
+            "timeout_rounds": [],
+            "error_rounds": [],
+            "provider_failure_rounds": [],
+            "invalid_score_rounds": [],
+        }
+        prepare_run_finalize(
+            project_dir=project_dir,
+            run_root=run_root,
+            run_summary_after=build_run_summary_after_image(run_summary),
+            run_config_after=build_run_config_after_image(finalized_run_config),
+            checkpoint_after=build_checkpoint_after_image(checkpoint_final),
         )
+        recover_run_finalize(project_dir)
         return
 
     save_round_outputs(
@@ -448,47 +471,43 @@ def run_diagnostic_mode(
         "model": model_name,
         "drafting_mode": drafting_mode,
     }
-    write_score_history(
-        score_history_path,
-        [round_metric],
+    score_history_after = build_history_after_image([], round_metric, round_index=1)
+    round_metrics_after = build_history_after_image([], round_metric, round_index=1)
+    resume_metadata = _diagnostic_resume_metadata(
+        completed_rounds=1,
+        can_resume=False,
+        stop_reason=STOP_MAX_ROUNDS,
     )
-    write_score_history(round_metrics_path, [round_metric])
-    write_json_file(
-        project_dir / "checkpoint.json",
-        {
-            "run_id": run_root.name,
-            "run_root": str(run_root),
-            "run_config": str(run_config_path),
-            "run_summary": str(run_root / "run_summary.json"),
-            "last_completed_round": 1,
-            "last_successful_agent": (
-                "judge"
-                if not judge_error
-                else "revise"
-                if not revise_error
-                else "review"
-                if not review_error
-                else "draft"
-                if not draft_error
-                else "none"
-            ),
-            "best_score": round(parsed_score, 2),
-            "best_round_path": str(round_dir),
-            "stop_reason": "MAX_ROUNDS",
-            "can_resume": False,
-            "updated_at": datetime.now().isoformat(),
-            "mode": "diagnostic",
-            "model": model_name,
-            "drafting_mode": drafting_mode,
-            "project": project_metadata or {},
-            "resume_metadata": _diagnostic_resume_metadata(
-                completed_rounds=1,
-                can_resume=False,
-                stop_reason=STOP_MAX_ROUNDS,
-            ),
-        },
-    )
-    run_config = finalize_run_config(
+    finalized_at = datetime.now().isoformat()
+    checkpoint_final = {
+        "run_id": run_root.name,
+        "run_root": str(run_root),
+        "run_config": str(run_config_path),
+        "run_summary": str(run_root / "run_summary.json"),
+        "last_completed_round": 1,
+        "last_successful_agent": (
+            "judge"
+            if not judge_error
+            else "revise"
+            if not revise_error
+            else "review"
+            if not review_error
+            else "draft"
+            if not draft_error
+            else "none"
+        ),
+        "best_score": round(parsed_score, 2),
+        "best_round_path": str(round_dir),
+        "stop_reason": "MAX_ROUNDS",
+        "can_resume": False,
+        "updated_at": finalized_at,
+        "mode": "diagnostic",
+        "model": model_name,
+        "drafting_mode": drafting_mode,
+        "project": project_metadata or {},
+        "resume_metadata": resume_metadata,
+    }
+    finalized_run_config = finalize_run_config(
         run_config,
         stop_reason="MAX_ROUNDS",
         can_resume=False,
@@ -496,51 +515,54 @@ def run_diagnostic_mode(
         best_score=parsed_score,
         best_round=1,
         total_runtime_seconds=time.monotonic() - run_started,
+        ended_at=finalized_at,
     )
-    write_json_file(run_config_path, run_config)
     metrics_totals = summarize_round_metrics([round_metric])
     total_runtime_seconds = round(time.monotonic() - run_started, 3)
-    write_json_file(
-        run_root / "run_summary.json",
-        {
-            "run_id": run_root.name,
-            "run_root": str(run_root),
-            "mode": "diagnostic",
-            "model": model_name,
-            "drafting_mode": drafting_mode,
-            "completed_rounds": 1,
-            "best_round": 1,
-            "best_score": round(parsed_score, 2),
-            "stop_reason": STOP_MAX_ROUNDS,
-            "can_resume": False,
-            "total_runtime_seconds": total_runtime_seconds,
-            "total_elapsed_seconds": total_runtime_seconds,
-            "total_agent_elapsed_seconds": metrics_totals["total_agent_elapsed_seconds"],
-            "total_estimated_input_tokens": metrics_totals["total_estimated_input_tokens"],
-            "total_estimated_output_tokens": metrics_totals["total_estimated_output_tokens"],
-            "total_estimated_tokens": metrics_totals["total_estimated_tokens"],
-            "total_estimated_input_chars": metrics_totals["total_estimated_input_chars"],
-            "total_output_chars": metrics_totals["total_output_chars"],
-            "token_estimate_method": metrics_totals["token_estimate_method"],
-            "agent_metric_totals": metrics_totals["agent_metric_totals"],
-            "timeout_count": metrics_totals["timeout_count"],
-            "error_count": metrics_totals["error_count"],
-            "resume_metadata": _diagnostic_resume_metadata(
-                completed_rounds=1,
-                can_resume=False,
-                stop_reason=STOP_MAX_ROUNDS,
-            ),
-            "score_history_path": str(score_history_path),
-            "round_metrics_path": str(round_metrics_path),
-            "run_config_path": str(run_config_path),
-            "successful_rounds": [1] if round_metric["successful_research_round"] else [],
-            "timeout_rounds": [1] if timeout_this_round else [],
-            "error_rounds": [1] if errors else [],
-            "provider_failure_rounds": [],
-            "invalid_score_rounds": [1] if round_metric["invalid_score_this_round"] else [],
-            "round_count": 1,
-        },
+    run_summary = {
+        "run_id": run_root.name,
+        "run_root": str(run_root),
+        "mode": "diagnostic",
+        "model": model_name,
+        "drafting_mode": drafting_mode,
+        "completed_rounds": 1,
+        "best_round": 1,
+        "best_score": round(parsed_score, 2),
+        "stop_reason": STOP_MAX_ROUNDS,
+        "can_resume": False,
+        "total_runtime_seconds": total_runtime_seconds,
+        "total_elapsed_seconds": total_runtime_seconds,
+        "total_agent_elapsed_seconds": metrics_totals["total_agent_elapsed_seconds"],
+        "total_estimated_input_tokens": metrics_totals["total_estimated_input_tokens"],
+        "total_estimated_output_tokens": metrics_totals["total_estimated_output_tokens"],
+        "total_estimated_tokens": metrics_totals["total_estimated_tokens"],
+        "total_estimated_input_chars": metrics_totals["total_estimated_input_chars"],
+        "total_output_chars": metrics_totals["total_output_chars"],
+        "token_estimate_method": metrics_totals["token_estimate_method"],
+        "agent_metric_totals": metrics_totals["agent_metric_totals"],
+        "timeout_count": metrics_totals["timeout_count"],
+        "error_count": metrics_totals["error_count"],
+        "resume_metadata": resume_metadata,
+        "score_history_path": str(score_history_path),
+        "round_metrics_path": str(round_metrics_path),
+        "run_config_path": str(run_config_path),
+        "successful_rounds": [1] if round_metric["successful_research_round"] else [],
+        "timeout_rounds": [1] if timeout_this_round else [],
+        "error_rounds": [1] if errors else [],
+        "provider_failure_rounds": [],
+        "invalid_score_rounds": [1] if round_metric["invalid_score_this_round"] else [],
+        "round_count": 1,
+    }
+    prepare_diagnostic_finalize(
+        project_dir=project_dir,
+        run_root=run_root,
+        score_history_after=score_history_after,
+        round_metrics_after=round_metrics_after,
+        run_summary_after=build_run_summary_after_image(run_summary),
+        run_config_after=build_run_config_after_image(finalized_run_config),
+        checkpoint_after=build_checkpoint_after_image(checkpoint_final),
     )
+    recover_diagnostic_finalize(project_dir)
     console.rule("Diagnostic Summary")
     console.print(f"[bold]Run root:[/bold] {display_path(run_root, repo_root)}")
     console.print(f"[bold]Round saved:[/bold] {display_path(round_dir, repo_root)}")

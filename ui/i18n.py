@@ -77,6 +77,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         "save_input": "Save Input",
         "input_saved": "task.md and memory.md saved.",
+        "input_save_failed": (
+            "Input save did not complete; inspect the project files before retrying because a "
+            "partial update may have occurred."
+        ),
+        "unsafe_project_paths": "This project's runtime artifacts are unsafe or unavailable.",
         "run_controls": "C. Run controls",
         "drafting_mode": "Drafting mode",
         "drafting_mode_best_guided": "Best guided (current default)",
@@ -128,6 +133,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "cloud_free_profile_saved": "Saved profile artifact with {count} candidates.",
         "cloud_free_recommendation": "Recommended `{model}`: {reason}",
         "cloud_free_manual_mode": "Manual preset uses the selected or typed cloud model.",
+        "cloud_free_no_eligible_recommendation": (
+            "No eligible automatic recommendation; using the selected or typed cloud model."
+        ),
         "cloud_free_runtime_status": "Cloud free runtime status",
         "cloud_free_status": "Status",
         "cloud_free_delay": "Delay (s)",
@@ -274,6 +282,26 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "No analytics artifacts yet. Complete a run to generate score history, round metrics, "
             "or run summary data."
         ),
+        "round_commit_recovery_required": (
+            "A pending round commit must be recovered before these artifacts can be read safely."
+        ),
+        "round_commit_recovery_conflict": (
+            "Round commit recovery is blocked. Preserve the artifacts and inspect the conflict."
+        ),
+        "finalization_pending": (
+            "A pending run finalization must be recovered before these artifacts can be read safely."
+        ),
+        "finalization_conflict": (
+            "Run finalization recovery is blocked. Preserve the artifacts and inspect the conflict."
+        ),
+        "diagnostic_finalization_pending": (
+            "A pending diagnostic finalization must be recovered before these artifacts can be "
+            "read safely."
+        ),
+        "diagnostic_finalization_conflict": (
+            "Diagnostic finalization recovery is blocked. Preserve the artifacts and inspect the "
+            "conflict."
+        ),
         "analytics_best_score": "Best score",
         "analytics_completed_rounds": "Completed rounds",
         "analytics_timeout_errors": "Timeouts / errors",
@@ -337,6 +365,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         "resume_stale_checkpoint": "Resume checkpoint is stale. Run root is missing: {run_root}.",
         "resume_missing_run_root": "Resume checkpoint is missing run_root.",
+        "resume_unsafe_checkpoint": (
+            "Resume checkpoint has an unsafe or invalid run path. "
+            "Select a run stored under this project's runs directory."
+        ),
         "resume_partial_next_round": (
             "Resume is blocked because `{next_round_path}` is `{status}`. Safety action: {action}."
         ),
@@ -415,6 +447,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "memory_optional_help": "memory.md 是可选文件，并且会被 Git 忽略。点击保存后才会创建本地记忆文件。",
         "save_input": "保存输入",
         "input_saved": "task.md 和 memory.md 已保存。",
+        "input_save_failed": "输入保存未完成；重试前请检查项目文件，可能发生了部分更新。",
+        "unsafe_project_paths": "此项目的运行时 artifact 路径不安全或当前不可用。",
         "run_controls": "C. 运行控制",
         "drafting_mode": "起草模式",
         "drafting_mode_best_guided": "Best guided（当前默认）",
@@ -570,6 +604,12 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "run_metadata_empty": "还没有运行元数据。启动一次运行后会生成 run_config.json 和 run_summary.json。",
         "run_analytics_dashboard": "运行分析看板",
         "run_analytics_empty": "暂无分析 artifact。完成一次运行后会生成评分历史、轮次指标或运行摘要。",
+        "round_commit_recovery_required": "存在待恢复的轮次提交；恢复完成前不能安全读取这些 artifact。",
+        "round_commit_recovery_conflict": "轮次提交恢复被冲突阻止。请保留 artifact 并检查冲突。",
+        "finalization_pending": "存在待恢复的运行收尾事务；恢复完成前不能安全读取这些 artifact。",
+        "finalization_conflict": "运行收尾恢复被冲突阻止。请保留 artifact 并检查冲突。",
+        "diagnostic_finalization_pending": "存在待恢复的诊断收尾事务；恢复完成前不能安全读取这些 artifact。",
+        "diagnostic_finalization_conflict": "诊断收尾恢复被冲突阻止。请保留 artifact 并检查冲突。",
         "analytics_best_score": "最佳分数",
         "analytics_completed_rounds": "已完成轮数",
         "analytics_timeout_errors": "超时 / 错误",
@@ -622,6 +662,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "resume_unavailable": "当前不能恢复。上次停止原因：`{stop_reason}`。{model_note}",
         "resume_stale_checkpoint": "恢复检查点已失效：找不到运行目录 {run_root}。",
         "resume_missing_run_root": "恢复检查点缺少 run_root。",
+        "resume_unsafe_checkpoint": (
+            "恢复检查点包含不安全或无效的运行路径。请选择当前项目 runs 目录内的运行。"
+        ),
         "resume_partial_next_round": (
             "恢复已阻止：`{next_round_path}` 状态为 `{status}`。安全动作：{action}。"
         ),

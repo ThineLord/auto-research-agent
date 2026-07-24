@@ -4,8 +4,11 @@ import json
 import tempfile
 import types
 import unittest
+from contextlib import ExitStack
 from importlib.util import find_spec
+from itertools import combinations
 from pathlib import Path
+from unittest.mock import patch
 
 if find_spec("rich") is None:
     rich_module = types.ModuleType("rich")
@@ -57,18 +60,32 @@ if find_spec("yaml") is None:
 
     sys.modules["yaml"] = yaml_module
 
+import src.cli as cli_module
 import src.main as main_module
+import src.resume as resume_module
+import src.runner as runner_module
 from src.cli import parse_args
 from src.cloud_free import CloudFreeDailyQuotaExhausted
+from src.config import AppConfig
 from src.constants import (
     STOP_CLOUD_DAILY_QUOTA,
+    STOP_INVALID_SCORE,
+    STOP_MANUAL_INTERRUPT,
     STOP_MAX_ROUNDS,
+    STOP_NO_IMPROVEMENT,
     STOP_OLLAMA_TIMEOUT,
     STOP_PROVIDER_QUOTA_EXHAUSTED,
     STOP_USER_REQUESTED,
 )
 from src.resume import build_resume_preview, run_resume_mode
-from src.runner import run_iterative_rounds
+from src.run_analytics import analyze_run
+from src.run_compare import load_run_summary
+from src.runner import (
+    ResumeHistoryError,
+    _history_best_round,
+    _load_resume_histories,
+    run_iterative_rounds,
+)
 
 
 class FakeLLM:
@@ -143,6 +160,91 @@ class QuotaPauseAgents(FakeAgents):
     ) -> str:
         raise CloudFreeDailyQuotaExhausted(
             "Free-tier daily quota likely exhausted; safe to resume after reset."
+        )
+
+
+class InterruptingAgents(FakeAgents):
+    def draft(
+        self,
+        *,
+        task: str,
+        memory: str,
+        round_index: int,
+        previous_best: str,
+        previous_judge: str,
+        drafting_mode: str = "best_guided",
+        previous_review: str = "",
+        previous_draft: str = "",
+        previous_revised: str = "",
+    ) -> str:
+        raise KeyboardInterrupt
+
+
+class StageStoppingAgents(FakeAgents):
+    def __init__(self, stage: str, exception_type: type[BaseException]) -> None:
+        super().__init__([80])
+        self.stage = stage
+        self.exception_type = exception_type
+
+    def _stop(self, stage: str) -> None:
+        if stage != self.stage:
+            return
+        if self.exception_type is CloudFreeDailyQuotaExhausted:
+            raise CloudFreeDailyQuotaExhausted("daily quota test stop")
+        raise self.exception_type
+
+    def draft(
+        self,
+        *,
+        task: str,
+        memory: str,
+        round_index: int,
+        previous_best: str,
+        previous_judge: str,
+        drafting_mode: str = "best_guided",
+        previous_review: str = "",
+        previous_draft: str = "",
+        previous_revised: str = "",
+    ) -> str:
+        self._stop("draft")
+        return super().draft(
+            task=task,
+            memory=memory,
+            round_index=round_index,
+            previous_best=previous_best,
+            previous_judge=previous_judge,
+            drafting_mode=drafting_mode,
+            previous_review=previous_review,
+            previous_draft=previous_draft,
+            previous_revised=previous_revised,
+        )
+
+    def review(self, *, task: str, memory: str, draft_output: str) -> str:
+        self._stop("review")
+        return super().review(task=task, memory=memory, draft_output=draft_output)
+
+    def revise(
+        self,
+        *,
+        task: str,
+        memory: str,
+        draft_output: str,
+        review_output: str,
+    ) -> str:
+        self._stop("revise")
+        return super().revise(
+            task=task,
+            memory=memory,
+            draft_output=draft_output,
+            review_output=review_output,
+        )
+
+    def judge(self, *, task: str, memory: str, revised_output: str) -> str:
+        self._stop("judge")
+        return super().judge(
+            task=task,
+            memory=memory,
+            revised_output=revised_output,
         )
 
 
@@ -326,6 +428,27 @@ class GenericProviderFailureAgents(FakeAgents):
         raise RuntimeError("Gemini request failed.")
 
 
+class InvalidScoreAgents(FakeAgents):
+    def judge(self, *, task: str, memory: str, revised_output: str) -> str:
+        return "Judge completed without a numeric score."
+
+
+class UnrepresentableJudgeAgents(FakeAgents):
+    def judge(self, *, task: str, memory: str, revised_output: str) -> str:
+        return json.dumps(
+            {
+                "score": 10**400,
+                "rubric": {
+                    "evaluation_design_quality": 10**400,
+                    "tomorrow_actionability": 12,
+                },
+                "reasons": ["Unrepresentable score fixture."],
+                "blockers": [],
+                "next_step": "STOP",
+            }
+        )
+
+
 class RoundLoopTests(unittest.TestCase):
     def test_main_reexports_backward_compatible_api(self) -> None:
         self.assertIs(main_module.run_iterative_rounds, run_iterative_rounds)
@@ -334,23 +457,105 @@ class RoundLoopTests(unittest.TestCase):
         self.assertTrue(callable(main_module.run_diagnostic_mode))
         self.assertTrue(callable(main_module.run_session_mode))
 
-    def test_parse_args_accepts_mode_and_model_flags(self) -> None:
+    def test_round_loop_rejects_non_positive_max_rounds_before_writing_artifacts(self) -> None:
+        for max_rounds in (0, -1):
+            with self.subTest(max_rounds=max_rounds), tempfile.TemporaryDirectory() as tmp:
+                project_dir = Path(tmp) / "project"
+                project_dir.mkdir()
+                memory_path = project_dir / "memory.md"
+                memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                agents = RecordingAgents()
+
+                with self.assertRaisesRegex(ValueError, "max_rounds must be >= 1"):
+                    run_iterative_rounds(
+                        console=Console(),
+                        agents=agents,
+                        task_text="Design a privacy-aware memory adapter.",
+                        project_dir=project_dir,
+                        memory_path=memory_path,
+                        mode="normal",
+                        model_name="fake-model",
+                        max_rounds=max_rounds,
+                        stop_if_no_improvement_rounds=10,
+                        global_max_runtime_seconds=60,
+                        per_agent_timeout_seconds=300,
+                    )
+
+                self.assertEqual(agents.draft_rounds, [])
+                self.assertFalse((project_dir / "runs").exists())
+                self.assertFalse((project_dir / "checkpoint.json").exists())
+
+    def test_round_loop_rejects_non_positive_start_round_before_writing_artifacts(self) -> None:
+        for start_round in (0, -1, -0.5, 1.5, True):
+            with self.subTest(start_round=start_round), tempfile.TemporaryDirectory() as tmp:
+                project_dir = Path(tmp) / "project"
+                project_dir.mkdir()
+                memory_path = project_dir / "memory.md"
+                memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                agents = RecordingAgents()
+
+                with self.assertRaisesRegex(ValueError, "start_round must be >= 1"):
+                    run_iterative_rounds(
+                        console=Console(),
+                        agents=agents,
+                        task_text="Design a privacy-aware memory adapter.",
+                        project_dir=project_dir,
+                        memory_path=memory_path,
+                        mode="resume",
+                        model_name="fake-model",
+                        max_rounds=1,
+                        start_round=start_round,  # type: ignore[arg-type]
+                        stop_if_no_improvement_rounds=10,
+                        global_max_runtime_seconds=60,
+                        per_agent_timeout_seconds=300,
+                    )
+
+                self.assertEqual(agents.draft_rounds, [])
+                self.assertFalse((project_dir / "runs").exists())
+                self.assertFalse((project_dir / "checkpoint.json").exists())
+
+    def test_parse_args_accepts_each_primary_mode_with_compatible_modifiers(self) -> None:
+        mode_cases = {
+            "session": (["--session", "--project", "selected", "--max-rounds", "2"], True),
+            "diagnostic": (["--diagnostic", "--project", "selected"], True),
+            "continuous": (
+                ["--continuous", "--project", "selected", "--max-rounds", "2"],
+                True,
+            ),
+            "resume": (["--resume", "--project", "selected", "--max-rounds", "2"], True),
+            "survey": (
+                ["--survey", "--project", "selected", "--survey-output", "survey.md"],
+                True,
+            ),
+            "mock": (["--mock", "--project", "selected", "--max-rounds", "2"], True),
+            "compare_runs": (
+                ["--compare-runs", "run-a", "run-b", "--compare-output", "comparison.json"],
+                ["run-a", "run-b"],
+            ),
+            "analyze_run": (
+                ["--analyze-run", "run-a", "--analyze-output", "analysis.json"],
+                "run-a",
+            ),
+            "cloud_free_discover": (
+                ["--cloud-free-discover", "--project", "selected"],
+                True,
+            ),
+            "cloud_free_profile": (
+                ["--cloud-free-profile", "--project", "selected"],
+                True,
+            ),
+        }
+
+        for attribute, (argv, expected) in mode_cases.items():
+            with self.subTest(mode=attribute):
+                args = parse_args(argv)
+                self.assertEqual(getattr(args, attribute), expected)
+
+    def test_parse_args_accepts_normal_mode_and_general_modifiers(self) -> None:
         args = parse_args(
             [
-                "--diagnostic",
-                "--survey",
-                "--mock",
-                "--survey-output",
-                "custom_survey.md",
-                "--compare-runs",
-                "projects/example/runs/a",
-                "projects/example/runs/b",
-                "--compare-output",
-                "projects/example/run_comparison.json",
-                "--analyze-run",
-                "projects/example/runs/a",
-                "--analyze-output",
-                "projects/example/run_analysis.json",
+                "--project",
+                "selected",
                 "--model",
                 "llama3.1:8b",
                 "--benchmark-preset",
@@ -362,18 +567,51 @@ class RoundLoopTests(unittest.TestCase):
             ]
         )
 
-        self.assertTrue(args.diagnostic)
-        self.assertTrue(args.survey)
-        self.assertTrue(args.mock)
-        self.assertEqual(args.survey_output, "custom_survey.md")
-        self.assertEqual(args.compare_runs, ["projects/example/runs/a", "projects/example/runs/b"])
-        self.assertEqual(args.compare_output, "projects/example/run_comparison.json")
-        self.assertEqual(args.analyze_run, "projects/example/runs/a")
-        self.assertEqual(args.analyze_output, "projects/example/run_analysis.json")
+        self.assertFalse(
+            any(
+                (
+                    args.session,
+                    args.diagnostic,
+                    args.continuous,
+                    args.resume,
+                    args.survey,
+                    args.mock,
+                    args.compare_runs,
+                    args.analyze_run,
+                    args.cloud_free_discover,
+                    args.cloud_free_profile,
+                )
+            )
+        )
+        self.assertEqual(args.project, "selected")
         self.assertEqual(args.model, "llama3.1:8b")
         self.assertEqual(args.benchmark_preset, "free_eval")
         self.assertEqual(args.max_provider_quota_failures, 2)
         self.assertEqual(args.drafting_mode, "continue_from_previous_draft")
+
+    def test_parse_args_rejects_every_primary_mode_pair_in_either_order(self) -> None:
+        primary_modes = (
+            ("session", ["--session"]),
+            ("diagnostic", ["--diagnostic"]),
+            ("continuous", ["--continuous"]),
+            ("resume", ["--resume"]),
+            ("survey", ["--survey"]),
+            ("mock", ["--mock"]),
+            ("compare_runs", ["--compare-runs", "run-a", "run-b"]),
+            ("analyze_run", ["--analyze-run", "run-a"]),
+            ("cloud_free_discover", ["--cloud-free-discover"]),
+            ("cloud_free_profile", ["--cloud-free-profile"]),
+        )
+
+        for (left_name, left_argv), (right_name, right_argv) in combinations(primary_modes, 2):
+            for order, argv in (
+                ("forward", [*left_argv, *right_argv]),
+                ("reverse", [*right_argv, *left_argv]),
+            ):
+                with self.subTest(left=left_name, right=right_name, order=order):
+                    with self.assertRaises(SystemExit) as raised:
+                        parse_args(argv)
+                    self.assertEqual(raised.exception.code, 2)
 
     def test_round_loop_writes_outputs_and_keeps_best_score(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -739,6 +977,8 @@ class RoundLoopTests(unittest.TestCase):
             project_dir.mkdir()
             memory_path = project_dir / "memory.md"
             memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            best_output_path = project_dir / "best_output.md"
+            best_output_path.write_text("Trusted prior best.\n", encoding="utf-8")
 
             result = run_iterative_rounds(
                 console=Console(),
@@ -767,6 +1007,80 @@ class RoundLoopTests(unittest.TestCase):
             self.assertFalse(score_history[0]["provider_quota_this_round"])
             self.assertTrue(score_history[0]["skipped_placeholder_this_round"])
             self.assertFalse(score_history[0]["successful_research_round"])
+            self.assertFalse(score_history[0]["improved"])
+            self.assertEqual(result["best_output"], "Trusted prior best.")
+            self.assertEqual(best_output_path.read_text(encoding="utf-8"), "Trusted prior best.\n")
+
+    def test_invalid_judge_score_does_not_replace_trusted_best_output(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            best_output_path = project_dir / "best_output.md"
+            best_output_path.write_text("Trusted prior best.\n", encoding="utf-8")
+
+            result = run_iterative_rounds(
+                console=Console(),
+                agents=InvalidScoreAgents(),
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="normal",
+                model_name="fake-model",
+                max_rounds=1,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+            )
+
+            score_history = json.loads(
+                (project_dir / "score_history.json").read_text(encoding="utf-8")
+            )
+
+            self.assertEqual(result["stop_reason"], STOP_INVALID_SCORE)
+            self.assertTrue(score_history[0]["invalid_score_this_round"])
+            self.assertFalse(score_history[0]["successful_research_round"])
+            self.assertFalse(score_history[0]["improved"])
+            self.assertEqual(result["best_output"], "Trusted prior best.")
+            self.assertEqual(best_output_path.read_text(encoding="utf-8"), "Trusted prior best.\n")
+
+    def test_unrepresentable_judge_numbers_follow_invalid_score_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            best_output_path = project_dir / "best_output.md"
+            best_output_path.write_text("Trusted prior best.\n", encoding="utf-8")
+
+            result = run_iterative_rounds(
+                console=Console(),
+                agents=UnrepresentableJudgeAgents(),
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="normal",
+                model_name="fake-model",
+                max_rounds=1,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+            )
+            round_metrics = json.loads(
+                (Path(result["run_root"]) / "round_metrics.json").read_text(encoding="utf-8")
+            )
+
+            self.assertEqual(result["stop_reason"], STOP_INVALID_SCORE)
+            self.assertTrue(round_metrics[0]["invalid_score_this_round"])
+            self.assertFalse(round_metrics[0]["successful_research_round"])
+            self.assertFalse(round_metrics[0]["improved"])
+            self.assertEqual(
+                round_metrics[0]["judge_rubric"],
+                {"tomorrow_actionability": 12.0},
+            )
+            self.assertEqual(result["best_output"], "Trusted prior best.")
+            self.assertEqual(best_output_path.read_text(encoding="utf-8"), "Trusted prior best.\n")
 
     def test_round_loop_checkpoints_resumable_cloud_quota_pause(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -795,6 +1109,223 @@ class RoundLoopTests(unittest.TestCase):
             self.assertTrue(checkpoint["can_resume"])
             self.assertTrue(checkpoint["paused_until_reset"])
             self.assertEqual(checkpoint["last_completed_round"], 0)
+
+    def test_interrupt_and_quota_stage_matrix_preserves_resumable_attempts(self) -> None:
+        stages = ("draft", "review", "revise", "judge")
+        stop_cases = (
+            (KeyboardInterrupt, STOP_MANUAL_INTERRUPT),
+            (CloudFreeDailyQuotaExhausted, STOP_CLOUD_DAILY_QUOTA),
+        )
+        for exception_type, expected_reason in stop_cases:
+            for stage_index, stage in enumerate(stages):
+                with (
+                    self.subTest(exception=exception_type.__name__, stage=stage),
+                    tempfile.TemporaryDirectory() as tmp,
+                ):
+                    project_dir = Path(tmp) / "project"
+                    project_dir.mkdir()
+                    memory_path = project_dir / "memory.md"
+                    memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                    kwargs = {
+                        "console": Console(),
+                        "agents": StageStoppingAgents(stage, exception_type),
+                        "task_text": "Design a privacy-aware memory adapter.",
+                        "project_dir": project_dir,
+                        "memory_path": memory_path,
+                        "mode": "test",
+                        "model_name": "fake-model",
+                        "max_rounds": 1,
+                        "stop_if_no_improvement_rounds": 10,
+                        "global_max_runtime_seconds": 60,
+                        "per_agent_timeout_seconds": 300,
+                    }
+                    if exception_type is KeyboardInterrupt:
+                        with self.assertRaises(KeyboardInterrupt):
+                            run_iterative_rounds(**kwargs)
+                    else:
+                        result = run_iterative_rounds(**kwargs)
+                        self.assertEqual(result["stop_reason"], expected_reason)
+
+                    checkpoint = json.loads(
+                        (project_dir / "checkpoint.json").read_text(encoding="utf-8")
+                    )
+                    run_root = Path(checkpoint["run_root"])
+                    attempts = list((run_root / "partial_rounds" / "round_01").glob("attempt_*"))
+                    self.assertEqual(len(attempts), 1)
+                    manifest = json.loads(
+                        (attempts[0] / "attempt.json").read_text(encoding="utf-8")
+                    )
+                    self.assertEqual(manifest["state"], "stopped")
+                    self.assertEqual(manifest["stop_reason"], expected_reason)
+                    self.assertEqual(manifest["completed_stages"], list(stages[:stage_index]))
+                    self.assertFalse((run_root / "round_01").exists())
+                    self.assertTrue(checkpoint["can_resume"])
+                    preview = build_resume_preview(
+                        project_dir=project_dir,
+                        checkpoint=checkpoint,
+                        repo_root=Path(tmp),
+                    )
+                    self.assertTrue(preview["can_resume"])
+                    self.assertEqual(preview["next_round_status"], "staged_partial")
+                    self.assertEqual(
+                        preview["next_round_safety_action"],
+                        "retry_round_preserve_attempt",
+                    )
+                    self.assertEqual(preview["next_round_preserved_attempt_count"], 1)
+                    expected_latest = stages[stage_index - 1] if stage_index else None
+                    self.assertEqual(
+                        preview["next_round_latest_verified_completed_stage"],
+                        expected_latest,
+                    )
+
+    def test_manual_interrupt_finalizes_resumable_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+
+            with self.assertRaises(KeyboardInterrupt):
+                run_iterative_rounds(
+                    console=Console(),
+                    agents=InterruptingAgents(),
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    mode="test",
+                    model_name="fake-model",
+                    max_rounds=2,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                )
+
+            checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
+            run_root = Path(checkpoint["run_root"])
+            run_summary = json.loads((run_root / "run_summary.json").read_text(encoding="utf-8"))
+            run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+
+            for artifact in (checkpoint, run_summary, run_config):
+                self.assertEqual(artifact["stop_reason"], STOP_MANUAL_INTERRUPT)
+                self.assertTrue(artifact["can_resume"])
+            self.assertEqual(checkpoint["last_completed_round"], 0)
+            self.assertEqual(run_summary["completed_rounds"], 0)
+            self.assertEqual(run_config["completed_rounds"], 0)
+            self.assertTrue((project_dir / "interrupted_report.md").is_file())
+
+    def test_pre_agent_interrupts_finalize_and_resume_the_pending_round(self) -> None:
+        for stage in ("attempt_dir", "round_log", "memory_load"):
+            with self.subTest(stage=stage), tempfile.TemporaryDirectory() as tmp:
+                project_dir = Path(tmp) / "project"
+                project_dir.mkdir()
+                memory_path = project_dir / "memory.md"
+                memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                agents = RecordingAgents()
+                original_create_round_attempt = runner_module.create_round_attempt
+                original_log = runner_module._log
+                original_get_memory = runner_module.get_memory_for_prompt
+
+                def interrupt_after_attempt_dir(*args: object, **kwargs: object) -> Path:
+                    original_create_round_attempt(*args, **kwargs)
+                    raise KeyboardInterrupt
+
+                def interrupt_after_round_log(
+                    console: Console,
+                    log_path: Path,
+                    mode: str,
+                    message: str,
+                ) -> None:
+                    original_log(console, log_path, mode, message)
+                    if message.startswith("round_enter "):
+                        raise KeyboardInterrupt
+
+                def interrupt_after_memory_load(path: Path) -> str:
+                    original_get_memory(path)
+                    raise KeyboardInterrupt
+
+                with ExitStack() as stack:
+                    if stage == "attempt_dir":
+                        stack.enter_context(
+                            patch.object(
+                                runner_module,
+                                "create_round_attempt",
+                                side_effect=interrupt_after_attempt_dir,
+                            )
+                        )
+                    elif stage == "round_log":
+                        stack.enter_context(
+                            patch.object(
+                                runner_module,
+                                "_log",
+                                side_effect=interrupt_after_round_log,
+                            )
+                        )
+                    else:
+                        stack.enter_context(
+                            patch.object(
+                                runner_module,
+                                "get_memory_for_prompt",
+                                side_effect=interrupt_after_memory_load,
+                            )
+                        )
+
+                    with self.assertRaises(KeyboardInterrupt):
+                        run_iterative_rounds(
+                            console=Console(),
+                            agents=agents,
+                            task_text="Design a privacy-aware memory adapter.",
+                            project_dir=project_dir,
+                            memory_path=memory_path,
+                            mode="test",
+                            model_name="fake-model",
+                            max_rounds=1,
+                            stop_if_no_improvement_rounds=10,
+                            global_max_runtime_seconds=60,
+                            per_agent_timeout_seconds=300,
+                        )
+
+                self.assertEqual(agents.draft_rounds, [])
+                checkpoint = json.loads(
+                    (project_dir / "checkpoint.json").read_text(encoding="utf-8")
+                )
+                run_root = Path(checkpoint["run_root"])
+                run_summary = json.loads(
+                    (run_root / "run_summary.json").read_text(encoding="utf-8")
+                )
+                run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+                for artifact in (checkpoint, run_summary, run_config):
+                    self.assertEqual(artifact["stop_reason"], STOP_MANUAL_INTERRUPT)
+                    self.assertTrue(artifact["can_resume"])
+                self.assertEqual(checkpoint["last_completed_round"], 0)
+                self.assertEqual(checkpoint["resume_metadata"]["next_round"], 1)
+                self.assertFalse((run_root / "round_01").exists())
+                attempts = list((run_root / "partial_rounds" / "round_01").glob("attempt_*"))
+                self.assertEqual(len(attempts), 1)
+                attempt_manifest = json.loads(
+                    (attempts[0] / "attempt.json").read_text(encoding="utf-8")
+                )
+                self.assertEqual(attempt_manifest["state"], "stopped")
+                self.assertEqual(attempt_manifest["completed_stages"], [])
+                self.assertTrue((project_dir / "interrupted_report.md").is_file())
+
+                resumed = run_iterative_rounds(
+                    console=Console(),
+                    agents=FakeAgents([90]),
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    mode="resume",
+                    model_name="fake-model",
+                    max_rounds=1,
+                    start_round=1,
+                    run_root_override=run_root,
+                    initial_best_score=checkpoint["best_score"],
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                )
+                self.assertEqual(resumed["completed_rounds"], 1)
+                self.assertEqual(resumed["stop_reason"], STOP_MAX_ROUNDS)
 
     def test_stop_after_requested_rounds_keeps_exact_completed_count(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -894,10 +1425,16 @@ class RoundLoopTests(unittest.TestCase):
             self.assertEqual([entry["round"] for entry in score_history], [1])
             self.assertEqual([entry["score"] for entry in score_history], [88.0])
             self.assertNotIn(0.0, [entry["score"] for entry in score_history])
-            self.assertTrue((run_root / "round_02").exists())
+            self.assertFalse((run_root / "round_02").exists())
+            attempts = list((run_root / "partial_rounds" / "round_02").glob("attempt_*"))
+            self.assertEqual(len(attempts), 1)
+            attempt_manifest = json.loads(
+                (attempts[0] / "attempt.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(attempt_manifest["state"], "stopped")
             self.assertIn(
                 "Judge skipped",
-                (run_root / "round_02" / "04_judge.md").read_text(encoding="utf-8"),
+                (attempts[0] / "output" / "04_judge.md").read_text(encoding="utf-8"),
             )
 
     def test_resume_starts_after_last_real_completed_round(self) -> None:
@@ -927,7 +1464,7 @@ class RoundLoopTests(unittest.TestCase):
             agents = RecordingAgents()
             console = Console(record=True)
 
-            run_resume_mode(
+            resume_started = run_resume_mode(
                 console=console,
                 agents=agents,
                 task_text="Design a privacy-aware memory adapter.",
@@ -943,6 +1480,7 @@ class RoundLoopTests(unittest.TestCase):
             checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
             run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
             run_summary = json.loads((run_root / "run_summary.json").read_text(encoding="utf-8"))
+            self.assertTrue(resume_started)
             self.assertEqual(agents.draft_rounds, [4])
             self.assertEqual(checkpoint["last_completed_round"], 4)
             self.assertEqual(
@@ -964,6 +1502,2563 @@ class RoundLoopTests(unittest.TestCase):
                     resume_metadata["next_round_safety_action"], "proceed_create_round_dir"
                 )
             self.assertEqual(run_config["resume_sessions"][0]["start_round"], 4)
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_resume_mode_rejects_linked_project_ancestor_before_checkpoint_read(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            outside_project = root / "outside-projects" / "selected"
+            outside_project.mkdir(parents=True)
+            external_checkpoint = outside_project / "checkpoint.json"
+            external_checkpoint.write_text(
+                '{"run_id": "private", "can_resume": true}\n',
+                encoding="utf-8",
+            )
+            (root / "projects").symlink_to(
+                root / "outside-projects",
+                target_is_directory=True,
+            )
+            project_dir = root / "projects" / "selected"
+
+            with patch.object(
+                resume_module,
+                "read_json_file",
+                side_effect=AssertionError("external checkpoint must not be read"),
+            ) as read_checkpoint:
+                with self.assertRaises(OSError):
+                    run_resume_mode(
+                        console=Console(),
+                        agents=RecordingAgents(),
+                        task_text="must not run",
+                        project_dir=project_dir,
+                        memory_path=project_dir / "memory.md",
+                        model_name="fake-model",
+                        max_rounds=1,
+                        stop_if_no_improvement_rounds=1,
+                        global_max_runtime_seconds=1,
+                        per_agent_timeout_seconds=1,
+                    )
+
+            read_checkpoint.assert_not_called()
+            self.assertEqual(
+                external_checkpoint.read_text(encoding="utf-8"),
+                '{"run_id": "private", "can_resume": true}\n',
+            )
+
+    def test_resume_preserves_legacy_manifest_provenance_and_unknown_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            run_root = project_dir / "runs" / "legacy-run"
+            previous_round = run_root / "round_01"
+            previous_round.mkdir(parents=True)
+            (previous_round / "04_judge.md").write_text("legacy judge\n", encoding="utf-8")
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            (project_dir / "best_output.md").write_text("Legacy best.\n", encoding="utf-8")
+            history = [
+                {
+                    "round": 1,
+                    "score": 80.0,
+                    "improved": True,
+                    "successful_research_round": True,
+                }
+            ]
+            (run_root / "round_metrics.json").write_text(json.dumps(history), encoding="utf-8")
+            (project_dir / "score_history.json").write_text(json.dumps(history), encoding="utf-8")
+            original_manifest = {
+                "run_id": "legacy-run",
+                "run_root": str(run_root),
+                "mode": "session",
+                "model": "original-model",
+                "drafting_mode": "fresh_with_review",
+                "started_at": "2026-06-20T01:02:03+00:00",
+                "project": {"project_name": "original-project", "legacy_project": True},
+                "resume_metadata": {"legacy_resume_marker": {"preserve": True}},
+                "legacy_extension": {"nested": [1, {"preserve": "exactly"}]},
+                "run_config": "legacy-run-config-pointer",
+            }
+            manifest_path = run_root / "run_manifest.json"
+            manifest_path.write_text(json.dumps(original_manifest), encoding="utf-8")
+            (project_dir / "checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "legacy-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 1,
+                        "best_score": 80.0,
+                        "best_round_path": str(previous_round),
+                        "can_resume": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            resumed = run_resume_mode(
+                console=Console(),
+                agents=RecordingAgents(),
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                model_name="current-model",
+                max_rounds=2,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+                project_metadata={"project_name": "current-project"},
+            )
+
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertTrue(resumed)
+            for key in (
+                "run_id",
+                "mode",
+                "model",
+                "drafting_mode",
+                "started_at",
+                "project",
+                "legacy_extension",
+            ):
+                self.assertEqual(manifest[key], original_manifest[key])
+            self.assertEqual(manifest["run_root"], str(run_root.resolve()))
+            self.assertEqual(manifest["run_config"], str(run_root.resolve() / "run_config.json"))
+            self.assertEqual(
+                manifest["resume_metadata"]["legacy_resume_marker"],
+                {"preserve": True},
+            )
+            self.assertEqual(
+                manifest["resume_metadata"]["lifecycle_action"],
+                "resume_existing_run",
+            )
+            self.assertEqual(manifest["resume_metadata"]["resume_from_round"], 2)
+
+    def test_resume_preview_requires_checkpoint_id_to_match_canonical_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            run_root = project_dir / "runs" / "canonical-run"
+            run_root.mkdir(parents=True)
+            alias_root = run_root.parent / "legacy-alias"
+            alias_root.symlink_to(run_root, target_is_directory=True)
+
+            for name, checkpoint_root, checkpoint_id in (
+                ("direct mismatch", run_root, "different-run"),
+                ("symlink alias", alias_root, "legacy-alias"),
+                ("non-string id", run_root, 7),
+            ):
+                with self.subTest(name=name):
+                    preview = build_resume_preview(
+                        project_dir=project_dir,
+                        checkpoint={
+                            "run_id": checkpoint_id,
+                            "run_root": str(checkpoint_root),
+                            "last_completed_round": 0,
+                            "can_resume": True,
+                        },
+                    )
+
+                    self.assertFalse(preview["can_resume"])
+                    self.assertEqual(preview["blocked_reason"], "run_id_mismatch")
+                    self.assertNotIn(str(Path(tmp)), preview["message"])
+
+            derived_preview = build_resume_preview(
+                project_dir=project_dir,
+                checkpoint={
+                    "run_root": str(alias_root),
+                    "last_completed_round": 0,
+                    "can_resume": True,
+                },
+            )
+            self.assertTrue(derived_preview["can_resume"])
+            self.assertEqual(derived_preview["run_id"], "canonical-run")
+            self.assertEqual(Path(derived_preview["run_root"]), run_root.resolve())
+
+    def test_resume_preview_requires_literal_true_and_finite_best_score(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            base_checkpoint = {
+                "run_id": "resume-run",
+                "run_root": str(run_root),
+                "last_completed_round": 0,
+            }
+
+            for invalid_flag in ("false", "true", 1, 0, [], {}):
+                with self.subTest(can_resume=invalid_flag):
+                    preview = build_resume_preview(
+                        project_dir=project_dir,
+                        checkpoint={**base_checkpoint, "can_resume": invalid_flag},
+                    )
+
+                    self.assertFalse(preview["can_resume"])
+                    self.assertEqual(preview["blocked_reason"], "not_resume_eligible")
+
+            valid_preview = build_resume_preview(
+                project_dir=project_dir,
+                checkpoint={
+                    **base_checkpoint,
+                    "can_resume": True,
+                    "best_score": "80.5",
+                },
+            )
+            self.assertTrue(valid_preview["can_resume"])
+            self.assertEqual(valid_preview["best_score"], 80.5)
+
+            for invalid_score in (10**400, "Infinity", float("inf"), float("nan"), True):
+                with self.subTest(best_score=invalid_score):
+                    preview = build_resume_preview(
+                        project_dir=project_dir,
+                        checkpoint={
+                            **base_checkpoint,
+                            "can_resume": True,
+                            "best_score": invalid_score,
+                        },
+                    )
+
+                    self.assertTrue(preview["can_resume"])
+                    self.assertEqual(preview["best_score"], -1.0)
+
+    def test_non_boolean_resume_eligibility_blocks_before_agents_or_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            checkpoint_path = project_dir / "checkpoint.json"
+            checkpoint_path.write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 0,
+                        "best_score": -1,
+                        "can_resume": "false",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            before = {
+                path.relative_to(project_dir): path.read_bytes()
+                for path in project_dir.rglob("*")
+                if path.is_file()
+            }
+            agents = RecordingAgents()
+
+            resume_started = run_resume_mode(
+                console=Console(),
+                agents=agents,
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                model_name="fake-model",
+                max_rounds=1,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+            )
+            after = {
+                path.relative_to(project_dir): path.read_bytes()
+                for path in project_dir.rglob("*")
+                if path.is_file()
+            }
+
+            self.assertFalse(resume_started)
+            self.assertEqual(agents.draft_rounds, [])
+            self.assertEqual(after, before)
+
+    def test_resume_rejects_unpreservable_legacy_manifest_before_writes(self) -> None:
+        deeply_nested_manifest = b'{"nested":' * 150 + b"0" + b"}" * 150
+        cases = {
+            "invalid_json": b'{"run_id":',
+            "invalid_utf8": b"\xff\xfe",
+            "non_object": b"[]",
+            "deep_json": deeply_nested_manifest,
+            "mismatched_run_id": b'{"run_id": "different-run"}',
+            "invalid_run_id_type": b'{"run_id": 7}',
+            "invalid_resume_metadata": (
+                b'{"run_id": "resume-run", "resume_metadata": "legacy-text"}'
+            ),
+        }
+        for name, manifest_bytes in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
+                project_dir = Path(tmp) / "project"
+                run_root = project_dir / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                memory_path = project_dir / "memory.md"
+                memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                manifest_path = run_root / "run_manifest.json"
+                manifest_path.write_bytes(manifest_bytes)
+                checkpoint_path = project_dir / "checkpoint.json"
+                checkpoint_bytes = json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 0,
+                        "best_score": -1,
+                        "can_resume": True,
+                    }
+                ).encode()
+                checkpoint_path.write_bytes(checkpoint_bytes)
+                agents = RecordingAgents()
+
+                with self.assertRaises(ResumeHistoryError) as caught:
+                    run_resume_mode(
+                        console=Console(),
+                        agents=agents,
+                        task_text="Design a privacy-aware memory adapter.",
+                        project_dir=project_dir,
+                        memory_path=memory_path,
+                        model_name="fake-model",
+                        max_rounds=1,
+                        stop_if_no_improvement_rounds=10,
+                        global_max_runtime_seconds=60,
+                        per_agent_timeout_seconds=300,
+                    )
+
+                self.assertEqual(agents.draft_rounds, [])
+                self.assertEqual(manifest_path.read_bytes(), manifest_bytes)
+                self.assertEqual(checkpoint_path.read_bytes(), checkpoint_bytes)
+                self.assertFalse((run_root / "run_config.json").exists())
+                self.assertFalse((run_root / "run_summary.json").exists())
+                self.assertFalse((run_root / "round_01").exists())
+                self.assertIn("run_manifest.json", str(caught.exception))
+                self.assertNotIn(str(Path(tmp)), str(caught.exception))
+
+    def test_resume_rejects_invalid_existing_run_config_before_writes(self) -> None:
+        deeply_nested_config = b'{"nested":' * 150 + b"0" + b"}" * 150
+        cases = {
+            "invalid_json": b'{"schema_version": 1, "started_at": ',
+            "invalid_utf8": b"\xff\xfe",
+            "non_object": b"[]",
+            "null": b"null",
+            "deep_json": deeply_nested_config,
+        }
+        for name, config_bytes in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
+                project_dir = Path(tmp) / "project"
+                run_root = project_dir / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                memory_path = project_dir / "memory.md"
+                memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                config_path = run_root / "run_config.json"
+                config_path.write_bytes(config_bytes)
+                manifest_path = run_root / "run_manifest.json"
+                manifest_path.write_text(
+                    json.dumps(
+                        {
+                            "run_id": "resume-run",
+                            "started_at": "2026-01-01T00:00:00+00:00",
+                            "legacy_extension": {"preserve": True},
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                checkpoint_path = project_dir / "checkpoint.json"
+                checkpoint_path.write_text(
+                    json.dumps(
+                        {
+                            "run_id": "resume-run",
+                            "run_root": str(run_root),
+                            "last_completed_round": 0,
+                            "best_score": -1,
+                            "can_resume": True,
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                stop_path = project_dir / "STOP_REQUESTED"
+                stop_path.write_text("STOP_REQUESTED\n", encoding="utf-8")
+                original_bytes = {
+                    path: path.read_bytes()
+                    for path in (config_path, manifest_path, checkpoint_path, stop_path)
+                }
+                agents = RecordingAgents()
+
+                with self.assertRaises(ResumeHistoryError) as caught:
+                    run_resume_mode(
+                        console=Console(),
+                        agents=agents,
+                        task_text="Design a privacy-aware memory adapter.",
+                        project_dir=project_dir,
+                        memory_path=memory_path,
+                        model_name="fake-model",
+                        max_rounds=1,
+                        stop_if_no_improvement_rounds=10,
+                        global_max_runtime_seconds=60,
+                        per_agent_timeout_seconds=300,
+                    )
+
+                self.assertEqual(agents.draft_rounds, [])
+                for path, expected_bytes in original_bytes.items():
+                    self.assertEqual(path.read_bytes(), expected_bytes)
+                for unexpected_path in (
+                    project_dir / "run.log",
+                    project_dir / "score_history.json",
+                    project_dir / "research_state.json",
+                    run_root / "run_summary.json",
+                    run_root / "round_metrics.json",
+                    run_root / "round_01",
+                ):
+                    self.assertFalse(unexpected_path.exists())
+                self.assertIn("run_config.json", str(caught.exception))
+                self.assertNotIn(str(Path(tmp)), str(caught.exception))
+
+    def test_resume_manifest_write_failure_restores_startup_metadata_generation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            artifact_payloads = {
+                run_root / "run_config.json": {
+                    "schema_version": 1,
+                    "run_id": "resume-run",
+                    "status": "completed",
+                    "started_at": "2026-01-01T00:00:00+00:00",
+                    "completed_rounds": 0,
+                    "best_score": -1,
+                    "resume_sessions": [],
+                },
+                run_root / "run_manifest.json": {
+                    "run_id": "resume-run",
+                    "legacy_extension": {"preserve": True},
+                    "resume_metadata": {"legacy_resume_marker": "keep"},
+                },
+                run_root / "run_summary.json": {
+                    "run_id": "resume-run",
+                    "completed_rounds": 0,
+                    "best_score": -1,
+                },
+                run_root / "round_metrics.json": [],
+                project_dir / "score_history.json": [],
+                project_dir / "checkpoint.json": {
+                    "run_id": "resume-run",
+                    "run_root": str(run_root),
+                    "last_completed_round": 0,
+                    "best_score": -1,
+                    "can_resume": True,
+                },
+            }
+            for path, payload in artifact_payloads.items():
+                path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+            stop_path = project_dir / "STOP_REQUESTED"
+            stop_path.write_text("STOP_REQUESTED\n", encoding="utf-8")
+            tracked_paths = (*artifact_payloads, stop_path)
+            before = {path: path.read_bytes() for path in tracked_paths}
+            before_files = {
+                path.relative_to(project_dir): path.read_bytes()
+                for path in project_dir.rglob("*")
+                if path.is_file()
+            }
+            agents = RecordingAgents()
+            original_write = runner_module.write_json_file
+            manifest_failure_injected = False
+
+            def fail_manifest_once(path: Path, data: object, **kwargs: object) -> None:
+                nonlocal manifest_failure_injected
+                if Path(path).name == "run_manifest.json" and not manifest_failure_injected:
+                    manifest_failure_injected = True
+                    raise OSError("injected startup manifest failure")
+                original_write(path, data, **kwargs)
+
+            with (
+                patch.object(runner_module, "write_json_file", side_effect=fail_manifest_once),
+                self.assertRaises(ResumeHistoryError),
+            ):
+                run_resume_mode(
+                    console=Console(),
+                    agents=agents,
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    model_name="fake-model",
+                    max_rounds=1,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                )
+
+            after_failed_start = {path: path.read_bytes() for path in tracked_paths}
+            after_failed_files = {
+                path.relative_to(project_dir): path.read_bytes()
+                for path in project_dir.rglob("*")
+                if path.is_file()
+            }
+            failed_start_log_exists = (project_dir / "run.log").exists()
+            failed_start_round_exists = (run_root / "round_01").exists()
+            failed_start_agent_rounds = list(agents.draft_rounds)
+
+            self.assertTrue(
+                run_resume_mode(
+                    console=Console(),
+                    agents=agents,
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    model_name="fake-model",
+                    max_rounds=1,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                )
+            )
+            resumed_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+            resumed_manifest = json.loads(
+                (run_root / "run_manifest.json").read_text(encoding="utf-8")
+            )
+            successful_log_text = (project_dir / "run.log").read_text(encoding="utf-8")
+            transaction_exists_after_retry = (
+                run_root / runner_module._RESUME_STARTUP_TRANSACTION_NAME
+            ).exists()
+
+        self.assertTrue(manifest_failure_injected)
+        self.assertEqual(after_failed_start, before)
+        self.assertEqual(after_failed_files, before_files)
+        self.assertFalse(failed_start_log_exists)
+        self.assertFalse(failed_start_round_exists)
+        self.assertEqual(failed_start_agent_rounds, [])
+        self.assertEqual(agents.draft_rounds, [])
+        self.assertEqual(len(resumed_config["resume_sessions"]), 1)
+        self.assertEqual(resumed_manifest["legacy_extension"], {"preserve": True})
+        self.assertEqual(
+            resumed_manifest["resume_metadata"]["legacy_resume_marker"],
+            "keep",
+        )
+        self.assertEqual(successful_log_text.count("run_start"), 1)
+        self.assertFalse(transaction_exists_after_retry)
+
+    def test_resume_startup_transaction_rolls_back_each_write_point_failure(self) -> None:
+        stages = (
+            "journal_prepare",
+            "run_config",
+            "run_config_keyboard_interrupt",
+            "run_manifest",
+            "journal_cleanup_before_unlink",
+            "journal_cleanup_after_unlink",
+        )
+        for stage in stages:
+            with self.subTest(stage=stage), tempfile.TemporaryDirectory() as tmp:
+                run_root = Path(tmp) / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                before_payloads = {
+                    "run_config.json": {
+                        "schema_version": 1,
+                        "run_id": "resume-run",
+                        "status": "completed",
+                        "resume_sessions": [],
+                    },
+                    "run_manifest.json": {
+                        "run_id": "resume-run",
+                        "legacy_extension": {"preserve": True},
+                    },
+                }
+                after_payloads = {
+                    "run_config.json": {
+                        **before_payloads["run_config.json"],
+                        "status": "running",
+                        "resume_sessions": [{"start_round": 1}],
+                    },
+                    "run_manifest.json": {
+                        **before_payloads["run_manifest.json"],
+                        "resume_metadata": {"lifecycle_action": "resume_existing_run"},
+                    },
+                }
+                before_texts = {
+                    name: json.dumps(payload, indent=2) + "\n"
+                    for name, payload in before_payloads.items()
+                }
+                for name, text in before_texts.items():
+                    (run_root / name).write_text(text, encoding="utf-8")
+
+                original_write = runner_module.write_json_file
+                original_unlink = runner_module.unlink_artifact_file
+                write_target = {
+                    "journal_prepare": runner_module._RESUME_STARTUP_TRANSACTION_NAME,
+                    "run_config": "run_config.json",
+                    "run_config_keyboard_interrupt": "run_config.json",
+                    "run_manifest": "run_manifest.json",
+                }.get(stage)
+                write_failed = False
+                cleanup_failed = False
+
+                def fault_write(path: Path, data: object, **kwargs: object) -> None:
+                    nonlocal write_failed
+                    if Path(path).name == write_target and not write_failed:
+                        write_failed = True
+                        if stage == "run_config_keyboard_interrupt":
+                            raise KeyboardInterrupt
+                        raise OSError(f"injected {stage} failure")
+                    original_write(path, data, **kwargs)
+
+                def fault_unlink(path: Path, **kwargs: object) -> None:
+                    nonlocal cleanup_failed
+                    is_target = (
+                        Path(path).name == runner_module._RESUME_STARTUP_TRANSACTION_NAME
+                        and stage.startswith("journal_cleanup")
+                        and not cleanup_failed
+                    )
+                    if is_target:
+                        cleanup_failed = True
+                        if stage == "journal_cleanup_after_unlink":
+                            original_unlink(path, **kwargs)
+                        raise OSError(f"injected {stage} failure")
+                    original_unlink(path, **kwargs)
+
+                with (
+                    patch.object(runner_module, "write_json_file", side_effect=fault_write),
+                    patch.object(runner_module, "unlink_artifact_file", side_effect=fault_unlink),
+                    self.assertRaises(
+                        KeyboardInterrupt if stage == "run_config_keyboard_interrupt" else OSError
+                    ),
+                ):
+                    runner_module._write_resume_startup_metadata(
+                        run_root=run_root,
+                        run_id="resume-run",
+                        run_config=after_payloads["run_config.json"],
+                        run_manifest=after_payloads["run_manifest.json"],
+                    )
+
+                self.assertEqual(bool(write_target), write_failed)
+                self.assertEqual(stage.startswith("journal_cleanup"), cleanup_failed)
+                for name, text in before_texts.items():
+                    self.assertEqual((run_root / name).read_text(encoding="utf-8"), text)
+                self.assertFalse(
+                    (run_root / runner_module._RESUME_STARTUP_TRANSACTION_NAME).exists()
+                )
+
+    def test_resume_startup_transaction_does_not_change_new_run_order(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            (project_dir / "STOP_REQUESTED").write_text("STOP_REQUESTED\n", encoding="utf-8")
+            events: list[str] = []
+            original_write = runner_module.write_json_file
+
+            def record_write(path: Path, data: object, **kwargs: object) -> None:
+                events.append(f"write:{Path(path).name}")
+                original_write(path, data, **kwargs)
+
+            def record_log(
+                console: Console,
+                log_path: Path,
+                mode: str,
+                message: str,
+            ) -> None:
+                if message.startswith("run_start "):
+                    events.append("log:run_start")
+
+            agents = RecordingAgents()
+            with (
+                patch.object(runner_module, "write_json_file", side_effect=record_write),
+                patch.object(runner_module, "_log", side_effect=record_log),
+            ):
+                run_iterative_rounds(
+                    console=Console(),
+                    agents=agents,
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    mode="normal",
+                    model_name="fake-model",
+                    max_rounds=1,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                )
+
+            self.assertEqual(
+                events[:3],
+                ["write:run_config.json", "log:run_start", "write:run_manifest.json"],
+            )
+            self.assertEqual(agents.draft_rounds, [])
+
+    def test_resume_startup_transaction_recovers_after_interrupted_rollback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            before_config = {
+                "schema_version": 1,
+                "run_id": "resume-run",
+                "status": "completed",
+                "resume_sessions": [],
+                "best_score": -1,
+            }
+            before_manifest = {
+                "run_id": "resume-run",
+                "legacy_extension": {"preserve": True},
+            }
+            before_texts = {
+                "run_config.json": json.dumps(before_config, indent=2) + "\n",
+                "run_manifest.json": json.dumps(before_manifest, indent=2) + "\n",
+            }
+            for name, text in before_texts.items():
+                (run_root / name).write_text(text, encoding="utf-8")
+            (project_dir / "checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 0,
+                        "best_score": -1,
+                        "can_resume": True,
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            (project_dir / "STOP_REQUESTED").write_text("STOP_REQUESTED\n", encoding="utf-8")
+            agents = RecordingAgents()
+
+            original_write = runner_module.write_json_file
+            original_restore = runner_module.write_file_text
+            manifest_failed = False
+            rollback_failed = False
+
+            def fail_manifest(path: Path, data: object, **kwargs: object) -> None:
+                nonlocal manifest_failed
+                if Path(path).name == "run_manifest.json" and not manifest_failed:
+                    manifest_failed = True
+                    raise OSError("injected manifest failure")
+                original_write(path, data, **kwargs)
+
+            def fail_first_restore(path: Path, text: str, **kwargs: object) -> None:
+                nonlocal rollback_failed
+                if not rollback_failed:
+                    rollback_failed = True
+                    raise OSError("injected rollback failure")
+                original_restore(path, text, **kwargs)
+
+            with (
+                patch.object(runner_module, "write_json_file", side_effect=fail_manifest),
+                patch.object(runner_module, "write_file_text", side_effect=fail_first_restore),
+                self.assertRaisesRegex(ResumeHistoryError, "recovery is incomplete"),
+            ):
+                run_resume_mode(
+                    console=Console(),
+                    agents=agents,
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    model_name="fake-model",
+                    max_rounds=1,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                )
+
+            transaction_path = run_root / runner_module._RESUME_STARTUP_TRANSACTION_NAME
+            self.assertTrue(manifest_failed)
+            self.assertTrue(rollback_failed)
+            self.assertTrue(transaction_path.is_file())
+            interrupted_config = json.loads(
+                (run_root / "run_config.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(interrupted_config["status"], "running")
+            self.assertEqual(len(interrupted_config["resume_sessions"]), 1)
+            self.assertEqual(
+                (run_root / "run_manifest.json").read_text(encoding="utf-8"),
+                before_texts["run_manifest.json"],
+            )
+            self.assertFalse((project_dir / "run.log").exists())
+            self.assertEqual(agents.draft_rounds, [])
+
+            self.assertTrue(
+                run_resume_mode(
+                    console=Console(),
+                    agents=agents,
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    model_name="fake-model",
+                    max_rounds=1,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                )
+            )
+            resumed_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+            resumed_manifest = json.loads(
+                (run_root / "run_manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                len(resumed_config["resume_sessions"]),
+                1,
+            )
+            self.assertEqual(
+                resumed_manifest["legacy_extension"],
+                {"preserve": True},
+            )
+            self.assertFalse(transaction_path.exists())
+            self.assertEqual(agents.draft_rounds, [])
+            self.assertEqual(
+                (project_dir / "run.log").read_text(encoding="utf-8").count("run_start"),
+                1,
+            )
+
+    def test_resume_startup_transaction_recovers_each_interrupted_disk_state(self) -> None:
+        for state in (
+            "journal_only",
+            "config_written",
+            "pair_written",
+            "rollback_config_restored",
+        ):
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as tmp:
+                run_root = Path(tmp) / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                before_payloads = {
+                    "run_config.json": {"run_id": "resume-run", "resume_sessions": []},
+                    "run_manifest.json": {
+                        "run_id": "resume-run",
+                        "legacy_extension": "keep",
+                    },
+                }
+                after_payloads = {
+                    "run_config.json": {
+                        "run_id": "resume-run",
+                        "resume_sessions": [{"start_round": 1}],
+                    },
+                    "run_manifest.json": {
+                        "run_id": "resume-run",
+                        "legacy_extension": "keep",
+                        "resume_metadata": {"lifecycle_action": "resume_existing_run"},
+                    },
+                }
+                before_texts = {
+                    name: json.dumps(payload, indent=2) + "\n"
+                    for name, payload in before_payloads.items()
+                }
+                after_texts = {
+                    name: json.dumps(payload, indent=2) for name, payload in after_payloads.items()
+                }
+                for name, text in before_texts.items():
+                    (run_root / name).write_text(text, encoding="utf-8")
+                transaction = {
+                    "schema_version": 1,
+                    "kind": "resume_startup_metadata",
+                    "state": "prepared",
+                    "run_id": "resume-run",
+                    "artifacts": {
+                        name: {
+                            "before_present": True,
+                            "before_text": before_texts[name],
+                            "before_sha256": runner_module._startup_text_sha256(before_texts[name]),
+                            "after_sha256": runner_module._startup_text_sha256(after_texts[name]),
+                        }
+                        for name in before_texts
+                    },
+                }
+                transaction_path = run_root / runner_module._RESUME_STARTUP_TRANSACTION_NAME
+                transaction_path.write_text(json.dumps(transaction, indent=2), encoding="utf-8")
+                if state in {"config_written", "pair_written"}:
+                    (run_root / "run_config.json").write_text(
+                        after_texts["run_config.json"], encoding="utf-8"
+                    )
+                if state in {"pair_written", "rollback_config_restored"}:
+                    (run_root / "run_manifest.json").write_text(
+                        after_texts["run_manifest.json"], encoding="utf-8"
+                    )
+
+                self.assertTrue(
+                    runner_module._recover_resume_startup_transaction(
+                        run_root=run_root,
+                        run_id="resume-run",
+                    )
+                )
+
+                for name, text in before_texts.items():
+                    self.assertEqual((run_root / name).read_text(encoding="utf-8"), text)
+                self.assertFalse(transaction_path.exists())
+
+    def test_resume_startup_transaction_restores_legacy_missing_artifacts(self) -> None:
+        for missing_name in ("run_config.json", "run_manifest.json"):
+            with self.subTest(missing_name=missing_name), tempfile.TemporaryDirectory() as tmp:
+                run_root = Path(tmp) / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                before_texts = {
+                    "run_config.json": '{"run_id": "resume-run", "resume_sessions": []}\n',
+                    "run_manifest.json": '{"run_id": "resume-run", "legacy": true}\n',
+                }
+                for name, text in before_texts.items():
+                    if name != missing_name:
+                        (run_root / name).write_text(text, encoding="utf-8")
+                after_config = {"run_id": "resume-run", "resume_sessions": [{"start_round": 1}]}
+                after_manifest = {"run_id": "resume-run", "legacy": True}
+                original_unlink = runner_module.unlink_artifact_file
+                cleanup_failed = False
+
+                def fail_cleanup_once(path: Path, **kwargs: object) -> None:
+                    nonlocal cleanup_failed
+                    if (
+                        Path(path).name == runner_module._RESUME_STARTUP_TRANSACTION_NAME
+                        and not cleanup_failed
+                    ):
+                        cleanup_failed = True
+                        raise OSError("injected cleanup failure")
+                    original_unlink(path, **kwargs)
+
+                with (
+                    patch.object(
+                        runner_module,
+                        "unlink_artifact_file",
+                        side_effect=fail_cleanup_once,
+                    ),
+                    self.assertRaises(OSError),
+                ):
+                    runner_module._write_resume_startup_metadata(
+                        run_root=run_root,
+                        run_id="resume-run",
+                        run_config=after_config,
+                        run_manifest=after_manifest,
+                    )
+
+                self.assertTrue(cleanup_failed)
+                self.assertFalse((run_root / missing_name).exists())
+                preserved_name = next(name for name in before_texts if name != missing_name)
+                self.assertEqual(
+                    (run_root / preserved_name).read_text(encoding="utf-8"),
+                    before_texts[preserved_name],
+                )
+                self.assertFalse(
+                    (run_root / runner_module._RESUME_STARTUP_TRANSACTION_NAME).exists()
+                )
+
+    def test_resume_startup_transaction_rejects_invalid_or_conflicting_state(self) -> None:
+        valid_before_config = '{"run_id": "resume-run"}\n'
+        valid_before_manifest = '{"run_id": "resume-run"}\n'
+        valid_transaction: dict[str, object] = {
+            "schema_version": 1,
+            "kind": "resume_startup_metadata",
+            "state": "prepared",
+            "run_id": "resume-run",
+            "artifacts": {
+                "run_config.json": {
+                    "before_present": True,
+                    "before_text": valid_before_config,
+                    "before_sha256": runner_module._startup_text_sha256(valid_before_config),
+                    "after_sha256": runner_module._startup_text_sha256(valid_before_config),
+                },
+                "run_manifest.json": {
+                    "before_present": True,
+                    "before_text": valid_before_manifest,
+                    "before_sha256": runner_module._startup_text_sha256(valid_before_manifest),
+                    "after_sha256": runner_module._startup_text_sha256(valid_before_manifest),
+                },
+            },
+        }
+        invalid_cases: dict[str, str | dict[str, object]] = {
+            "invalid_json": "{",
+            "wrong_run_id": {
+                **valid_transaction,
+                "run_id": "other-run",
+            },
+            "extra_top_level_field": {
+                **valid_transaction,
+                "unexpected": True,
+            },
+        }
+        for name, transaction in invalid_cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
+                run_root = Path(tmp) / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                config_path = run_root / "run_config.json"
+                manifest_path = run_root / "run_manifest.json"
+                config_path.write_text(valid_before_config, encoding="utf-8")
+                manifest_path.write_text(valid_before_manifest, encoding="utf-8")
+                transaction_path = run_root / runner_module._RESUME_STARTUP_TRANSACTION_NAME
+                transaction_text = (
+                    transaction if isinstance(transaction, str) else json.dumps(transaction)
+                )
+                transaction_path.write_text(transaction_text, encoding="utf-8")
+                before = {
+                    path.name: path.read_bytes()
+                    for path in (config_path, manifest_path, transaction_path)
+                }
+
+                with self.assertRaises(ResumeHistoryError) as caught:
+                    runner_module._recover_resume_startup_transaction(
+                        run_root=run_root,
+                        run_id="resume-run",
+                    )
+
+                self.assertNotIn(str(Path(tmp)), str(caught.exception))
+                self.assertEqual(
+                    {
+                        path.name: path.read_bytes()
+                        for path in (config_path, manifest_path, transaction_path)
+                    },
+                    before,
+                )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            config_path = run_root / "run_config.json"
+            manifest_path = run_root / "run_manifest.json"
+            before_config = '{"run_id": "resume-run"}\n'
+            before_manifest = '{"run_id": "resume-run", "legacy": true}\n'
+            after_config = '{"run_id": "resume-run", "status": "running"}'
+            after_manifest = '{"run_id": "resume-run", "legacy": true}'
+            config_path.write_text('{"external": "change"}\n', encoding="utf-8")
+            manifest_path.write_text(before_manifest, encoding="utf-8")
+            transaction = {
+                "schema_version": 1,
+                "kind": "resume_startup_metadata",
+                "state": "prepared",
+                "run_id": "resume-run",
+                "artifacts": {
+                    "run_config.json": {
+                        "before_present": True,
+                        "before_text": before_config,
+                        "before_sha256": runner_module._startup_text_sha256(before_config),
+                        "after_sha256": runner_module._startup_text_sha256(after_config),
+                    },
+                    "run_manifest.json": {
+                        "before_present": True,
+                        "before_text": before_manifest,
+                        "before_sha256": runner_module._startup_text_sha256(before_manifest),
+                        "after_sha256": runner_module._startup_text_sha256(after_manifest),
+                    },
+                },
+            }
+            transaction_path = run_root / runner_module._RESUME_STARTUP_TRANSACTION_NAME
+            transaction_path.write_text(json.dumps(transaction), encoding="utf-8")
+            before = {
+                path.name: path.read_bytes()
+                for path in (config_path, manifest_path, transaction_path)
+            }
+
+            with self.assertRaisesRegex(ResumeHistoryError, "changed outside"):
+                runner_module._recover_resume_startup_transaction(
+                    run_root=run_root,
+                    run_id="resume-run",
+                )
+
+            self.assertEqual(
+                {
+                    path.name: path.read_bytes()
+                    for path in (config_path, manifest_path, transaction_path)
+                },
+                before,
+            )
+
+    def test_repeated_resume_does_not_invent_sparse_manifest_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            run_root = project_dir / "runs" / "sparse-run"
+            run_root.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            manifest_path = run_root / "run_manifest.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "run_id": "sparse-run",
+                        "legacy_extension": {"preserve": True},
+                        "resume_metadata": {"legacy_resume_marker": "keep"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            checkpoint_path = project_dir / "checkpoint.json"
+            checkpoint_path.write_text(
+                json.dumps(
+                    {
+                        "run_id": "sparse-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 0,
+                        "best_score": -1,
+                        "can_resume": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            for session_index in (1, 2):
+                (project_dir / "STOP_REQUESTED").write_text("STOP_REQUESTED\n", encoding="utf-8")
+                resumed = run_resume_mode(
+                    console=Console(),
+                    agents=RecordingAgents(),
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    model_name=f"current-model-{session_index}",
+                    max_rounds=1,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                    project_metadata={"project_name": f"current-project-{session_index}"},
+                    drafting_mode="continue_from_previous_draft",
+                )
+
+                self.assertTrue(resumed)
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                for creation_field in (
+                    "mode",
+                    "model",
+                    "drafting_mode",
+                    "started_at",
+                    "project",
+                ):
+                    self.assertNotIn(creation_field, manifest)
+                self.assertEqual(manifest["legacy_extension"], {"preserve": True})
+                self.assertEqual(manifest["resume_metadata"]["legacy_resume_marker"], "keep")
+                self.assertEqual(
+                    manifest["resume_metadata"]["lifecycle_action"],
+                    "resume_existing_run",
+                )
+                self.assertEqual(manifest["run_id"], "sparse-run")
+                self.assertEqual(manifest["run_root"], str(run_root.resolve()))
+                self.assertFalse((project_dir / "STOP_REQUESTED").exists())
+                run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+                self.assertEqual(len(run_config["resume_sessions"]), session_index)
+                self.assertEqual(run_config["resume_sessions"][-1]["start_round"], 1)
+
+    def test_resume_rejects_run_roots_outside_the_selected_project(self) -> None:
+        unsafe_kinds = (
+            "absolute",
+            "traversal",
+            "symlink",
+            "runs_directory",
+            "relative",
+            "nested",
+            "sibling_prefix",
+            "missing_outside",
+            "nul_character",
+        )
+        for unsafe_kind in unsafe_kinds:
+            with self.subTest(unsafe_kind=unsafe_kind), tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                project_dir = repo_root / "projects" / "selected"
+                runs_dir = project_dir / "runs"
+                runs_dir.mkdir(parents=True)
+                outside_run = repo_root / "projects" / "other" / "runs" / unsafe_kind
+                if unsafe_kind != "missing_outside":
+                    outside_run.mkdir(parents=True)
+
+                if unsafe_kind == "absolute":
+                    checkpoint_run_root = outside_run
+                elif unsafe_kind == "traversal":
+                    escaped_run = project_dir / "escaped-run"
+                    escaped_run.mkdir()
+                    checkpoint_run_root = runs_dir / ".." / escaped_run.name
+                elif unsafe_kind == "symlink":
+                    checkpoint_run_root = runs_dir / "linked-run"
+                    checkpoint_run_root.symlink_to(outside_run, target_is_directory=True)
+                elif unsafe_kind == "relative":
+                    relative_target = runs_dir / "relative-run"
+                    relative_target.mkdir()
+                    checkpoint_run_root = Path("projects/selected/runs/relative-run")
+                elif unsafe_kind == "nested":
+                    checkpoint_run_root = runs_dir / "nested" / "run"
+                    checkpoint_run_root.mkdir(parents=True)
+                elif unsafe_kind == "sibling_prefix":
+                    checkpoint_run_root = project_dir / "runs-evil" / "run"
+                    checkpoint_run_root.mkdir(parents=True)
+                elif unsafe_kind == "nul_character":
+                    checkpoint_run_root = str(runs_dir / "bad") + "\x00tail"
+                else:
+                    checkpoint_run_root = (
+                        runs_dir if unsafe_kind == "runs_directory" else outside_run
+                    )
+
+                checkpoint = {
+                    "run_id": "unsafe-run",
+                    "run_root": str(checkpoint_run_root),
+                    "last_completed_round": 0,
+                    "can_resume": True,
+                }
+                preview = build_resume_preview(
+                    project_dir=project_dir,
+                    checkpoint=checkpoint,
+                    repo_root=repo_root,
+                )
+
+                self.assertFalse(preview["can_resume"])
+                self.assertEqual(preview["blocked_reason"], "unsafe_run_root")
+                self.assertIn("selected project's runs directory", preview["message"])
+                self.assertNotIn(str(repo_root), preview["message"])
+
+    def test_runner_rejects_unsafe_run_root_override_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "projects" / "selected"
+            project_dir.mkdir(parents=True)
+            outside_run = repo_root / "outside-run"
+            outside_run.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            agents = RecordingAgents()
+
+            with self.assertRaisesRegex(ResumeHistoryError, "selected project's runs directory"):
+                run_iterative_rounds(
+                    console=Console(),
+                    agents=agents,
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    mode="resume",
+                    model_name="fake-model",
+                    max_rounds=1,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                    run_root_override=outside_run,
+                    repo_root=repo_root,
+                )
+
+            self.assertEqual(agents.draft_rounds, [])
+            self.assertEqual(list(outside_run.iterdir()), [])
+            self.assertFalse((project_dir / "checkpoint.json").exists())
+            self.assertFalse((project_dir / "run.log").exists())
+
+    def test_runner_rechecks_resume_child_paths_before_writes(self) -> None:
+        for unsafe_kind in (
+            "next_round",
+            "future_round",
+            "previous_output",
+            "state_artifact",
+            "transaction_artifact",
+        ):
+            with self.subTest(unsafe_kind=unsafe_kind), tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                project_dir = repo_root / "projects" / "selected"
+                run_root = project_dir / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                outside_path = repo_root / "outside" / unsafe_kind
+                outside_path.parent.mkdir(parents=True)
+                start_round = 1
+                max_rounds = 1
+                if unsafe_kind == "next_round":
+                    outside_path.mkdir()
+                    (run_root / "round_01").symlink_to(
+                        outside_path,
+                        target_is_directory=True,
+                    )
+                elif unsafe_kind == "future_round":
+                    outside_path.mkdir()
+                    (run_root / "round_02").symlink_to(
+                        outside_path,
+                        target_is_directory=True,
+                    )
+                    max_rounds = 2
+                elif unsafe_kind == "previous_output":
+                    outside_path.write_text("private context\n", encoding="utf-8")
+                    previous_round = run_root / "round_01"
+                    previous_round.mkdir()
+                    (previous_round / "04_judge.md").symlink_to(outside_path)
+                    start_round = 2
+                elif unsafe_kind == "state_artifact":
+                    outside_path.write_text('{"private": true}\n', encoding="utf-8")
+                    (run_root / "run_config.json").symlink_to(outside_path)
+                else:
+                    outside_path.write_text('{"private": true}\n', encoding="utf-8")
+                    (run_root / runner_module._RESUME_STARTUP_TRANSACTION_NAME).symlink_to(
+                        outside_path
+                    )
+                outside_bytes = outside_path.read_bytes() if outside_path.is_file() else None
+                memory_path = project_dir / "memory.md"
+                memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                agents = RecordingAgents()
+
+                with self.assertRaises(ResumeHistoryError):
+                    run_iterative_rounds(
+                        console=Console(),
+                        agents=agents,
+                        task_text="Design a privacy-aware memory adapter.",
+                        project_dir=project_dir,
+                        memory_path=memory_path,
+                        mode="resume",
+                        model_name="fake-model",
+                        max_rounds=max_rounds,
+                        start_round=start_round,
+                        stop_if_no_improvement_rounds=10,
+                        global_max_runtime_seconds=60,
+                        per_agent_timeout_seconds=300,
+                        run_root_override=run_root,
+                        repo_root=repo_root,
+                    )
+
+                self.assertEqual(agents.draft_rounds, [])
+                self.assertFalse((project_dir / "checkpoint.json").exists())
+                self.assertFalse((project_dir / "run.log").exists())
+                if outside_bytes is not None:
+                    self.assertEqual(outside_path.read_bytes(), outside_bytes)
+                else:
+                    self.assertEqual(list(outside_path.iterdir()), [])
+
+    def test_cli_unsafe_resume_exits_two_and_releases_run_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            project_dir = temp_root / "projects" / "selected"
+            project_dir.mkdir(parents=True)
+            outside_run = temp_root / "outside-run"
+            outside_run.mkdir()
+            (project_dir / "checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "outside-run",
+                        "run_root": str(outside_run),
+                        "last_completed_round": 0,
+                        "can_resume": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            args = parse_args(
+                [
+                    "--resume",
+                    "--provider",
+                    "ollama",
+                    "--model",
+                    "qwen3:8b",
+                    "--project",
+                    "selected",
+                ]
+            )
+            project_input = types.SimpleNamespace(
+                project_name="selected",
+                project_dir=project_dir,
+                task_path=project_dir / "task.md",
+                task_text="# Resume safety test",
+                project_title="Resume safety test",
+                source_kind="user_provided",
+                as_metadata=lambda: {"project_name": "selected"},
+            )
+
+            with (
+                patch.object(cli_module, "parse_args", return_value=args),
+                patch.object(cli_module, "load_app_config", return_value=AppConfig()),
+                patch.object(cli_module, "load_project_input", return_value=project_input),
+                patch.object(
+                    cli_module,
+                    "list_installed_ollama_models",
+                    return_value=(["qwen3:8b"], None),
+                ),
+                patch.object(
+                    cli_module,
+                    "create_llm_client",
+                    return_value=types.SimpleNamespace(timeout_seconds=1),
+                ),
+            ):
+                with self.assertRaisesRegex(SystemExit, "2"):
+                    cli_module.main()
+
+            self.assertFalse((project_dir / "active_run.json").exists())
+            self.assertFalse((project_dir / "run.log").exists())
+            self.assertEqual(list(outside_run.iterdir()), [])
+
+    def test_cli_resume_history_error_exits_two_and_releases_run_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "projects" / "selected"
+            project_dir.mkdir(parents=True)
+            args = parse_args(
+                [
+                    "--resume",
+                    "--provider",
+                    "ollama",
+                    "--model",
+                    "qwen3:8b",
+                    "--project",
+                    "selected",
+                ]
+            )
+            project_input = types.SimpleNamespace(
+                project_name="selected",
+                project_dir=project_dir,
+                task_path=project_dir / "task.md",
+                task_text="# Resume history safety test",
+                project_title="Resume history safety test",
+                source_kind="user_provided",
+                as_metadata=lambda: {"project_name": "selected"},
+            )
+
+            with (
+                patch.object(cli_module, "parse_args", return_value=args),
+                patch.object(cli_module, "load_app_config", return_value=AppConfig()),
+                patch.object(cli_module, "load_project_input", return_value=project_input),
+                patch.object(
+                    cli_module,
+                    "list_installed_ollama_models",
+                    return_value=(["qwen3:8b"], None),
+                ),
+                patch.object(
+                    cli_module,
+                    "create_llm_client",
+                    return_value=types.SimpleNamespace(timeout_seconds=1),
+                ),
+                patch.object(
+                    cli_module,
+                    "run_resume_mode",
+                    side_effect=ResumeHistoryError("unsafe history"),
+                ),
+            ):
+                with self.assertRaises(SystemExit) as raised:
+                    cli_module.main()
+
+            self.assertEqual(raised.exception.code, 2)
+            self.assertFalse((project_dir / "active_run.json").exists())
+            self.assertFalse((project_dir / "run.log").exists())
+
+    def test_cli_model_constructor_failures_release_run_lock(self) -> None:
+        for failure_stage in ("client", "agents"):
+            with self.subTest(stage=failure_stage), tempfile.TemporaryDirectory() as tmp:
+                temp_root = Path(tmp)
+                project_dir = temp_root / "projects" / "selected"
+                project_dir.mkdir(parents=True)
+                args = parse_args(
+                    [
+                        "--diagnostic",
+                        "--provider",
+                        "ollama",
+                        "--model",
+                        "qwen3:8b",
+                        "--project",
+                        "selected",
+                    ]
+                )
+                project_input = types.SimpleNamespace(
+                    project_name="selected",
+                    project_dir=project_dir,
+                    task_path=project_dir / "task.md",
+                    task_text="# Constructor failure test",
+                    project_title="Constructor failure test",
+                    source_kind="user_provided",
+                    as_metadata=lambda: {"project_name": "selected"},
+                )
+                client_result = (
+                    RuntimeError("injected client failure")
+                    if failure_stage == "client"
+                    else types.SimpleNamespace(timeout_seconds=1)
+                )
+
+                with (
+                    patch.object(cli_module, "parse_args", return_value=args),
+                    patch.object(cli_module, "load_app_config", return_value=AppConfig()),
+                    patch.object(cli_module, "load_project_input", return_value=project_input),
+                    patch.object(
+                        cli_module,
+                        "list_installed_ollama_models",
+                        return_value=(["qwen3:8b"], None),
+                    ),
+                    patch.object(
+                        cli_module,
+                        "create_llm_client",
+                        side_effect=client_result if isinstance(client_result, Exception) else None,
+                        return_value=None
+                        if isinstance(client_result, Exception)
+                        else client_result,
+                    ),
+                    patch.object(
+                        cli_module.ResearchAgents,
+                        "from_prompt_dir",
+                        side_effect=RuntimeError("injected agents failure")
+                        if failure_stage == "agents"
+                        else None,
+                    ),
+                ):
+                    with self.assertRaisesRegex(RuntimeError, f"injected {failure_stage} failure"):
+                        cli_module.main()
+
+                self.assertFalse((project_dir / "active_run.json").exists())
+                retry_handle, retry_error = cli_module.acquire_run_lock(
+                    project_dir,
+                    mode="diagnostic",
+                    model_name="qwen3:8b",
+                )
+                self.assertIsNotNone(retry_handle)
+                self.assertIsNone(retry_error)
+                cli_module.release_run_lock(retry_handle)
+
+    def test_resume_rejects_non_directory_run_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "projects" / "selected"
+            runs_dir = project_dir / "runs"
+            runs_dir.mkdir(parents=True)
+            run_root_file = runs_dir / "not-a-directory"
+            run_root_file.write_text("sentinel\n", encoding="utf-8")
+
+            preview = build_resume_preview(
+                project_dir=project_dir,
+                checkpoint={
+                    "run_root": str(run_root_file),
+                    "last_completed_round": 0,
+                    "can_resume": True,
+                },
+                repo_root=repo_root,
+            )
+
+            self.assertFalse(preview["can_resume"])
+            self.assertEqual(preview["blocked_reason"], "invalid_run_root")
+            self.assertEqual(run_root_file.read_text(encoding="utf-8"), "sentinel\n")
+            self.assertNotIn(str(repo_root), preview["message"])
+
+    def test_resume_accepts_run_under_configured_runs_storage_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "projects" / "selected"
+            project_dir.mkdir(parents=True)
+            external_runs = repo_root / "configured-run-storage"
+            external_runs.mkdir()
+            (project_dir / "runs").symlink_to(external_runs, target_is_directory=True)
+            run_root = external_runs / "legacy-run"
+            run_root.mkdir()
+
+            preview = build_resume_preview(
+                project_dir=project_dir,
+                checkpoint={
+                    "run_id": "legacy-run",
+                    "run_root": str(run_root),
+                    "last_completed_round": 0,
+                    "can_resume": True,
+                },
+                repo_root=repo_root,
+            )
+
+            self.assertTrue(preview["can_resume"])
+            self.assertEqual(Path(preview["run_root"]), run_root.resolve())
+            self.assertEqual(preview["next_round_status"], "missing")
+
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_runner_creates_and_resumes_under_configured_runs_storage_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "projects" / "selected"
+            project_dir.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            external_runs = repo_root / "configured-run-storage"
+            external_runs.mkdir()
+            (project_dir / "runs").symlink_to(external_runs, target_is_directory=True)
+
+            first = run_iterative_rounds(
+                console=Console(),
+                agents=FakeAgents([60]),
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="test",
+                model_name="fake-model",
+                max_rounds=1,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+                repo_root=repo_root,
+            )
+            run_root = Path(first["run_root"])
+            second = run_iterative_rounds(
+                console=Console(),
+                agents=FakeAgents([70]),
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="resume",
+                model_name="fake-model",
+                max_rounds=2,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+                start_round=2,
+                run_root_override=run_root,
+                initial_best_score=float(first["best_score"]),
+                repo_root=repo_root,
+            )
+
+            self.assertEqual(run_root.parent, external_runs.resolve())
+            for round_index in (1, 2):
+                round_dir = run_root / f"round_{round_index:02d}"
+                self.assertTrue(round_dir.is_dir())
+                for filename in ("01_draft.md", "02_review.md", "03_revised.md", "04_judge.md"):
+                    self.assertTrue((round_dir / filename).is_file())
+            self.assertEqual(second["completed_rounds"], 2)
+            self.assertTrue((project_dir / "checkpoint.json").is_file())
+
+    def test_resume_preview_blocks_unreadable_next_round_without_leaking_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "projects" / "selected"
+            run_root = project_dir / "runs" / "resume-run"
+            next_round = run_root / "round_01"
+            next_round.mkdir(parents=True)
+            checkpoint = {
+                "run_id": "resume-run",
+                "run_root": str(run_root),
+                "last_completed_round": 0,
+                "can_resume": True,
+            }
+
+            with patch(
+                "src.storage.os.listdir",
+                side_effect=PermissionError(str(next_round)),
+            ):
+                preview = build_resume_preview(
+                    project_dir=project_dir,
+                    checkpoint=checkpoint,
+                    repo_root=repo_root,
+                )
+
+            self.assertFalse(preview["can_resume"])
+            self.assertEqual(preview["blocked_reason"], "unsafe_round_path")
+            self.assertEqual(preview["next_round_status"], "unsafe")
+            self.assertNotIn(str(repo_root), preview["message"])
+
+    def test_resume_preview_blocks_inaccessible_root_and_state_file(self) -> None:
+        for inaccessible_kind in ("run_root", "run_config"):
+            with (
+                self.subTest(inaccessible_kind=inaccessible_kind),
+                tempfile.TemporaryDirectory() as tmp,
+            ):
+                repo_root = Path(tmp)
+                project_dir = repo_root / "projects" / "selected"
+                run_root = project_dir / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                run_config_path = run_root / "run_config.json"
+                run_config_path.write_text('{"legacy": true}\n', encoding="utf-8")
+                inaccessible_path = (
+                    run_root if inaccessible_kind == "run_root" else run_config_path
+                ).resolve()
+
+                def fake_access(path: object, mode: int) -> bool:
+                    del mode
+                    return Path(path).resolve() != inaccessible_path
+
+                with patch("src.resume_safety.os.access", side_effect=fake_access):
+                    preview = build_resume_preview(
+                        project_dir=project_dir,
+                        checkpoint={
+                            "run_id": "resume-run",
+                            "run_root": str(run_root),
+                            "last_completed_round": 0,
+                            "can_resume": True,
+                        },
+                        repo_root=repo_root,
+                    )
+
+                self.assertFalse(preview["can_resume"])
+                self.assertEqual(
+                    preview["blocked_reason"],
+                    "inaccessible_run_root"
+                    if inaccessible_kind == "run_root"
+                    else "unsafe_artifact_path",
+                )
+                self.assertNotIn(str(repo_root), preview["message"])
+
+    def test_resume_wraps_racing_io_error_without_leaking_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            project_dir = repo_root / "projects" / "selected"
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            (project_dir / "checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 0,
+                        "can_resume": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            console = Console(record=True)
+            private_temp_path = repo_root / "outside" / ".run_config.secret.tmp"
+
+            with patch(
+                "src.resume.run_iterative_rounds",
+                side_effect=PermissionError(str(private_temp_path)),
+            ):
+                with self.assertRaisesRegex(ResumeHistoryError, "artifact I/O failed") as caught:
+                    run_resume_mode(
+                        console=console,
+                        agents=RecordingAgents(),
+                        task_text="Design a privacy-aware memory adapter.",
+                        project_dir=project_dir,
+                        memory_path=memory_path,
+                        model_name="fake-model",
+                        max_rounds=1,
+                        stop_if_no_improvement_rounds=10,
+                        global_max_runtime_seconds=60,
+                        per_agent_timeout_seconds=300,
+                        repo_root=repo_root,
+                    )
+
+            self.assertNotIn(str(repo_root), str(caught.exception))
+            self.assertNotIn(str(repo_root), console.export_text(styles=False))
+
+    def test_resume_rejects_escaping_round_symlinks_without_external_reads_or_writes(
+        self,
+    ) -> None:
+        for round_kind, last_completed_round in (("previous", 1), ("next", 0)):
+            with self.subTest(round_kind=round_kind), tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                project_dir = repo_root / "projects" / "selected"
+                run_root = project_dir / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                outside_round = repo_root / "outside" / round_kind
+                outside_round.mkdir(parents=True)
+                sentinel_path = outside_round / "04_judge.md"
+                sentinel_path.write_text("external private context\n", encoding="utf-8")
+                linked_round = run_root / f"round_{1:02d}"
+                linked_round.symlink_to(outside_round, target_is_directory=True)
+                checkpoint = {
+                    "run_id": "resume-run",
+                    "run_root": str(run_root),
+                    "last_completed_round": last_completed_round,
+                    "can_resume": True,
+                }
+                checkpoint_path = project_dir / "checkpoint.json"
+                checkpoint_path.write_text(json.dumps(checkpoint), encoding="utf-8")
+                checkpoint_bytes = checkpoint_path.read_bytes()
+                memory_path = project_dir / "memory.md"
+                memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                agents = DraftContextAgents()
+                console = Console(record=True)
+
+                preview = build_resume_preview(
+                    project_dir=project_dir,
+                    checkpoint=checkpoint,
+                    repo_root=repo_root,
+                )
+                resume_started = run_resume_mode(
+                    console=console,
+                    agents=agents,
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    model_name="fake-model",
+                    max_rounds=1,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                    repo_root=repo_root,
+                )
+
+                self.assertFalse(preview["can_resume"])
+                self.assertEqual(preview["blocked_reason"], "unsafe_round_path")
+                self.assertFalse(resume_started)
+                self.assertEqual(agents.draft_contexts, [])
+                self.assertEqual(
+                    sentinel_path.read_text(encoding="utf-8"),
+                    "external private context\n",
+                )
+                self.assertEqual(checkpoint_path.read_bytes(), checkpoint_bytes)
+                self.assertFalse((run_root / "run_config.json").exists())
+                self.assertNotIn(str(repo_root), console.export_text(styles=False))
+
+    def test_resume_rejects_unsafe_state_artifacts_without_reading_them(self) -> None:
+        unsafe_artifacts = (
+            ("run_config_symlink", "run_config.json", True),
+            ("run_manifest_symlink", "run_manifest.json", True),
+            ("run_config_directory", "run_config.json", False),
+        )
+        for case, artifact_name, use_symlink in unsafe_artifacts:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                project_dir = repo_root / "projects" / "selected"
+                run_root = project_dir / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                external_config = repo_root / "outside" / "private.json"
+                external_config.parent.mkdir()
+                external_config.write_text('{"private": "sentinel"}\n', encoding="utf-8")
+                artifact_path = run_root / artifact_name
+                if use_symlink:
+                    artifact_path.symlink_to(external_config)
+                else:
+                    artifact_path.mkdir()
+                checkpoint = {
+                    "run_id": "resume-run",
+                    "run_root": str(run_root),
+                    "last_completed_round": 0,
+                    "can_resume": True,
+                }
+                checkpoint_path = project_dir / "checkpoint.json"
+                checkpoint_path.write_text(json.dumps(checkpoint), encoding="utf-8")
+                memory_path = project_dir / "memory.md"
+                memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                agents = RecordingAgents()
+
+                preview = build_resume_preview(
+                    project_dir=project_dir,
+                    checkpoint=checkpoint,
+                    repo_root=repo_root,
+                )
+                resume_started = run_resume_mode(
+                    console=Console(),
+                    agents=agents,
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    model_name="fake-model",
+                    max_rounds=1,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                    repo_root=repo_root,
+                )
+
+                self.assertFalse(preview["can_resume"])
+                self.assertEqual(preview["blocked_reason"], "unsafe_artifact_path")
+                self.assertFalse(resume_started)
+                self.assertEqual(agents.draft_rounds, [])
+                self.assertEqual(
+                    external_config.read_text(encoding="utf-8"),
+                    '{"private": "sentinel"}\n',
+                )
+                self.assertEqual(artifact_path.is_symlink(), use_symlink)
+
+    def test_resume_preserves_history_best_round_and_previous_round_context(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            best_output_path = project_dir / "best_output.md"
+            best_output_path.write_text("Trusted round 2 best.\n", encoding="utf-8")
+
+            round_outputs = {
+                1: ("draft one", "review one", "revised one", "judge one"),
+                2: ("draft two", "review two", "revised two", "judge two"),
+                3: ("draft three", "review three", "revised three", "judge three"),
+            }
+            for round_index, outputs in round_outputs.items():
+                round_dir = run_root / f"round_{round_index:02d}"
+                round_dir.mkdir()
+                for filename, content in zip(
+                    ("01_draft.md", "02_review.md", "03_revised.md", "04_judge.md"),
+                    outputs,
+                    strict=True,
+                ):
+                    (round_dir / filename).write_text(f"{content}\n", encoding="utf-8")
+
+            historical_metrics = [
+                {
+                    "round": 1,
+                    "score": 80.0,
+                    "improved": True,
+                    "non_improve_streak": 0,
+                    "successful_research_round": True,
+                    "timeout_this_round": False,
+                    "provider_failure_this_round": False,
+                    "invalid_score_this_round": False,
+                    "errors": [],
+                    "agent_timings_seconds": {"draft": 1.0},
+                    "estimated_input_tokens": 40,
+                    "estimated_output_tokens": 60,
+                    "estimated_total_tokens": 100,
+                },
+                {
+                    "round": 2,
+                    "score": 93.0,
+                    "improved": True,
+                    "non_improve_streak": 0,
+                    "successful_research_round": True,
+                    "timeout_this_round": False,
+                    "provider_failure_this_round": False,
+                    "invalid_score_this_round": False,
+                    "errors": [],
+                    "agent_timings_seconds": {"draft": 2.0},
+                    "estimated_input_tokens": 80,
+                    "estimated_output_tokens": 120,
+                    "estimated_total_tokens": 200,
+                },
+                {
+                    "round": 3,
+                    "score": 85.0,
+                    "improved": False,
+                    "non_improve_streak": 1,
+                    "successful_research_round": True,
+                    "timeout_this_round": False,
+                    "provider_failure_this_round": False,
+                    "invalid_score_this_round": False,
+                    "errors": [],
+                    "agent_timings_seconds": {"draft": 3.0},
+                    "estimated_input_tokens": 120,
+                    "estimated_output_tokens": 180,
+                    "estimated_total_tokens": 300,
+                },
+            ]
+            (run_root / "round_metrics.json").write_text(
+                json.dumps(historical_metrics), encoding="utf-8"
+            )
+            (project_dir / "score_history.json").write_text(
+                json.dumps(historical_metrics), encoding="utf-8"
+            )
+            (run_root / "run_config.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "started_at": "2026-07-10T00:00:00+00:00",
+                        "completed_rounds": 3,
+                        "best_score": 93.0,
+                        "best_round": 2,
+                        "total_runtime_seconds": 12.5,
+                        "resume_sessions": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (run_root / "run_summary.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "completed_rounds": 3,
+                        "round_count": 3,
+                        "best_score": 100.0,
+                        "best_round": 3,
+                        "total_runtime_seconds": 12.5,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (project_dir / "checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 3,
+                        "best_score": 80.0,
+                        "best_round": 4,
+                        "best_round_path": str(run_root / "round_04"),
+                        "last_successful_agent": "judge",
+                        "can_resume": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            agents = DraftContextAgents()
+
+            run_resume_mode(
+                console=Console(),
+                agents=agents,
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                model_name="fake-model",
+                max_rounds=4,
+                stop_if_no_improvement_rounds=2,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+                drafting_mode="continue_from_previous_draft",
+            )
+
+            round_metrics = json.loads(
+                (run_root / "round_metrics.json").read_text(encoding="utf-8")
+            )
+            score_history = json.loads(
+                (project_dir / "score_history.json").read_text(encoding="utf-8")
+            )
+            checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
+            run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+            run_summary = json.loads((run_root / "run_summary.json").read_text(encoding="utf-8"))
+
+            self.assertEqual(round_metrics[:3], historical_metrics)
+            self.assertEqual(score_history[:3], historical_metrics)
+            self.assertEqual([entry["round"] for entry in round_metrics], [1, 2, 3, 4])
+            self.assertEqual([entry["round"] for entry in score_history], [1, 2, 3, 4])
+            self.assertEqual(round_metrics, score_history)
+            self.assertEqual(round_metrics[-1]["non_improve_streak"], 2)
+            self.assertTrue(round_metrics[-1]["evolution_metrics"]["has_previous_round"])
+            self.assertEqual(
+                round_metrics[-1]["evolution_metrics"]["score_delta_vs_previous"], -35.0
+            )
+
+            self.assertEqual(len(agents.draft_contexts), 1)
+            self.assertEqual(agents.draft_contexts[0]["previous_judge"], "judge three")
+            self.assertEqual(agents.draft_contexts[0]["previous_review"], "review three")
+            self.assertEqual(agents.draft_contexts[0]["previous_draft"], "draft three")
+            self.assertEqual(agents.draft_contexts[0]["previous_revised"], "revised three")
+
+            self.assertEqual(checkpoint["last_completed_round"], 4)
+            self.assertEqual(checkpoint["best_score"], 93.0)
+            self.assertEqual(checkpoint["best_round"], 2)
+            self.assertEqual(checkpoint["best_round_path"], str((run_root / "round_02").resolve()))
+            self.assertEqual(checkpoint["last_successful_agent"], "judge")
+            self.assertEqual(checkpoint["stop_reason"], STOP_NO_IMPROVEMENT)
+            self.assertEqual(run_config["completed_rounds"], 4)
+            self.assertEqual(run_config["best_round"], 2)
+            self.assertTrue(run_config["resume_metadata"]["best_score_reconciled"])
+            self.assertGreaterEqual(run_config["total_runtime_seconds"], 12.5)
+            self.assertEqual(run_summary["completed_rounds"], 4)
+            self.assertEqual(run_summary["round_count"], 4)
+            self.assertEqual(run_summary["best_round"], 2)
+            self.assertEqual(run_summary["stop_reason"], STOP_NO_IMPROVEMENT)
+            self.assertEqual(run_summary["successful_rounds"], [1, 2, 3, 4])
+            self.assertGreaterEqual(run_summary["total_runtime_seconds"], 12.5)
+            self.assertGreater(run_summary["total_estimated_tokens"], 600)
+            comparison_summary = load_run_summary(run_root)
+            analysis = analyze_run(run_root)
+            self.assertEqual(comparison_summary["completed_rounds"], 4)
+            self.assertEqual(comparison_summary["round_count"], 4)
+            self.assertEqual(comparison_summary["average_score"], 77.0)
+            self.assertEqual(analysis["score"]["first_round"], 1)
+            self.assertEqual(analysis["score"]["latest_round"], 4)
+            self.assertEqual(analysis["score"]["score_delta_first_to_latest"], -30.0)
+            self.assertEqual(
+                best_output_path.read_text(encoding="utf-8"), "Trusted round 2 best.\n"
+            )
+            self.assertEqual(
+                (run_root / "round_03" / "03_revised.md").read_text(encoding="utf-8"),
+                "revised three\n",
+            )
+
+    def test_resume_rejects_unreadable_previous_context_before_writes(self) -> None:
+        for filename in ("01_draft.md", "02_review.md", "03_revised.md", "04_judge.md"):
+            for case in ("invalid_utf8", "read_error"):
+                with (
+                    self.subTest(filename=filename, case=case),
+                    tempfile.TemporaryDirectory() as tmp,
+                ):
+                    project_dir = Path(tmp) / "project"
+                    run_root = project_dir / "runs" / "resume-run"
+                    previous_round_dir = run_root / "round_01"
+                    previous_round_dir.mkdir(parents=True)
+                    memory_path = project_dir / "memory.md"
+                    memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                    context_path = previous_round_dir / filename
+                    context_path.write_bytes(
+                        b"\xff\xfe" if case == "invalid_utf8" else b"Prior round context.\n"
+                    )
+                    artifact_contents = {
+                        run_root / "run_config.json": b'{"run_id": "resume-run"}',
+                        run_root / "run_manifest.json": b'{"run_id": "resume-run"}',
+                        project_dir / "checkpoint.json": json.dumps(
+                            {
+                                "run_id": "resume-run",
+                                "run_root": str(run_root),
+                                "last_completed_round": 1,
+                                "best_score": -1,
+                                "can_resume": True,
+                            }
+                        ).encode(),
+                    }
+                    for path, content in artifact_contents.items():
+                        path.write_bytes(content)
+                    before = {
+                        path.relative_to(project_dir): path.read_bytes()
+                        for path in project_dir.rglob("*")
+                        if path.is_file()
+                    }
+                    agents = RecordingAgents()
+                    console = Console(record=True)
+                    original_read = runner_module.read_regular_text
+
+                    def read_with_injected_error(path: Path, **kwargs: object) -> str:
+                        if Path(path).name == filename:
+                            raise OSError(f"private prior context path: {path}")
+                        return original_read(path, **kwargs)
+
+                    read_patch = (
+                        patch.object(
+                            runner_module,
+                            "read_regular_text",
+                            side_effect=read_with_injected_error,
+                        )
+                        if case == "read_error"
+                        else patch.object(runner_module, "read_regular_text", wraps=original_read)
+                    )
+                    with read_patch, self.assertRaises(ResumeHistoryError) as caught:
+                        run_resume_mode(
+                            console=console,
+                            agents=agents,
+                            task_text="Design a privacy-aware memory adapter.",
+                            project_dir=project_dir,
+                            memory_path=memory_path,
+                            model_name="fake-model",
+                            max_rounds=2,
+                            stop_if_no_improvement_rounds=10,
+                            global_max_runtime_seconds=60,
+                            per_agent_timeout_seconds=300,
+                        )
+
+                    after = {
+                        path.relative_to(project_dir): path.read_bytes()
+                        for path in project_dir.rglob("*")
+                        if path.is_file()
+                    }
+                    self.assertEqual(agents.draft_rounds, [])
+                    self.assertEqual(after, before)
+                    self.assertFalse((run_root / "round_02").exists())
+                    self.assertIn(filename, str(caught.exception))
+                    self.assertNotIn(str(Path(tmp)), str(caught.exception))
+                    self.assertIsNone(caught.exception.__cause__)
+                    if hasattr(console, "export_text"):
+                        output = " ".join(console.export_text().split())
+                        self.assertIn("Cannot resume safely", output)
+                        self.assertIn(filename, output)
+                        self.assertNotIn(str(Path(tmp)), output)
+
+    def test_resume_allows_genuinely_missing_legacy_previous_context(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            (project_dir / "checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 1,
+                        "best_score": -1,
+                        "can_resume": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            agents = DraftContextAgents()
+
+            resume_started = run_resume_mode(
+                console=Console(),
+                agents=agents,
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                model_name="fake-model",
+                max_rounds=2,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+            )
+
+            self.assertTrue(resume_started)
+            self.assertEqual(len(agents.draft_contexts), 1)
+            self.assertEqual(agents.draft_contexts[0]["previous_judge"], "")
+            self.assertEqual(agents.draft_contexts[0]["previous_review"], "")
+            self.assertEqual(agents.draft_contexts[0]["previous_draft"], "")
+            self.assertEqual(agents.draft_contexts[0]["previous_revised"], "")
+
+    def test_resume_uses_project_score_history_for_legacy_run_without_metrics(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            run_root = project_dir / "runs" / "legacy-resume-run"
+            previous_round_dir = run_root / "round_01"
+            previous_round_dir.mkdir(parents=True)
+            (previous_round_dir / "04_judge.md").write_text("legacy judge\n", encoding="utf-8")
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            (project_dir / "best_output.md").write_text("Legacy best.\n", encoding="utf-8")
+            legacy_entry = {
+                "round": "1",
+                "score": "80",
+                "improved": True,
+                "non_improve_streak": 0,
+                "successful_research_round": True,
+                "legacy_marker": {"preserve": True},
+            }
+            (project_dir / "score_history.json").write_text(
+                json.dumps([legacy_entry]), encoding="utf-8"
+            )
+            (project_dir / "checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "legacy-resume-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 1,
+                        "best_score": 80.0,
+                        "best_round_path": str(previous_round_dir),
+                        "can_resume": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            run_resume_mode(
+                console=Console(),
+                agents=RecordingAgents(),
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                model_name="fake-model",
+                max_rounds=2,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+            )
+
+            round_metrics = json.loads(
+                (run_root / "round_metrics.json").read_text(encoding="utf-8")
+            )
+            score_history = json.loads(
+                (project_dir / "score_history.json").read_text(encoding="utf-8")
+            )
+            run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+            run_summary = json.loads((run_root / "run_summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(round_metrics[0], legacy_entry)
+            self.assertEqual(score_history[0], legacy_entry)
+            self.assertEqual([entry["round"] for entry in round_metrics], ["1", 2])
+            self.assertEqual([entry["round"] for entry in score_history], ["1", 2])
+            self.assertEqual(
+                round_metrics[-1]["evolution_metrics"]["score_delta_vs_previous"], -16.0
+            )
+            self.assertEqual(run_summary["round_count"], 2)
+            self.assertEqual(run_summary["best_round"], 1)
+            self.assertEqual(run_config["resume_metadata"]["history_status"], "complete")
+            self.assertEqual(
+                run_config["resume_metadata"]["round_metrics_source"],
+                "score_history_fallback",
+            )
+
+    def test_resume_stop_before_new_round_does_not_rewind_history(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            (project_dir / "best_output.md").write_text("Trusted best.\n", encoding="utf-8")
+            historical_metrics = [
+                {
+                    "round": round_index,
+                    "score": score,
+                    "improved": round_index == 2,
+                    "non_improve_streak": 1 if round_index == 3 else 0,
+                    "successful_research_round": True,
+                    "errors": [],
+                }
+                for round_index, score in ((1, 80.0), (2, 93.0), (3, 85.0))
+            ]
+            history_bytes = json.dumps(historical_metrics).encode()
+            (run_root / "round_metrics.json").write_bytes(history_bytes)
+            (project_dir / "score_history.json").write_bytes(history_bytes)
+            (run_root / "run_config.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "started_at": "2026-07-10T00:00:00+00:00",
+                        "completed_rounds": 3,
+                        "best_score": 93.0,
+                        "best_round": 2,
+                        "total_runtime_seconds": 7.5,
+                        "resume_sessions": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (run_root / "run_summary.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "completed_rounds": 3,
+                        "round_count": 3,
+                        "best_score": 93.0,
+                        "best_round": 2,
+                        "total_runtime_seconds": 7.5,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (project_dir / "checkpoint.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 3,
+                        "best_score": 93.0,
+                        "best_round_path": str(run_root / "round_02"),
+                        "last_successful_agent": "judge",
+                        "can_resume": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (project_dir / "STOP_REQUESTED").write_text("STOP_REQUESTED\n", encoding="utf-8")
+            agents = RecordingAgents()
+
+            run_resume_mode(
+                console=Console(),
+                agents=agents,
+                task_text="Design a privacy-aware memory adapter.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                model_name="fake-model",
+                max_rounds=4,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+            )
+
+            checkpoint = json.loads((project_dir / "checkpoint.json").read_text(encoding="utf-8"))
+            run_config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+            run_summary = json.loads((run_root / "run_summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(agents.draft_rounds, [])
+            self.assertFalse((run_root / "round_04").exists())
+            self.assertEqual((run_root / "round_metrics.json").read_bytes(), history_bytes)
+            self.assertEqual((project_dir / "score_history.json").read_bytes(), history_bytes)
+            self.assertEqual(checkpoint["last_completed_round"], 3)
+            self.assertEqual(checkpoint["best_round"], 2)
+            self.assertEqual(checkpoint["best_round_path"], str((run_root / "round_02").resolve()))
+            self.assertEqual(checkpoint["stop_reason"], STOP_USER_REQUESTED)
+            self.assertEqual(checkpoint["last_successful_agent"], "judge")
+            self.assertEqual(run_config["completed_rounds"], 3)
+            self.assertEqual(run_config["best_round"], 2)
+            self.assertEqual(run_summary["completed_rounds"], 3)
+            self.assertEqual(run_summary["round_count"], 3)
+            self.assertEqual(run_summary["best_round"], 2)
+
+    def test_history_best_round_prefers_the_strict_improvement_on_tied_scores(self) -> None:
+        history = [
+            {"round": 1, "score": 80.0, "improved": True},
+            {"round": 2, "score": 93.0, "improved": True},
+            {"round": 3, "score": 93.0, "improved": False},
+        ]
+        self.assertEqual(_history_best_round(history, 93.0), 2)
+        self.assertEqual(
+            _history_best_round(
+                [
+                    {"round": 1, "score": 93.0},
+                    {"round": 2, "score": 93.0},
+                ],
+                93.0,
+            ),
+            1,
+        )
+
+    def test_unsafe_resume_histories_fail_before_writing_any_artifact(self) -> None:
+        valid_round_one = b'[{"round": 1, "score": 80}]'
+        huge_positive_score = b'[{"round": 1, "score": ' + b"9" * 400 + b"}]"
+        huge_negative_score = b'[{"round": 1, "score": -' + b"9" * 400 + b"}]"
+        deeply_nested_value = b'{"nested":' * 150 + b"0" + b"}" * 150
+        unsafe_histories = {
+            "invalid_json": (b'{"not": "complete"', valid_round_one, 80.0),
+            "invalid_utf8": (b"\xff\xfe", valid_round_one, 80.0),
+            "huge_integer": (
+                b'[{"round": ' + b"9" * 5000 + b"}]",
+                valid_round_one,
+                80.0,
+            ),
+            "huge_positive_score": (huge_positive_score, huge_positive_score, 80.0),
+            "huge_negative_score": (huge_negative_score, huge_negative_score, 80.0),
+            "huge_positive_score_round_metrics_only": (
+                huge_positive_score,
+                None,
+                80.0,
+            ),
+            "huge_negative_score_round_metrics_only": (
+                huge_negative_score,
+                None,
+                80.0,
+            ),
+            "deep_json": (b"[" * 2000 + b"0" + b"]" * 2000, valid_round_one, 80.0),
+            "deep_history_value": (
+                b'[{"round": 1, "details": ' + deeply_nested_value + b"}]",
+                valid_round_one,
+                80.0,
+            ),
+            "wrong_type": (b'{"round": 1}', valid_round_one, 80.0),
+            "duplicate_round": (
+                b'[{"round": 1}, {"round": 1}]',
+                valid_round_one,
+                80.0,
+            ),
+            "future_round": (
+                b'[{"round": 1}, {"round": 2}]',
+                valid_round_one,
+                80.0,
+            ),
+            "different_round_sequences": (valid_round_one, b"[]", 80.0),
+            "same_round_conflicting_fields": (
+                b'[{"round": 1, "score": 80, "successful_research_round": false}]',
+                b'[{"round": 1, "score": 80, "successful_research_round": true}]',
+                80.0,
+            ),
+            "same_round_bool_int_conflict": (
+                b'[{"round": 1, "score": 80, "successful_research_round": true}]',
+                b'[{"round": 1, "score": 80, "successful_research_round": 1}]',
+                80.0,
+            ),
+            "nested_bool_int_conflict": (
+                b'[{"round": 1, "score": 80, "agent_io_metrics": {"draft": {"called": true}}}]',
+                b'[{"round": 1, "score": 80, "agent_io_metrics": {"draft": {"called": 1}}}]',
+                80.0,
+            ),
+            "list_bool_int_conflict": (
+                b'[{"round": 1, "score": 80, "errors": [true]}]',
+                b'[{"round": 1, "score": 80, "errors": [1]}]',
+                80.0,
+            ),
+            "unsupported_checkpoint_best": (valid_round_one, valid_round_one, 90.0),
+        }
+        for case, (
+            round_metrics_content,
+            score_history_content,
+            checkpoint_best_score,
+        ) in unsafe_histories.items():
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp:
+                project_dir = Path(tmp) / "project"
+                project_dir.mkdir()
+                run_root = project_dir / "runs" / "resume-run"
+                run_root.mkdir(parents=True)
+                memory_path = project_dir / "memory.md"
+                memory_path.write_text("Manual memory.\n", encoding="utf-8")
+                artifact_contents = {
+                    run_root / "round_metrics.json": round_metrics_content,
+                    run_root / "run_config.json": b'{"run_id": "resume-run"}',
+                    run_root / "run_summary.json": b'{"completed_rounds": 1}',
+                    run_root / "run_manifest.json": b'{"legacy_field": "preserve"}',
+                    project_dir / "checkpoint.json": json.dumps(
+                        {
+                            "run_id": "resume-run",
+                            "run_root": str(run_root),
+                            "last_completed_round": 1,
+                            "best_score": checkpoint_best_score,
+                            "best_round_path": str(run_root / "round_01"),
+                            "can_resume": True,
+                        }
+                    ).encode(),
+                }
+                if score_history_content is not None:
+                    artifact_contents[project_dir / "score_history.json"] = score_history_content
+                for path, content in artifact_contents.items():
+                    path.write_bytes(content)
+                before = {
+                    path.relative_to(project_dir): path.read_bytes()
+                    for path in project_dir.rglob("*")
+                    if path.is_file()
+                }
+                agents = RecordingAgents()
+                console = Console(record=True)
+
+                with self.assertRaises(ResumeHistoryError) as caught:
+                    run_resume_mode(
+                        console=console,
+                        agents=agents,
+                        task_text="Design a privacy-aware memory adapter.",
+                        project_dir=project_dir,
+                        memory_path=memory_path,
+                        model_name="fake-model",
+                        max_rounds=2,
+                        stop_if_no_improvement_rounds=10,
+                        global_max_runtime_seconds=60,
+                        per_agent_timeout_seconds=300,
+                    )
+
+                after = {
+                    path.relative_to(project_dir): path.read_bytes()
+                    for path in project_dir.rglob("*")
+                    if path.is_file()
+                }
+                self.assertEqual(agents.draft_rounds, [])
+                self.assertEqual(after, before)
+                self.assertFalse((run_root / "round_02").exists())
+                for path, content in artifact_contents.items():
+                    self.assertEqual(path.read_bytes(), content)
+                if hasattr(console, "export_text"):
+                    output = " ".join(console.export_text().split())
+                    self.assertIn("Cannot resume safely", output)
+                    if case == "unsupported_checkpoint_best":
+                        self.assertIn("checkpoint best_score", output)
+                    else:
+                        self.assertIn("round_metrics.json", output)
+                    self.assertNotIn(str(Path(tmp)), output)
+                self.assertNotIn(str(Path(tmp)), str(caught.exception))
+
+    def test_legacy_score_history_fallback_must_not_exceed_checkpoint_best(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            score_history_path = root / "score_history.json"
+            round_metrics_path = root / "run" / "round_metrics.json"
+            score_history_path.write_text(
+                '[{"round": 1, "score": 90, "successful_research_round": true}]',
+                encoding="utf-8",
+            )
+
+            for checkpoint_best_score in (80.0, 100.0, None):
+                with self.subTest(checkpoint_best_score=checkpoint_best_score):
+                    with self.assertRaisesRegex(ResumeHistoryError, "checkpoint best_score"):
+                        _load_resume_histories(
+                            score_history_path=score_history_path,
+                            round_metrics_path=round_metrics_path,
+                            start_round=2,
+                            checkpoint_best_score=checkpoint_best_score,
+                        )
+
+            self.assertFalse(round_metrics_path.exists())
+
+    def test_legacy_unsuccessful_round_preserves_unrepresentable_score(self) -> None:
+        for sign in ("", "-"):
+            with self.subTest(sign=sign), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                round_metrics_path = root / "run" / "round_metrics.json"
+                round_metrics_path.parent.mkdir()
+                round_metrics_path.write_text(
+                    '[{"round": 1, "score": '
+                    + sign
+                    + "9" * 400
+                    + ', "successful_research_round": false}]',
+                    encoding="utf-8",
+                )
+
+                score_history, round_metrics, metadata = _load_resume_histories(
+                    score_history_path=root / "score_history.json",
+                    round_metrics_path=round_metrics_path,
+                    start_round=2,
+                    checkpoint_best_score=80.0,
+                )
+
+                self.assertEqual(score_history, round_metrics)
+                self.assertFalse(round_metrics[0]["successful_research_round"])
+                self.assertEqual(len(str(abs(round_metrics[0]["score"]))), 400)
+                self.assertEqual(round_metrics[0]["score"] < 0, sign == "-")
+                self.assertEqual(metadata["round_metrics_source"], "round_metrics")
+                self.assertEqual(metadata["score_history_source"], "round_metrics_fallback")
+
+    def test_partial_history_without_best_metadata_preserves_existing_best(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            run_root = project_dir / "runs" / "resume-run"
+            run_root.mkdir(parents=True)
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            artifact_contents = {
+                run_root / "round_metrics.json": b'[{"round": 1, "score": 50}]',
+                project_dir / "score_history.json": b'[{"round": 1, "score": 50}]',
+                project_dir / "best_output.md": b"Trusted missing-round best.\n",
+                run_root / "run_config.json": b'{"run_id": "resume-run"}',
+                run_root / "run_summary.json": b'{"completed_rounds": 2}',
+                project_dir / "checkpoint.json": json.dumps(
+                    {
+                        "run_id": "resume-run",
+                        "run_root": str(run_root),
+                        "last_completed_round": 2,
+                        "can_resume": True,
+                    }
+                ).encode(),
+            }
+            for path, content in artifact_contents.items():
+                path.write_bytes(content)
+
+            with self.assertRaisesRegex(ResumeHistoryError, "partial history"):
+                run_resume_mode(
+                    console=Console(),
+                    agents=RecordingAgents(),
+                    task_text="Design a privacy-aware memory adapter.",
+                    project_dir=project_dir,
+                    memory_path=memory_path,
+                    model_name="fake-model",
+                    max_rounds=3,
+                    stop_if_no_improvement_rounds=10,
+                    global_max_runtime_seconds=60,
+                    per_agent_timeout_seconds=300,
+                )
+
+            self.assertFalse((run_root / "round_03").exists())
+            for path, content in artifact_contents.items():
+                self.assertEqual(path.read_bytes(), content)
 
     def test_resume_blocks_partial_next_round_without_overwriting(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -996,7 +4091,7 @@ class RoundLoopTests(unittest.TestCase):
             agents = RecordingAgents()
             console = Console(record=True)
 
-            run_resume_mode(
+            resume_started = run_resume_mode(
                 console=console,
                 agents=agents,
                 task_text="Design a privacy-aware memory adapter.",
@@ -1011,6 +4106,7 @@ class RoundLoopTests(unittest.TestCase):
             )
 
             self.assertFalse(preview["can_resume"])
+            self.assertFalse(resume_started)
             self.assertEqual(preview["blocked_reason"], "partial_next_round_exists")
             self.assertEqual(preview["next_round_status"], "partial")
             self.assertEqual(preview["next_round_safety_action"], "fail_safe_require_user_action")
@@ -1039,6 +4135,18 @@ class RoundLoopTests(unittest.TestCase):
                 checkpoint={},
                 repo_root=repo_root,
             )
+            invalid_round_previews = [
+                build_resume_preview(
+                    project_dir=project_dir,
+                    checkpoint={
+                        "can_resume": True,
+                        "run_root": str(project_dir / "runs" / "invalid-run"),
+                        "last_completed_round": invalid_round,
+                    },
+                    repo_root=repo_root,
+                )
+                for invalid_round in (-1, -0.5, 1.5, True)
+            ]
             stale_preview = build_resume_preview(
                 project_dir=project_dir,
                 checkpoint={
@@ -1067,6 +4175,11 @@ class RoundLoopTests(unittest.TestCase):
 
         self.assertFalse(missing_preview["can_resume"])
         self.assertEqual(missing_preview["blocked_reason"], "missing_checkpoint")
+        for invalid_round_preview in invalid_round_previews:
+            self.assertFalse(invalid_round_preview["can_resume"])
+            self.assertEqual(
+                invalid_round_preview["blocked_reason"], "invalid_last_completed_round"
+            )
         self.assertFalse(stale_preview["can_resume"])
         self.assertEqual(stale_preview["blocked_reason"], "stale_run_root")
         self.assertEqual(stale_preview["next_round"], 3)

@@ -9,7 +9,21 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
 
+from .storage import read_regular_text
+
 RUN_CONFIG_SCHEMA_VERSION = 1
+
+
+class InvalidRunConfigError(ValueError):
+    """Raised when an existing run config cannot be preserved safely."""
+
+
+class _InheritGitRoot:
+    """Sentinel for compatibility with callers that only provide repo_root."""
+
+
+INHERIT_GIT_ROOT = _InheritGitRoot()
+GitRootSetting = Path | None | _InheritGitRoot
 
 
 def utc_now_iso() -> str:
@@ -86,6 +100,7 @@ def build_initial_run_config(
     project_metadata: Mapping[str, Any] | None = None,
     prompt_dir: Path | None = None,
     repo_root: Path | None = None,
+    git_root: GitRootSetting = INHERIT_GIT_ROOT,
     started_at: str | None = None,
     existing_run_config: Mapping[str, Any] | None = None,
     resume_metadata: Mapping[str, Any] | None = None,
@@ -96,7 +111,8 @@ def build_initial_run_config(
     resume_sessions = list(existing.get("resume_sessions", []))
     start_round = int((runtime_config or {}).get("start_round", 1))
     drafting_mode = str((runtime_config or {}).get("drafting_mode", ""))
-    if start_round > 1:
+    resumes_existing_run = (resume_metadata or {}).get("lifecycle_action") == "resume_existing_run"
+    if start_round > 1 or resumes_existing_run:
         resume_sessions.append(
             {
                 "started_at": current_session_started_at,
@@ -115,6 +131,8 @@ def build_initial_run_config(
     }
     if model_parameters:
         model.update(_json_safe(model_parameters))
+
+    effective_git_root = repo_root if git_root is INHERIT_GIT_ROOT else git_root
 
     return {
         "schema_version": RUN_CONFIG_SCHEMA_VERSION,
@@ -137,7 +155,7 @@ def build_initial_run_config(
         "topic": _json_safe(topic_snapshot or {}),
         "prompt_files": collect_prompt_file_hashes(prompt_dir),
         "git": {
-            "commit": git_commit_hash(repo_root),
+            "commit": git_commit_hash(effective_git_root),
         },
         "project": _json_safe(project_metadata or {}),
         "resume_metadata": _json_safe(resume_metadata or {}),
@@ -193,21 +211,41 @@ def finalize_run_config(
     return finalized
 
 
-def read_run_config(run_root: Path) -> dict[str, Any]:
+def read_run_config(
+    run_root: Path,
+    *,
+    safe_artifacts: bool = False,
+    anchor: Path | None = None,
+    strict_existing: bool = False,
+) -> dict[str, Any]:
+    def read_path(path: Path) -> str:
+        if safe_artifacts:
+            return read_regular_text(path, anchor=anchor)
+        return path.read_text(encoding="utf-8")
+
     run_config_path = run_root / "run_config.json"
-    if run_config_path.exists():
-        try:
-            data = json.loads(run_config_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return {}
-        return data if isinstance(data, dict) else {}
+    missing = object()
+    try:
+        data = json.loads(read_path(run_config_path))
+    except FileNotFoundError:
+        data = missing
+    except (OSError, UnicodeError, ValueError, RecursionError):
+        if strict_existing:
+            raise InvalidRunConfigError("run_config.json is unreadable or invalid JSON") from None
+        return {}
+    if data is not missing:
+        if isinstance(data, dict):
+            return data
+        if strict_existing:
+            raise InvalidRunConfigError("run_config.json must contain a JSON object")
+        return {}
 
     manifest_path = run_root / "run_manifest.json"
-    if not manifest_path.exists():
-        return {}
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        manifest = json.loads(read_path(manifest_path))
+    except FileNotFoundError:
+        return {}
+    except (OSError, UnicodeError, json.JSONDecodeError):
         return {}
     if not isinstance(manifest, dict):
         return {}

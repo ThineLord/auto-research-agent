@@ -1,0 +1,75 @@
+model:
+  provider: ollama
+  name: qwen3:8b
+  temperature: 0.3
+  timeout_seconds: 300
+  max_prompt_chars: 12000
+  gemini:
+    api_key_env: GEMINI_API_KEY
+    api_key: ""
+    models:
+      - gemini-3.5-flash
+      - gemini-2.5-flash
+      - gemini-2.5-flash-lite
+ollama_base_url: http://localhost:11434
+project_name: example
+topic:
+  title: Example Research Planning Task
+  description: A public-safe starter project for learning the local research workflow.
+  keywords:
+    - research
+    - planning
+    - methods
+    - evaluation
+    - risks
+max_rounds: 5
+stop_if_no_improvement_rounds: 2
+top_p: 0.9
+drafting_mode: best_guided
+runtime:
+  normal_max_runtime_seconds: 10800
+  continuous_max_runtime_seconds: 43200
+cloud_free:
+  cloud_free_mode: true
+  free_runner_preset: auto_long_run
+  min_delay_seconds:
+  max_delay_seconds: 3600
+  max_retries: 5
+  prompt_budget_chars: 24000
+  prompt_budget_tokens:
+  allow_model_fallback: true
+  allowed_model_patterns:
+    - ^gemini-.*flash
+    - ^gemini-.*flash-lite
+    - ^gemma
+    - .*gemma.*
+    - .*(high[-_ ]?tpm|unlimited).*
+  blocked_model_patterns:
+    - pro
+    - preview
+    - live
+    - tts
+    - image
+    - batch
+    - flex
+    - priority
+    - grounding
+    - google[-_ ]?search
+    - \bsearch\b
+    - map
+    - maps
+    - code[-_ ]?execution
+    - file[-_ ]?search
+    - context[-_ ]?cach
+    - \btool
+literature_survey:
+  include_task: true
+  include_memory: true
+  include_project_markdown: true
+  include_run_outputs: true
+  source_globs:
+    - "outputs/**/*.md"
+    - "artifacts/**/*.md"
+  max_source_files: 80
+  max_papers: 200
+  output_dir: survey

@@ -75,6 +75,11 @@ make run ARGS="--model phi3:mini"
 `ollama_base_url` 不是有效 HTTP/HTTPS 地址，或 `project_name` 不是简单项目文件夹名，
 会直接显示具体配置错误并停止。
 
+数值 CLI override 也遵守相同边界：延时必须是有限非负数且最大延时不超过 86400 秒，
+重试次数为 0–20，prompt 大小至少 1000 字符，轮数至少为 1，provider quota 连续失败
+阈值允许为 0 但不能为负。CLI 与配置合并后的最大延时不能小于最小延时；无效输入会在
+创建项目或 provider 前以状态 2 停止。
+
 推荐继续使用当前嵌套格式：
 
 ```yaml
@@ -288,6 +293,10 @@ make continuous
 - `projects/example/checkpoint.json`
 - `projects/example/interrupted_report.md`
 
+两者的进程语义不同：若 runner 在受保护的 agent 执行阶段捕获 `Ctrl+C`，会先完成上述
+可恢复 artifact，再返回状态 130；`STOP_REQUESTED` 是成功的协作式停止，返回状态 0 并
+记录 `USER_STOP_REQUESTED`。
+
 ## 如何恢复（resume）
 
 ```bash
@@ -298,8 +307,17 @@ make resume
 
 - 从 `last_completed_round + 1` 继续
 - 不覆盖已完成 round 文件
+- 保留并追加既有 `round_metrics.json` 和 `score_history.json`，同时延续 best-round、累计 runtime、
+  未提升计数、上一轮 judge，以及当前 drafting mode 所需的 review/draft/revised 上下文
 - 如果下一轮目录不存在或为空，可以继续；如果下一轮目录已存在且非空，会 fail-safe 停止，
   避免覆盖 partial/uncheckpointed 输出
+- 如果既有 history 不是安全的 JSON array，或包含无效、重复、乱序、未来轮次，会在任何 artifact
+  写入前 fail-safe 停止并让 CLI 返回状态 2；两份 history 的轮次或共有字段冲突时也会阻塞。旧 run
+  缺少 run-local metrics 时，只有 project score history 能关联到 checkpoint 上一轮才会兼容恢复
+- `run_root` 必须是当前项目 `runs/` 下既有的绝对、每-run 目录。相对路径、其他项目、`..` 穿越、
+  `runs/` 本身或普通文件会在扫描候选目录前 fail-safe 阻塞。resume 还会检查它将读取的
+  run config/manifest/summary/metrics、上一轮上下文和本次计划写入的所有 round 目录，拒绝逃逸
+  符号链接、无效文件类型或不可安全访问的路径。仓库生成的旧版项目内绝对路径仍兼容
 - 只有更高分时才更新 `best_output.md`
 
 ## 输出文件怎么读（先看哪个）
@@ -331,7 +349,27 @@ prompt 文件 SHA-256、Git commit、开始/结束时间、停止原因和是否
 
 CLI `--resume` 会先打印 resume preview，包括 run id/root、last completed round、next round、
 stop reason、是否可 resume、下一轮目录状态和安全动作。UI 的 Resume 区域也显示同样信息，
-并会提示缺失、stale checkpoint 或 partial next-round directory。
+并会提示缺失、stale、路径不安全的 checkpoint 或 partial next-round directory；这些检查失败时
+Resume 按钮会禁用。
+如果 preview 显示 `round_commit_recovery_required`，它只是在只读地报告成功轮次的跨文件提交
+尚未完成，不会在 UI 内修改 artifact。下一次 normal/continuous/session/resume/mock CLI 入口会
+先取得项目锁，在 provider 预检和 Agent 构造前进行无网络、可重复的 roll-forward，然后用推进后的
+checkpoint 重新生成 resume preview。若显示 `round_commit_recovery_conflict`，请保留 journal 和
+所有 artifact 供人工检查；analytics、benchmark report 和 UI 的相关读取会继续 fail closed。
+checkpoint 若显式提供 `run_id`，必须与 canonical run 目录名一致；省略时会安全推导。resume
+会保留旧 `run_manifest.json` 的创建期 provenance 和未知扩展字段；若 manifest 无法无损读取或
+合并，会在写入任何新 artifact 前停止。
+
+恢复同一个 run 时，`run_config.json` 和 `run_manifest.json` 作为一个启动元数据单元更新。
+写入期间 run 目录可能短暂出现隐藏文件 `.resume_startup_transaction.json`；若普通 I/O 异常、
+`Ctrl+C` 或进程终止留下该文件，下次 `--resume` 在 provider/client 初始化成功并进入 resume
+runner 后，会在记录日志或调用 agent 之前回退到上一组完整元数据，再开始新的恢复会话。不要
+手动编辑或删除该文件；如果校验检测到 canonical 元数据已被外部程序改动，resume 会 fail
+closed 并要求先备份 run 目录后人工核对，而不会覆盖无法归属的内容。该机制依赖单文件原子
+替换并覆盖正常
+异常/进程中断，不承诺断电级持久性。journal 删除是恢复会话的启动提交点；若进程恰在提交后、
+写 `run_start` 日志前被强制终止，完整的 config/manifest 会保留这个零工作量会话，后续 resume
+会把它视为一次已启动但未进入 agent 的历史尝试，而不是回退其中一个文件。
 
 如果要看本次 run 总览和每轮指标，查看：
 

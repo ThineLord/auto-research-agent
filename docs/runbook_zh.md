@@ -147,6 +147,11 @@ make resume
   preview；它不是新建 run 后使用 `best_output.md` 作为 previous-best context。
 - 如果下一轮目录已经存在且非空，`resume` 会 fail-safe 停止，不会覆盖 partial 输出；先人工检查、
   移动或删除该目录，再重新运行 `make resume`。
+- `checkpoint.run_root` 只接受当前项目 `runs/<run_id>` 下既有的绝对目录；相对路径、跨项目/穿越路径、
+  普通文件会在扫描候选目录前阻塞。resume 消费的 config/legacy manifest/summary/metrics/history、
+  上一轮上下文和计划 round 目录若为逃逸符号链接或无效文件类型也会阻塞；CLI 返回状态 2，UI 禁用 Resume。
+- checkpoint 显式 `run_id` 必须匹配 canonical run 目录名。旧 manifest 的创建期字段和未知扩展
+  会保留；无法解析、身份冲突或无法合并时，resume 会在任何 artifact 写入前 fail closed。
 
 如果误启动了长任务：
 
@@ -155,12 +160,16 @@ touch projects/example/STOP_REQUESTED
 ```
 
 请求安全停止。程序会在安全点退出，并更新 checkpoint。
+这是协作式停止：命令正常返回状态 0，artifact 中记录 `USER_STOP_REQUESTED`。
 
 终端里直接运行的进程，也可以按：
 
 ```bash
 Ctrl+C
 ```
+
+`Ctrl+C` 返回状态 130。若 runner 在受保护的 agent 执行阶段捕获中断，会先写完可恢复的
+checkpoint、run summary/config 和 interrupted report，再把中断传播到进程边界。
 
 ## 5. 如何指定 rounds 数量
 
@@ -348,7 +357,8 @@ lsof -iTCP:8501 -sTCP:LISTEN -n -P || true
 
 - 终端没有报 `Config error`、`Model ... is not installed`、`Ollama is not available`。
 - `projects/example/checkpoint.json` 存在且 `last_completed_round >= 1`。
-- `projects/example/checkpoint.json` 里 `run_root` 指向的目录存在。
+- `projects/example/checkpoint.json` 里 `run_root` 是当前项目 `runs/` 下既有的绝对、每-run 目录，
+  且 resume 将消费的 round/state artifact 路径没有通过符号链接逃逸。
 - `projects/example/checkpoint.json` 里 `run_config` 指向的 `run_config.json` 存在。
 - `checkpoint.json` / `run_config.json` / `run_summary.json` 里有 `resume_metadata`，能区分
   `resume_existing_run` 和 `start_new_run`。

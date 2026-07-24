@@ -157,6 +157,9 @@ make resume
 读取 `projects/example/checkpoint.json` 继续同一个 run；CLI 会先显示 resume preview，包括
 run id/root、上一轮、下一轮、stop reason、can_resume、下一轮目录状态和安全动作。已完成轮次文件会保留；
 如果下一轮目录已存在且非空，resume 会 fail-safe 停止，要求先人工检查/移动/删除该目录。
+只有当前项目 `runs/<run_id>` 下既有的绝对目录可恢复；跨项目、相对、穿越或非目录 root 会在扫描
+候选目录前阻塞。resume 会另外验证它消费的 config/legacy manifest/summary/metrics/history、
+上一轮 context 和本次计划 round 路径；这些路径若通过符号链接逃逸也会阻塞，UI 同时禁用 Resume。
 这不同于新开一个 run 后把 `best_output.md` 当 previous-best context 使用。
 
 ```bash
@@ -201,6 +204,8 @@ touch projects/example/STOP_REQUESTED
 ```
 
 请求研究循环在安全点停止；UI 的 `Pause / Stop Safely` 按钮也是创建这个文件。
+该协作式停止正常返回状态 0；终端 `Ctrl+C` 返回状态 130。若 runner 在受保护的 agent
+执行阶段捕获中断，会先完成可恢复 artifact 的写入。
 
 ## 5. 输出文件在哪里
 
@@ -243,6 +248,17 @@ similarity/evolution、timeout/error、agent timing 和 estimated tokens。它�
 ```
 
 `--analyze-run` 不调用模型，会输出分数首尾变化、超时/错误、估算 token、相似度和 rubric 摘要。
+
+只读检查一个旧项目的 history 状态：
+
+```bash
+.venv/bin/python -m src.main --legacy-migration-preview example
+```
+
+该 preview 只检查 `projects/example` 这一显式项目，不扫描其他项目，不加载 provider/config，
+不取得或删除运行锁，也不创建、复制、修复或删除 artifact。输出中的
+`execution_authorized` 固定为 `false`。
+
 - `projects/example/model_ops.log`：UI 拉取或删除模型时的日志。
 
 当前输出约定：
@@ -297,7 +313,8 @@ similarity/evolution、timeout/error、agent timing 和 estimated tokens。它�
 
 ## 7. 可视化有什么用
 
-从研究者视角看，当前 UI 对“运行管理”有用，并提供基础分数表格和趋势线；更深入的跨 run 质量分析仍需要人工阅读输出或使用 helper。
+从研究者视角看，当前 UI 对“运行管理”有用，并已内置单 run analytics 和多 run comparison；
+更深入的研究质量判断仍需要人工阅读输出，不能由这些汇总指标替代。
 
 它能帮助判断 auto research 是否在变好：
 
@@ -309,7 +326,8 @@ similarity/evolution、timeout/error、agent timing 和 estimated tokens。它�
 
 - 分数只来自同一个 judge agent，缺少多 judge、一致性、人工标注或任务级指标。
 - 已有基础文本演化指标，例如 draft 到 revised 的相似度、revised/judge 相对上一轮的相似度和低变化轮次；但 novelty drift、重复率和实验可执行度仍需要人工判断或后续指标。
-- 还没有完整实验 dashboard；当前有 score history 表格、分数趋势、run comparison 和基础估算 token/耗时指标。
+- 已有基础实验 dashboard，可查看 score、rubric、similarity/evolution、timeout/error、agent
+  耗时、估算 token 和 run comparison；它还不是带人工标注、统计显著性或真实成本核算的完整评估系统。
 
 它能帮助发现卡顿、重复、退化、跑偏：
 
@@ -329,11 +347,14 @@ similarity/evolution、timeout/error、agent timing 和 estimated tokens。它�
 目前还缺的关键指标：
 
 - 真实 provider token usage 和明确价格假设下的成本统计；当前只有 `estimated_*_tokens`，不等于账单 token。
-- 更完整的 rubric 子项曲线；当前 run summary 和 run comparison 已有均值/最新值/首尾变化。
+- 跨 run 的 rubric 子项曲线和不确定性分析；当前单 run dashboard 有 rubric 趋势，run
+  summary 保存均值、最新值和首尾变化，run comparison 只展示 compact averages。
 - 更细的差异摘要、重复率和 novelty drift；当前只有基础相似度、变动行数和低变化轮次。
 - 是否引用了上一轮 draft、上一轮 review、previous best 的可追踪 lineage。
-- 不同模型、不同 drafting mode、不同 prompt 版本的 UI 对比表。
-- 更完整可视化曲线：rubric、耗时、错误、超时、重复、non-improve streak。
+- prompt hash、关键配置差异和 lineage 的显式 UI 对比；当前表格已经能比较 model 和
+  drafting mode，但不会自动判断 prompt/config 差异的因果影响。
+- 跨 run 的时间序列叠加、diff、novelty drift、重复率和 non-improve streak 可视化；当前
+  dashboard 已提供单 run 的 rubric、耗时、错误/超时和相似度视图。
 
 ## 8. 代码结构导览
 
@@ -367,10 +388,12 @@ similarity/evolution、timeout/error、agent timing 和 estimated tokens。它�
 - `src/session.py`：session 模式，先生成 objective 和 plan，再跑迭代，最后生成 report。
 - `src/literature_survey.py`：不调用模型的文献综述资料收集、论文元数据解析、去重、主题/缺口分析和报告生成。
 - `src/resume.py`：读取 checkpoint 并从下一轮继续。
+- `src/resume_safety.py`：统一校验 resume root、round 和 state artifact 的路径边界。
 - `src/storage.py`：文件读写、round 输出、score 解析、memory 更新、research_state 更新。
 - `src/runtime.py`：后台进程、UI 元数据、run lock、测试运行、停止信号。
 - `src/run_config.py`：生成 run-level 复现信息、prompt 文件 hash、Git commit，并兼容读取旧 `run_manifest.json`。
 - `src/run_compare.py`：读取 `run_summary.json`，比较两个或多个 run。
+- `src/run_analytics.py`：汇总单个 run 的趋势、鲁棒性、成本准备度和可解释性指标。
 - `src/judge_output.py`：judge JSON schema 和分数解析。
 - `src/logging_config.py`：结构化日志格式。
 - `src/constants.py`：停止原因和运行常量。
@@ -409,7 +432,9 @@ similarity/evolution、timeout/error、agent timing 和 estimated tokens。它�
 
 - A 更适合做严格对照实验，因为每轮都从同一 task 出发，只让 review idea 影响下一轮，比较容易分析“review 是否带来提升”。
 - B 更接近真实写作迭代，可能更快收敛，但路径依赖更强，容易累积错误和重复。
-- 建议先实现 A/B 显式开关，再用相同模型、相同 task、相同 max_rounds 跑两个 run，比 `score_history`、rubric 子项、重复率、人工可执行度。
+- 可以直接使用已实现的 `fresh_from_task_with_review` 与
+  `continue_from_previous_draft` drafting mode，用相同模型、相同 task、相同 max_rounds
+  跑两个 run，再比较 `score_history`、rubric 子项、重复率和人工可执行度。
 
 ## 10. 下一步开发优先级
 
@@ -420,28 +445,31 @@ similarity/evolution、timeout/error、agent timing 和 estimated tokens。它�
 - 先不要跑长 continuous；只跑 `make diagnostic ARGS="--provider ollama --model qwen3:8b"` 或 `make diagnostic ARGS="--provider ollama --model deepseek-r1:8b"` 做一轮真实 smoke。
 - 打开 UI，确认 `best_output.md`、`checkpoint.json`、`score_history.json` 都能正常浏览。
 
-### 今天可以做
+### 已完成，可直接验证
 
-- 为 run comparison helper 增加 CLI 包装命令。
-- 在 UI 里加一个多 run 对比视图。
-- 清理 UI 的 Streamlit deprecation warning，把 `use_container_width=True` 改成 `width='stretch'`。
-- 用 UI/CLI 的 resume preview 明确已有 checkpoint 是否还要继续，还是新开一个 clean run。
+- `--compare-runs` 已提供 CLI 包装，UI 的 `Run comparison` 已能比较多个 run。
+- `round_metrics.json` 和 `run_summary.json` 已记录 agent elapsed seconds 与估算 token；这些
+  数值用于相对比较，不代表 provider 账单。
+- UI 已使用当前 Streamlit 的 `width="stretch"` 参数，并提供 resume preview、单 run
+  analytics 和多 run comparison。
 
-### 之后 1-2 天做
+### 近期仍有价值
 
-- 增加两个 run 的比较视图：模型、mode、轮数、最好分、平均分、超时数、重复数。
-- 记录每个 agent 的 elapsed seconds 到结构化 JSON，而不是只散落在 log。
-- 增加 token 估算或真实 token 统计，为成本/时间分析打基础。
-- 在实际实验中验证 `resume_metadata` 是否足够解释“继续旧 run”和“从旧 best 开新 run”的差异。
+- 在 UI comparison 中显式呈现 prompt hash、关键配置差异和 provenance，而不推断因果关系。
+- 在真实实验和 legacy checkpoint fixtures 中复核现有 `resume_metadata` 的可读性与兼容性，
+  保持 `start_new_run` 和 `resume_existing_run` 两种 lifecycle action 的明确区分。
+- 为真实 provider token usage、价格假设和硬预算上限设计 fail-closed 的成本记录边界。
+- 增加 novelty drift、重复率和跨 run 时间序列对比，同时保留人工阅读原始输出的入口。
 
 ### 更长期做
 
 - 扩展更多 provider：在现有 Ollama/Gemini 之外增加 OpenAI API 或其他兼容 API，并统一模型配置。
 - 支持完整成本统计：input tokens、output tokens、价格、总成本。
 - 支持多 judge 或人工复核，提高分数可信度。
-- 支持 prompt 版本管理和 run reproducibility。
-- 支持实验 dashboard：score 曲线、rubric 曲线、耗时曲线、重复率、diff、mode 对比。
-- 支持导出 research report，把 best output、judge blockers、score trend 汇总成可提交文档。
+- 支持 prompt 版本管理，并在现有 run reproducibility metadata 上提供兼容的版本比较。
+- 在现有基础 dashboard 上扩展跨 run 曲线、重复率、diff、置信区间和受控 mode 对比。
+- 支持跨 run 的 paper-facing comparison report；已有 session `final_session_report.md` 不应
+  被误当作跨实验结论。
 
 ## 11. 实际建议
 

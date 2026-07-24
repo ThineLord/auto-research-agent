@@ -5,11 +5,75 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from src.run_config import collect_prompt_file_hashes, read_run_config
+from src.run_config import (
+    InvalidRunConfigError,
+    build_initial_run_config,
+    collect_prompt_file_hashes,
+    read_run_config,
+)
 
 
 class RunConfigTests(unittest.TestCase):
+    def test_explicit_git_root_is_separate_from_display_repo_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "run"
+            repo_root = Path(tmp) / "workspace"
+            with patch("src.run_config.git_commit_hash", return_value=None) as git_hash:
+                build_initial_run_config(
+                    run_id="run",
+                    run_root=run_root,
+                    mode="mock",
+                    model_name="mock",
+                    repo_root=repo_root,
+                    git_root=None,
+                )
+            git_hash.assert_called_once_with(None)
+
+            with patch("src.run_config.git_commit_hash", return_value=None) as git_hash:
+                build_initial_run_config(
+                    run_id="run",
+                    run_root=run_root,
+                    mode="mock",
+                    model_name="mock",
+                    repo_root=repo_root,
+                )
+            git_hash.assert_called_once_with(repo_root)
+
+    def test_round_one_resume_session_depends_on_lifecycle_not_round_number(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "runs" / "selected"
+            run_root.mkdir(parents=True)
+            common = {
+                "run_id": "selected",
+                "run_root": run_root,
+                "model_name": "fake-model",
+                "runtime_config": {"start_round": 1},
+                "started_at": "2026-07-11T00:00:00+00:00",
+            }
+
+            new_run = build_initial_run_config(
+                **common,
+                mode="normal",
+                resume_metadata={"lifecycle_action": "start_new_run"},
+            )
+            resumed_run = build_initial_run_config(
+                **common,
+                mode="resume",
+                existing_run_config={
+                    "started_at": "2026-07-10T00:00:00+00:00",
+                    "resume_sessions": [],
+                },
+                resume_metadata={"lifecycle_action": "resume_existing_run"},
+            )
+
+        self.assertEqual(new_run["resume_sessions"], [])
+        self.assertEqual(
+            resumed_run["resume_sessions"],
+            [{"started_at": "2026-07-11T00:00:00+00:00", "start_round": 1}],
+        )
+
     def test_collect_prompt_file_hashes_records_markdown_prompt_hashes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             prompt_dir = Path(tmp) / "prompts"
@@ -46,8 +110,10 @@ class RunConfigTests(unittest.TestCase):
             )
 
             config = read_run_config(run_root)
+            strict_config = read_run_config(run_root, strict_existing=True)
 
         self.assertEqual(config["schema_version"], 0)
+        self.assertEqual(strict_config, config)
         self.assertEqual(config["compatibility"]["source"], "run_manifest.json")
         self.assertTrue(config["compatibility"]["run_config_missing"])
         self.assertEqual(config["model"]["name"], "qwen3:8b")
@@ -67,6 +133,43 @@ class RunConfigTests(unittest.TestCase):
             (run_root / "run_manifest.json").mkdir()
 
             self.assertEqual(read_run_config(run_root), {})
+
+    def test_read_run_config_strict_mode_rejects_an_existing_non_object(self) -> None:
+        for content in ("[]\n", "null\n"):
+            with self.subTest(content=content), tempfile.TemporaryDirectory() as tmp:
+                run_root = Path(tmp) / "runs" / "invalid-run-config"
+                run_root.mkdir(parents=True)
+                (run_root / "run_config.json").write_text(content, encoding="utf-8")
+
+                self.assertEqual(read_run_config(run_root), {})
+                with self.assertRaisesRegex(
+                    InvalidRunConfigError,
+                    "run_config.json must contain a JSON object",
+                ) as caught:
+                    read_run_config(run_root, strict_existing=True)
+
+                self.assertNotIn(str(Path(tmp)), str(caught.exception))
+
+    def test_read_run_config_strict_mode_masks_existing_read_failures(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "runs" / "unreadable-run-config"
+            private_path = Path(tmp) / "private" / "run_config.json"
+            with patch(
+                "src.run_config.read_regular_text",
+                side_effect=PermissionError(str(private_path)),
+            ):
+                self.assertEqual(read_run_config(run_root, safe_artifacts=True), {})
+                with self.assertRaisesRegex(
+                    InvalidRunConfigError,
+                    "run_config.json is unreadable or invalid JSON",
+                ) as caught:
+                    read_run_config(
+                        run_root,
+                        safe_artifacts=True,
+                        strict_existing=True,
+                    )
+
+        self.assertNotIn(str(Path(tmp)), str(caught.exception))
 
 
 if __name__ == "__main__":

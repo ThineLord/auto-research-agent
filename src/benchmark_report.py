@@ -3,14 +3,27 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import stat
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from pathlib import Path
 from statistics import mean
 from typing import Any
 
+from . import constants as stop_constants
+from .round_commit_recovery import (
+    ensure_round_commit_readable,
+    infer_round_commit_project_dir,
+)
 from .storage import display_path, parse_score, read_file_text, write_text
+
+_KNOWN_STOP_REASONS = frozenset(
+    value
+    for name, value in vars(stop_constants).items()
+    if name.startswith("STOP_") and isinstance(value, str)
+)
 
 
 @dataclass(frozen=True)
@@ -77,11 +90,42 @@ def _similarity(a: str, b: str) -> float:
     return SequenceMatcher(None, a[:12000], b[:12000]).ratio()
 
 
-def _read_json(path: Path) -> Any:
+def _read_json(path: Path) -> dict[str, Any]:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        metadata = path.lstat()
+    except OSError:
         return {}
+    if not stat.S_ISREG(metadata.st_mode):
+        return {}
+
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError:
+        return {}
+    try:
+        opened_metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(opened_metadata.st_mode) or (
+            metadata.st_dev,
+            metadata.st_ino,
+        ) != (opened_metadata.st_dev, opened_metadata.st_ino):
+            return {}
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+    except OSError:
+        return {}
+    finally:
+        os.close(descriptor)
+
+    try:
+        data = json.loads(b"".join(chunks).decode("utf-8"))
+    except (OSError, ValueError, RecursionError):
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def _round_index(round_dir: Path) -> int:
@@ -96,11 +140,88 @@ def _infer_repo_root(run_root: Path) -> Path | None:
     return None
 
 
+def _nonempty_string(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
+def _stop_reason(value: Any) -> str | None:
+    normalized = _nonempty_string(value)
+    return normalized if normalized in _KNOWN_STOP_REASONS else None
+
+
+def _resolved_path(path: Path) -> Path | None:
+    try:
+        return path.resolve(strict=False)
+    except (OSError, RuntimeError, ValueError):
+        return None
+
+
+def _checkpoint_root_matches_run(checkpoint_root: str, run_root: Path) -> bool:
+    try:
+        checkpoint_path = Path(checkpoint_root)
+    except (TypeError, ValueError):
+        return False
+
+    if checkpoint_path.is_absolute():
+        candidates = [checkpoint_path]
+    else:
+        project_dir = run_root.parent.parent
+        candidates = [project_dir / checkpoint_path, run_root.parent / checkpoint_path]
+        repo_root = _infer_repo_root(run_root)
+        if repo_root is not None:
+            candidates.append(repo_root / checkpoint_path)
+
+    resolved_run_root = _resolved_path(run_root)
+    if resolved_run_root is None:
+        return False
+    return any(_resolved_path(candidate) == resolved_run_root for candidate in candidates)
+
+
+def _checkpoint_belongs_to_run(checkpoint: dict[str, Any], run_root: Path) -> bool:
+    raw_checkpoint_root = checkpoint.get("run_root")
+    raw_checkpoint_run_id = checkpoint.get("run_id")
+    if raw_checkpoint_root is not None and not isinstance(raw_checkpoint_root, str):
+        return False
+    if raw_checkpoint_run_id is not None and not isinstance(raw_checkpoint_run_id, str):
+        return False
+    checkpoint_root = _nonempty_string(raw_checkpoint_root)
+    checkpoint_run_id = _nonempty_string(raw_checkpoint_run_id)
+    if checkpoint_root is not None:
+        if not _checkpoint_root_matches_run(checkpoint_root, run_root):
+            return False
+        return checkpoint_run_id is None or checkpoint_run_id == run_root.name
+    return checkpoint_run_id == run_root.name
+
+
+def _stop_reason_for_run(run_root: Path) -> str:
+    for filename in ("run_summary.json", "run_config.json", "run_manifest.json"):
+        stop_reason = _stop_reason(_read_json(run_root / filename).get("stop_reason"))
+        if stop_reason is not None:
+            return stop_reason
+
+    checkpoint = _read_json(run_root.parent.parent / "checkpoint.json")
+    if _checkpoint_belongs_to_run(checkpoint, run_root):
+        stop_reason = _stop_reason(checkpoint.get("stop_reason"))
+        if stop_reason is not None:
+            return stop_reason
+    return "unknown"
+
+
 def _read_round_text(path: Path) -> str:
     return read_file_text(path).strip()
 
 
-def analyze_benchmark_run(run_root: Path) -> BenchmarkReportAnalysis:
+def analyze_benchmark_run(
+    run_root: Path,
+    *,
+    project_dir: Path | None = None,
+) -> BenchmarkReportAnalysis:
+    selected_project = project_dir or infer_round_commit_project_dir(run_root)
+    if selected_project is not None:
+        ensure_round_commit_readable(selected_project)
     round_dirs = sorted(
         [path for path in run_root.glob("round_*") if path.is_dir()],
         key=_round_index,
@@ -192,16 +313,20 @@ def analyze_benchmark_run(run_root: Path) -> BenchmarkReportAnalysis:
     )
 
 
-def write_benchmark_report(*, run_root: Path, output_path: Path) -> BenchmarkReportAnalysis:
-    analysis = analyze_benchmark_run(run_root)
-    checkpoint = _read_json(run_root.parent.parent / "checkpoint.json")
+def write_benchmark_report(
+    *,
+    run_root: Path,
+    output_path: Path,
+    project_dir: Path | None = None,
+) -> BenchmarkReportAnalysis:
+    analysis = analyze_benchmark_run(run_root, project_dir=project_dir)
     lines = [
         "# Auto Research Agent Benchmark Report",
         "",
         "## Experiment Overview",
         "",
         f"- Run root: `{display_path(run_root, _infer_repo_root(run_root))}`",
-        f"- Stop reason: `{checkpoint.get('stop_reason', 'unknown')}`",
+        f"- Stop reason: `{_stop_reason_for_run(run_root)}`",
         f"- Successful research rounds: {len(analysis.successful_research_rounds)}",
         f"- Failed provider rounds: {len(analysis.failed_provider_rounds)}",
         f"- Skipped placeholder rounds: {len(analysis.skipped_placeholder_rounds)}",

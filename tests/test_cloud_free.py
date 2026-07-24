@@ -9,7 +9,9 @@ from unittest.mock import patch
 from rich.console import Console
 
 import src.cli as cli_module
+import src.llm as llm_module
 from src.cloud_free import (
+    FREE_RUNNER_AUTO,
     FREE_RUNNER_QUALITY,
     FREE_RUNNER_VOLUME,
     CloudFreeConfig,
@@ -17,16 +19,19 @@ from src.cloud_free import (
     CloudFreeScheduler,
     CloudModelProfile,
     apply_cloud_prompt_budget,
+    build_cached_candidate_pool,
     build_candidate_pool,
     choose_fallback_model,
     classify_gemini_error,
     classify_model,
+    discover_free_cloud_models,
     filter_safe_text_models,
     load_discovery_artifact,
     load_profile_artifact,
     model_info_from_sdk_model,
     profile_free_cloud_models,
     recommend_free_cloud_model,
+    save_discovery_artifact,
     save_profile_artifact,
 )
 from src.config import (
@@ -93,6 +98,153 @@ class CloudFreePolicyTests(unittest.TestCase):
             [model.model_id for model in safe],
             ["gemini-3.5-flash", "gemma-3-1b-it"],
         )
+
+    def test_lazy_discovery_iteration_returns_redacted_error_tuple(self) -> None:
+        secret = "LOCAL-DISCOVERY-SECRET"
+        private_path = "/private/discovery/provider/cache"
+
+        class FailingPager:
+            models: list[object] = []
+
+            def __init__(self, error: Exception) -> None:
+                self.error = error
+
+            def __iter__(self):
+                yield SimpleNamespace(name="models/gemini-3.5-flash")
+                raise self.error
+
+        for lazy_error in (
+            RuntimeError(f"lazy pager failed with api_key={secret} path={private_path}"),
+            TypeError(f"lazy pager type failure at {private_path}"),
+        ):
+            with self.subTest(error=lazy_error.__class__.__name__):
+                wrapper = SimpleNamespace(
+                    _resolve_api_key=lambda: SimpleNamespace(known_secrets=(secret,)),
+                    _ensure_api_key_available=lambda _credential=None: None,
+                    _create_client=lambda _credential=None: SimpleNamespace(
+                        models=SimpleNamespace(list=lambda: FailingPager(lazy_error))
+                    ),
+                )
+                with patch("src.cloud_free._create_genai_client", return_value=wrapper):
+                    discovered, error = discover_free_cloud_models(
+                        api_key_env="GEMINI_API_KEY",
+                        api_key=secret,
+                    )
+
+                self.assertEqual(discovered, [])
+                self.assertTrue(error)
+                self.assertNotIn(secret, error)
+                self.assertNotIn(private_path, error)
+
+        legacy_wrapper = SimpleNamespace(models=[SimpleNamespace(name="models/gemini-3.5-flash")])
+        wrapper = SimpleNamespace(
+            _resolve_api_key=lambda: SimpleNamespace(known_secrets=(secret,)),
+            _ensure_api_key_available=lambda _credential=None: None,
+            _create_client=lambda _credential=None: SimpleNamespace(
+                models=SimpleNamespace(list=lambda: legacy_wrapper)
+            ),
+        )
+        with patch("src.cloud_free._create_genai_client", return_value=wrapper):
+            discovered, error = discover_free_cloud_models(
+                api_key_env="GEMINI_API_KEY",
+                api_key=secret,
+            )
+
+        self.assertEqual([model.model_id for model in discovered], ["gemini-3.5-flash"])
+        self.assertEqual(error, "")
+
+    def test_model_discovery_redacts_effective_environment_key_before_truncation(
+        self,
+    ) -> None:
+        cases = (
+            (
+                "short-custom",
+                {"CUSTOM_PROVIDER_KEY": "xyz"},
+                "CUSTOM_PROVIDER_KEY",
+                "xyz",
+                "xyz",
+            ),
+            (
+                "custom",
+                {
+                    "CUSTOM_PROVIDER_KEY": (
+                        "discovery-custom-credential-with-an-unrecognized-shape"
+                    ),
+                    "GOOGLE_API_KEY": "unused-google-credential",
+                    "GEMINI_API_KEY": "unused-gemini-credential",
+                },
+                "CUSTOM_PROVIDER_KEY",
+                "discovery-custom-credential-with-an-unrecognized-shape",
+                "discovery-custom-credential-with-an-unrecognized-shape",
+            ),
+            (
+                "both-builtins",
+                {
+                    "GOOGLE_API_KEY": ("discovery-google-credential-with-an-unrecognized-shape"),
+                    "GEMINI_API_KEY": ("discovery-gemini-credential-with-an-unrecognized-shape"),
+                },
+                "GEMINI_API_KEY",
+                "discovery-google-credential-with-an-unrecognized-shape",
+                "discovery-google-credential-with-an-unrecognized-shape",
+            ),
+            (
+                "overlapping-candidates",
+                {
+                    "CUSTOM_PROVIDER_KEY": "overlap-credential",
+                    "GOOGLE_API_KEY": "overlap-credential-long-tail",
+                },
+                "CUSTOM_PROVIDER_KEY",
+                "overlap-credential",
+                "overlap-credential-long-tail",
+            ),
+        )
+
+        for case_name, environment, api_key_env, expected_key, echoed_key in cases:
+            with self.subTest(case=case_name):
+                selected_key = ""
+
+                class FailingClient:
+                    def __init__(self, **kwargs):
+                        nonlocal selected_key
+                        selected_key = (
+                            kwargs.get("api_key")
+                            or llm_module.os.environ.get("GOOGLE_API_KEY")
+                            or llm_module.os.environ.get("GEMINI_API_KEY")
+                            or ""
+                        )
+                        self.models = SimpleNamespace(list=self.list_models)
+
+                    def list_models(self):
+                        raise RuntimeError("x" * 210 + echoed_key)
+
+                fake_genai = SimpleNamespace(Client=FailingClient)
+                with (
+                    patch.object(
+                        llm_module,
+                        "_load_google_genai",
+                        return_value=(fake_genai, SimpleNamespace()),
+                    ),
+                    patch.dict(llm_module.os.environ, environment, clear=True),
+                ):
+                    discovered, error = discover_free_cloud_models(
+                        api_key_env=api_key_env,
+                    )
+
+                self.assertEqual(discovered, [])
+                self.assertTrue(selected_key == expected_key, "fake SDK selected wrong key")
+                leak_probe = (
+                    echoed_key.removeprefix(expected_key)
+                    if echoed_key != expected_key and echoed_key.startswith(expected_key)
+                    else echoed_key[:12]
+                )
+                self.assertFalse(
+                    leak_probe in error,
+                    "discovery error retained a captured credential fragment",
+                )
+                self.assertTrue(
+                    "[redacted-api-key]" in error,
+                    "discovery error was truncated before credential redaction",
+                )
 
     def test_model_discovery_metadata_handles_missing_fields(self) -> None:
         info = model_info_from_sdk_model(SimpleNamespace(name="models/gemma-3-1b-it"))
@@ -203,6 +355,46 @@ class CloudFreePolicyTests(unittest.TestCase):
         self.assertTrue(info.retryable)
         self.assertEqual(info.error_type, "rate_limited")
 
+    def test_timeout_error_has_safe_non_retrying_classification(self) -> None:
+        class TimeoutException(Exception):
+            pass
+
+        class ReadTimeout(TimeoutException):
+            pass
+
+        for error in (
+            TimeoutError("read operation timed out"),
+            ReadTimeout(""),
+        ):
+            with self.subTest(error_type=type(error).__name__):
+                info = classify_gemini_error(error)
+
+                self.assertEqual(info.error_type, "timeout")
+                self.assertEqual(info.public_message, "Gemini request timed out.")
+                self.assertFalse(info.retryable)
+
+        unsupported_option = classify_gemini_error(
+            RuntimeError("invalid option timeout is unsupported")
+        )
+        self.assertEqual(unsupported_option.error_type, "unknown")
+        for error_type in ("TimeoutConfigurationError", "NotATimeoutError"):
+            with self.subTest(error_type=error_type):
+                misleading_error = type(error_type, (Exception,), {})("configuration rejected")
+                self.assertEqual(classify_gemini_error(misleading_error).error_type, "unknown")
+
+    def test_http_timeout_status_preserves_existing_retry_policy(self) -> None:
+        class HttpError(Exception):
+            def __init__(self, status_code: int):
+                super().__init__(f"HTTP {status_code}")
+                self.status_code = status_code
+
+        for status_code, retryable in ((408, False), (504, True)):
+            with self.subTest(status_code=status_code):
+                info = classify_gemini_error(HttpError(status_code))
+
+                self.assertEqual(info.error_type, "timeout")
+                self.assertEqual(info.retryable, retryable)
+
     def test_prompt_budget_guard_preserves_critical_state(self) -> None:
         prompt = (
             "# Topic Context\nKeep this topic.\n\n"
@@ -265,6 +457,296 @@ class CloudFreePolicyTests(unittest.TestCase):
         self.assertIsNotNone(volume)
         self.assertEqual(volume.model_id, "gemma-3-high-tpm")
 
+    def test_all_blocked_profiles_do_not_fallback_to_known_failed_candidate(self) -> None:
+        candidate = classify_model(model_id="gemini-3.5-flash")
+        blocking_profiles = {
+            "unreachable": CloudModelProfile(model_id=candidate.model_id),
+            "daily_quota": CloudModelProfile(
+                model_id=candidate.model_id,
+                reachable=True,
+                structured_output_works=True,
+                daily_quota_exhausted=True,
+            ),
+            "billing_safety": CloudModelProfile(
+                model_id=candidate.model_id,
+                reachable=True,
+                structured_output_works=True,
+                safety_tool_billing_error=True,
+            ),
+            "token_context": CloudModelProfile(
+                model_id=candidate.model_id,
+                reachable=True,
+                structured_output_works=True,
+                token_context_error=True,
+            ),
+        }
+        for reason, profile in blocking_profiles.items():
+            for preset in (FREE_RUNNER_AUTO, FREE_RUNNER_QUALITY, FREE_RUNNER_VOLUME):
+                with self.subTest(reason=reason, preset=preset):
+                    self.assertIsNone(
+                        recommend_free_cloud_model(
+                            candidates=[candidate],
+                            profiles=[profile],
+                            preset=preset,
+                        )
+                    )
+            self.assertIsNone(
+                choose_fallback_model(
+                    current_model="different-current-model",
+                    candidates=[candidate],
+                    profiles=[profile],
+                )
+            )
+
+        unprofiled = classify_model(model_id="gemini-2.5-flash-lite")
+        mixed = recommend_free_cloud_model(
+            candidates=[candidate, unprofiled],
+            profiles=[blocking_profiles["unreachable"]],
+        )
+        self.assertIsNotNone(mixed)
+        self.assertEqual(mixed.model_id, unprofiled.model_id)
+        self.assertEqual(
+            choose_fallback_model(
+                current_model="different-current-model",
+                candidates=[candidate, unprofiled],
+                profiles=[blocking_profiles["unreachable"]],
+            ),
+            unprofiled.model_id,
+        )
+
+        healthy = recommend_free_cloud_model(
+            candidates=[candidate],
+            profiles=[
+                CloudModelProfile(
+                    model_id=candidate.model_id,
+                    reachable=True,
+                    structured_output_works=True,
+                )
+            ],
+        )
+        self.assertIsNotNone(healthy)
+        self.assertEqual(healthy.model_id, candidate.model_id)
+        self.assertEqual(
+            recommend_free_cloud_model(candidates=[candidate]).model_id,
+            candidate.model_id,
+        )
+
+    def test_conflicting_duplicate_profiles_fail_closed_in_every_order(self) -> None:
+        candidate = classify_model(model_id="gemini-3.5-flash")
+        unprofiled = classify_model(model_id="gemini-2.5-flash-lite")
+        healthy = CloudModelProfile(
+            model_id=candidate.model_id,
+            reachable=True,
+            structured_output_works=True,
+            score_parsing_works=True,
+        )
+        blocked = CloudModelProfile(
+            model_id=candidate.model_id,
+            reachable=True,
+            structured_output_works=True,
+            daily_quota_exhausted=True,
+        )
+        alternate_profile = CloudModelProfile(
+            model_id=unprofiled.model_id,
+            reachable=True,
+            structured_output_works=True,
+        )
+
+        for order_name, profiles in (
+            ("blocked-then-healthy", [blocked, healthy]),
+            ("healthy-then-blocked", [healthy, blocked]),
+        ):
+            with self.subTest(order=order_name, surface="cached-pool"):
+                cached = build_cached_candidate_pool(
+                    discovered_models=[candidate, unprofiled],
+                    profiles=[*profiles, alternate_profile],
+                )
+                self.assertEqual([item.model_id for item in cached], [unprofiled.model_id])
+            for preset in (FREE_RUNNER_AUTO, FREE_RUNNER_QUALITY, FREE_RUNNER_VOLUME):
+                with self.subTest(order=order_name, surface="recommendation", preset=preset):
+                    recommendation = recommend_free_cloud_model(
+                        candidates=[candidate, unprofiled],
+                        profiles=profiles,
+                        preset=preset,
+                    )
+                    self.assertIsNotNone(recommendation)
+                    self.assertEqual(recommendation.model_id, unprofiled.model_id)
+            with self.subTest(order=order_name, surface="fallback"):
+                self.assertEqual(
+                    choose_fallback_model(
+                        current_model="different-current-model",
+                        candidates=[candidate, unprofiled],
+                        profiles=profiles,
+                    ),
+                    unprofiled.model_id,
+                )
+
+    def test_equivalent_duplicate_profiles_remain_compatible(self) -> None:
+        candidate = classify_model(model_id="gemini-3.5-flash")
+        healthy = CloudModelProfile(
+            model_id=candidate.model_id,
+            reachable=True,
+            structured_output_works=True,
+            score_parsing_works=True,
+        )
+        equivalent = CloudModelProfile(
+            model_id=candidate.model_id,
+            reachable=True,
+            structured_output_works=True,
+            score_parsing_works=True,
+        )
+        self.assertIsNot(healthy, equivalent)
+        self.assertEqual(healthy, equivalent)
+        profiles = [healthy, equivalent]
+
+        cached = build_cached_candidate_pool(
+            discovered_models=[candidate],
+            profiles=profiles,
+        )
+        self.assertEqual([item.model_id for item in cached], [candidate.model_id])
+        recommendation = recommend_free_cloud_model(
+            candidates=[candidate],
+            profiles=profiles,
+        )
+        self.assertIsNotNone(recommendation)
+        self.assertEqual(recommendation.model_id, candidate.model_id)
+        self.assertEqual(
+            choose_fallback_model(
+                current_model="different-current-model",
+                candidates=[candidate],
+                profiles=profiles,
+            ),
+            candidate.model_id,
+        )
+
+    def test_cached_candidate_pool_excludes_stale_discovery_outside_profile_cohort(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            stale_model = classify_model(
+                model_id="gemma-3-high-tpm",
+                source="discovered",
+            )
+            fallback_profiles = [
+                CloudModelProfile(
+                    model_id=model_id,
+                    daily_quota_exhausted=True,
+                )
+                for model_id in ("gemini-3.5-flash", "gemini-2.5-flash-lite")
+            ]
+            save_discovery_artifact(project_dir, [stale_model])
+            save_profile_artifact(project_dir, fallback_profiles)
+
+            discovered = load_discovery_artifact(project_dir)
+            profiles = load_profile_artifact(project_dir)
+            stale_candidates = build_candidate_pool(discovered_models=discovered)
+            stale_recommendation = recommend_free_cloud_model(
+                candidates=stale_candidates,
+                profiles=profiles,
+            )
+            self.assertIsNotNone(stale_recommendation)
+            self.assertEqual(stale_recommendation.model_id, "gemma-3-high-tpm")
+
+            reconciled = build_cached_candidate_pool(
+                discovered_models=discovered,
+                profiles=profiles,
+            )
+            recommendation = recommend_free_cloud_model(
+                candidates=reconciled,
+                profiles=profiles,
+            )
+            self.assertEqual(
+                [candidate.model_id for candidate in reconciled],
+                ["gemini-2.5-flash-lite", "gemini-3.5-flash"],
+            )
+            self.assertIsNone(recommendation)
+
+            exact_profiles = [
+                CloudModelProfile(model_id=candidate.model_id) for candidate in stale_candidates
+            ]
+            self.assertEqual(
+                build_cached_candidate_pool(
+                    discovered_models=discovered,
+                    profiles=exact_profiles,
+                ),
+                stale_candidates,
+            )
+            self.assertEqual(
+                build_cached_candidate_pool(discovered_models=discovered),
+                stale_candidates,
+            )
+            self.assertEqual(
+                [
+                    candidate.model_id
+                    for candidate in build_cached_candidate_pool(
+                        discovered_models=discovered,
+                        profiles=[CloudModelProfile(model_id="gemini-3.5-flash")],
+                    )
+                ],
+                ["gemini-3.5-flash"],
+            )
+            self.assertEqual(
+                build_cached_candidate_pool(
+                    discovered_models=discovered,
+                    profiles=[
+                        CloudModelProfile(
+                            model_id="gemini-3.5-flash",
+                            safe_text_generation=False,
+                        )
+                    ],
+                ),
+                [],
+            )
+            duplicate_profiles = [
+                CloudModelProfile(model_id="gemini-3.5-flash"),
+                CloudModelProfile(model_id="gemini-3.5-flash"),
+            ]
+            duplicate_candidates = build_cached_candidate_pool(
+                discovered_models=discovered,
+                profiles=duplicate_profiles,
+            )
+            self.assertEqual(
+                [candidate.model_id for candidate in duplicate_candidates],
+                ["gemini-3.5-flash"],
+            )
+            self.assertEqual(duplicate_candidates[0].source, "configured")
+            legacy_prefixed_profiles = [
+                CloudModelProfile(
+                    model_id=f"models/{model_id}",
+                    daily_quota_exhausted=True,
+                )
+                for model_id in ("gemini-3.5-flash", "gemini-2.5-flash-lite")
+            ]
+            legacy_candidates = build_cached_candidate_pool(
+                discovered_models=discovered,
+                profiles=legacy_prefixed_profiles,
+            )
+            self.assertEqual(legacy_candidates, [])
+            self.assertIsNone(
+                recommend_free_cloud_model(
+                    candidates=legacy_candidates,
+                    profiles=legacy_prefixed_profiles,
+                )
+            )
+            blocked_model = classify_model(model_id="gemini-3.5-pro")
+            exact_with_blocked = build_cached_candidate_pool(
+                discovered_models=[*discovered, blocked_model],
+                profiles=exact_profiles,
+            )
+            self.assertEqual(exact_with_blocked, stale_candidates)
+            self.assertNotIn(
+                "gemini-3.5-pro",
+                {candidate.model_id for candidate in exact_with_blocked},
+            )
+            currently_blocked = build_cached_candidate_pool(
+                discovered_models=discovered,
+                profiles=exact_profiles,
+                config=CloudFreeConfig(blocked_model_patterns=(r"gemma",)),
+            )
+            self.assertNotIn(
+                "gemma-3-high-tpm",
+                {candidate.model_id for candidate in currently_blocked},
+            )
+
     def test_profile_artifact_does_not_store_api_keys(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_dir = Path(tmp)
@@ -277,6 +759,34 @@ class CloudFreePolicyTests(unittest.TestCase):
             self.assertNotIn(secret, path.read_text(encoding="utf-8"))
             self.assertNotIn("api_key", path.read_text(encoding="utf-8").lower())
 
+    @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
+    def test_cloud_artifact_helpers_reject_linked_project_ancestor(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            outside_project = root / "outside-projects" / "selected"
+            artifacts = outside_project / "artifacts"
+            artifacts.mkdir(parents=True)
+            external_profile = artifacts / "cloud_free_profile.json"
+            external_profile.write_text('[{"private": true}]\n', encoding="utf-8")
+            (root / "projects").symlink_to(
+                root / "outside-projects",
+                target_is_directory=True,
+            )
+            project_dir = root / "projects" / "selected"
+
+            with self.assertRaises(OSError):
+                save_profile_artifact(
+                    project_dir,
+                    [CloudModelProfile(model_id="must-not-write")],
+                )
+
+            self.assertEqual(load_profile_artifact(project_dir), [])
+            self.assertEqual(load_discovery_artifact(project_dir), [])
+            self.assertEqual(
+                external_profile.read_text(encoding="utf-8"),
+                '[{"private": true}]\n',
+            )
+
     def test_stale_cloud_free_artifact_paths_return_empty_lists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_dir = Path(tmp)
@@ -287,6 +797,77 @@ class CloudFreePolicyTests(unittest.TestCase):
 
             self.assertEqual(load_profile_artifact(project_dir), [])
             self.assertEqual(load_discovery_artifact(project_dir), [])
+
+    def test_invalid_utf8_cloud_free_artifacts_return_empty_lists(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            artifacts = project_dir / "artifacts"
+            artifacts.mkdir()
+            (artifacts / "cloud_free_profile.json").write_bytes(b"\xff\xfe")
+            (artifacts / "cloud_free_models.json").write_bytes(b"\xff\xfe")
+
+            self.assertEqual(load_profile_artifact(project_dir), [])
+            self.assertEqual(load_discovery_artifact(project_dir), [])
+
+            (artifacts / "cloud_free_profile.json").write_text("{}", encoding="utf-8")
+            (artifacts / "cloud_free_models.json").write_text("{}", encoding="utf-8")
+            for error in (ValueError("oversized integer"), RecursionError("too deeply nested")):
+                with (
+                    self.subTest(error=error.__class__.__name__),
+                    patch(
+                        "src.cloud_free.json.loads",
+                        side_effect=error,
+                    ),
+                ):
+                    self.assertEqual(load_profile_artifact(project_dir), [])
+                    self.assertEqual(load_discovery_artifact(project_dir), [])
+
+            (artifacts / "cloud_free_profile.json").write_text(
+                '{"profiles": null}', encoding="utf-8"
+            )
+            (artifacts / "cloud_free_models.json").write_text('{"models": 7}', encoding="utf-8")
+            self.assertEqual(load_profile_artifact(project_dir), [])
+            self.assertEqual(load_discovery_artifact(project_dir), [])
+
+            huge_integer = "9" * 4001
+            (artifacts / "cloud_free_profile.json").write_text(
+                '{"profiles": [{"model_id": "seed", "latency_seconds": ' + huge_integer + "}]}",
+                encoding="utf-8",
+            )
+            (artifacts / "cloud_free_models.json").write_text(
+                '{"models": [{"model_id": "seed", "input_token_limit": ' + huge_integer + "}]}",
+                encoding="utf-8",
+            )
+            self.assertEqual(load_profile_artifact(project_dir), [])
+            self.assertEqual(load_discovery_artifact(project_dir), [])
+
+            (artifacts / "cloud_free_profile.json").write_text(
+                '{"profiles": [{"model_id": "seed", "latency_seconds": "slow"}]}',
+                encoding="utf-8",
+            )
+            (artifacts / "cloud_free_models.json").write_text(
+                '{"models": [{"model_id": null}, {"model_id": []}, '
+                '{"model_id": "seed", "input_token_limit": []}]}',
+                encoding="utf-8",
+            )
+            self.assertEqual(load_profile_artifact(project_dir), [])
+            self.assertEqual(load_discovery_artifact(project_dir), [])
+
+            (artifacts / "cloud_free_profile.json").write_text(
+                '{"profiles": [{"model_id": " gemini-test ", "reachable": true}]}',
+                encoding="utf-8",
+            )
+            (artifacts / "cloud_free_models.json").write_text(
+                '{"models": [{"model_id": " gemini-test ", '
+                '"supported_generation_methods": ["generateContent"], '
+                '"safe_text_generation": true}]}',
+                encoding="utf-8",
+            )
+            loaded_profiles = load_profile_artifact(project_dir)
+            loaded_models = load_discovery_artifact(project_dir)
+            self.assertEqual([profile.model_id for profile in loaded_profiles], ["gemini-test"])
+            self.assertEqual([model.model_id for model in loaded_models], ["gemini-test"])
+            self.assertEqual(loaded_models[0].supported_generation_methods, ("generateContent",))
 
     def test_cloud_free_discovery_cli_masks_project_and_artifact_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -59,6 +59,7 @@ projects/*/checkpoint.json
 projects/*/interrupted_report.md
 projects/*/STOP_REQUESTED
 projects/*/active_run.json
+projects/*/active_run.guard
 projects/*/ui_run_process.json
 projects/*/*.pdf
 *.pdf

@@ -1,22 +1,29 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
+import stat
 import sys
+from collections.abc import Mapping, MutableMapping
 from pathlib import Path
 from typing import Any, Sequence
+from urllib.parse import urlsplit
 
 import requests
 import streamlit as st
 
 from src.benchmarking import BENCHMARK_PRESETS
 from src.cloud_free import (
+    DISCOVERY_ARTIFACT_NAME,
     FREE_RUNNER_AUTO,
     FREE_RUNNER_MANUAL,
     FREE_RUNNER_PRESETS,
     FREE_RUNNER_QUALITY,
     FREE_RUNNER_VOLUME,
+    PROFILE_ARTIFACT_NAME,
+    build_cached_candidate_pool,
     build_candidate_pool,
     discover_free_cloud_models,
     filter_safe_text_models,
@@ -41,12 +48,23 @@ from src.config import (
     ConfigValidationError,
     format_model_label,
     load_app_config,
+    normalize_ollama_model_name,
     query_ollama_models,
     save_default_model_name,
     save_default_model_selection,
 )
+from src.constants import UI_GEMINI_API_KEY_ENV
 from src.llm import GeminiClient
-from src.resume import inspect_next_round_directory
+from src.resume import build_resume_preview
+from src.resume_safety import (
+    resume_artifact_links_are_safe,
+    validate_project_run_root,
+    validate_resume_round_dir,
+)
+from src.round_commit_recovery import (
+    infer_round_commit_project_dir,
+    round_commit_read_blocker,
+)
 from src.run_analytics import analyze_run
 from src.run_compare import compare_runs
 from src.runtime import (
@@ -56,7 +74,19 @@ from src.runtime import (
     run_project_tests,
     start_background_process,
 )
-from src.storage import read_file_text, read_json_file, tail_file_lines, write_file_text
+from src.storage import (
+    artifact_path_exists,
+    artifact_path_is_safe,
+    ensure_artifact_paths_safe,
+    ensure_project_runtime_paths_safe,
+    list_artifact_directories,
+    read_file_text,
+    read_json_file,
+    read_regular_text,
+    tail_file_lines,
+    write_file_text,
+)
+from src.ui_health_identity import private_ollama_path_id
 from ui.i18n import LANGUAGE_LABELS, translate
 from ui.theme import DEFAULT_THEME, THEME_LABEL_KEYS, build_theme_css, normalize_theme
 
@@ -95,6 +125,22 @@ DRAFTING_MODE_LABEL_KEYS = {
     "fresh_from_task_with_review": "drafting_mode_fresh_with_review",
     "continue_from_previous_draft": "drafting_mode_continue_from_previous",
 }
+CLOUD_FREE_CACHE_IDENTITY_KEY = "cloud_free_cache_identity"
+CLOUD_FREE_DISCOVERY_SESSION_KEY = "cloud_free_discovered_models"
+CLOUD_FREE_PROFILE_SESSION_KEY = "cloud_free_profile_results"
+OLLAMA_HEALTH_SESSION_KEY = "model_health"
+GEMINI_HEALTH_SESSION_KEY = "gemini_model_health"
+HEALTH_MESSAGE_REQUIRED_ARGS = {
+    "health_no_model": frozenset(),
+    "health_timeout": frozenset({"base_url"}),
+    "health_api_unhealthy": frozenset({"base_url", "error"}),
+    "health_model_missing": frozenset({"model"}),
+    "health_model_ok": frozenset({"model"}),
+    "gemini_health_missing_key": frozenset(),
+    "gemini_health_failed": frozenset({"error"}),
+    "gemini_health_ok": frozenset({"model"}),
+}
+SAFE_OLLAMA_HEALTH_PATH_SEGMENTS = frozenset({"api", "ollama", "proxy", "service"})
 
 
 def relative_repo_path(path: Path) -> str:
@@ -114,6 +160,10 @@ def output_display_path(path: Path) -> str:
 
 def create_stop_signal(stop_signal_path: Path) -> bool:
     try:
+        ensure_project_runtime_paths_safe(
+            stop_signal_path.parent,
+            anchor=stop_signal_path.parent.parent,
+        )
         write_file_text(stop_signal_path, "STOP_REQUESTED\n")
     except OSError:
         return False
@@ -137,8 +187,15 @@ def default_project_index(projects: list[str], configured_project_name: str) -> 
     return 0
 
 
+def discover_project_names(projects_dir: Path) -> list[str]:
+    try:
+        return sorted(name for _mtime, name, _path in list_artifact_directories(projects_dir))
+    except OSError:
+        return []
+
+
 def input_text_or_placeholder(path: Path, placeholder_key: str) -> str:
-    if path.exists():
+    if artifact_path_is_safe(path, allow_missing=False):
         return read_file_text(path)
     return t(placeholder_key)
 
@@ -266,6 +323,7 @@ def build_run_command(
     benchmark_preset: str | None = None,
     max_provider_quota_failures: int | None = None,
     drafting_mode: str | None = None,
+    gemini_api_key_override_env: str | None = None,
 ) -> list[str]:
     mode_flags = {
         "diagnostic": ["--diagnostic"],
@@ -290,6 +348,8 @@ def build_run_command(
         command.extend(["--project", project])
     if provider == MODEL_PROVIDER_GEMINI and gemini_api_key_env:
         command.extend(["--gemini-api-key-env", gemini_api_key_env])
+    if provider == MODEL_PROVIDER_GEMINI and gemini_api_key_override_env:
+        command.extend(["--gemini-api-key-override-env", gemini_api_key_override_env])
     if provider == MODEL_PROVIDER_GEMINI and free_runner_preset:
         command.extend(["--free-runner-preset", free_runner_preset])
     if benchmark_preset:
@@ -308,11 +368,8 @@ def build_provider_env_overrides(
 ) -> dict[str, str]:
     if provider != MODEL_PROVIDER_GEMINI:
         return {}
-    env_name = api_key_env.strip()
-    key_value = api_key_value.strip()
-    if not env_name or not key_value:
-        return {}
-    return {env_name: key_value}
+    _ = api_key_env  # Retained for compatibility with existing helper callers.
+    return {UI_GEMINI_API_KEY_ENV: api_key_value.strip()}
 
 
 def has_gemini_api_key_source(
@@ -337,6 +394,216 @@ def refresh_ollama_model_cache(*, base_url: str, timeout_seconds: int = 5) -> No
     models, error = query_ollama_models(timeout_seconds=timeout_seconds, base_url=base_url)
     st.session_state["ollama_models"] = models
     st.session_state["ollama_models_error"] = error or ""
+
+
+def _cloud_free_artifact_content_identity(
+    project_dir: Path,
+    artifact_name: str,
+) -> tuple[str, str]:
+    artifact_path = project_dir / "artifacts" / artifact_name
+    try:
+        content = read_regular_text(artifact_path, missing_ok=False)
+    except FileNotFoundError:
+        return ("missing", "")
+    except UnicodeError:
+        return ("unreadable", "")
+    except OSError:
+        return ("unsafe_or_unreadable", "")
+    return ("sha256", hashlib.sha256(content.encode("utf-8")).hexdigest())
+
+
+def cloud_free_cache_identity(project_dir: Path) -> tuple[object, ...]:
+    project_dir = Path(project_dir)
+    ensure_project_runtime_paths_safe(project_dir, anchor=project_dir.parent)
+    canonical_project = project_dir.resolve(strict=True)
+    project_metadata = project_dir.lstat()
+    return (
+        canonical_project.as_posix(),
+        project_metadata.st_dev,
+        project_metadata.st_ino,
+        _cloud_free_artifact_content_identity(project_dir, DISCOVERY_ARTIFACT_NAME),
+        _cloud_free_artifact_content_identity(project_dir, PROFILE_ARTIFACT_NAME),
+    )
+
+
+def _clear_cloud_free_session_cache(session_state: MutableMapping[str, Any]) -> None:
+    session_state.pop(CLOUD_FREE_CACHE_IDENTITY_KEY, None)
+    session_state.pop(CLOUD_FREE_DISCOVERY_SESSION_KEY, None)
+    session_state.pop(CLOUD_FREE_PROFILE_SESSION_KEY, None)
+
+
+def load_scoped_cloud_free_cache(
+    project_dir: Path,
+    session_state: MutableMapping[str, Any],
+) -> tuple[list[Any], list[Any]]:
+    try:
+        identity = cloud_free_cache_identity(project_dir)
+    except (OSError, RuntimeError):
+        _clear_cloud_free_session_cache(session_state)
+        return [], []
+    discovered_models = session_state.get(CLOUD_FREE_DISCOVERY_SESSION_KEY)
+    profile_results = session_state.get(CLOUD_FREE_PROFILE_SESSION_KEY)
+    if (
+        session_state.get(CLOUD_FREE_CACHE_IDENTITY_KEY) != identity
+        or not isinstance(discovered_models, list)
+        or not isinstance(profile_results, list)
+    ):
+        _clear_cloud_free_session_cache(session_state)
+        try:
+            for _attempt in range(2):
+                discovered_models = load_discovery_artifact(project_dir)
+                profile_results = load_profile_artifact(project_dir)
+                observed_identity = cloud_free_cache_identity(project_dir)
+                if observed_identity == identity:
+                    session_state[CLOUD_FREE_DISCOVERY_SESSION_KEY] = discovered_models
+                    session_state[CLOUD_FREE_PROFILE_SESSION_KEY] = profile_results
+                    session_state[CLOUD_FREE_CACHE_IDENTITY_KEY] = identity
+                    return discovered_models, profile_results
+                identity = observed_identity
+        except (OSError, RuntimeError):
+            pass
+        _clear_cloud_free_session_cache(session_state)
+        return [], []
+    return discovered_models, profile_results
+
+
+def ollama_health_connection_scope(base_url: str) -> tuple[str, ...]:
+    try:
+        parsed = urlsplit(str(base_url or "").strip())
+        hostname = parsed.hostname
+    except ValueError:
+        return ("invalid_endpoint",)
+    if not parsed.scheme or not hostname:
+        return ("invalid_endpoint",)
+    try:
+        port = parsed.port
+    except ValueError:
+        netloc_without_userinfo = parsed.netloc.rsplit("@", 1)[-1]
+        numeric_port = re.search(r":([0-9]+)$", netloc_without_userinfo)
+        port_scope = f"invalid_port:{numeric_port.group(1)}" if numeric_port else "invalid_port"
+    else:
+        if port is None:
+            if parsed.scheme.lower() == "http":
+                port = 80
+            elif parsed.scheme.lower() == "https":
+                port = 443
+        port_scope = "" if port is None else str(port)
+    normalized_path = parsed.path.rstrip("/") or "/"
+    path_segments = tuple(segment for segment in normalized_path.split("/") if segment)
+    path_is_non_secret = all(
+        segment.lower() in SAFE_OLLAMA_HEALTH_PATH_SEGMENTS
+        or re.fullmatch(r"v[0-9]+", segment.lower())
+        for segment in path_segments
+    )
+    path_scope = (
+        ("path", normalized_path)
+        if path_is_non_secret
+        else ("private_path_id", private_ollama_path_id(normalized_path))
+    )
+    return (
+        "endpoint",
+        parsed.scheme.lower(),
+        hostname.lower(),
+        port_scope,
+        *path_scope,
+        "userinfo" if parsed.username is not None or parsed.password is not None else "anonymous",
+        "query" if parsed.query else "no_query",
+    )
+
+
+def ollama_health_display_endpoint(base_url: str) -> str:
+    scope = ollama_health_connection_scope(base_url)
+    if not scope or scope[0] != "endpoint":
+        return "<configured endpoint>"
+    _label, scheme, hostname, port, *_non_secret_details = scope
+    display_host = f"[{hostname}]" if ":" in hostname else hostname
+    if port.startswith("invalid_port"):
+        return f"{scheme}://{display_host}:<invalid-port>"
+    return f"{scheme}://{display_host}:{port}" if port else f"{scheme}://{display_host}"
+
+
+def resolve_ui_gemini_api_key(session_value: str, config_value: str) -> str:
+    return str(session_value or "").strip() or str(config_value or "").strip()
+
+
+def gemini_health_connection_scope(
+    *,
+    api_key_env: str,
+    session_key_present: bool,
+    config_key_present: bool,
+    environment: Mapping[str, str] | None = None,
+) -> tuple[str, ...]:
+    if session_key_present:
+        return ("session_key",)
+    if config_key_present:
+        return ("config_key",)
+    environment = os.environ if environment is None else environment
+    configured_env = str(api_key_env or "").strip()
+    built_in_envs = {DEFAULT_GEMINI_API_KEY_ENV, "GOOGLE_API_KEY"}
+    if (
+        configured_env
+        and configured_env not in built_in_envs
+        and str(environment.get(configured_env, "")).strip()
+    ):
+        return ("environment", configured_env)
+    for env_name in ("GOOGLE_API_KEY", DEFAULT_GEMINI_API_KEY_ENV):
+        if str(environment.get(env_name, "")):
+            return ("environment", env_name)
+    return ("missing",)
+
+
+def build_model_health_identity(
+    *,
+    provider: str,
+    model: str,
+    connection_scope: Sequence[str],
+) -> tuple[str, str, tuple[str, ...]]:
+    return (
+        str(provider or "").strip().lower(),
+        str(model or "").strip(),
+        tuple(str(part) for part in connection_scope),
+    )
+
+
+def store_scoped_health_result(
+    session_state: MutableMapping[str, Any],
+    *,
+    key: str,
+    identity: tuple[str, str, tuple[str, ...]],
+    result: dict[str, Any],
+) -> None:
+    session_state[key] = {"identity": identity, "result": result}
+
+
+def load_scoped_health_result(
+    session_state: MutableMapping[str, Any],
+    *,
+    key: str,
+    identity: tuple[str, str, tuple[str, ...]],
+) -> dict[str, Any] | None:
+    cached = session_state.get(key)
+    if not isinstance(cached, Mapping) or cached.get("identity") != identity:
+        session_state.pop(key, None)
+        return None
+    result = cached.get("result")
+    message_key = result.get("message_key") if isinstance(result, dict) else None
+    message_args = result.get("message_args") if isinstance(result, dict) else None
+    if (
+        not isinstance(result, dict)
+        or not isinstance(result.get("ok"), bool)
+        or not isinstance(result.get("message"), str)
+        or not isinstance(message_key, str)
+        or message_key not in HEALTH_MESSAGE_REQUIRED_ARGS
+        or not isinstance(message_args, Mapping)
+        or not HEALTH_MESSAGE_REQUIRED_ARGS[message_key].issubset(message_args)
+    ):
+        session_state.pop(key, None)
+        return None
+    return result
+
+
+def clear_session_health_result(key: str) -> None:
+    st.session_state.pop(key, None)
 
 
 def localized_stage(stage: Any) -> str:
@@ -400,6 +667,7 @@ def check_ollama_model_health(
             "message_args": {},
         }
 
+    display_endpoint = ollama_health_display_endpoint(base_url)
     url = f"{base_url.rstrip('/')}/api/tags"
     try:
         response = requests.get(url, timeout=timeout_seconds)
@@ -410,27 +678,40 @@ def check_ollama_model_health(
             "ok": False,
             "api_ok": False,
             "model_ok": False,
-            "message": f"Ollama API timed out at {base_url}.",
+            "message": f"Ollama API timed out at {display_endpoint}.",
             "message_key": "health_timeout",
-            "message_args": {"base_url": base_url},
+            "message_args": {"base_url": display_endpoint},
         }
     except (requests.RequestException, ValueError) as exc:
+        error_type = type(exc).__name__
         return {
             "ok": False,
             "api_ok": False,
             "model_ok": False,
-            "message": f"Ollama API is not healthy at {base_url}: {exc}",
+            "message": f"Ollama API is not healthy at {display_endpoint}: {error_type}",
             "message_key": "health_api_unhealthy",
-            "message_args": {"base_url": base_url, "error": exc},
+            "message_args": {"base_url": display_endpoint, "error": error_type},
+        }
+
+    raw_models = payload.get("models", []) if isinstance(payload, Mapping) else None
+    if not isinstance(payload, Mapping) or not isinstance(raw_models, list):
+        error_type = "InvalidResponse"
+        return {
+            "ok": False,
+            "api_ok": False,
+            "model_ok": False,
+            "message": f"Ollama API is not healthy at {display_endpoint}: {error_type}",
+            "message_key": "health_api_unhealthy",
+            "message_args": {"base_url": display_endpoint, "error": error_type},
         }
 
     api_models = [
-        str(model.get("name", "")).strip()
-        for model in payload.get("models", [])
-        if isinstance(model, dict)
+        name
+        for model in raw_models
+        if isinstance(model, dict) and (name := normalize_ollama_model_name(model.get("name", "")))
     ]
     available_models = {name for name in installed_model_names if name} | {
-        name for name in api_models if name
+        name for name in api_models
     }
     model_ok = model_name in available_models
     if not model_ok:
@@ -496,13 +777,14 @@ def check_gemini_model_health(
             top_p=0.9,
         )
     except RuntimeError as exc:
+        error_type = type(exc).__name__
         return {
             "ok": False,
             "api_ok": False,
             "model_ok": False,
-            "message": f"Gemini health check failed: {exc}",
+            "message": f"Gemini health check failed: {error_type}",
             "message_key": "gemini_health_failed",
-            "message_args": {"error": exc},
+            "message_args": {"error": error_type},
         }
 
     if not output.strip():
@@ -606,11 +888,39 @@ def infer_running_stage(
 
 def describe_resume_state(
     *,
+    project_dir: Path,
     checkpoint: dict[str, Any],
     run_active: bool,
     selected_model: str,
 ) -> dict[str, Any]:
     if not checkpoint:
+        preview = build_resume_preview(
+            project_dir=project_dir,
+            checkpoint=checkpoint,
+            repo_root=ROOT,
+        )
+        if preview.get("blocked_reason") in {
+            "round_commit_recovery_required",
+            "round_commit_recovery_conflict",
+            "finalization_pending",
+            "finalization_conflict",
+            "diagnostic_finalization_pending",
+            "diagnostic_finalization_conflict",
+        }:
+            return {
+                "can_resume": False,
+                "level": "warning",
+                "message": str(preview["message"]),
+                "message_key": str(preview["blocked_reason"]),
+                "message_args": {},
+                "details": {
+                    "run_id": preview.get("run_id") or "N/A",
+                    "next_round": preview.get("next_round"),
+                    "round_commit_status": preview.get("round_commit_status"),
+                    "finalization_status": preview.get("finalization_status"),
+                    "diagnostic_finalization_status": preview.get("diagnostic_finalization_status"),
+                },
+            }
         return {
             "can_resume": False,
             "level": "info",
@@ -640,84 +950,89 @@ def describe_resume_state(
             f" Checkpoint model was `{checkpoint_model}`; selected model is `{selected_model}`."
         )
 
-    run_root_text = str(checkpoint.get("run_root", "")).strip()
-    run_root = Path(run_root_text) if run_root_text else None
-    run_id = str(checkpoint.get("run_id") or (run_root.name if run_root else "") or "N/A")
-    last_completed_round = _safe_int(checkpoint.get("last_completed_round"))
-    next_round = last_completed_round + 1
-    stop_reason = str(checkpoint.get("stop_reason", "unknown") or "unknown")
-    details = {
-        "run_id": run_id,
-        "run_root": output_display_path(run_root) if run_root else "N/A",
-        "last_completed_round": last_completed_round,
-        "next_round": next_round,
-        "stop_reason": stop_reason,
-        "can_resume": bool(checkpoint.get("can_resume")),
-        "completed_round_files_preserved": bool(checkpoint.get("can_resume")),
-    }
-    if checkpoint.get("can_resume") and not run_root:
-        details["can_resume"] = False
-        details["completed_round_files_preserved"] = False
+    preview = build_resume_preview(
+        project_dir=project_dir,
+        checkpoint=checkpoint,
+        repo_root=ROOT,
+    )
+    if preview.get("blocked_reason") in {
+        "round_commit_recovery_required",
+        "round_commit_recovery_conflict",
+        "finalization_pending",
+        "finalization_conflict",
+        "diagnostic_finalization_pending",
+        "diagnostic_finalization_conflict",
+    }:
         return {
             "can_resume": False,
             "level": "warning",
-            "message": "Resume checkpoint is missing run_root.",
-            "message_key": "resume_missing_run_root",
+            "message": str(preview["message"]),
+            "message_key": str(preview["blocked_reason"]),
             "message_args": {},
             "model_mismatch": model_mismatch,
             "checkpoint_model": checkpoint_model,
             "selected_model": selected_model,
-            "details": details,
+            "details": {
+                "run_id": preview.get("run_id") or "N/A",
+                "next_round": preview.get("next_round"),
+                "round_commit_status": preview.get("round_commit_status"),
+                "finalization_status": preview.get("finalization_status"),
+                "diagnostic_finalization_status": preview.get("diagnostic_finalization_status"),
+            },
         }
-    if run_root and checkpoint.get("can_resume") and not run_root.exists():
+    run_id = str(preview.get("run_id") or checkpoint.get("run_id") or "N/A")
+    last_completed_round = _safe_int(preview.get("last_completed_round"))
+    next_round = _safe_int(preview.get("next_round"), last_completed_round + 1)
+    stop_reason = str(preview.get("stop_reason") or checkpoint.get("stop_reason") or "unknown")
+    details = {
+        "run_id": run_id,
+        "run_root": str(preview.get("run_root_display") or "N/A"),
+        "last_completed_round": last_completed_round,
+        "next_round": next_round,
+        "stop_reason": stop_reason,
+        "can_resume": bool(preview.get("can_resume")),
+        "completed_round_files_preserved": bool(checkpoint.get("can_resume")),
+        "next_round_status": preview.get("next_round_status", "unknown"),
+        "next_round_safety_action": preview.get("next_round_safety_action", "none"),
+        "next_round_path": preview.get("next_round_display", "N/A"),
+        "next_round_blocks_resume": bool(preview.get("next_round_blocks_resume")),
+        "next_round_existing_files": ", ".join(
+            str(name) for name in preview.get("next_round_existing_files", [])
+        )
+        or "none",
+    }
+    if checkpoint.get("can_resume") and not preview.get("can_resume"):
         details["can_resume"] = False
-        details["completed_round_files_preserved"] = False
-        return {
-            "can_resume": False,
-            "level": "warning",
-            "message": f"Resume checkpoint is stale. Run root is missing: {details['run_root']}.",
-            "message_key": "resume_stale_checkpoint",
-            "message_args": {"run_root": details["run_root"]},
-            "model_mismatch": model_mismatch,
-            "checkpoint_model": checkpoint_model,
-            "selected_model": selected_model,
-            "details": details,
-        }
-
-    next_round_info = inspect_next_round_directory(
-        run_root / f"round_{next_round:02d}" if run_root else None,
-        ROOT,
-    )
-    details.update(
-        {
-            "next_round_status": next_round_info["status"],
-            "next_round_safety_action": next_round_info["safety_action"],
-            "next_round_path": next_round_info["display_path"],
-            "next_round_blocks_resume": next_round_info["blocks_resume"],
-            "next_round_existing_files": ", ".join(next_round_info["existing_files"]) or "none",
-        }
-    )
-    if checkpoint.get("can_resume") and next_round_info["blocks_resume"]:
-        details["can_resume"] = False
-        return {
-            "can_resume": False,
-            "level": "warning",
-            "message": (
-                "Resume is blocked because the next round directory already contains files."
-            ),
-            "message_key": "resume_partial_next_round",
-            "message_args": {
+        blocked_reason = str(preview.get("blocked_reason") or "unsafe_run_root")
+        message_key = {
+            "missing_run_root": "resume_missing_run_root",
+            "stale_run_root": "resume_stale_checkpoint",
+            "partial_next_round_exists": "resume_partial_next_round",
+        }.get(blocked_reason, "resume_unsafe_checkpoint")
+        message_args = (
+            {
                 "next_round_path": details["next_round_path"],
                 "status": details["next_round_status"],
                 "action": details["next_round_safety_action"],
-            },
+            }
+            if blocked_reason == "partial_next_round_exists"
+            else {"run_root": details["run_root"]}
+            if blocked_reason == "stale_run_root"
+            else {}
+        )
+        return {
+            "can_resume": False,
+            "level": "warning",
+            "message": str(preview.get("message") or "Resume checkpoint is unsafe."),
+            "message_key": message_key,
+            "message_args": message_args,
             "model_mismatch": model_mismatch,
             "checkpoint_model": checkpoint_model,
             "selected_model": selected_model,
             "details": details,
         }
 
-    if checkpoint.get("can_resume"):
+    if preview.get("can_resume"):
         return {
             "can_resume": True,
             "level": "success",
@@ -753,34 +1068,65 @@ def detect_output_kind(path: Path) -> str:
     return "text"
 
 
-def resolve_run_artifact_paths(project_dir: Path, checkpoint: dict[str, Any]) -> dict[str, Path]:
+def resolve_run_artifact_paths(project_dir: Path, checkpoint: dict[str, Any]) -> dict[str, Any]:
+    """Resolve UI run artifacts without trusting redundant checkpoint path fields."""
     run_root_text = str(checkpoint.get("run_root", "")).strip()
-    run_root = Path(run_root_text) if run_root_text else None
-    run_config_path = (
-        Path(str(checkpoint.get("run_config")))
-        if checkpoint.get("run_config")
-        else (run_root / "run_config.json" if run_root else project_dir / "run_config.json")
-    )
-    run_summary_path = (
-        Path(str(checkpoint.get("run_summary")))
-        if checkpoint.get("run_summary")
-        else (run_root / "run_summary.json" if run_root else project_dir / "run_summary.json")
-    )
+    run_root_requested = bool(run_root_text)
+    run_root: Path | None
+    run_scope_valid = True
+    if run_root_requested:
+        run_root, run_root_error = validate_project_run_root(
+            project_dir=project_dir,
+            run_root_value=run_root_text,
+        )
+        run_scope_valid = run_root_error is None and run_root is not None
+    else:
+        # Older project layouts stored these files directly in the selected project.
+        run_root = project_dir
 
-    round_metrics_path = (
-        run_root / "round_metrics.json" if run_root else project_dir / "round_metrics.json"
-    )
-    if run_summary_path.exists():
-        run_summary = read_json_file(run_summary_path)
-        round_metrics_text = str(run_summary.get("round_metrics_path", "")).strip()
-        if round_metrics_text:
-            round_metrics_path = Path(round_metrics_text)
+    artifact_root = run_root if run_scope_valid and run_root is not None else project_dir
+    run_config_path = artifact_root / "run_config.json"
+    run_summary_path = artifact_root / "run_summary.json"
+    round_metrics_path = artifact_root / "round_metrics.json"
+    run_manifest_path = artifact_root / "run_manifest.json"
+
+    if run_scope_valid and run_root_requested:
+        artifact_safety = {
+            name: resume_artifact_links_are_safe(parent_dir=artifact_root, paths=(path,))
+            for name, path in (
+                ("run_config", run_config_path),
+                ("run_summary", run_summary_path),
+                ("round_metrics", round_metrics_path),
+                ("run_manifest", run_manifest_path),
+            )
+        }
+    elif run_scope_valid:
+        artifact_safety = {
+            name: artifact_path_is_safe(path, allow_missing=True)
+            for name, path in (
+                ("run_config", run_config_path),
+                ("run_summary", run_summary_path),
+                ("round_metrics", round_metrics_path),
+                ("run_manifest", run_manifest_path),
+            )
+        }
+    else:
+        artifact_safety = {
+            "run_config": False,
+            "run_summary": False,
+            "round_metrics": False,
+            "run_manifest": False,
+        }
 
     return {
-        "run_root": run_root or project_dir,
+        "run_root": artifact_root,
+        "run_root_requested": run_root_requested,
+        "run_scope_valid": run_scope_valid,
         "run_config": run_config_path,
         "run_summary": run_summary_path,
         "round_metrics": round_metrics_path,
+        "run_manifest": run_manifest_path,
+        **{f"{name}_safe": safe for name, safe in artifact_safety.items()},
     }
 
 
@@ -809,9 +1155,20 @@ def _short_commit(value: Any) -> str:
 
 
 def build_run_metadata_rows(project_dir: Path, checkpoint: dict[str, Any]) -> list[dict[str, str]]:
+    recovery_blocker, _ = round_commit_read_blocker(project_dir)
+    if recovery_blocker is not None:
+        return []
     paths = resolve_run_artifact_paths(project_dir, checkpoint)
-    run_config = read_json_file(paths["run_config"]) if paths["run_config"].exists() else {}
-    run_summary = read_json_file(paths["run_summary"]) if paths["run_summary"].exists() else {}
+    run_config = (
+        read_json_file(paths["run_config"])
+        if paths["run_config_safe"] and paths["run_config"].exists()
+        else {}
+    )
+    run_summary = (
+        read_json_file(paths["run_summary"])
+        if paths["run_summary_safe"] and paths["run_summary"].exists()
+        else {}
+    )
     if not run_config and not run_summary:
         return []
 
@@ -893,23 +1250,38 @@ def build_run_metadata_rows(project_dir: Path, checkpoint: dict[str, Any]) -> li
         ("run_meta_git_commit", _short_commit(git_meta.get("commit"))),
         ("run_meta_started_at", run_config.get("started_at")),
         ("run_meta_ended_at", run_config.get("ended_at")),
-        ("run_meta_run_config_path", output_display_path(paths["run_config"])),
-        ("run_meta_run_summary_path", output_display_path(paths["run_summary"])),
-        ("run_meta_round_metrics_path", output_display_path(paths["round_metrics"])),
+        (
+            "run_meta_run_config_path",
+            output_display_path(paths["run_config"]) if paths["run_config_safe"] else None,
+        ),
+        (
+            "run_meta_run_summary_path",
+            output_display_path(paths["run_summary"]) if paths["run_summary_safe"] else None,
+        ),
+        (
+            "run_meta_round_metrics_path",
+            output_display_path(paths["round_metrics"]) if paths["round_metrics_safe"] else None,
+        ),
     ]
     return [{"field_key": field_key, "value": _display_value(value)} for field_key, value in values]
 
 
 def discover_project_run_roots(project_dir: Path, *, limit: int = 12) -> list[Path]:
-    runs_dir = project_dir / "runs"
-    if not runs_dir.exists():
+    try:
+        runs_root = ensure_project_runtime_paths_safe(project_dir)
+        if runs_root is None:
+            return []
+        run_roots = list_artifact_directories(runs_root)
+    except OSError:
         return []
-    run_roots = [path for path in runs_dir.iterdir() if path.is_dir()]
-    return sorted(
-        run_roots,
-        key=lambda path: (path.stat().st_mtime, path.name),
-        reverse=True,
-    )[:limit]
+    return [
+        path
+        for _, _, path in sorted(
+            run_roots,
+            key=lambda item: (item[0], item[1]),
+            reverse=True,
+        )[:limit]
+    ]
 
 
 def _count_text(value: Any) -> str:
@@ -925,8 +1297,36 @@ def _artifact_path_display(value: Any) -> str:
     return output_display_path(Path(text))
 
 
-def build_run_comparison_rows(run_roots: Sequence[Path]) -> list[dict[str, Any]]:
-    comparison = compare_runs([Path(run_root) for run_root in run_roots])
+def build_run_comparison_rows(
+    run_roots: Sequence[Path],
+    *,
+    project_dir: Path | None = None,
+) -> list[dict[str, Any]]:
+    safe_run_roots = []
+    for run_root_value in run_roots:
+        run_root = Path(run_root_value)
+        selected_project = project_dir or infer_round_commit_project_dir(run_root)
+        if selected_project is not None:
+            blocker, _ = round_commit_read_blocker(selected_project)
+            if blocker is not None:
+                continue
+        try:
+            root_metadata = run_root.lstat()
+        except OSError:
+            continue
+        if not stat.S_ISDIR(root_metadata.st_mode):
+            continue
+        if all(
+            artifact_path_is_safe(run_root / filename, allow_missing=True)
+            for filename in (
+                "run_config.json",
+                "run_summary.json",
+                "run_manifest.json",
+                "round_metrics.json",
+            )
+        ):
+            safe_run_roots.append(run_root)
+    comparison = compare_runs(safe_run_roots, safe_artifacts=True)
     rows: list[dict[str, Any]] = []
     for run in comparison.get("runs", []):
         if not isinstance(run, dict):
@@ -970,17 +1370,61 @@ def _has_run_artifacts(run_root: Path) -> bool:
 
 
 def build_run_analytics_dashboard(project_dir: Path, checkpoint: dict[str, Any]) -> dict[str, Any]:
+    recovery_blocker, recovery = round_commit_read_blocker(project_dir)
+    if recovery_blocker is not None:
+        return {
+            "available": False,
+            "blocked_reason": recovery_blocker,
+            "round_commit_status": recovery.status,
+            "finalization_status": (
+                recovery.status if recovery_blocker.startswith("finalization_") else None
+            ),
+            "diagnostic_finalization_status": (
+                recovery.status if recovery_blocker.startswith("diagnostic_finalization_") else None
+            ),
+            "cards": [],
+            "score_rows": [],
+            "rubric_rows": [],
+            "similarity_rows": [],
+            "agent_timing_rows": [],
+            "token_rows": [],
+            "sources": [],
+        }
     paths = resolve_run_artifact_paths(project_dir, checkpoint)
     run_root = paths["run_root"]
-    run_summary = read_json_file(paths["run_summary"]) if paths["run_summary"].exists() else {}
-    round_metric_entries = _read_json_list_file(paths["round_metrics"])
-    score_rows = load_score_history_rows(project_dir / "score_history.json")
+    run_summary = (
+        read_json_file(paths["run_summary"])
+        if paths["run_summary_safe"] and paths["run_summary"].exists()
+        else {}
+    )
+    round_metric_entries = (
+        _read_json_list_file(paths["round_metrics"]) if paths["round_metrics_safe"] else []
+    )
+    use_legacy_project_history = paths["run_scope_valid"] and not paths["run_root_requested"]
+    score_rows = (
+        load_score_history_rows(project_dir / "score_history.json")
+        if use_legacy_project_history
+        else []
+    )
     if not score_rows and round_metric_entries:
         score_rows = _flatten_metric_rows(round_metric_entries)
 
     analysis: dict[str, Any] = {}
-    if run_root.exists() and _has_run_artifacts(run_root):
-        analysis = analyze_run(run_root)
+    analysis_artifacts_safe = all(
+        paths[f"{name}_safe"]
+        for name in ("run_config", "run_summary", "round_metrics", "run_manifest")
+    )
+    if (
+        paths["run_scope_valid"]
+        and analysis_artifacts_safe
+        and run_root.exists()
+        and _has_run_artifacts(run_root)
+    ):
+        analysis = analyze_run(
+            run_root,
+            safe_artifacts=True,
+            project_dir=project_dir,
+        )
     rounds = analysis.get("rounds") if isinstance(analysis.get("rounds"), dict) else {}
     score = analysis.get("score") if isinstance(analysis.get("score"), dict) else {}
     robustness = analysis.get("robustness") if isinstance(analysis.get("robustness"), dict) else {}
@@ -1027,14 +1471,15 @@ def build_run_analytics_dashboard(project_dir: Path, checkpoint: dict[str, Any])
         {"label_key": "analytics_agent_elapsed", "value": _format_seconds(total_agent_elapsed)},
         {"label_key": "analytics_estimated_tokens", "value": total_estimated_tokens},
     ]
+    source_candidates = (
+        (paths["run_summary"], paths["run_summary_safe"]),
+        (paths["round_metrics"], paths["round_metrics_safe"]),
+        (project_dir / "score_history.json", use_legacy_project_history),
+    )
     source_paths = [
         output_display_path(path)
-        for path in (
-            paths["run_summary"],
-            paths["round_metrics"],
-            project_dir / "score_history.json",
-        )
-        if path.exists()
+        for path, path_safe in source_candidates
+        if path_safe and path.exists()
     ]
     return {
         "available": bool(score_rows or run_summary or round_metric_entries),
@@ -1190,7 +1635,10 @@ def render_run_analytics_dashboard(project_dir: Path, checkpoint: dict[str, Any]
     dashboard = build_run_analytics_dashboard(project_dir, checkpoint)
     st.subheader(t("run_analytics_dashboard"))
     if not dashboard["available"]:
-        st.info(t("run_analytics_empty"))
+        if dashboard.get("blocked_reason"):
+            st.warning(t(str(dashboard["blocked_reason"])))
+        else:
+            st.info(t("run_analytics_empty"))
         return
 
     metric_columns = st.columns(len(dashboard["cards"]))
@@ -1265,8 +1713,11 @@ def _render_dashboard_table_chart(
 
 
 def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[dict[str, Any]]:
+    recovery_blocker, _ = round_commit_read_blocker(project_dir)
     paths = resolve_run_artifact_paths(project_dir, checkpoint)
-    run_root = paths["run_root"] if paths["run_root"] != project_dir else None
+    run_root = (
+        paths["run_root"] if paths["run_scope_valid"] and paths["run_root"] != project_dir else None
+    )
     catalog = [
         {
             "label": "Best output",
@@ -1291,19 +1742,22 @@ def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[
         {
             "label": "Run config",
             "label_key": "output_run_config",
-            "path": paths["run_config"],
+            "path": paths["run_config"] if paths["run_config_safe"] else None,
+            "path_safe": paths["run_config_safe"],
             "missing_key": "missing_run_config",
         },
         {
             "label": "Run summary",
             "label_key": "output_run_summary",
-            "path": paths["run_summary"],
+            "path": paths["run_summary"] if paths["run_summary_safe"] else None,
+            "path_safe": paths["run_summary_safe"],
             "missing_key": "missing_run_summary",
         },
         {
             "label": "Round metrics",
             "label_key": "output_round_metrics",
-            "path": paths["round_metrics"],
+            "path": paths["round_metrics"] if paths["round_metrics_safe"] else None,
+            "path_safe": paths["round_metrics_safe"],
             "missing_key": "missing_round_metrics",
         },
         {
@@ -1332,49 +1786,92 @@ def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[
     round_index = _safe_int(checkpoint.get("last_completed_round"))
     if run_root and round_index > 0 and run_root.exists():
         round_dir = run_root / f"round_{round_index:02d}"
-        catalog.extend(
-            [
+        safe_round_dir, round_error = validate_resume_round_dir(
+            run_root=run_root,
+            round_dir=round_dir,
+        )
+        if round_error is None and safe_round_dir is not None:
+            round_outputs = [
                 {
                     "label": "Latest round draft",
                     "label_key": "output_latest_draft",
-                    "path": round_dir / "01_draft.md",
+                    "path": safe_round_dir / "01_draft.md",
                 },
                 {
                     "label": "Latest round review",
                     "label_key": "output_latest_review",
-                    "path": round_dir / "02_review.md",
+                    "path": safe_round_dir / "02_review.md",
                 },
                 {
                     "label": "Latest round revised",
                     "label_key": "output_latest_revised",
-                    "path": round_dir / "03_revised.md",
+                    "path": safe_round_dir / "03_revised.md",
                 },
                 {
                     "label": "Latest round judge",
                     "label_key": "output_latest_judge",
-                    "path": round_dir / "04_judge.md",
+                    "path": safe_round_dir / "04_judge.md",
                 },
             ]
+            for item in round_outputs:
+                path_safe = resume_artifact_links_are_safe(
+                    parent_dir=safe_round_dir,
+                    paths=(item["path"],),
+                )
+                item["path_safe"] = path_safe
+                if not path_safe:
+                    item["path"] = None
+            catalog.extend(round_outputs)
+
+    resolved_catalog = []
+    for item in catalog:
+        if recovery_blocker is not None and item["label"] in {
+            "Best output",
+            "Checkpoint",
+            "Round metrics",
+            "Score history",
+            "Latest round draft",
+            "Latest round review",
+            "Latest round revised",
+            "Latest round judge",
+        }:
+            item["path"] = None
+            item["path_safe"] = False
+            item["missing_key"] = recovery_blocker
+        path = item["path"]
+        path_safe = bool(item.get("path_safe", True)) and (
+            path is None or artifact_path_is_safe(path, allow_missing=True)
         )
+        path_exists = bool(
+            path_safe and path is not None and artifact_path_is_safe(path, allow_missing=False)
+        )
+        resolved_catalog.append(
+            {
+                "label": item["label"],
+                "label_key": item["label_key"],
+                "path": path if path_safe else None,
+                "kind": detect_output_kind(path) if path is not None else "text",
+                "exists": path_exists,
+                "missing_key": item.get("missing_key", "output_not_generated"),
+            }
+        )
+    return resolved_catalog
 
-    return [
-        {
-            "label": item["label"],
-            "label_key": item["label_key"],
-            "path": item["path"],
-            "kind": detect_output_kind(item["path"]),
-            "exists": item["path"].exists(),
-            "missing_key": item.get("missing_key", "output_not_generated"),
-        }
-        for item in catalog
-    ]
 
-
-def load_score_history_rows(score_history_path: Path) -> list[dict[str, Any]]:
-    if not score_history_path.exists():
-        return []
+def load_score_history_rows(
+    score_history_path: Path,
+    *,
+    project_dir: Path | None = None,
+) -> list[dict[str, Any]]:
+    if project_dir is not None:
+        blocker, _ = round_commit_read_blocker(project_dir)
+        if blocker is not None:
+            return []
     try:
-        payload = json.loads(read_file_text(score_history_path))
+        content = read_file_text(score_history_path)
+        if not content:
+            return []
+        payload = json.loads(content)
     except json.JSONDecodeError:
         return []
     if not isinstance(payload, list):
@@ -1459,8 +1956,13 @@ def render_live_progress_and_logs(
     stop_signal_path: Path,
     default_model: str,
 ) -> None:
+    try:
+        ensure_project_runtime_paths_safe(proj_path, anchor=proj_path.parent)
+    except OSError:
+        st.warning(t("unsafe_project_paths"))
+        return
     run_meta = get_active_process_meta(run_meta_path(proj_path))
-    checkpoint = read_json_file(checkpoint_path) if checkpoint_path.exists() else {}
+    checkpoint = read_json_file(checkpoint_path)
     run_log_text = tail_file_lines(run_log_path, max_lines=240)
 
     progress = infer_running_stage(
@@ -1478,7 +1980,12 @@ def render_live_progress_and_logs(
     st.write(t("drafting_mode_line", mode=progress["drafting_mode"]))
     st.write(t("last_successful_agent", agent=progress["last_successful_agent"]))
     st.write(t("stop_reason", reason=progress["stop_reason"]))
-    st.write(t("stop_signal_present", present=stop_signal_path.exists()))
+    st.write(
+        t(
+            "stop_signal_present",
+            present=artifact_path_exists(stop_signal_path, allow_directory=True),
+        )
+    )
     st.write(t("selected_model", model=st.session_state.get("selected_model", default_model)))
     cloud_free_status = checkpoint.get("cloud_free", {})
     if isinstance(cloud_free_status, dict) and cloud_free_status:
@@ -1539,11 +2046,7 @@ def main() -> None:
         else:
             st.info(t("quick_tests_help"))
 
-    projects = (
-        sorted([p.name for p in PROJECTS_DIR.iterdir() if p.is_dir()])
-        if PROJECTS_DIR.exists()
-        else []
-    )
+    projects = discover_project_names(PROJECTS_DIR)
     default_index = default_project_index(projects, app_config.project_name)
     selected_project = st.selectbox(
         t("project_selector"), projects, index=default_index if projects else None
@@ -1563,6 +2066,11 @@ def main() -> None:
         )
 
     proj_path = project_path(selected_project)
+    try:
+        ensure_project_runtime_paths_safe(proj_path, anchor=PROJECTS_DIR)
+    except OSError:
+        st.error(t("unsafe_project_paths"))
+        return
     st.write(t("project_path", path=project_display_path(proj_path)))
 
     task_path = proj_path / "task.md"
@@ -1573,7 +2081,7 @@ def main() -> None:
     stop_signal_path = proj_path / "STOP_REQUESTED"
     run_meta = get_active_process_meta(run_meta_path(proj_path))
     model_job_meta = get_active_process_meta(model_job_meta_path(proj_path))
-    checkpoint = read_json_file(checkpoint_path) if checkpoint_path.exists() else {}
+    checkpoint = read_json_file(checkpoint_path)
 
     col_input_left, col_input_right = st.columns(2)
     with col_input_left:
@@ -1582,7 +2090,7 @@ def main() -> None:
             value=input_text_or_placeholder(task_path, "task_placeholder"),
             height=260,
         )
-        if not task_path.exists():
+        if not artifact_path_is_safe(task_path, allow_missing=False):
             st.caption(t("task_missing_help"))
     with col_input_right:
         memory_text = st.text_area(
@@ -1590,12 +2098,17 @@ def main() -> None:
             value=input_text_or_placeholder(memory_path, "memory_placeholder"),
             height=260,
         )
-        if not memory_path.exists():
+        if not artifact_path_is_safe(memory_path, allow_missing=False):
             st.caption(t("memory_optional_help"))
     if st.button(t("save_input")):
-        write_file_text(task_path, task_text)
-        write_file_text(memory_path, memory_text)
-        st.success(t("input_saved"))
+        try:
+            ensure_artifact_paths_safe((task_path, memory_path))
+            write_file_text(task_path, task_text)
+            write_file_text(memory_path, memory_text)
+        except OSError:
+            st.error(t("input_save_failed"))
+        else:
+            st.success(t("input_saved"))
 
     st.subheader(t("run_controls"))
     run_active = bool(run_meta)
@@ -1651,6 +2164,7 @@ def main() -> None:
         refresh_col, model_status_col = st.columns([1, 4])
         with refresh_col:
             if st.button(t("refresh_models")):
+                st.session_state.pop(OLLAMA_HEALTH_SESSION_KEY, None)
                 refresh_ollama_model_cache(base_url=app_config.ollama_base_url)
                 st.session_state["model_list_refreshed"] = True
 
@@ -1728,12 +2242,22 @@ def main() -> None:
             t("gemini_api_key_env"),
             value=app_config.model.gemini.api_key_env,
             key="gemini_api_key_env",
+            on_change=clear_session_health_result,
+            args=(GEMINI_HEALTH_SESSION_KEY,),
         )
         gemini_api_key_password = st.text_input(
             t("gemini_api_key_password"),
             type="password",
             key="gemini_api_key_password",
             help=t("gemini_api_key_password_help"),
+            on_change=clear_session_health_result,
+            args=(GEMINI_HEALTH_SESSION_KEY,),
+        )
+        gemini_session_api_key = gemini_api_key_password.strip()
+        gemini_config_api_key = app_config.model.gemini.api_key.strip()
+        gemini_inline_api_key = resolve_ui_gemini_api_key(
+            gemini_session_api_key,
+            gemini_config_api_key,
         )
         cloud_models = list(app_config.model.gemini.models or DEFAULT_GEMINI_MODELS)
         cloud_default_model = (
@@ -1743,15 +2267,14 @@ def main() -> None:
         )
         key_available = has_gemini_api_key_source(
             api_key_env=gemini_api_key_env,
-            api_key_value=gemini_api_key_password,
-            config_api_key=app_config.model.gemini.api_key,
+            api_key_value=gemini_inline_api_key,
         )
         if not key_available:
             st.warning(t("gemini_health_missing_key"))
         provider_env_overrides = build_provider_env_overrides(
             selected_provider,
             gemini_api_key_env,
-            gemini_api_key_password,
+            gemini_session_api_key,
         )
 
         st.markdown(f"**{t('cloud_free_runner')}**")
@@ -1771,12 +2294,10 @@ def main() -> None:
             key="free_runner_preset",
         )
 
-        discovered_models = st.session_state.get("cloud_free_discovered_models")
-        if not isinstance(discovered_models, list):
-            discovered_models = load_discovery_artifact(proj_path)
-        profile_results = st.session_state.get("cloud_free_profile_results")
-        if not isinstance(profile_results, list):
-            profile_results = load_profile_artifact(proj_path)
+        discovered_models, profile_results = load_scoped_cloud_free_cache(
+            proj_path,
+            st.session_state,
+        )
 
         discover_col, profile_col, recommendation_col = st.columns([1, 1, 3])
         with discover_col:
@@ -1784,14 +2305,15 @@ def main() -> None:
                 with st.spinner(t("discovering_free_cloud_models")):
                     discovered, error = discover_free_cloud_models(
                         api_key_env=gemini_api_key_env,
-                        api_key=gemini_api_key_password or app_config.model.gemini.api_key,
+                        api_key=gemini_inline_api_key,
                         config=app_config.cloud_free,
                     )
                 if error:
                     st.error(t("cloud_free_discovery_failed", error=error))
                 else:
                     save_discovery_artifact(proj_path, discovered)
-                    st.session_state["cloud_free_discovered_models"] = discovered
+                    st.session_state.pop(CLOUD_FREE_CACHE_IDENTITY_KEY, None)
+                    st.session_state[CLOUD_FREE_DISCOVERY_SESSION_KEY] = discovered
                     discovered_models = discovered
                     st.success(t("cloud_free_discovery_saved", count=len(discovered)))
         with profile_col:
@@ -1809,16 +2331,18 @@ def main() -> None:
                     profiles = profile_free_cloud_models(
                         candidates=safe_candidates,
                         api_key_env=gemini_api_key_env,
-                        api_key=gemini_api_key_password or app_config.model.gemini.api_key,
+                        api_key=gemini_inline_api_key,
                     )
                 save_profile_artifact(proj_path, profiles)
-                st.session_state["cloud_free_profile_results"] = profiles
+                st.session_state.pop(CLOUD_FREE_CACHE_IDENTITY_KEY, None)
+                st.session_state[CLOUD_FREE_PROFILE_SESSION_KEY] = profiles
                 profile_results = profiles
                 st.success(t("cloud_free_profile_saved", count=len(profiles)))
 
-        cloud_candidates = build_candidate_pool(
+        cloud_candidates = build_cached_candidate_pool(
             discovered_models=discovered_models,
             configured_models=cloud_models,
+            profiles=profile_results,
             config=app_config.cloud_free,
         )
         cloud_free_recommendation = recommend_free_cloud_model(
@@ -1835,8 +2359,10 @@ def main() -> None:
                         reason=cloud_free_recommendation.reason,
                     )
                 )
-            else:
+            elif selected_free_runner_preset == FREE_RUNNER_MANUAL:
                 st.info(t("cloud_free_manual_mode"))
+            else:
+                st.info(t("cloud_free_no_eligible_recommendation"))
 
         selected_cloud_model = st.session_state.get("selected_cloud_model_picker")
         if selected_cloud_model not in cloud_models:
@@ -1900,15 +2426,34 @@ def main() -> None:
         )
 
         gemini_health_col, gemini_health_result_col = st.columns([1, 3])
+        gemini_health_identity = build_model_health_identity(
+            provider=MODEL_PROVIDER_GEMINI,
+            model=effective_model,
+            connection_scope=gemini_health_connection_scope(
+                api_key_env=gemini_api_key_env,
+                session_key_present=bool(gemini_session_api_key),
+                config_key_present=bool(gemini_config_api_key),
+            ),
+        )
         with gemini_health_col:
             if st.button(t("check_gemini_health")):
-                st.session_state["gemini_model_health"] = check_gemini_model_health(
+                gemini_health = check_gemini_model_health(
                     selected_model=effective_model,
                     api_key_env=gemini_api_key_env,
-                    api_key_value=gemini_api_key_password or app_config.model.gemini.api_key,
+                    api_key_value=gemini_inline_api_key,
+                )
+                store_scoped_health_result(
+                    st.session_state,
+                    key=GEMINI_HEALTH_SESSION_KEY,
+                    identity=gemini_health_identity,
+                    result=gemini_health,
                 )
         with gemini_health_result_col:
-            gemini_health = st.session_state.get("gemini_model_health")
+            gemini_health = load_scoped_health_result(
+                st.session_state,
+                key=GEMINI_HEALTH_SESSION_KEY,
+                identity=gemini_health_identity,
+            )
             if gemini_health:
                 if gemini_health["ok"]:
                     st.success(localized_message(gemini_health))
@@ -1983,6 +2528,11 @@ def main() -> None:
                 selected_benchmark_preset if mode == "continuous" else None,
                 selected_max_provider_quota_failures if mode == "continuous" else None,
                 selected_drafting_mode,
+                gemini_api_key_override_env=(
+                    UI_GEMINI_API_KEY_ENV
+                    if selected_provider == MODEL_PROVIDER_GEMINI and gemini_session_api_key
+                    else None
+                ),
             ),
             cwd=ROOT,
             log_path=run_log_path,
@@ -2017,6 +2567,7 @@ def main() -> None:
             else:
                 st.error(t("stop_signal_failed", path=stop_signal_display))
     resume_state = describe_resume_state(
+        project_dir=proj_path,
         checkpoint=checkpoint,
         run_active=run_active,
         selected_model=model_label,
@@ -2119,16 +2670,31 @@ def main() -> None:
             st.caption(t("no_installed_model"))
 
         health_col, health_result_col = st.columns([1, 3])
+        ollama_health_identity = build_model_health_identity(
+            provider=MODEL_PROVIDER_OLLAMA,
+            model=effective_model,
+            connection_scope=ollama_health_connection_scope(app_config.ollama_base_url),
+        )
         with health_col:
             if st.button(t("check_model_health")):
-                st.session_state["model_health"] = check_model_health(
+                model_health = check_model_health(
                     provider=MODEL_PROVIDER_OLLAMA,
                     base_url=app_config.ollama_base_url,
                     selected_model=effective_model,
                     installed_model_names=installed_model_names,
                 )
+                store_scoped_health_result(
+                    st.session_state,
+                    key=OLLAMA_HEALTH_SESSION_KEY,
+                    identity=ollama_health_identity,
+                    result=model_health,
+                )
         with health_result_col:
-            model_health = st.session_state.get("model_health")
+            model_health = load_scoped_health_result(
+                st.session_state,
+                key=OLLAMA_HEALTH_SESSION_KEY,
+                identity=ollama_health_identity,
+            )
             if model_health:
                 if model_health["ok"]:
                     st.success(localized_message(model_health))
@@ -2226,7 +2792,10 @@ def main() -> None:
 
     render_run_analytics_dashboard(proj_path, checkpoint)
 
-    score_rows = load_score_history_rows(proj_path / "score_history.json")
+    score_rows = load_score_history_rows(
+        proj_path / "score_history.json",
+        project_dir=proj_path,
+    )
     st.subheader(t("score_history_table"))
     if score_rows:
         st.dataframe(score_rows, width="stretch")
@@ -2253,7 +2822,10 @@ def main() -> None:
         if len(selected_run_roots) < 2:
             st.info(t("run_comparison_select_two"))
         else:
-            comparison_rows = build_run_comparison_rows(selected_run_roots)
+            comparison_rows = build_run_comparison_rows(
+                selected_run_roots,
+                project_dir=proj_path,
+            )
             st.dataframe(comparison_rows, width="stretch", hide_index=True)
             chart_rows = [
                 {
@@ -2281,7 +2853,8 @@ def main() -> None:
     )
     selected_output = output_catalog[selected_output_index]
     selected_path = selected_output["path"]
-    st.caption(output_display_path(selected_path))
+    if selected_path is not None:
+        st.caption(output_display_path(selected_path))
     if not selected_output["exists"]:
         st.info(t(str(selected_output.get("missing_key", "output_not_generated"))))
     else:
