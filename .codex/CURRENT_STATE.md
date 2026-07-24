@@ -1,22 +1,23 @@
 # Codex Current State
 
-Updated: 2026-07-24 (Asia/Hong_Kong)
+Updated: 2026-07-25 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: preserve the remotely verified ARA-055 package 7B closeout and wait for a separate
-  owner decision before any package 7C execution work.
+- Current goal: implement the explicitly approved ARA-055 package 7C exact missing-history-twin
+  transaction without authorizing package 7D rollback or any general legacy repair.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `3a2b62f8e31d3ade0271b50df5f98da14fc8621c` (the exact
-  externally verified ARA-055 package 7B implementation retained by the additive recovery schema;
+- State recorded against commit: `c87063180ed7623424aa54722dad8a867788902c` (the exact
+  externally verified ARA-055 package 7B closeout retained by the additive recovery schema;
   resolve current `HEAD` live).
-- Last externally verified fallback: `3a2b62f8e31d3ade0271b50df5f98da14fc8621c` (exact local,
+- Last externally verified fallback: `c87063180ed7623424aa54722dad8a867788902c` (exact local,
   remote-tracking, `ls-remote`, GitHub branch, and PR-head equality plus all Python 3.10/3.13
   push/PR jobs passed)
-- Active task at this snapshot: none. There is no unblocked implementation task. Package 7C
-  execution, rollback, and batch discovery remain unapproved.
+- Active task at this snapshot: ARA-055 package 7C exact missing-history-twin execution and
+  recovery. Package 7D rollback, deletion, quarantine, batch discovery, partial repair, canonical
+  adoption, and general migration remain unapproved.
 - Uncommitted changes: not persisted as a static claim. Resolve the exact live state with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -551,6 +552,26 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 - Draft PR 13 remains open and mergeable. Comment `5071600457` records the implementation,
   validation, safety boundary, and package 7C exclusion. No provider or ignored-runtime access
   occurred.
+
+## ARA-055 Package 7C Activation
+
+- Owner approval: after package 7B closeout recommended exact missing-twin execution, the owner
+  said `批准` and confirmed the 60–100 minute long-task assessment with `确认启动` on 2026-07-25.
+- Stable fallback: `c87063180ed7623424aa54722dad8a867788902c`, exact local/upstream/
+  `ls-remote`/GitHub branch/PR-head equal. Push/PR runs `30106096013`/`30106101027` passed Python
+  3.10/3.13 and every workflow step with zero annotations.
+- Baseline: classifier/preview/recovery coverage passes `27 passed, 115 subtests`; the worktree is
+  clean and draft PR 13 is open and mergeable.
+- Authorized scope: support only `exact_missing_history_twin`; require an explicit owner-selected
+  evidence destination; create a restrictive bounded evidence bundle before a fixed immutable
+  project transaction; copy exact source bytes into the safely absent twin with no replacement;
+  recover only by lock-held roll-forward; and extend shared entry/read blockers.
+- Acceptance: internal/configured-external storage, either source direction, changed-generation
+  conflicts, interruption/retry boundaries, byte preservation, provider-free CLI, full layered
+  regression, wheel, staged safety, push, and Python 3.10/3.13 CI.
+- Exclusions: no package 7D rollback/delete/quarantine, batch discovery, partial/sparse/string-round
+  repair, canonical adoption, source rewrite, inferred field/round generation, dependency/default/
+  provider/experiment change, real historical execution, or ignored-runtime access.
 
 ## Completed Steps
 
@@ -1406,9 +1427,13 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Remaining Steps
 
-- No approved implementation remains. Preserve the package 7B remote-verified state.
+- Audit existing lock, transaction, storage, CLI, and shared reader-guard primitives.
+- Add provider-free package 7C red tests, then implement the smallest exact-copy roll-forward
+  transaction and evidence contract.
+- Run ARA-055 focused/related tests, `make check`, isolated wheel, staged safety, scope review,
+  commit, push, Python 3.10/3.13 CI, and a final recovery snapshot.
 - Preserve all journal-less, partial, ambiguous, unsafe, and unknown legacy evidence byte-for-byte;
-  do not start package 7C.
+  do not broaden package 7C beyond the sole exact missing-twin class.
 - Do not activate ARA-018 without an owner license/distribution decision.
 
 ## Test Status
@@ -2438,7 +2463,7 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 ```bash
 git status --short --branch
 git rev-parse --verify HEAD
-.venv/bin/python -m pytest -q tests/test_recovery_state.py
+.venv/bin/python -m pytest -q tests/test_legacy_migration.py tests/test_recovery_state.py
 ```
 
 ## Interruption Recovery

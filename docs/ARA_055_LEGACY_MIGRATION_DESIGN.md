@@ -1,7 +1,7 @@
 # ARA-055 Legacy History Migration Design
 
 Status: package 7A read-only classifier and package 7B single-project preview are remotely
-verified; execution is not implemented or approved
+verified; package 7C exact missing-twin execution is approved but not yet implemented
 
 Date: 2026-07-24
 
@@ -446,9 +446,8 @@ runtime caller and cannot mutate state.
 
 ### 7C - Exact missing-twin execution
 
-Status: not implemented or approved.
+Status: explicitly approved on 2026-07-25; implementation is active.
 
-- Requires a new explicit implementation approval after 7A/7B are remotely verified.
 - Add restricted evidence-bundle creation, strict fixed journal codec, create-only exact-byte
   publication, lock-held recovery, and reader/entry guards.
 - Support only `exact_missing_history_twin`; every other class remains report-only.

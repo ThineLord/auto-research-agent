@@ -142,9 +142,9 @@ status-2 boundary, valid zero/boundary behavior, unchanged configuration schema/
 provider-free scope.
 
 ARA-055 package 7B read-only discovery integration and reader guard verification are complete.
-Last externally verified fallback: `3a2b62f8e31d3ade0271b50df5f98da14fc8621c`. Local HEAD, upstream,
+Last externally verified fallback: `c87063180ed7623424aa54722dad8a867788902c`. Local HEAD, upstream,
 `ls-remote`, the GitHub branch, and draft PR 13 all resolved to that commit. Push/PR runs
-`30105129908`/`30105131795` passed Python 3.10/3.13 and every workflow step with zero annotations.
+`30106096013`/`30106101027` passed Python 3.10/3.13 and every workflow step with zero annotations.
 
 The local package 7B implementation adds only `--legacy-migration-preview PROJECT`, its temporary
 and installed-package tests, documentation, and `.codex` state. Focused tests pass `27 passed, 115
@@ -152,10 +152,15 @@ subtests`; CLI/installed-package coverage passes `79 passed, 291 subtests`; rela
 transaction/UI coverage passes `218 passed, 468 subtests`; full `make check` passes `503 passed,
 970 subtests` plus formatting, lint, imports, and zero-finding safety scans. The isolated real-wheel
 install smoke and final focused/recovery rerun pass. PR comment `5071600457` records the closeout.
-There is no unblocked implementation task. Package 7C execution remains separately approval-gated. Do not execute
-migration, write an evidence bundle/journal/receipt, create a target, steal or remove a lock,
-inspect ignored runtime, change dependencies/defaults/providers/experiments, scan all projects,
-move/delete/quarantine evidence, or infer missing generations.
+
+ARA-055 package 7C exact missing-history-twin execution is active after the owner confirmed the
+60–100 minute long-task assessment with `确认启动` on 2026-07-25. Its scope is only the strict
+`exact_missing_history_twin` class, an explicit owner-selected restrictive evidence bundle, one
+fixed create-only project transaction, exact-byte target publication, lock-held roll-forward
+recovery, and shared entry/read blockers. Use only synthetic temporary fixtures. Do not execute
+against ignored or real historical runtime, implement rollback/delete/quarantine, scan all
+projects, repair partial/sparse/string histories, adopt canonical evidence, rewrite the source,
+infer generations, or change dependencies/defaults/providers/experiments.
 
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.

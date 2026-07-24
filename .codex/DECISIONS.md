@@ -1110,3 +1110,16 @@
 - Excluded scope: package 7C execution, target/evidence/journal/receipt creation, recursive project
   discovery, lock recovery/removal, rollback/delete/quarantine, dependency/default/config schema
   or provider/experiment changes, ignored runtime access, and historical artifact mutation.
+
+## 2026-07-25 - Approve ARA-055 package 7C exact missing-twin execution
+
+- Approval: after package 7B closeout recommended package 7C, the owner said `批准` and confirmed
+  the 60–100 minute long-task assessment with `确认启动`.
+- Authorized scope: the sole `exact_missing_history_twin` class; an explicit owner-selected
+  restrictive evidence bundle; one fixed project-local immutable transaction; exact-byte
+  no-replace target publication; lock-held roll-forward recovery; and shared reader/entry guards.
+- Evidence boundary: only the selected source history is copied verbatim; other authorities are
+  represented by bounded validated fields and digests. No hidden default destination or upload.
+- Excluded scope: package 7D rollback/delete/quarantine, batch discovery, partial/sparse/string-
+  round repair, canonical adoption, source rewrite, inferred generations, real ignored-runtime
+  execution, dependency/default/provider/experiment changes, and general migration.

@@ -1,6 +1,6 @@
 # Known Issues
 
-Updated: 2026-07-24 (Asia/Hong_Kong)
+Updated: 2026-07-25 (Asia/Hong_Kong)
 
 ## KI-001 - Stale invalid `.git/REBASE_HEAD`
 
@@ -634,7 +634,10 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   `218 passed, 468 subtests`; full `make check` passes `503 passed, 970 subtests` plus every static,
   import, and safety gate, and the isolated wheel smoke passes. Implementation `3a2b62f` is exact
   remote-equal; push/PR runs `30105129908`/`30105131795` passed Python 3.10/3.13 with zero
-  annotations. Package 7C execution is unapproved.
+  annotations.
+- Package-7C activation: exact missing-twin evidence/transaction/execution/recovery is explicitly
+  approved and active against remote-equal fallback `c870631`; every other legacy state remains
+  preserve-only, and package 7D destructive rollback is unapproved.
 - Package-1 result: commit `4cd4bf4` adds filesystem-free exact after-image builders and a strict
   bounded journal codec with provider-free regression coverage. No runtime caller creates, reads,
   or applies the journal yet, so this issue remains open.

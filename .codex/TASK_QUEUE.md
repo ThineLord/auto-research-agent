@@ -1,6 +1,6 @@
 # Codex Task Queue
 
-Updated: 2026-07-23 (Asia/Hong_Kong)
+Updated: 2026-07-25 (Asia/Hong_Kong)
 
 Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `DEFERRED`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -985,6 +985,23 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Deferral boundary: ARA-055 is complete through package 7B. Package 7C exact-copy execution and
   package 7D rollback remain separately approval-gated; no unblocked ARA-055 implementation is
   active.
+- Package 7C approval: after package 7B closeout recommended exact missing-twin execution, the
+  owner said `批准` and confirmed the 60–100 minute long-task assessment with `确认启动` on
+  2026-07-25.
+- Package 7C authorized scope: support only `exact_missing_history_twin`; require an explicit
+  owner-selected evidence destination; create a restrictive bounded evidence bundle before a
+  fixed project-local create-only transaction; publish exact source bytes into the safely absent
+  twin; perform lock-held roll-forward recovery; and extend shared entry/read blockers.
+- Package 7C acceptance: both source directions, internal/configured-external run storage,
+  interruption and changed-generation conflicts, exact-byte preservation, no provider/ignored-
+  runtime access, focused/related/full/wheel/staged validation, remote equality, and Python
+  3.10/3.13 CI.
+- Package 7C exclusions: no rollback/delete/quarantine, batch discovery, partial/sparse/string-
+  round repair, canonical adoption, source rewrite, inference, dependency/default/provider/
+  experiment change, real historical execution, ignored-runtime access, or package 7D.
+- Package 7C baseline: `c87063180ed7623424aa54722dad8a867788902c` is exact remote-equal;
+  push/PR runs `30106096013`/`30106101027` pass Python 3.10/3.13 with zero annotations.
+  Classifier/preview/recovery coverage passes `27 passed, 115 subtests`.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 
