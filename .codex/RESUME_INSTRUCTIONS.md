@@ -141,17 +141,17 @@ passed, 809 subtests` plus formatting, lint, imports, and zero-finding safety sc
 status-2 boundary, valid zero/boundary behavior, unchanged configuration schema/defaults, and
 provider-free scope.
 
-ARA-055 package 7 design is complete. Last externally verified fallback:
-`e5f35715279c76b38b2250ef6ba8fcf4c9e79890`. Push/PR runs
-`30090592035`/`30090595366` passed Python 3.10/3.13 and every workflow step; draft PR 13 is clean
-and comment `5069543857` records the evidence. Read
+ARA-055 package 7A is the sole active task after the owner said `批准，继续` on 2026-07-24.
+Last externally verified fallback: `f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0`. Push/PR runs
+`30091187286`/`30091190516` passed Python 3.10/3.13 and every workflow step; draft PR 13 is clean.
+Read
 `docs/ARA_055_LEGACY_MIGRATION_DESIGN.md` before any follow-up. It rejects general repair and
-permits only one future exact missing-history-twin candidate. Do not implement package 7A,
-execute migration, add a command/API, inspect ignored runtime, change schemas/defaults/
-dependencies/providers/experiments, move/delete/quarantine evidence, or infer missing generations
-without new approval.
+permits only one future exact missing-history-twin candidate. Package 7A may implement only the
+read-only, explicitly targeted L00-L20 classifier and additive redacted report schema. Do not add
+CLI/doctor/UI routing, execute migration, write an evidence bundle/journal/receipt, create a target,
+inspect ignored runtime, change dependencies/defaults/providers/experiments, scan all projects,
+move/delete/quarantine evidence, or infer missing generations.
 
-There is no unblocked implementation task.
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 

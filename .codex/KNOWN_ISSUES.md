@@ -616,6 +616,9 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   ambiguous, partial, journal-less published/canonical/finalization/diagnostic, unsafe, and unknown
   states are non-migratable. Read-only discovery, exact-copy execution, and destructive rollback
   remain three separate approval gates.
+- Package-7A activation: the owner approved only the read-only targeted classifier/report layer on
+  2026-07-24. Execution, evidence/journal writes, rollback, batch scanning, provider work, and
+  ignored-runtime access remain excluded.
 - Package-1 result: commit `4cd4bf4` adds filesystem-free exact after-image builders and a strict
   bounded journal codec with provider-free regression coverage. No runtime caller creates, reads,
   or applies the journal yet, so this issue remains open.

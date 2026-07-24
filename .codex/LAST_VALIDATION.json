@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-    "recorded_at": "2026-07-24T19:52:14+08:00",
+    "recorded_at": "2026-07-24T21:04:24+08:00",
   "branch": "codex/sol-autonomous-hardening",
-    "head_commit": "e5f35715279c76b38b2250ef6ba8fcf4c9e79890",
-    "last_known_stable_commit": "e5f35715279c76b38b2250ef6ba8fcf4c9e79890",
+    "head_commit": "f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0",
+    "last_known_stable_commit": "f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-    "state_recorded_against_commit": "e5f35715279c76b38b2250ef6ba8fcf4c9e79890",
+    "state_recorded_against_commit": "f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-24T19:52:14+08:00",
-    "commit": "e5f35715279c76b38b2250ef6ba8fcf4c9e79890",
+    "verified_at": "2026-07-24T21:04:24+08:00",
+    "commit": "f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 30090592035,
+        "run_id": 30091187286,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "e5f35715279c76b38b2250ef6ba8fcf4c9e79890",
+        "head_sha": "f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-                "run_id": 30090595366,
+                "run_id": 30091190516,
         "event": "pull_request",
         "workflow": "CI",
-                "head_sha": "e5f35715279c76b38b2250ef6ba8fcf4c9e79890",
+                "head_sha": "f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,37 @@
       }
     }
   },
-    "status": "ara055_package7_design_complete",
+    "status": "ara055_package7a_activated",
     "commands": [
+        {
+            "command": "ARA-055 package 7A activation baseline and recovery audit",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "owner_approval": "package_7a_read_only_classifier_only",
+                "commit": "f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0",
+                "remote_equal": true,
+                "ahead": 0,
+                "behind": 0,
+                "pull_request": 13,
+                "pull_request_state": "open_draft_clean",
+                "push_run_id": 30091187286,
+                "pull_request_run_id": 30091190516,
+                "python_310": "success",
+                "python_313": "success",
+                "make_check_pytest_passed": 481,
+                "make_check_subtests_passed": 849,
+                "make_check_duration_seconds": 226.22,
+                "ruff_formatted_files": 72,
+                "imports": "passed",
+                "tracked_files_scanned": 118,
+                "safety_findings": 0,
+                "provider_calls": 0,
+                "ignored_runtime_access": 0,
+                "migration_execution": false,
+                "artifact_mutation": false
+            }
+        },
         {
             "command": "ARA-055 package 7 design remote, CI, and PR verification",
             "exit_code": 0,
@@ -4922,6 +4951,17 @@
     }
   ],
   "failures": [
+    {
+      "command": "first ARA-055 package 7A activation recovery-state consistency check",
+      "result": "corrected_before_activation_commit",
+      "summary": {
+        "pytest_failed": 1,
+        "pytest_passed": 5,
+        "pytest_subtests_passed": 1,
+        "cause": "an unscoped status patch marked ARA-001 active instead of ARA-055",
+        "fix": "restored ARA-001 to DONE and marked ARA-055 IN_PROGRESS using task-title context"
+      }
+    },
     {
       "command": "first ARA-055 package 7 closeout recovery-state consistency check",
       "result": "corrected_before_closeout_commit",

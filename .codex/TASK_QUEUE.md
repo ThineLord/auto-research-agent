@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `DONE`
+- Status: `IN_PROGRESS`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -914,6 +914,21 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   runs `30090592035`/`30090595366` passed Python 3.10/3.13 and every workflow step with zero
   annotations. PR comment `5069543857` records the result. Package 7A discovery implementation,
   package 7C execution, and rollback remain separately approval-gated and were not started.
+- Package 7A approval: after package 7 design closeout recommended the read-only classifier/report
+  package, the owner said `批准，继续` on 2026-07-24.
+- Package 7A authorized scope: implement fixed L00-L20 classification and reason enums, a strict
+  additive filesystem-free report builder, and explicitly targeted bounded/no-follow inspection of
+  one project with trusted internal/configured-external run identity and redacted output.
+- Package 7A acceptance: every design state has synthetic temporary coverage; discovery performs no
+  write, stale-lock deletion, recursive project scan, provider/client construction, or execution;
+  unsafe/ambiguous states fail closed without paths/raw values; focused/related tests, `make check`,
+  staged safety, push, and Python 3.10/3.13 CI pass.
+- Package 7A exclusions: no CLI/doctor/UI integration, `--execute`, evidence-bundle/journal/receipt
+  write, missing-target creation, rollback/delete/quarantine, batch discovery, dependency/default
+  change, provider/network work, ignored-runtime access, or package 7B/7C/7D.
+- Package 7A baseline: `f8b770d` is exact remote-equal; push/PR runs
+  `30091187286`/`30091190516` pass. Local `make check` passes `481 passed, 849 subtests`, formatting,
+  Ruff, imports, and zero-finding safety scans over 118 tracked files.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

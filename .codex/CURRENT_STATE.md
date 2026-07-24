@@ -4,19 +4,20 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: ARA-055 package 7 design is complete; wait for explicit owner approval before any
-  package 7A discovery implementation or other task.
+- Current goal: implement the explicitly approved ARA-055 package 7A read-only legacy classifier
+  and report schema without adding any migration execution or artifact mutation.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `e5f35715279c76b38b2250ef6ba8fcf4c9e79890` (the exact
-  externally verified ARA-055 package 7 design commit retained by the additive recovery schema;
+- State recorded against commit: `f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0` (the exact
+  externally verified ARA-055 package 7 design closeout retained by the additive recovery schema;
   resolve current `HEAD` live).
-- Last externally verified fallback: `e5f35715279c76b38b2250ef6ba8fcf4c9e79890` (exact local,
+- Last externally verified fallback: `f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0` (exact local,
   remote-tracking, `ls-remote`, GitHub branch, and PR-head equality plus all Python 3.10/3.13
   push/PR jobs passed)
-- Active task at this snapshot: none. ARA-055 package 7 design is closed; no implementation or
-  execution package is authorized.
+- Active task at this snapshot: ARA-055 package 7A read-only classifier/report implementation.
+  Migration execution, evidence-bundle writes, transaction writes, rollback, and batch discovery
+  remain unauthorized.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -433,6 +434,28 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   runtime read, schema/default/dependency change, cleanup, or quarantine was performed.
 - Recommended next task is package 7A: read-only, explicitly targeted legacy classification and
   report schema using synthetic fixtures only. It requires separate owner approval.
+
+## ARA-055 Package 7A Activation
+
+- Owner approval: `批准，继续` on 2026-07-24 after package 7A was explicitly recommended as the
+  next task with its read-only scope and separate execution boundary.
+- Stable baseline: `f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0`, exact local/upstream/
+  `ls-remote`/PR-head equal. Closeout push/PR runs `30091187286`/`30091190516` passed Python
+  3.10/3.13, isolated-wheel validation, and every workflow step; PR 13 is open, draft, and clean.
+- Local baseline `make check` passes formatting over 72 files, Ruff, imports, repository safety
+  over 118 tracked files with zero findings, and `481 passed, 849 subtests` in 226.22 seconds.
+- Authorized implementation: one pure, explicitly targeted, provider-free classifier with fixed
+  L00-L20 state/reason enums, strict additive result schema, bounded no-follow reads, safe
+  internal/configured-external run identity checks, and path/value-redacted human/JSON reporting.
+- Required behavior: classify one selected project snapshot without mutation, recursive project
+  scans, provider/client construction, stale-lock deletion, or implicit execution. Unsafe and
+  ambiguous states must remain non-migratable.
+- Explicit exclusions: no `--execute`, missing-twin creation, evidence/provenance bundle write,
+  migration journal/receipt, runtime artifact update, rollback/delete/quarantine, CLI/doctor/UI
+  integration beyond a filesystem-free report builder, dependency/default/schema changes outside
+  the new additive report schema, provider/network work, or ignored-runtime inspection.
+- Next checkpoint: commit and push this activation state before adding failing classifier tests or
+  production code.
 
 ## Completed Steps
 
@@ -1288,9 +1311,10 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Remaining Steps
 
-- There is no active approved implementation task.
-- Do not start ARA-055 package 7A, exact-copy execution, or rollback without separate approval.
-- Preserve all journal-less, partial, ambiguous, unsafe, and unknown legacy evidence byte-for-byte.
+- Add ARA-055 package 7A failing tests for the fixed L00-L20 states and no-write contract.
+- Implement only the pure targeted classifier and additive path-redacted report schema.
+- Preserve all journal-less, partial, ambiguous, unsafe, and unknown legacy evidence byte-for-byte;
+  do not start exact-copy execution or rollback.
 - Do not activate ARA-018 without an owner license/distribution decision.
 
 ## Test Status
@@ -2320,7 +2344,7 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 ```bash
 git status --short --branch
 git rev-parse HEAD
-git log --oneline --decorate -n 10
+.venv/bin/python -m pytest -q tests/test_recovery_state.py
 ```
 
 ## Interruption Recovery

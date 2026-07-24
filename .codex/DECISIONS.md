@@ -1070,3 +1070,15 @@
   absent fixed target with no replacement. Do not update any other artifact.
 - Approval boundary: package 7A read-only classification, package 7C exact-copy execution, and any
   later destructive rollback are separately approval-gated. This design authorizes none of them.
+
+## 2026-07-24 - Approve ARA-055 package 7A read-only classification
+
+- Approval: after package 7 design closeout recommended package 7A, the owner said `批准，继续`.
+- Authorized scope: fixed L00-L20 classification/reason enums, one strict additive report schema,
+  and explicitly targeted bounded/no-follow inspection of one selected project using trusted
+  internal/configured-external run identity.
+- Mutation boundary: discovery is pure and provider-free. It must not write, create, replace,
+  delete, quarantine, recover, steal a lock, scan all projects, or implicitly execute migration.
+- Excluded scope: CLI/doctor/UI routing, evidence bundle, transaction/receipt, missing-twin
+  creation, rollback, dependencies/defaults/providers/experiments, ignored runtime, and packages
+  7B-7D.
