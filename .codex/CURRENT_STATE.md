@@ -4,21 +4,19 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: implement the explicitly approved ARA-061 numeric CLI validation without changing
-  configuration schemas, scheduler policy, defaults, providers, or experiment behavior.
+- Current goal: preserve the remotely verified ARA-061 closeout and await explicit approval for
+  the next approval-gated maintenance package.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `2ac99e0fde929dc9d919702e2e7195ced1d0f7af` (the exact
-  externally verified ARA-061 activation checkpoint retained by the additive recovery schema;
+- State recorded against commit: `b1c1b6c96aaa46b03ef1e25c30aebc771893e4d9` (the exact
+  externally verified ARA-061 implementation retained by the additive recovery schema;
   resolve current `HEAD` live).
-- Last externally verified fallback: `2ac99e0fde929dc9d919702e2e7195ced1d0f7af` (exact local,
+- Last externally verified fallback: `b1c1b6c96aaa46b03ef1e25c30aebc771893e4d9` (exact local,
   remote-tracking, `ls-remote`, GitHub branch, and PR-head equality plus all Python 3.10/3.13
   push/PR jobs passed)
-- Active task at this snapshot: ARA-061. Authorized scope is strict finite/range/cross-option
-  validation for the seven existing numeric CLI overrides plus provider-free regression coverage.
-  ARA-055 package 5, config-file schemas, dependencies, scheduler policy/defaults, provider calls,
-  experiment behavior, and ignored runtime remain excluded.
+- Active task at this snapshot: none. ARA-061 is complete; ARA-055 package 5 and the owner-blocked
+  release-policy task remain separately approval-gated.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -197,7 +195,7 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 - Package 5's separate finalization transaction is recommended next but requires explicit owner
   approval before activation or implementation.
 
-## ARA-061 Activation
+## ARA-061 Closeout
 
 - Owner approval: `批准ARA061` on 2026-07-24 after the required 45–60 minute long-task checkpoint.
 - Stable baseline: `00a488dce12f7be548ce00d1980d97fd4883e4ff`, exact local/upstream/
@@ -222,11 +220,15 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   and staged modes over 115 files with zero findings, and `466 passed, 809 subtests` in 180.21
   seconds. After explicit eight-path staging, staged safety and cached diff checks pass; recovery
   state passes `6 passed, 1 subtest`, and the focused CLI guard passes `4 passed, 18 subtests`.
-- Current uncommitted task files are `src/cli.py`, `tests/test_cli_exit_codes.py`, `CHANGELOG.md`,
-  `README.md`, `docs/USER_GUIDE.md`, and this recovery update. No provider or ignored-runtime
-  access occurred.
-- Next command:
-  `git diff --check`, then explicitly stage only the recorded ARA-061 paths.
+- Implementation `b1c1b6c96aaa46b03ef1e25c30aebc771893e4d9` is exact local/upstream/
+  `ls-remote`/PR-head equal. Push/PR runs `30081927773`/`30081930092` passed Python 3.10/3.13 and
+  every workflow step; PR comment `5068253242` records the evidence and scope.
+- ARA-061 is complete. No provider or ignored-runtime access occurred. A bounded GitHub watcher
+  query encountered one `unexpected EOF`; querying the same run IDs proved both workflows green.
+  One read-only status search also used backticks inside double quotes, causing harmless zsh
+  command-substitution errors; the literal-safe rerun succeeded and changed no files or Git state.
+- The first closeout recovery-state check rejected a missing explicit fallback label (`1 failed,
+  5 passed`); the recovery wording was corrected and the exact rerun passes `6 passed, 1 subtest`.
 
 ## Completed Steps
 
@@ -1082,10 +1084,6 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Remaining Steps
 
-- Review and explicitly stage the ARA-061 implementation, tests, docs, and recovery records; rerun
-  staged safety validation, then commit and push if the index exactly matches the reviewed scope.
-- Verify exact local/upstream/`ls-remote`/PR-head equality and both Python 3.10/3.13 push/PR CI
-  events before closing ARA-061.
 - Await explicit owner approval before activating ARA-055 package 5; do not change finalization
   writers or readers while it remains approval-gated.
 - Preserve packages 3-4 transaction ordering, lock-held entry recovery, and non-mutating read-only
@@ -1108,6 +1106,9 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 - ARA-061 full `make check` passes formatting over 70 files, Ruff, imports, tracked/staged safety
   over 115 files with zero findings, and `466 passed, 809 subtests` in 180.21 seconds. Recovery
   state passes `6 passed, 1 subtest`.
+- ARA-061 implementation `b1c1b6c` is exact local/upstream/`ls-remote`/PR-head equal. Push/PR
+  runs `30081927773`/`30081930092` passed Python 3.10/3.13, isolated-wheel validation, formatting,
+  lint, imports, repository safety, and all tests.
 - ARA-055 package-4 closeout `00a488d` is exact local/upstream/`ls-remote`/PR-head equal.
   Closeout push/PR runs `30035438824`/`30035441752` passed Python 3.10/3.13 and every workflow
   step.

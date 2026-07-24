@@ -944,7 +944,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-061 - Reject invalid numeric CLI overrides instead of silently coercing them
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P2
 - Risk: medium
 - Description: cloud pacing, retry, prompt-budget, prompt-limit, and provider-quota CLI overrides
@@ -960,10 +960,14 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Commit required: yes.
 - Dependencies: owner explicitly approved ARA-061 on 2026-07-24 after reviewing the 45–60 minute
   task estimate and reproduced defect.
-- Reproduction: `--min-delay-seconds 100 --max-delay-seconds 1`, `nan`/`inf` delays, negative
-  retries/quota thresholds, and subminimum prompt budgets/limits are all currently accepted.
+- Pre-fix reproduction: `--min-delay-seconds 100 --max-delay-seconds 1`, `nan`/`inf` delays,
+  negative retries/quota thresholds, and subminimum prompt budgets/limits were accepted.
 - Scope boundary: no provider calls, ignored runtime access, config-file schema changes,
   dependency changes, scheduler policy redesign, new default values, or ARA-055 package 5 work.
+- Completion: strict parsers and the effective delay check now fail invalid input with status 2
+  before project/provider work. Focused tests pass `4 passed, 18 subtests`; related tests pass
+  `244 passed, 554 subtests`; full `make check` passes `466 passed, 809 subtests`. Implementation
+  `b1c1b6c` is remote-equal and push/PR runs `30081927773`/`30081930092` passed Python 3.10/3.13.
 
 ## ARA-011 - Prevent failed rounds from replacing a trusted best output
 

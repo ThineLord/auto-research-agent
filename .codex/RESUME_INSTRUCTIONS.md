@@ -137,19 +137,18 @@ every workflow step. Focused validation passes `9 passed`, related validation pa
 and blocks read-only mixed-generation consumers without mutation. PR 13 comment `5062099962`
 records the result.
 
-ARA-061 is the sole active task after the owner said `批准ARA061` on 2026-07-24. Use
-`2ac99e0fde929dc9d919702e2e7195ced1d0f7af` as the conservative exact externally verified
-fallback; activation push/PR runs `30080995141`/`30080997040` passed. The local implementation,
-tests, and docs are uncommitted: focused validation passes `4 passed, 18 subtests`, related
-regression passes `244 passed, 554 subtests`, and full `make check` passes `466 passed, 809
-subtests` plus formatting, lint, imports, and zero-finding safety scans. Review and stage only the
-recorded task paths, rerun staged safety, then commit and push if green. Preserve valid zero/
-boundary behavior and fail invalid values before project writes or provider work.
+ARA-061 is complete. Use `b1c1b6c96aaa46b03ef1e25c30aebc771893e4d9` as the conservative exact
+externally verified fallback. Focused validation passes `4 passed, 18
+subtests`, related regression passes `244 passed, 554 subtests`, and full `make check` passes `466
+passed, 809 subtests` plus formatting, lint, imports, and zero-finding safety scans. Push/PR runs
+`30081927773`/`30081930092` passed Python 3.10/3.13 and every workflow step. Preserve the strict
+status-2 boundary, valid zero/boundary behavior, unchanged configuration schema/defaults, and
+provider-free scope.
 
 ARA-055 package 5 finalization journaling remains separately approval-gated. Do not add
 finalization writer/reader behavior, diagnostic routing, migration, configuration schema/default
 changes, dependencies, providers, ignored-runtime access, scheduler-policy changes, or packages
-6-7 while implementing ARA-061.
+6-7 without explicit approval. There is no unblocked implementation task.
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 

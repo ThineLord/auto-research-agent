@@ -951,3 +951,20 @@
   writes, provider preflight, client construction, or agent work. Do not silently reinterpret it.
 - Excluded scope: no configuration-file schema/default change, scheduler policy redesign,
   dependency, provider, experiment, ignored-runtime, or ARA-055 package-5 change.
+
+## 2026-07-24 - Complete ARA-061 at the CLI startup boundary
+
+- Implementation: `b1c1b6c96aaa46b03ef1e25c30aebc771893e4d9` replaces permissive numeric
+  parsers and downstream clamps with finite/range-aware argument types, then validates the
+  effective min/max relation after configuration merge.
+- Compatibility: documented boundaries remain accepted, including `--max-rounds 1`,
+  `--max-provider-quota-failures 0`, 86400 seconds maximum delay, retry count 20, and 1000-character
+  prompt minima. Defaults, configuration schema, scheduler policy, providers, and experiments are
+  unchanged.
+- Verification: focused `4 passed, 18 subtests`; related `244 passed, 554 subtests`; full
+  `make check` `466 passed, 809 subtests`; staged safety 115 files with zero findings.
+- Remote evidence: exact local/upstream/`ls-remote`/PR-head equality; push/PR CI
+  `30081927773`/`30081930092` passed Python 3.10/3.13 and every workflow step. PR comment
+  `5068253242` records the result.
+- Next boundary: ARA-055 package 5 remains separately approval-gated; this completion does not
+  authorize finalization journaling or other queued policy work.

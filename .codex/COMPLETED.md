@@ -1111,3 +1111,17 @@ Validation and implementation outcomes will be appended only after they are actu
 - Implementation `efcad88` is exact local/upstream/`ls-remote`/PR-head equal. Push/PR runs
   `30034539432`/`30034542276` passed Python 3.10/3.13 and every workflow step; PR 13 comment
   `5062099962` records the result and exclusions.
+
+## 2026-07-24 - ARA-061 strict numeric CLI validation
+
+- Replaced permissive CLI numeric parsing and silent clamps with finite/range validators for delay,
+  retry, prompt, and quota overrides; retained the existing positive-round guard.
+- Added an effective post-config min/max delay check that exits with startup status 2 before
+  project creation or provider work. Valid boundaries, including quota threshold zero, remain.
+- Added parser, direct-main, real module-entrypoint no-write, configuration-merge, and boundary
+  compatibility coverage; updated README, user guide, and changelog.
+- Focused tests pass `4 passed, 18 subtests`; related tests pass `244 passed, 554 subtests`; full
+  `make check` passes `466 passed, 809 subtests`; staged safety scans 115 files clean.
+- Implementation `b1c1b6c` is exact local/upstream/`ls-remote`/PR-head equal. Push/PR runs
+  `30081927773`/`30081930092` passed Python 3.10/3.13 and every workflow step; PR 13 comment
+  `5068253242` records the result and exclusions.

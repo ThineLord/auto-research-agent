@@ -610,7 +610,7 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## KI-061 - Numeric CLI overrides accept invalid or inconsistent values
 
-- Status: confirmed and active as ARA-061
+- Status: fixed by ARA-061 at remote-equal implementation `b1c1b6c`
 - Severity: P2 reliability, pacing, and user-intent integrity
 - Evidence: the current parser accepts non-finite delay values, negative retry/quota thresholds,
   subminimum prompt budgets/limits, and `--min-delay-seconds 100 --max-delay-seconds 1`.
@@ -621,3 +621,6 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   writes or provider work, with valid zero/boundary compatibility retained.
 - Boundary: configuration-file schemas and defaults, scheduler policy, providers, experiments,
   dependencies, ignored runtime, and ARA-055 package 5 are not part of ARA-061.
+- Resolution: strict numeric argument types reject non-finite/out-of-range values, and startup
+  rejects an invalid effective delay relation after configuration merge. Provider-free entrypoint
+  tests prove status 2 and no project creation; valid boundaries and zero quota threshold remain.
