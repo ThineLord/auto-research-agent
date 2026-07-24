@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-    "recorded_at": "2026-07-24T21:04:24+08:00",
+    "recorded_at": "2026-07-24T22:01:00+08:00",
   "branch": "codex/sol-autonomous-hardening",
     "head_commit": "f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0",
     "last_known_stable_commit": "f8b770d8a42e3fe00d234f8b6f172e3fc79cb0f0",
@@ -54,8 +54,85 @@
       }
     }
   },
-    "status": "ara055_package7a_activated",
+    "status": "ara055_package7a_ready_to_commit",
     "commands": [
+        {
+            "command": "ARA-055 package 7A final explicit staging and safety review",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "task_owned_paths_staged": 9,
+                "tracked_index_files_scanned": 120,
+                "safety_findings": 0,
+                "cached_diff_check": "passed",
+                "recovery_pytest_passed": 6,
+                "recovery_pytest_subtests_passed": 1,
+                "provider_calls": 0,
+                "ignored_runtime_access": 0,
+                "migration_execution": false,
+                "artifact_mutation": false
+            }
+        },
+        {
+            "command": "ARA-055 package 7A full local make check",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "ruff_formatted_files": 74,
+                "ruff": "passed",
+                "imports": "passed",
+                "repository_safety_self_test": "passed",
+                "tracked_files_scanned": 120,
+                "safety_findings": 0,
+                "pytest_passed": 498,
+                "pytest_subtests_passed": 963,
+                "pytest_duration_seconds": 355.43,
+                "provider_calls": 0,
+                "ignored_runtime_access": 0,
+                "migration_execution": false,
+                "artifact_mutation": false
+            }
+        },
+        {
+            "command": "ARA-055 package 7A isolated wheel install smoke",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "source_snapshot": "tracked_index",
+                "source_tree_imports": "excluded",
+                "wheel_install_smoke": "passed",
+                "provider_calls": 0,
+                "ignored_runtime_access": 0,
+                "migration_execution": false,
+                "artifact_mutation": false
+            }
+        },
+        {
+            "command": "ARA-055 package 7A focused and related local implementation validation",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "activation_commit": "80f24b6702e0fe78675a277047a77923b45de24e",
+                "legacy_state_classes": 21,
+                "eligible_execution_classes": 0,
+                "eligible_discovery_classes": 1,
+                "focused_pytest_passed": 17,
+                "focused_pytest_subtests_passed": 114,
+                "focused_duration_seconds": 1.16,
+                "related_pytest_passed": 224,
+                "related_pytest_subtests_passed": 642,
+                "related_duration_seconds": 154.31,
+                "internal_and_external_storage": "passed",
+                "both_history_source_directions": "passed",
+                "read_only_contract": "passed",
+                "path_redaction": "passed",
+                "provider_calls": 0,
+                "ignored_runtime_access": 0,
+                "migration_execution": false,
+                "artifact_mutation": false,
+                "full_make_check": "passed_498_tests_963_subtests"
+            }
+        },
         {
             "command": "ARA-055 package 7A activation baseline and recovery audit",
             "exit_code": 0,

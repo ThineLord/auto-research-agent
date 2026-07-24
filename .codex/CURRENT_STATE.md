@@ -18,8 +18,10 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 - Active task at this snapshot: ARA-055 package 7A read-only classifier/report implementation.
   Migration execution, evidence-bundle writes, transaction writes, rollback, and batch discovery
   remain unauthorized.
-- Uncommitted changes: not persisted as a static claim. Resolve live with
-  `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
+- Uncommitted task-owned changes at this implementation checkpoint:
+  `src/legacy_migration.py`, `tests/test_legacy_migration.py`,
+  `docs/ARA_055_LEGACY_MIGRATION_DESIGN.md`, and the `.codex/` recovery files. Resolve the exact
+  live state with `git status --short --branch`.
 
 ## Live Worktree Interpretation
 
@@ -456,6 +458,34 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   the new additive report schema, provider/network work, or ignored-runtime inspection.
 - Next checkpoint: commit and push this activation state before adding failing classifier tests or
   production code.
+
+## ARA-055 Package 7A Local Implementation Checkpoint
+
+- Activation `80f24b6702e0fe78675a277047a77923b45de24e` was committed and pushed before
+  implementation. The conservative externally verified fallback remains `f8b770d`.
+- `src/legacy_migration.py` now provides fixed L00-L20 and reason enums, one explicitly targeted
+  read-only classifier, a strict JSON-compatible report builder, and bounded path-redacted human
+  output. There is no CLI/doctor/UI caller and no migration execution path.
+- Synthetic internal/configured-external fixtures cover all 21 design rows, both history-source
+  directions, current journals, attempt/canonical ownership, live/stale/malformed locks, bounded
+  and unsafe serialization, unsafe source/target identities, path redaction, no recursive scan,
+  and no mutation/network primitive use.
+- Focused validation passes `17 passed, 114 subtests` in 1.16 seconds. Related attempt, transaction,
+  runner, storage, run-config, mock, and CLI regression passes `224 passed, 642 subtests` in 154.31
+  seconds.
+- Recovery-state validation passes `6 passed, 1 subtest`. The isolated source-excluded wheel smoke
+  passes. Final `make check` passes formatting over
+  74 files, Ruff, imports including `src.legacy_migration`, repository-safety self-test/scans over
+  120 tracked/index files with zero findings, and `498 passed, 963 subtests` in 355.43 seconds.
+- All nine task-owned paths are explicitly staged. Final staged safety scans 120 tracked/index
+  files with zero findings; cached whitespace and scope review pass.
+- Recent non-code command corrections: `python` was unavailable (use `.venv/bin/python`); the first
+  red test failed at collection because the new module did not yet exist, as intended; one related
+  regression command named a nonexistent `tests/test_resume_safety.py`, ran zero tests, and was
+  replaced with the repository's actual test files.
+- Remaining before a stable implementation commit: commit/push, remote equality, Python 3.10/3.13
+  CI, PR update, and a clean closeout checkpoint.
+- Next command: `git commit -m "feat: add read-only legacy migration classifier"`.
 
 ## Completed Steps
 
@@ -2343,8 +2373,8 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ```bash
 git status --short --branch
-git rev-parse HEAD
-.venv/bin/python -m pytest -q tests/test_recovery_state.py
+git commit -m "feat: add read-only legacy migration classifier"
+git push origin codex/sol-autonomous-hardening
 ```
 
 ## Interruption Recovery
@@ -2392,10 +2422,10 @@ Read `.codex/RESUME_INSTRUCTIONS.md`, then compare this file with `git status --
   continuation. Existing canonical partial rounds remain fail-closed and require a separately
   approved explicit migration; do not infer stage truth from placeholders or
   `last_successful_agent`.
-- ARA-055 packages 1-6 are complete. Package 7 authorization covers design only: preserve every
-  current journal and artifact byte, do not inspect ignored runtime, and do not implement discovery,
-  execution, rollback, cleanup, or quarantine. The design's future 7A read-only classifier is the
-  next possible package and still requires separate owner approval.
+- ARA-055 packages 1-6 and package 7 design are complete; package 7A read-only classification is
+  explicitly approved and locally implemented. Preserve every current journal and artifact byte,
+  do not inspect ignored runtime, and do not add CLI/doctor/UI integration, execution, target or
+  evidence creation, rollback, cleanup, quarantine, or package 7B/7C/7D behavior.
 - ARA-061 is complete. Reject only invalid numeric CLI override values and inconsistent effective
   delay bounds; preserve valid zero-disable quota behavior, existing configuration-file validation,
   defaults, scheduler policy, provider behavior, and experiment semantics.

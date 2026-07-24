@@ -1082,3 +1082,17 @@
 - Excluded scope: CLI/doctor/UI routing, evidence bundle, transaction/receipt, missing-twin
   creation, rollback, dependencies/defaults/providers/experiments, ignored runtime, and packages
   7B-7D.
+
+## 2026-07-24 - Keep package 7A internal, total, and execution-inert
+
+- The classifier accepts exactly one owner-selected project path and reads only fixed allowlisted
+  project/run leaves through existing registered-anchor and bounded no-follow primitives.
+- A valid live lock returns an orthogonal `busy` result; stale locks remain untouched; malformed
+  locks and unsafe/unknown evidence fail closed without exposing path or raw-value diagnostics.
+- Only `exact_missing_history_twin` can report `eligible_candidate`. The strict report always sets
+  `execution_authorized` to false and has no function capable of creating the missing target.
+- Current ARA-054/ARA-055 journals and attempt/canonical states retain their existing owners.
+  Package 7A maps their read-only classifiers rather than reconstructing or recovering evidence.
+- Human and machine reports contain fixed enums, logical artifact labels, bounded public run IDs,
+  source digest/size where applicable, and no private path, content, exception graph, provider
+  value, or environment value.

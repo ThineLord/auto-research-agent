@@ -929,6 +929,18 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Package 7A baseline: `f8b770d` is exact remote-equal; push/PR runs
   `30091187286`/`30091190516` pass. Local `make check` passes `481 passed, 849 subtests`, formatting,
   Ruff, imports, and zero-finding safety scans over 118 tracked files.
+- Package 7A local result: the internal API implements fixed L00-L20/reason enums, targeted
+  bounded/no-follow inspection, a strict JSON report, and bounded human output without any
+  integration or mutation caller. Internal/configured-external synthetic coverage includes every
+  design row and both source directions.
+- Package 7A local validation: focused coverage passes `17 passed, 114 subtests`; related ARA-054/
+  ARA-055, runner, storage, run-config, mock, and CLI regression passes `224 passed, 642 subtests`.
+  Recovery validation passes `6 passed, 1 subtest`; the isolated wheel smoke passes; final
+  `make check` passes `498 passed, 963 subtests` plus every static/import/safety gate over 120
+  tracked/index files with zero findings.
+- Package 7A pre-commit checkpoint: all nine task-owned paths are explicitly staged; final staged
+  safety scans 120 files with zero findings and cached diff checks pass. Commit/push/CI/PR
+  verification and closeout remain. Keep the task `IN_PROGRESS` until remotely verified.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

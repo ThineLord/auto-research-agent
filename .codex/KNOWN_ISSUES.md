@@ -619,6 +619,12 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 - Package-7A activation: the owner approved only the read-only targeted classifier/report layer on
   2026-07-24. Execution, evidence/journal writes, rollback, batch scanning, provider work, and
   ignored-runtime access remain excluded.
+- Package-7A local result: fixed L00-L20 classification plus strict redacted machine/human reports
+  are implemented without a caller capable of mutation. Synthetic internal/configured-external
+  coverage passes `17 passed, 114 subtests`; related transaction/recovery regression passes `224
+  passed, 642 subtests`; final `make check` passes `498 passed, 963 subtests` plus all static,
+  import, safety, and isolated-wheel gates. Final staging and remote verification remain before
+  closeout.
 - Package-1 result: commit `4cd4bf4` adds filesystem-free exact after-image builders and a strict
   bounded journal codec with provider-free regression coverage. No runtime caller creates, reads,
   or applies the journal yet, so this issue remains open.

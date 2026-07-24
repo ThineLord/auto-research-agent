@@ -1,6 +1,7 @@
 # ARA-055 Legacy History Migration Design
 
-Status: design complete; discovery and execution are not implemented or approved
+Status: package 7A read-only classifier implemented; discovery integration and execution are not
+implemented or approved
 
 Date: 2026-07-24
 
@@ -40,19 +41,20 @@ history synthesis, or automatic rollback.
 
 ## Authorization boundary
 
-The owner approved package 7's design stage only.
+The owner subsequently approved package 7A only. Package 7A adds a provider-free internal,
+explicitly targeted classifier plus strict machine and human report builders. It does not expose
+the classifier through CLI, doctor, UI, or automatic startup paths.
 
-This design was produced from tracked code, tests, Git history, and provider-free temporary test
-behavior. It does not:
+Package 7A does not:
 
-- inspect ignored project runs, checkpoints, histories, logs, or provider artifacts;
-- add a discovery or migration command, API, journal, receipt, or runtime path;
-- read, copy, rewrite, move, quarantine, or delete a historical artifact;
+- scan for projects/runs or inspect any unselected checkpoint, history, log, or provider artifact;
+- add a discovery command, migration command, journal, receipt, or runtime path;
+- copy, rewrite, move, quarantine, delete, or create a historical artifact;
 - change a schema, dependency, configuration default, provider, score, prompt, metric, or result;
-- authorize package 7 discovery implementation or any migration execution.
+- authorize package 7B integration, package 7C execution, or package 7D rollback.
 
-Both read-only classifier implementation and execution require later, separately scoped owner
-approval. Approval of discovery must not be interpreted as approval to create a target history.
+Approval of read-only classification must not be interpreted as approval to create a target
+history. Every later package retains its separate approval boundary.
 
 ## Current compatibility behavior
 
@@ -196,7 +198,7 @@ without creating the target or evidence claiming success.
 
 ## Read-only discovery contract
 
-A future discovery package must be a pure, explicitly targeted operation:
+The package 7A discovery API is a pure, explicitly targeted operation:
 
 - one project per invocation;
 - no provider/client construction, network access, retry loop, or artifact mutation;
@@ -206,7 +208,7 @@ A future discovery package must be a pure, explicitly targeted operation:
 - no recursive canonical-output or log traversal;
 - no implicit migration after a successful dry run.
 
-Its machine result should use a strict additive schema similar to:
+Its machine result uses this strict additive schema:
 
 ```json
 {
@@ -229,6 +231,11 @@ For a refusal, `status` is `not_migratable`, the classification is one of the fi
 and `reason_codes` contains bounded enums only. Human output uses logical artifact labels and
 bounded IDs; it must not include private absolute paths, file contents, exception graphs, prompts,
 provider responses, environment values, or credentials.
+
+`classify_legacy_history_migration(project_dir)` returns the path-redacted inspection,
+`build_legacy_migration_report(inspection)` returns the fixed JSON-compatible object, and
+`format_legacy_migration_report(inspection)` returns bounded human text. These functions are
+internal APIs in package 7A; no command or automatic caller is added.
 
 Discovery success means only that the snapshot was classifiable. It must not describe a
 non-migratable result as command failure, corruption, or safe-to-delete evidence. A future CLI can
@@ -393,16 +400,20 @@ not turn tolerance into fabricated provenance.
 | automatically roll back or quarantine ambiguous files | destructive and can erase user/research evidence | reject |
 | leave all legacy states unchanged forever | safest default; unnecessarily retains one deterministic missing-twin gap | default, with optional exact-copy candidate |
 
-## Future approval-gated packages
+## Approval-gated packages and status
 
 ### 7A - Read-only classifier and report schema
 
-- Implement fixed state/reason enums and explicitly targeted inspection.
-- Add no-follow/bounded safety validation and path-redacted human/JSON output.
-- Do not add `--execute`, journal writes, bundle writes, or artifact creation.
-- Validate every matrix row with synthetic temporary fixtures.
+Status: implemented as an internal API under the package 7A approval.
+
+- Fixed state/reason enums and explicitly targeted inspection are implemented.
+- No-follow/bounded safety validation and path-redacted human/JSON output are implemented.
+- No `--execute`, journal writes, bundle writes, artifact creation, or integration caller exists.
+- Synthetic tests cover every L00-L20 row in internal and configured-external storage.
 
 ### 7B - Discovery integration and reader guard design verification
+
+Status: not implemented or approved.
 
 - Expose the read-only result through an owner-approved doctor/preview surface.
 - Prove no provider construction, lock theft, scan-all behavior, or mutation.
@@ -411,6 +422,8 @@ not turn tolerance into fabricated provenance.
 
 ### 7C - Exact missing-twin execution
 
+Status: not implemented or approved.
+
 - Requires a new explicit implementation approval after 7A/7B are remotely verified.
 - Add restricted evidence-bundle creation, strict fixed journal codec, create-only exact-byte
   publication, lock-held recovery, and reader/entry guards.
@@ -418,6 +431,8 @@ not turn tolerance into fabricated provenance.
 - Do not implement rollback, bulk discovery, partial repair, or canonical adoption.
 
 ### 7D - Explicit rollback, only if a real need is demonstrated
+
+Status: not implemented or approved.
 
 - Requires a separate destructive-operation approval and a new threat-model review.
 - May remove only the exact created twin under the rollback conditions above.
