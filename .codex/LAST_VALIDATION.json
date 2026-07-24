@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-    "recorded_at": "2026-07-24T18:59:33+08:00",
+    "recorded_at": "2026-07-24T19:09:23+08:00",
   "branch": "codex/sol-autonomous-hardening",
-    "head_commit": "ecf9ead409e3e72993cade65f69df65b6f2f4269",
-    "last_known_stable_commit": "ecf9ead409e3e72993cade65f69df65b6f2f4269",
+    "head_commit": "24d56ba2a39a6504672d7b42e0f3487707fcf7fc",
+    "last_known_stable_commit": "24d56ba2a39a6504672d7b42e0f3487707fcf7fc",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-    "state_recorded_against_commit": "ecf9ead409e3e72993cade65f69df65b6f2f4269",
+    "state_recorded_against_commit": "24d56ba2a39a6504672d7b42e0f3487707fcf7fc",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-24T18:40:00+08:00",
-    "commit": "ecf9ead409e3e72993cade65f69df65b6f2f4269",
+    "verified_at": "2026-07-24T19:09:23+08:00",
+    "commit": "24d56ba2a39a6504672d7b42e0f3487707fcf7fc",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 30086126360,
+        "run_id": 30088147987,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "ecf9ead409e3e72993cade65f69df65b6f2f4269",
+        "head_sha": "24d56ba2a39a6504672d7b42e0f3487707fcf7fc",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-                "run_id": 30086129319,
+                "run_id": 30088150085,
         "event": "pull_request",
         "workflow": "CI",
-                "head_sha": "ecf9ead409e3e72993cade65f69df65b6f2f4269",
+                "head_sha": "24d56ba2a39a6504672d7b42e0f3487707fcf7fc",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,29 @@
       }
     }
   },
-    "status": "ara055_package6_local_implementation_checkpoint",
+    "status": "ara055_package6_complete_remote_verified",
     "commands": [
+        {
+            "command": "ARA-055 package 6 implementation remote verification",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "implementation_commit": "24d56ba2a39a6504672d7b42e0f3487707fcf7fc",
+                "remote_equal": true,
+                "ahead": 0,
+                "behind": 0,
+                "pull_request": 13,
+                "pull_request_state": "open_draft_clean",
+                "pull_request_comment": 5069196079,
+                "push_run_id": 30088147987,
+                "pull_request_run_id": 30088150085,
+                "python_310": "success",
+                "python_313": "success",
+                "check_run_annotations": 0,
+                "provider_calls": 0,
+                "ignored_runtime_access": 0
+            }
+        },
         {
             "command": "ARA-055 package 6 focused and related local validation",
             "exit_code": 0,
@@ -4831,6 +4852,16 @@
     }
   ],
   "failures": [
+    {
+      "command": "first ARA-055 package 6 closeout recovery-state consistency check",
+      "result": "corrected_before_commit",
+      "summary": {
+        "pytest_failed": 1,
+        "pytest_passed": 5,
+        "cause": "the resume section described the verified SHA without the parser-required explicit fallback label",
+        "fix": "restored the exact Last externally verified fallback label; rerun passed 6 tests and 1 subtest"
+      }
+    },
     {
       "command": "post-validation read-only recovery-state location search",
       "result": "interrupted_without_file_change",

@@ -1037,3 +1037,10 @@
   5 semantics or infer a diagnostic attempt/migration identity.
 - Recover only under the existing entry lock before provider/client work. Preview and readers stay
   non-mutating and fail closed on unknown generations.
+
+## 2026-07-24 - Complete ARA-055 package 6 without starting legacy migration
+
+- Implementation `24d56ba` and push/PR CI `30088147987`/`30088150085` are green on Python
+  3.10/3.13, every isolated-wheel/check step, and zero annotations.
+- Package 6 closes the approved diagnostic split-generation defect. Package 7 remains an explicit
+  legacy-migration design/owner decision and is not implied by this completion.

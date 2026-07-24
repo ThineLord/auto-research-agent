@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -874,6 +874,11 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
   before commit, first rerun
   `.venv/bin/python -m pytest -q tests/test_diagnostic_finalize_recovery.py
   tests/test_diagnostic.py tests/test_round_commit_entry.py`.
+- Package 6 completion: implementation `24d56ba2a39a6504672d7b42e0f3487707fcf7fc` is exact
+  local/upstream/`ls-remote`/PR-head equal. Push/PR runs `30088147987`/`30088150085` pass Python
+  3.10/3.13, isolated-wheel validation, every workflow step, and zero annotations. Draft PR 13 is
+  open and cleanly mergeable; comment `5069196079` records the evidence. Package 7 legacy migration
+  remains separately approval-gated and was not started.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

@@ -1,5 +1,19 @@
 # Completed Maintenance Work
 
+## 2026-07-24 - ARA-055 package 6 recoverable diagnostic finalization
+
+- Added a strict bounded diagnostic-finalization journal for the exact score history, run metrics,
+  summary, finalized config, and checkpoint generations, with checkpoint applied last.
+- Internal/configured-external `OSError` and `KeyboardInterrupt` fault coverage proves idempotent
+  convergence at every write and cleanup boundary; unknown generations remain preserved and fail
+  closed.
+- Diagnostic entry recovers under the project lock before provider/client work. Preview, UI,
+  analytics, comparison, and report readers remain non-mutating; zero-round quota finalization
+  reuses package 5.
+- Local `make check` passes `481 passed, 849 subtests`. Implementation `24d56ba` is exact
+  remote-equal; push/PR runs `30088147987`/`30088150085` pass Python 3.10/3.13, every workflow
+  step, and zero annotations. No provider or ignored-runtime access occurred.
+
 ## 2026-07-24 - ARA-055 package 5 recoverable run finalization
 
 - Added a strict bounded create-only finalization journal for exact run summary, finalized run

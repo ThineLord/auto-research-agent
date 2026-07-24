@@ -606,7 +606,9 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
   roll-forward transaction; every internal/external write and cleanup `OSError`/`KeyboardInterrupt`
   boundary converges in focused tests, and pending/conflicting readers fail closed. Related
   validation passes `252 passed, 616 subtests`; full `make check` passes `481 passed, 849 subtests`.
-  Remote verification remains.
+  Implementation `24d56ba` is remote-equal and push/PR CI `30088147987`/`30088150085` is green.
+  Legacy journal-less split artifacts remain unchanged; package 7 migration requires separate
+  approval.
 - Package-1 result: commit `4cd4bf4` adds filesystem-free exact after-image builders and a strict
   bounded journal codec with provider-free regression coverage. No runtime caller creates, reads,
   or applies the journal yet, so this issue remains open.

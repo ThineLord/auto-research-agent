@@ -4,20 +4,19 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: implement the explicitly approved ARA-055 package 6 diagnostic transaction without
-  changing providers, experiments, configuration schemas, legacy artifacts, or package 7 migration.
+- Current goal: preserve the completed, remotely verified ARA-055 package 6 checkpoint and wait for
+  separate owner approval before any package 7 legacy-migration design.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `ecf9ead409e3e72993cade65f69df65b6f2f4269` (the exact
-  externally verified ARA-055 package 5 closeout retained by the additive recovery schema;
+- State recorded against commit: `24d56ba2a39a6504672d7b42e0f3487707fcf7fc` (the exact
+  externally verified ARA-055 package 6 implementation retained by the additive recovery schema;
   resolve current `HEAD` live).
-- Last externally verified fallback: `ecf9ead409e3e72993cade65f69df65b6f2f4269` (exact local,
+- Last externally verified fallback: `24d56ba2a39a6504672d7b42e0f3487707fcf7fc` (exact local,
   remote-tracking, `ls-remote`, GitHub branch, and PR-head equality plus all Python 3.10/3.13
   push/PR jobs passed)
-- Active task at this snapshot: ARA-055 package 6. Authorization is limited to a fixed
-  diagnostic-finalize transaction, lock-held diagnostic entry recovery, non-mutating reader
-  guards, quota finalization reuse, and provider-free fault/regression coverage.
+- Active task at this snapshot: none. ARA-055 package 6 is complete; package 7 legacy migration
+  remains separately approval-gated.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -360,8 +359,13 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 - One later read-only state-location command repeated a known shell quoting error: a backticked
   `make check` token inside a double-quoted pattern started an unintended duplicate gate. It was
   interrupted immediately with status 130; no file or Git state changed.
-- Next command: explicitly stage the 19 package-owned paths and run staged safety plus cached diff
-  checks.
+- Implementation `24d56ba2a39a6504672d7b42e0f3487707fcf7fc` is exact local/upstream/
+  `ls-remote`/PR-head equal. Push/PR runs `30088147987`/`30088150085` passed Python 3.10/3.13,
+  isolated-wheel validation, every workflow step, and zero annotations.
+- Draft PR 13 is open and cleanly mergeable. Comment `5069196079` records package 6's evidence
+  and exclusions. Package 6 is complete; package 7 remains outside authorization.
+- Next command: verify live Git/CI state, then wait for explicit approval before designing any
+  legacy migration.
 
 ## Completed Steps
 
