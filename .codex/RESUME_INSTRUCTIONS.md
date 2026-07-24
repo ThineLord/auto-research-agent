@@ -129,13 +129,9 @@ pass; full pytest reports `417 passed, 633 subtests`. Push/PR runs
 attempts, whole-round retry, shared classifier eligibility, bounded disk/attempt use, no-replace
 publication, and nonempty legacy canonical fail-closed behavior.
 
-ARA-055 packages 1-4 are complete. Package-4 implementation `efcad88` is exact local/upstream/
-`ls-remote`/PR-head equal; push/PR runs `30034539432`/`30034542276` passed Python 3.10/3.13 and
-every workflow step. Focused validation passes `9 passed`, related validation passes `256 passed,
-540 subtests`, the recovery matrix passes `16 passed, 99 subtests`, and full `make check` passes
-`462 passed, 791 subtests`. It recovers under the existing lock before provider/client/agent work
-and blocks read-only mixed-generation consumers without mutation. PR 13 comment `5062099962`
-records the result.
+ARA-055 packages 1-6 and package 7 design are complete. Preserve their checkpoint-last
+transactions, lock-held recovery, read-only conflict guards, configured-external-storage support,
+and byte-compatible legacy behavior. Do not infer a missing metric or generation.
 
 ARA-061 is complete; its implementation `b1c1b6c96aaa46b03ef1e25c30aebc771893e4d9` remains
 historical verified evidence rather than the active recovery fallback. Focused validation passes `4 passed, 18
@@ -145,21 +141,17 @@ passed, 809 subtests` plus formatting, lint, imports, and zero-finding safety sc
 status-2 boundary, valid zero/boundary behavior, unchanged configuration schema/defaults, and
 provider-free scope.
 
-ARA-055 package 7 design is the sole active task after the owner said `批准 继续` on 2026-07-24.
-Last externally verified fallback: `fe514e073047c10dc84b322225f01db2cb126e83`. Closeout push/PR
-runs `30088704158`/`30088706374` passed Python 3.10/3.13 and every workflow step. Read the package-7
-activation section in `.codex/CURRENT_STATE.md`, then inspect only tracked code/history/tests and
-temporary synthetic fixtures. Preserve packages 3-6 transactions and all existing artifact bytes.
-Do not inspect ignored runtime, implement or execute migration, add a command/API, change schemas/
-defaults/dependencies/providers/experiments, move/delete/quarantine evidence, or infer missing
-generations.
+ARA-055 package 7 design is complete. Last externally verified fallback:
+`e5f35715279c76b38b2250ef6ba8fcf4c9e79890`. Push/PR runs
+`30090592035`/`30090595366` passed Python 3.10/3.13 and every workflow step; draft PR 13 is clean
+and comment `5069543857` records the evidence. Read
+`docs/ARA_055_LEGACY_MIGRATION_DESIGN.md` before any follow-up. It rejects general repair and
+permits only one future exact missing-history-twin candidate. Do not implement package 7A,
+execute migration, add a command/API, inspect ignored runtime, change schemas/defaults/
+dependencies/providers/experiments, move/delete/quarantine evidence, or infer missing generations
+without new approval.
 
-The local package-7 design is now in `docs/ARA_055_LEGACY_MIGRATION_DESIGN.md`. It permits only one
-future exact missing-history-twin candidate and classifies every ambiguous state as non-migratable.
-Focused tests pass `51 passed, 50 subtests`; full `make check` passes `481 passed, 849 subtests`.
-If interrupted before the design commit, inspect the task-owned diff, rerun
-`.venv/bin/python -m pytest -q tests/test_recovery_state.py`, explicitly stage only the two design
-documents and `.codex` records, then run staged safety. Do not implement package 7A or execution.
+There is no unblocked implementation task.
 ARA-018 requires an explicit owner license/distribution decision. Do not start ARA-019, ARA-026,
 ARA-006, or ARA-007 until their recorded dependencies are satisfied.
 

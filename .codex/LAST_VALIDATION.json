@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-    "recorded_at": "2026-07-24T20:05:00+08:00",
+    "recorded_at": "2026-07-24T19:52:14+08:00",
   "branch": "codex/sol-autonomous-hardening",
-    "head_commit": "fe514e073047c10dc84b322225f01db2cb126e83",
-    "last_known_stable_commit": "fe514e073047c10dc84b322225f01db2cb126e83",
+    "head_commit": "e5f35715279c76b38b2250ef6ba8fcf4c9e79890",
+    "last_known_stable_commit": "e5f35715279c76b38b2250ef6ba8fcf4c9e79890",
   "current_head": {
     "ref": "HEAD",
     "resolution_argv": [
@@ -14,15 +14,15 @@
     ],
     "authoritative": true
   },
-    "state_recorded_against_commit": "fe514e073047c10dc84b322225f01db2cb126e83",
+    "state_recorded_against_commit": "e5f35715279c76b38b2250ef6ba8fcf4c9e79890",
   "working_tree_source": "live_git_status",
   "legacy_field_semantics": {
     "head_commit": "deprecated exact commit observed immediately before this tracked state snapshot",
     "last_known_stable_commit": "deprecated exact externally verified fallback; current HEAD stability requires live verification"
   },
   "last_external_verification": {
-    "verified_at": "2026-07-24T19:31:20+08:00",
-    "commit": "fe514e073047c10dc84b322225f01db2cb126e83",
+    "verified_at": "2026-07-24T19:52:14+08:00",
+    "commit": "e5f35715279c76b38b2250ef6ba8fcf4c9e79890",
     "remote_branch": "codex/sol-autonomous-hardening",
     "remote_equal": true,
     "local_equals_upstream": true,
@@ -31,10 +31,10 @@
     "behind": 0,
     "ci": {
       "push": {
-        "run_id": 30088704158,
+        "run_id": 30090592035,
         "event": "push",
         "workflow": "CI",
-        "head_sha": "fe514e073047c10dc84b322225f01db2cb126e83",
+        "head_sha": "e5f35715279c76b38b2250ef6ba8fcf4c9e79890",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -42,10 +42,10 @@
         }
       },
       "pull_request": {
-                "run_id": 30088706374,
+                "run_id": 30090595366,
         "event": "pull_request",
         "workflow": "CI",
-                "head_sha": "fe514e073047c10dc84b322225f01db2cb126e83",
+                "head_sha": "e5f35715279c76b38b2250ef6ba8fcf4c9e79890",
         "conclusion": "success",
         "jobs": {
           "Python 3.10": "success",
@@ -54,8 +54,31 @@
       }
     }
   },
-    "status": "ara055_package7_design_local_validated",
+    "status": "ara055_package7_design_complete",
     "commands": [
+        {
+            "command": "ARA-055 package 7 design remote, CI, and PR verification",
+            "exit_code": 0,
+            "result": "passed",
+            "summary": {
+                "design_commit": "e5f35715279c76b38b2250ef6ba8fcf4c9e79890",
+                "remote_equal": true,
+                "ahead": 0,
+                "behind": 0,
+                "pull_request": 13,
+                "pull_request_state": "open_draft_clean",
+                "pull_request_comment": 5069543857,
+                "push_run_id": 30090592035,
+                "pull_request_run_id": 30090595366,
+                "python_310": "success",
+                "python_313": "success",
+                "check_run_annotations": 0,
+                "provider_calls": 0,
+                "ignored_runtime_access": 0,
+                "migration_implementation": false,
+                "artifact_mutation": false
+            }
+        },
         {
             "command": "ARA-055 package 7 design focused and full local validation",
             "exit_code": 0,
@@ -4899,6 +4922,27 @@
     }
   ],
   "failures": [
+    {
+      "command": "first ARA-055 package 7 closeout recovery-state consistency check",
+      "result": "corrected_before_closeout_commit",
+      "summary": {
+        "pytest_failed": 1,
+        "pytest_passed": 5,
+        "cause": "RESUME_INSTRUCTIONS contained the correct fallback SHA without the explicit tested fallback label",
+        "fix": "added the exact Last externally verified fallback label and retained the same verified design commit"
+      }
+    },
+    {
+      "command": "task-state status search with backticks inside a double-quoted zsh pattern",
+      "result": "corrected_read_only_command",
+      "summary": {
+        "exit_code": 0,
+        "shell_errors": 2,
+        "cause": "zsh executed the literal TODO and IN_PROGRESS tokens as command substitutions",
+        "impact": "the following status scan and GitHub annotation query still completed; no file or Git state changed",
+        "fix": "do not place Markdown backticks inside double-quoted shell patterns"
+      }
+    },
     {
       "command": "first ARA-055 package 7 activation recovery-state consistency check",
       "result": "corrected_before_commit",

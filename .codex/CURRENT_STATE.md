@@ -4,21 +4,19 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Repository State
 
-- Current goal: close out the explicitly approved ARA-055 package 7 legacy-migration design
-  without reading ignored runtime, mutating historical artifacts, or implementing a migration.
+- Current goal: ARA-055 package 7 design is complete; wait for explicit owner approval before any
+  package 7A discovery implementation or other task.
 - Current branch: `codex/sol-autonomous-hardening`
 - Authoritative current HEAD reference: `HEAD`; resolve it without a shell using
   `git rev-parse --verify HEAD`. A tracked file cannot embed the SHA of the commit that contains it.
-- State recorded against commit: `fe514e073047c10dc84b322225f01db2cb126e83` (the exact
-  externally verified ARA-055 package 6 closeout retained by the additive recovery schema;
+- State recorded against commit: `e5f35715279c76b38b2250ef6ba8fcf4c9e79890` (the exact
+  externally verified ARA-055 package 7 design commit retained by the additive recovery schema;
   resolve current `HEAD` live).
-- Last externally verified fallback: `fe514e073047c10dc84b322225f01db2cb126e83` (exact local,
+- Last externally verified fallback: `e5f35715279c76b38b2250ef6ba8fcf4c9e79890` (exact local,
   remote-tracking, `ls-remote`, GitHub branch, and PR-head equality plus all Python 3.10/3.13
   push/PR jobs passed)
-- Active task at this snapshot: ARA-055 package 7 design validation/publication. Authorization is
-  limited to tracked code/history inspection, temporary synthetic fixtures, legacy-state
-  classification, migration threat modeling, rollback/provenance requirements, durable
-  documentation, and provider-free validation.
+- Active task at this snapshot: none. ARA-055 package 7 design is closed; no implementation or
+  execution package is authorized.
 - Uncommitted changes: not persisted as a static claim. Resolve live with
   `git status --short --branch`; a clean checkout of the commit containing this snapshot has none.
 
@@ -420,6 +418,21 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 - Remaining design-stage work: review and explicitly stage the two design documents plus recovery
   records, run staged safety/recovery-state checks, commit/push, verify Python 3.10/3.13 push and PR
   CI, update draft PR 13, and create the final recovery closeout.
+
+## ARA-055 Package 7 Design Closeout
+
+- Design commit `e5f35715279c76b38b2250ef6ba8fcf4c9e79890` is exact local/upstream/
+  `ls-remote`/GitHub branch/PR-head equal.
+- Push run `30090592035` and pull-request run `30090595366` passed Python 3.10/3.13, installation,
+  isolated-wheel validation, formatting, lint, imports, repository safety, and all tests. All four
+  check runs have zero annotations.
+- Draft PR 13 is open and cleanly mergeable. Comment `5069543857` records the design, evidence,
+  validation, and separate approval boundaries.
+- Package 7 design is complete. No discovery implementation, execution command/API, runtime
+  migration transaction, evidence bundle, rollback, artifact mutation, provider call, ignored
+  runtime read, schema/default/dependency change, cleanup, or quarantine was performed.
+- Recommended next task is package 7A: read-only, explicitly targeted legacy classification and
+  report schema using synthetic fixtures only. It requires separate owner approval.
 
 ## Completed Steps
 
@@ -1275,15 +1288,9 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 
 ## Remaining Steps
 
-- Add ARA-055 package-5 failing codec/recovery/runner/reader tests before implementation.
-- Implement only the fixed finalization transaction and approved entry/read-only routing.
-- Preserve packages 3-4 transaction ordering, lock-held entry recovery, and non-mutating read-only
-  classification for new and fully evidenced histories.
-- Preserve the legacy incomplete-history compatibility path; do not synthesize a missing
-  before-generation or silently migrate journal-less evidence.
-- Keep diagnostic integration and legacy migration in separately approved packages 6-7.
-- Keep legacy nonempty canonical partials immutable and fail-closed; an explicit migration remains
-  outside ARA-054 authorization.
+- There is no active approved implementation task.
+- Do not start ARA-055 package 7A, exact-copy execution, or rollback without separate approval.
+- Preserve all journal-less, partial, ambiguous, unsafe, and unknown legacy evidence byte-for-byte.
 - Do not activate ARA-018 without an owner license/distribution decision.
 
 ## Test Status
@@ -2313,8 +2320,7 @@ Updated: 2026-07-24 (Asia/Hong_Kong)
 ```bash
 git status --short --branch
 git rev-parse HEAD
-.venv/bin/python -m pytest -q tests/test_recovery_state.py
-git diff --check
+git log --oneline --decorate -n 10
 ```
 
 ## Interruption Recovery

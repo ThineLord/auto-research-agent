@@ -682,7 +682,7 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 
 ## ARA-055 - Make round history publication recoverable across two filesystems
 
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - Priority: P2
 - Risk: high
 - Description: project-global score history is written before run-local round metrics; failure of
@@ -910,6 +910,10 @@ Allowed states: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `DEFERRED`.
 - Package 7 remaining: staged safety/recovery validation, design commit/push, Python 3.10/3.13
   push/PR CI, PR update, and recovery closeout. Recommended next package after closeout is 7A
   read-only classifier/report schema, requiring separate owner approval.
+- Package 7 completion: design `e5f3571` is exact local/upstream/`ls-remote`/PR-head equal. Push/PR
+  runs `30090592035`/`30090595366` passed Python 3.10/3.13 and every workflow step with zero
+  annotations. PR comment `5069543857` records the result. Package 7A discovery implementation,
+  package 7C execution, and rollback remain separately approval-gated and were not started.
 
 ## ARA-056 - Cover interrupts before the protected agent phase
 

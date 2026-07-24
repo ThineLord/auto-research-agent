@@ -1,5 +1,20 @@
 # Completed Maintenance Work
 
+## 2026-07-24 - ARA-055 package 7 legacy migration design
+
+- Added `docs/ARA_055_LEGACY_MIGRATION_DESIGN.md` with 21 fixed state classes, exact eligibility,
+  evidence/provenance, dry-run, concurrency, rollback, compatibility, security, and fault-test
+  contracts.
+- Rejected general legacy repair. Only a safely absent twin history backed by one strict complete
+  checkpoint-correlated source is a future exact-byte-copy candidate; discovery, execution, and
+  destructive rollback remain independently approval-gated and unimplemented.
+- Focused tests pass `51 passed, 50 subtests`; full `make check` passes `481 passed, 849 subtests`;
+  staged safety scans 118 files with zero findings.
+- Design `e5f3571` is exact remote-equal. Push/PR runs `30090592035`/`30090595366` passed Python
+  3.10/3.13 and every workflow step with zero annotations; PR comment `5069543857` records the
+  result. No provider, ignored runtime, canonical artifact, schema, dependency, or migration
+  execution changed.
+
 ## 2026-07-24 - ARA-055 package 6 recoverable diagnostic finalization
 
 - Added a strict bounded diagnostic-finalization journal for the exact score history, run metrics,
