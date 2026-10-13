@@ -73,7 +73,7 @@ Mock mode 会复用正常 round runner，写入 `run_config.json`、`round_metri
 10. `.venv/bin/python -m src.main --legacy-migration-execute example
     --legacy-migration-evidence migration-evidence/example`：只对严格符合条件的缺失 history
     twin 执行显式 exact-copy。
-11. `make ui`：用 Streamlit 查看输入、进度、latest metadata、analytics dashboard、run comparison 和 outputs。
+11. `make ui`：用本地网页界面查看输入、进度、latest metadata、analytics dashboard、run comparison 和 outputs。
 
 稳定里程碑的几个边界：
 
@@ -217,7 +217,7 @@ export GEMINI_API_KEY="..."
 make diagnostic ARGS="--provider gemini --model gemini-3.5-flash"
 ```
 
-UI 里的 Gemini password 输入框只用于当前 Streamlit session 和本次启动的子进程，不会保存到
+UI 里的 Gemini password 输入框只用于当前浏览器页面内存 和本次启动的子进程，不会保存到
 `config.yaml`、命令行、运行 meta、checkpoint 或日志。点击 `Save Cloud Model as Default`
 只会保存 provider、模型名和 API key 环境变量名。
 
@@ -364,47 +364,47 @@ source distribution，也不会启动 Ollama、调用 Gemini 或运行需要模�
   - `cd auto-research-agent`
   - `make ui`
   - 或直接运行：`scripts/start_ui.sh`
-- 路径检查：
-  - UI 侧边栏会显示 `App root` 为 `<repo>`，避免直接暴露本机绝对路径
-  - 需要排查启动目录时，可展开 `Advanced paths` 查看详细路径
-- 界面语言：
-  - 在侧边栏 `Language` 选择 `English` 或 `中文`
-  - 语言选择会保存在当前 Streamlit 会话中，不会改动 `config.yaml`
-- 显示主题：
-  - 在侧边栏 `Theme` 选择 `Day Mode` 或 `Dark Mode`
-  - 主题会覆盖主界面、侧边栏、按钮、输入框、日志、代码块和状态提示
+- 页面结构：
+  - `Workspace / 工作台`：任务编辑、背景记忆、运行控制和进展概览
+  - `Outputs / 研究成果`：浏览 Markdown、JSON 和日志等已有成果
+  - `Run analytics / 运行分析`：评分与耗时图表、运行对比、元数据及明细数据
+  - `Settings / 设置`：模型来源、运行策略、模型管理和唯一的项目测试入口
+- 新界面由本机 Python HTTP 服务提供，默认地址 `http://127.0.0.1:8501`，仅绑定回环地址。
+  - 可用 `scripts/start_ui.sh --port 8502` 更改端口；无需 Node 构建或外部 CDN。
+  - 固定侧栏可收起为图标列，底部直接切换中英文和日间／夜间主题；偏好保存在本机浏览器。
+  - 任务与研究记忆共用编辑区，放大编辑器和日志以覆盖面板展示，不挤压主布局。
+  - 切换页面、语言、主题或项目会保留当前页面中的未保存草稿；刷新前会提示。
+  - 运行前自动保存当前任务和研究记忆。模型操作、项目测试均需显式点击。
+  - 设置 → 工作区工具显示项目位置；API 密钥不写入浏览器存储或配置文件。
+  - 页面与折线图共用主题变量；三维线稿文字随导航切换视角，并尊重减少动态效果设置。
+- 前端文件在 `ui/web/`，本地 API 在 `ui/server.py`；继续复用原有运行、安全存储及恢复逻辑。
+  `ui/app.py` 保留旧版 Streamlit 界面和已验证的辅助函数，默认启动入口已改为新界面。
 - 选择模型：
-  - 先在 `Model provider` / `模型来源` 选择 `Local Ollama` 或 `Cloud Gemini`
-  - UI 会自动读取本机 Ollama 已安装模型，并显示在 `Installed Ollama models`
-  - 点击 `Refresh models` / `刷新模型` 可重新读取本机模型列表
-  - 从下拉框选择模型后，运行按钮会带上 `--model <name>`
-  - 如果列表里没有你的模型，可在 `Manual model name` / `手动输入模型名` 输入完整模型名
-  - 手动输入非空时优先使用手动模型；否则使用下拉框选择
-- 拉取模型：
-  - 在 `Pull model by name` 输入模型名，点击 `Pull Model`
-- 删除模型：
-  - 选择已安装模型并勾选确认，点击 `Delete Selected Model`
-  - 若该模型正被运行任务使用，UI 会阻止删除
+  - 在「设置 → 模型连接」选择本地 Ollama 或云端 Gemini，输入模型名称或从候选列表中选择。
+  - 「检查连接」验证当前模型，「设为默认模型」保存选择。
+  - Gemini 支持临时密钥、环境变量、缓存推荐，以及显式触发的模型发现和能力探测。
+- 模型管理：
+  - 在「设置 → 模型管理」刷新已安装列表、下载模型或查看模型操作日志。
+  - 删除时必须输入完整模型名称确认；运行或模型操作进行中会阻止删除。
 - 输入任务：
-  - 如果 `config.yaml` 里的 `project_name` 存在，项目选择器默认打开该项目；否则才回到公开安全的 `example` 项目
-  - 项目路径和输出路径会显示为 `projects/<project>` 这类相对路径
-  - 在 UI 的 `task.md` 和 `memory.md` 文本框编辑，然后点击 `Save Input`
+  - 默认打开配置中的项目，缺失时回到可用项目。
+  - 在「研究任务／研究记忆」页签中编辑输入，再点击「保存修改」。
 - 开始运行：
-  - `Run Diagnostic` / `Run Normal` / `Run Continuous`
+  - 在工作台选择标准、连续或诊断模式，然后点击 `Start research / 开始研究`
   - UI 会把当前 provider 和模型自动传给后端（例如 `--provider ollama --model qwen3:8b`
     或 `--provider gemini --model gemini-3.5-flash`）
   - Gemini password 只通过子进程环境变量传递，不会进入命令行或 meta JSON
 - 运行项目测试：
-  - 在 `Project Tests` 里点击 `Run Tests`
+  - 在「设置 → 工作区工具」里点击 `Run tests / 运行测试`
   - 会执行当前环境的 `pytest -q`，并在页面显示通过/失败和完整输出
 - 安全停止：
-  - 点击 `Pause / Stop Safely`（创建 `STOP_REQUESTED`，后端在安全点退出）
+  - 点击 `Safe stop / 安全停止`（创建 `STOP_REQUESTED`，后端在安全点退出）
 - 恢复：
   - 点击 `Resume`（等价 `.venv/bin/python -m src.main --resume`）
 - 看结果：
-  - UI 的 `Latest run metadata` 会汇总最近一次 run 的 provider/model、drafting mode、Git commit、stop reason、best score 和 artifact 路径
-  - UI 的 `Run analytics dashboard` 会用现有 artifacts 显示 score、rubric、相似度/evolution、timeout/error、agent 耗时和估算 token 趋势；缺少旧字段时显示部分状态而不是报错
-  - UI 的 `Run comparison` 可选择多个 run，比较模型、drafting mode、轮数、最佳/平均分、停止原因、超时/错误数量、agent 耗时、估算 token 数、修订相似度和 rubric 子项均值
+  - 「运行分析 → 运行元数据」 会汇总最近一次 run 的 provider/model、drafting mode、Git commit、stop reason、best score 和 artifact 路径
+  - 「运行分析」 会用现有 artifacts 显示 score、rubric、相似度/evolution、timeout/error、agent 耗时和估算 token 趋势；缺少旧字段时显示部分状态而不是报错
+  - 「运行分析 → 运行比较」展示最近的 run，比较模型、drafting mode、轮数、最佳/平均分、停止原因、超时/错误数量、agent 耗时、估算 token 数、修订相似度和 rubric 子项均值
   - 先看 `projects/example/best_output.md`
   - 再看 `projects/example/runs/<run_id>/round_xx/`
   - 复现信息看 `projects/example/runs/<run_id>/run_config.json`

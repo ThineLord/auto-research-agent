@@ -31,7 +31,7 @@ help:
 		"  make session       Run session mode" \
 		"  make survey        Run local Literature Survey Mode" \
 		"  make mock          Run deterministic provider-free demo mode" \
-		"  make ui            Start the Streamlit UI with language/theme controls" \
+		"  make ui            Start the local research dashboard" \
 		"" \
 		"Run make install-dev once on a new checkout before testing or running." \
 		"Pass extra CLI flags with ARGS, for example:" \
@@ -104,4 +104,4 @@ mock: install
 	$(VENV_PYTHON) -m src.main --mock $(ARGS)
 
 ui: install
-	$(VENV_PYTHON) -m streamlit run ui/app.py $(ARGS)
+	$(VENV_PYTHON) -m ui.server $(ARGS)

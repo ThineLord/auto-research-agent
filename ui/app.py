@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import hashlib
+import html
 import json
 import os
 import re
 import stat
 import sys
 from collections.abc import Mapping, MutableMapping
+from functools import partial
 from pathlib import Path
 from typing import Any, Sequence
 from urllib.parse import urlsplit
 
+import altair as alt
+import pandas as pd
 import requests
 import streamlit as st
 
@@ -88,7 +92,13 @@ from src.storage import (
 )
 from src.ui_health_identity import private_ollama_path_id
 from ui.i18n import LANGUAGE_LABELS, translate
-from ui.theme import DEFAULT_THEME, THEME_LABEL_KEYS, build_theme_css, normalize_theme
+from ui.theme import (
+    DEFAULT_THEME,
+    THEME_LABEL_KEYS,
+    THEME_VALUES,
+    build_theme_css,
+    normalize_theme,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECTS_DIR = ROOT / "projects"
@@ -216,23 +226,59 @@ def t(key: str, **kwargs: Any) -> str:
 def ensure_ui_preferences() -> None:
     if st.session_state.get("ui_language") not in LANGUAGE_LABELS:
         st.session_state["ui_language"] = "en"
-    st.session_state["ui_theme"] = current_theme()
+    if st.session_state.get("ui_theme") not in THEME_LABEL_KEYS:
+        st.session_state["ui_theme"] = DEFAULT_THEME
+
+
+def localized_choice(
+    label: str,
+    options: Sequence[Any],
+    *,
+    key: str,
+    index: int = 0,
+    radio: bool = False,
+    **kwargs: Any,
+) -> Any:
+    """Keep semantic values stable while rebuilding translated frontend options.
+
+    Streamlit keys preserve the frontend's formatted option strings. Reusing a key
+    after translating options can leave an old label selected (or no radio selected).
+    The durable value and locale-specific widget must therefore use separate keys.
+    """
+    choices = list(options)
+    selected = st.session_state.get(key)
+    if selected not in choices:
+        selected = choices[index]
+    widget_key = f"_choice_{key}_{current_language()}"
+    if st.session_state.get(widget_key) not in choices:
+        st.session_state[widget_key] = selected
+
+    def remember() -> None:
+        st.session_state[key] = st.session_state[widget_key]
+
+    widget = st.radio if radio else st.selectbox
+    value = widget(label, choices, key=widget_key, on_change=remember, **kwargs)
+    st.session_state[key] = value
+    return value
 
 
 def render_interface_controls() -> None:
-    st.sidebar.header(t("sidebar_interface"))
-    st.sidebar.selectbox(
-        t("language_selector"),
-        list(LANGUAGE_LABELS),
-        format_func=lambda language: LANGUAGE_LABELS[language],
-        key="ui_language",
-    )
-    st.sidebar.selectbox(
-        t("theme_selector"),
-        list(THEME_LABEL_KEYS),
-        format_func=lambda theme: t(THEME_LABEL_KEYS[theme]),
-        key="ui_theme",
-    )
+    label = partial(translate, current_language())
+    with st.sidebar.expander(t("sidebar_interface"), expanded=True):
+        st.selectbox(
+            "Language / 语言",
+            list(LANGUAGE_LABELS),
+            format_func=lambda language: LANGUAGE_LABELS[language],
+            key="ui_language",
+        )
+        localized_choice(
+            t("theme_selector"),
+            list(THEME_LABEL_KEYS),
+            format_func=lambda theme: label(THEME_LABEL_KEYS[theme]),
+            key="ui_theme",
+            radio=True,
+            horizontal=True,
+        )
 
 
 def localized_message(payload: dict[str, Any]) -> str:
@@ -1631,6 +1677,80 @@ def _token_rows(rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
+def display_column(key: str) -> str:
+    label = t(f"column_{key}")
+    return key.replace("_", " ").capitalize() if label == f"column_{key}" else label
+
+
+def render_dataframe(rows: Any, **kwargs: Any) -> None:
+    """Keep native sorting/export while applying this session's theme to canvas cells."""
+    tokens = THEME_VALUES[current_theme()]
+    frame = pd.DataFrame(rows)
+    styled = frame.style.set_properties(
+        **{"background-color": tokens["surface"], "color": tokens["text"]}
+    )
+    st.dataframe(
+        styled,
+        column_config={column: display_column(str(column)) for column in frame.columns},
+        **kwargs,
+    )
+
+
+def render_chart(rows: list[dict[str, Any]], *, x: str, y: list[str], bar: bool = False) -> None:
+    """Canvas charts need explicit theme tokens; CSS cannot recolor their axes."""
+    tokens = THEME_VALUES[current_theme()]
+    records = [
+        {"x": row[x], "series": display_column(series), "value": row.get(series)}
+        for row in rows
+        for series in y
+        if row.get(x) is not None and _safe_float(row.get(series)) is not None
+    ]
+    if not records:
+        return
+    base = alt.Chart(pd.DataFrame(records))
+    chart = (
+        base.mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
+        if bar
+        else base.mark_line(point=True, strokeWidth=2.5)
+    )
+    chart = chart.encode(
+        x=alt.X(
+            "x:N" if bar else "x:Q",
+            title=display_column(x),
+            axis=alt.Axis(labelAngle=0, tickMinStep=1) if not bar else alt.Axis(labelAngle=-20),
+        ),
+        y=alt.Y("value:Q", title=display_column(y[0]) if len(y) == 1 else t("chart_value")),
+        color=alt.Color(
+            "series:N",
+            title=None,
+            legend=None if len(y) == 1 else alt.Legend(orient="bottom"),
+            scale=alt.Scale(range=[tokens["primary"], "#8c9fb0", "#b4a181", "#b48f99"]),
+        ),
+        tooltip=[
+            alt.Tooltip("x", title=display_column(x)),
+            alt.Tooltip("series:N", title=t("chart_metric")),
+            alt.Tooltip("value:Q", title=t("chart_value")),
+        ],
+    )
+    if bar:
+        chart = chart.encode(xOffset="series:N")
+    chart = (
+        chart.properties(height=260, background=tokens["app_bg"])
+        .configure_view(stroke=None)
+        .configure_axis(
+            labelColor=tokens["muted"],
+            titleColor=tokens["text"],
+            gridColor=tokens["border"],
+            domainColor=tokens["border"],
+            labelFont="sans-serif",
+            titleFont="sans-serif",
+            titleFontWeight="normal",
+        )
+        .configure_legend(labelColor=tokens["text"], titleColor=tokens["text"])
+    )
+    st.altair_chart(chart, theme=None, width="stretch")
+
+
 def render_run_analytics_dashboard(project_dir: Path, checkpoint: dict[str, Any]) -> None:
     dashboard = build_run_analytics_dashboard(project_dir, checkpoint)
     st.subheader(t("run_analytics_dashboard"))
@@ -1706,10 +1826,11 @@ def _render_dashboard_table_chart(
         if not rows:
             st.info(t(empty_key))
             return
-        st.dataframe(rows, width="stretch", hide_index=True)
         chart_y = [key for key in y if any(_safe_float(row.get(key)) is not None for row in rows)]
         if chart_y:
-            st.line_chart(rows, x=x, y=chart_y)
+            render_chart(rows, x=x, y=chart_y)
+        with st.expander(t("view_data")):
+            render_dataframe(rows, width="stretch", hide_index=True)
 
 
 def build_output_catalog(project_dir: Path, checkpoint: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1927,11 +2048,7 @@ def is_canonical_root() -> bool:
 
 
 def render_runtime_location_check() -> None:
-    st.sidebar.caption(t("app_root_label"))
-    st.sidebar.code("<repo>", language="text")
-    if is_canonical_root():
-        st.sidebar.success(t("canonical_root_success"))
-    else:
+    if not is_canonical_root():
         st.error(t("canonical_root_error"))
     with st.sidebar.expander(t("advanced_paths")):
         st.caption(t("current_root_path"))
@@ -1970,59 +2087,66 @@ def render_live_progress_and_logs(
         checkpoint=checkpoint,
         run_meta=run_meta,
     )
-    p1, p2, p3, p4 = st.columns(4)
-    p1.metric(t("metric_mode"), str(progress["mode"]))
+    p1, p2, p3 = st.columns(3)
+    p1.metric(t("metric_stage"), localized_stage(progress["stage"]))
     p2.metric(t("metric_round"), str(progress["round"]))
-    p3.metric(t("metric_stage"), localized_stage(progress["stage"]))
-    p4.metric(t("metric_best_score"), str(progress["best_score"]))
-    st.write(t("pid_line", pid=progress["pid"]))
-    st.write(t("model_line", model=progress["model"]))
-    st.write(t("drafting_mode_line", mode=progress["drafting_mode"]))
-    st.write(t("last_successful_agent", agent=progress["last_successful_agent"]))
-    st.write(t("stop_reason", reason=progress["stop_reason"]))
-    st.write(
-        t(
-            "stop_signal_present",
-            present=artifact_path_exists(stop_signal_path, allow_directory=True),
-        )
-    )
-    st.write(t("selected_model", model=st.session_state.get("selected_model", default_model)))
-    cloud_free_status = checkpoint.get("cloud_free", {})
-    if isinstance(cloud_free_status, dict) and cloud_free_status:
-        st.caption(t("cloud_free_runtime_status"))
-        cf1, cf2, cf3, cf4 = st.columns(4)
-        cf1.metric(t("cloud_free_status"), str(cloud_free_status.get("status", "N/A")))
-        cf2.metric(
-            t("cloud_free_delay"),
-            str(cloud_free_status.get("current_delay_seconds", "N/A")),
-        )
-        cf3.metric(
-            t("cloud_free_recent_429"),
-            str(cloud_free_status.get("recent_429_count", "N/A")),
-        )
-        cf4.metric(
-            t("cloud_free_rounds_hour"),
-            str(cloud_free_status.get("estimated_completed_rounds_per_hour", "N/A")),
-        )
+    p3.metric(t("metric_best_score"), str(progress["best_score"]))
     if checkpoint.get("paused_until_reset"):
         st.warning(str(checkpoint.get("pause_message", "")))
+    with st.expander(t("run_details")):
+        st.write(t("run_mode_detail", mode=progress["mode"]))
+        st.write(t("pid_line", pid=progress["pid"]))
+        st.write(t("model_line", model=progress["model"]))
+        st.write(t("drafting_mode_line", mode=progress["drafting_mode"]))
+        st.write(t("last_successful_agent", agent=progress["last_successful_agent"]))
+        st.write(t("stop_reason", reason=progress["stop_reason"]))
+        st.write(
+            t(
+                "stop_signal_present",
+                present=artifact_path_exists(stop_signal_path, allow_directory=True),
+            )
+        )
+        st.write(t("selected_model", model=st.session_state.get("selected_model", default_model)))
+        cloud_free_status = checkpoint.get("cloud_free", {})
+        if isinstance(cloud_free_status, dict) and cloud_free_status:
+            st.caption(t("cloud_free_runtime_status"))
+            cf1, cf2, cf3, cf4 = st.columns(4)
+            cf1.metric(t("cloud_free_status"), str(cloud_free_status.get("status", "N/A")))
+            cf2.metric(
+                t("cloud_free_delay"),
+                str(cloud_free_status.get("current_delay_seconds", "N/A")),
+            )
+            cf3.metric(
+                t("cloud_free_recent_429"),
+                str(cloud_free_status.get("recent_429_count", "N/A")),
+            )
+            cf4.metric(
+                t("cloud_free_rounds_hour"),
+                str(cloud_free_status.get("estimated_completed_rounds_per_hour", "N/A")),
+            )
 
-    st.subheader(t("live_logs_panel"))
-    st.code(run_log_text or t("no_logs_yet"), language="text")
-    st.caption(t("model_operation_logs"))
-    st.code(
-        tail_file_lines(model_job_log_path, max_lines=120) or t("no_model_operation_logs"),
-        language="text",
-    )
+        st.subheader(t("live_logs_panel"))
+        st.code(run_log_text or t("no_logs_yet"), language="text")
+        st.caption(t("model_operation_logs"))
+        st.code(
+            tail_file_lines(model_job_log_path, max_lines=120) or t("no_model_operation_logs"),
+            language="text",
+        )
 
 
 def main() -> None:
-    st.set_page_config(page_title="Auto Research Agent", layout="wide")
+    st.set_page_config(
+        page_title="Auto Research Agent",
+        page_icon=":material/blur_on:",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
     ensure_ui_preferences()
-    st.markdown(build_theme_css(current_theme()), unsafe_allow_html=True)
-    render_interface_controls()
-    st.title(t("app_title"))
-    render_runtime_location_check()
+    st.sidebar.markdown(
+        '<div class="ara-brand"><span class="ara-brand-mark">◈</span>'
+        "<div>Research Studio<small>AUTO RESEARCH AGENT</small></div></div>",
+        unsafe_allow_html=True,
+    )
     try:
         app_config, using_example_config = load_ui_config()
     except ConfigValidationError as exc:
@@ -2031,39 +2155,19 @@ def main() -> None:
     if using_example_config:
         st.info(t("using_example_config"))
 
-    st.subheader(t("quick_actions"))
-    quick_test_col, quick_status_col = st.columns([1, 3])
-    with quick_test_col:
-        if st.button(t("run_tests"), key="run_tests_quick"):
-            st.session_state["test_result"] = run_project_tests(ROOT)
-    with quick_status_col:
-        quick_test_result = st.session_state.get("test_result")
-        if quick_test_result:
-            if quick_test_result["ok"]:
-                st.success(t("tests_passed_short", elapsed=quick_test_result["elapsed"]))
-            else:
-                st.error(t("tests_failed_short", elapsed=quick_test_result["elapsed"]))
-        else:
-            st.info(t("quick_tests_help"))
-
     projects = discover_project_names(PROJECTS_DIR)
     default_index = default_project_index(projects, app_config.project_name)
-    selected_project = st.selectbox(
-        t("project_selector"), projects, index=default_index if projects else None
+    selected_project = st.sidebar.selectbox(
+        t("project_selector"),
+        projects,
+        index=default_index if projects else None,
+        key="selected_project",
     )
     if not selected_project:
         st.warning(t("no_project_found"))
         return
     if app_config.project_name and app_config.project_name not in projects:
         st.warning(t("configured_project_missing", project=app_config.project_name))
-    elif selected_project != app_config.project_name and app_config.project_name in projects:
-        st.info(
-            t(
-                "using_public_safe_project",
-                selected=selected_project,
-                configured=app_config.project_name,
-            )
-        )
 
     proj_path = project_path(selected_project)
     try:
@@ -2071,7 +2175,22 @@ def main() -> None:
     except OSError:
         st.error(t("unsafe_project_paths"))
         return
-    st.write(t("project_path", path=project_display_path(proj_path)))
+    st.sidebar.caption(t("local_workspace"))
+    render_interface_controls()
+    label = partial(translate, current_language())
+    render_runtime_location_check()
+    # Render after preference widgets: one authoritative token set per rerun.
+    st.markdown(build_theme_css(current_theme()), unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="ara-page-header"><div class="ara-eyebrow">'
+        f"{html.escape(t('workspace_eyebrow'))} / {html.escape(selected_project)}</div>"
+        f"<h1>{html.escape(t('workspace_title'))}</h1>"
+        f"<p>{html.escape(t('workspace_subtitle'))}</p></div>",
+        unsafe_allow_html=True,
+    )
+    workspace_tab, outputs_tab, analytics_tab, settings_tab = st.tabs(
+        [t("nav_workspace"), t("nav_outputs"), t("nav_analytics"), t("nav_settings")]
+    )
 
     task_path = proj_path / "task.md"
     memory_path = proj_path / "memory.md"
@@ -2083,438 +2202,452 @@ def main() -> None:
     model_job_meta = get_active_process_meta(model_job_meta_path(proj_path))
     checkpoint = read_json_file(checkpoint_path)
 
-    col_input_left, col_input_right = st.columns(2)
-    with col_input_left:
-        task_text = st.text_area(
-            t("input_editor_task"),
-            value=input_text_or_placeholder(task_path, "task_placeholder"),
-            height=260,
-        )
-        if not artifact_path_is_safe(task_path, allow_missing=False):
-            st.caption(t("task_missing_help"))
-    with col_input_right:
-        memory_text = st.text_area(
-            t("input_editor_memory"),
-            value=input_text_or_placeholder(memory_path, "memory_placeholder"),
-            height=260,
-        )
-        if not artifact_path_is_safe(memory_path, allow_missing=False):
-            st.caption(t("memory_optional_help"))
-    if st.button(t("save_input")):
-        try:
-            ensure_artifact_paths_safe((task_path, memory_path))
-            write_file_text(task_path, task_text)
-            write_file_text(memory_path, memory_text)
-        except OSError:
-            st.error(t("input_save_failed"))
-        else:
-            st.success(t("input_saved"))
-
-    st.subheader(t("run_controls"))
-    run_active = bool(run_meta)
-    model_job_active = bool(model_job_meta)
-    blocked = run_active or model_job_active
-    if run_active:
-        st.info(t("run_active", pid=run_meta.get("pid"), command=run_meta.get("command")))
-    if model_job_active:
-        st.warning(
-            t(
-                "model_job_active",
-                pid=model_job_meta.get("pid"),
-                command=model_job_meta.get("command"),
+    with workspace_tab:
+        brief_column, run_column = st.columns([1.65, 1], gap="large")
+    with brief_column:
+        with st.container(border=True, key="brief_card"):
+            st.subheader(t("input_editor_task"))
+            st.caption(t("task_editor_help"))
+            task_text = st.text_area(
+                t("input_editor_task"),
+                value=input_text_or_placeholder(task_path, "task_placeholder"),
+                height=270,
+                key=f"task_editor_{selected_project}",
+                label_visibility="collapsed",
             )
+            if not artifact_path_is_safe(task_path, allow_missing=False):
+                st.caption(t("task_missing_help"))
+            with st.expander(t("input_editor_memory")):
+                memory_text = st.text_area(
+                    t("input_editor_memory"),
+                    value=input_text_or_placeholder(memory_path, "memory_placeholder"),
+                    height=220,
+                    key=f"memory_editor_{selected_project}",
+                    label_visibility="collapsed",
+                )
+                if not artifact_path_is_safe(memory_path, allow_missing=False):
+                    st.caption(t("memory_optional_help"))
+            if st.button(t("save_input"), key="save_input", icon=":material/check:"):
+                try:
+                    ensure_artifact_paths_safe((task_path, memory_path))
+                    write_file_text(task_path, task_text)
+                    write_file_text(memory_path, memory_text)
+                except OSError:
+                    st.error(t("input_save_failed"))
+                else:
+                    st.success(t("input_saved"))
+
+    with settings_tab:
+        st.subheader(t("model_settings_title"))
+        st.caption(t("model_settings_help"))
+        run_active = bool(run_meta)
+        model_job_active = bool(model_job_meta)
+        blocked = run_active or model_job_active
+        if run_active:
+            st.info(t("run_active", pid=run_meta.get("pid"), command=run_meta.get("command")))
+        if model_job_active:
+            st.warning(
+                t(
+                    "model_job_active",
+                    pid=model_job_meta.get("pid"),
+                    command=model_job_meta.get("command"),
+                )
+            )
+
+        default_model = app_config.model.name
+        default_provider = (
+            app_config.model.provider
+            if app_config.model.provider in SUPPORTED_MODEL_PROVIDERS
+            else MODEL_PROVIDER_OLLAMA
+        )
+        if st.session_state.get("selected_provider") not in SUPPORTED_MODEL_PROVIDERS:
+            st.session_state["selected_provider"] = default_provider
+        selected_provider = localized_choice(
+            t("model_provider"),
+            [MODEL_PROVIDER_OLLAMA, MODEL_PROVIDER_GEMINI],
+            format_func=lambda provider: (
+                label("provider_local_ollama")
+                if provider == MODEL_PROVIDER_OLLAMA
+                else label("provider_cloud_gemini")
+            ),
+            key="selected_provider",
+        )
+        run_process_blocked = run_active or (
+            model_job_active and selected_provider == MODEL_PROVIDER_OLLAMA
         )
 
-    default_model = app_config.model.name
-    default_provider = (
-        app_config.model.provider
-        if app_config.model.provider in SUPPORTED_MODEL_PROVIDERS
-        else MODEL_PROVIDER_OLLAMA
-    )
-    if st.session_state.get("selected_provider") not in SUPPORTED_MODEL_PROVIDERS:
-        st.session_state["selected_provider"] = default_provider
-    selected_provider = st.selectbox(
-        t("model_provider"),
-        [MODEL_PROVIDER_OLLAMA, MODEL_PROVIDER_GEMINI],
-        format_func=lambda provider: (
-            t("provider_local_ollama")
-            if provider == MODEL_PROVIDER_OLLAMA
-            else t("provider_cloud_gemini")
-        ),
-        key="selected_provider",
-    )
-    run_process_blocked = run_active or (
-        model_job_active and selected_provider == MODEL_PROVIDER_OLLAMA
-    )
+        models: list[dict[str, Any]] = []
+        models_error = ""
+        installed_model_names: list[str] = []
+        effective_model = ""
+        model_label = ""
+        run_model_blocked = True
+        gemini_api_key_env = app_config.model.gemini.api_key_env
+        provider_env_overrides: dict[str, str] = {}
 
-    models: list[dict[str, Any]] = []
-    models_error = ""
-    installed_model_names: list[str] = []
-    effective_model = ""
-    model_label = ""
-    run_model_blocked = True
-    gemini_api_key_env = app_config.model.gemini.api_key_env
-    provider_env_overrides: dict[str, str] = {}
-
-    if selected_provider == MODEL_PROVIDER_OLLAMA:
-        if "ollama_models" not in st.session_state or "ollama_models_error" not in st.session_state:
-            refresh_ollama_model_cache(base_url=app_config.ollama_base_url)
-
-        st.markdown(f"**{t('installed_ollama_models')}**")
-        refresh_col, model_status_col = st.columns([1, 4])
-        with refresh_col:
-            if st.button(t("refresh_models")):
-                st.session_state.pop(OLLAMA_HEALTH_SESSION_KEY, None)
+        if selected_provider == MODEL_PROVIDER_OLLAMA:
+            if (
+                "ollama_models" not in st.session_state
+                or "ollama_models_error" not in st.session_state
+            ):
                 refresh_ollama_model_cache(base_url=app_config.ollama_base_url)
-                st.session_state["model_list_refreshed"] = True
 
-        models = list(st.session_state.get("ollama_models", []))
-        models_error = str(st.session_state.get("ollama_models_error", "") or "")
-        model_list_refreshed = bool(st.session_state.pop("model_list_refreshed", False))
-        installed_model_names = [m["name"] for m in models if str(m.get("name", "")).strip()]
+            st.markdown(f"**{t('installed_ollama_models')}**")
+            refresh_col, model_status_col = st.columns([1, 4])
+            with refresh_col:
+                if st.button(t("refresh_models")):
+                    st.session_state.pop(OLLAMA_HEALTH_SESSION_KEY, None)
+                    refresh_ollama_model_cache(base_url=app_config.ollama_base_url)
+                    st.session_state["model_list_refreshed"] = True
 
-        with model_status_col:
-            if models_error:
-                st.error(
-                    t(
-                        "ollama_models_error_prefix",
-                        error=localize_ollama_models_error(models_error),
+            models = list(st.session_state.get("ollama_models", []))
+            models_error = str(st.session_state.get("ollama_models_error", "") or "")
+            model_list_refreshed = bool(st.session_state.pop("model_list_refreshed", False))
+            installed_model_names = [m["name"] for m in models if str(m.get("name", "")).strip()]
+
+            with model_status_col:
+                if models_error:
+                    st.error(
+                        t(
+                            "ollama_models_error_prefix",
+                            error=localize_ollama_models_error(models_error),
+                        )
                     )
-                )
-            elif not installed_model_names:
-                st.warning(t("no_ollama_models_detected"))
-                st.caption(
-                    t("suggested_smaller_models", models=", ".join(SUGGESTED_SMALLER_MODELS))
-                )
-            elif model_list_refreshed:
-                st.success(t("model_list_refreshed"))
-            else:
-                st.info(t("use_selected_model"))
+                elif not installed_model_names:
+                    st.warning(t("no_ollama_models_detected"))
+                    st.caption(
+                        t("suggested_smaller_models", models=", ".join(SUGGESTED_SMALLER_MODELS))
+                    )
+                elif model_list_refreshed:
+                    st.success(t("model_list_refreshed"))
+                else:
+                    st.info(t("use_selected_model"))
 
-        dropdown_default = choose_model_picker_default(
-            installed_model_names=installed_model_names,
-            session_model=st.session_state.get("selected_model_picker")
-            or st.session_state.get("selected_model"),
-            config_model=default_model,
-        )
-        if (
-            installed_model_names
-            and st.session_state.get("selected_model_picker") not in installed_model_names
-        ):
-            st.session_state["selected_model_picker"] = dropdown_default
-        st.session_state.setdefault("manual_model_name", "")
-
-        picker_col, manual_col, effective_col = st.columns([2, 2, 2])
-        with picker_col:
-            if installed_model_names:
-                selected_model = st.selectbox(
-                    t("model_selector"),
-                    installed_model_names,
-                    index=installed_model_names.index(dropdown_default)
-                    if dropdown_default in installed_model_names
-                    else 0,
-                    key="selected_model_picker",
-                )
-            else:
-                selected_model = ""
-                st.caption(t("no_installed_model"))
-        with manual_col:
-            manual_model_name = st.text_input(
-                t("manual_model_name"),
-                key="manual_model_name",
-                placeholder=default_model,
-                help=t("manual_model_help"),
+            dropdown_default = choose_model_picker_default(
+                installed_model_names=installed_model_names,
+                session_model=st.session_state.get("selected_model_picker")
+                or st.session_state.get("selected_model"),
+                config_model=default_model,
             )
-        effective_model = resolve_effective_model(
-            selected_model=selected_model,
-            manual_model=manual_model_name,
-            config_model=default_model,
-        )
-        model_label = provider_model_label(selected_provider, effective_model)
-        st.session_state["selected_model"] = model_label
-        with effective_col:
-            st.write(t("effective_model", model=effective_model or t("none_option")))
-        run_model_blocked = bool(models_error) or not effective_model
-    else:
-        st.markdown(f"**{t('cloud_model_settings')}**")
-        st.caption(t("cloud_model_management_note"))
-        gemini_api_key_env = st.text_input(
-            t("gemini_api_key_env"),
-            value=app_config.model.gemini.api_key_env,
-            key="gemini_api_key_env",
-            on_change=clear_session_health_result,
-            args=(GEMINI_HEALTH_SESSION_KEY,),
-        )
-        gemini_api_key_password = st.text_input(
-            t("gemini_api_key_password"),
-            type="password",
-            key="gemini_api_key_password",
-            help=t("gemini_api_key_password_help"),
-            on_change=clear_session_health_result,
-            args=(GEMINI_HEALTH_SESSION_KEY,),
-        )
-        gemini_session_api_key = gemini_api_key_password.strip()
-        gemini_config_api_key = app_config.model.gemini.api_key.strip()
-        gemini_inline_api_key = resolve_ui_gemini_api_key(
-            gemini_session_api_key,
-            gemini_config_api_key,
-        )
-        cloud_models = list(app_config.model.gemini.models or DEFAULT_GEMINI_MODELS)
-        cloud_default_model = (
-            app_config.model.name
-            if app_config.model.provider == MODEL_PROVIDER_GEMINI
-            else DEFAULT_GEMINI_MODEL
-        )
-        key_available = has_gemini_api_key_source(
-            api_key_env=gemini_api_key_env,
-            api_key_value=gemini_inline_api_key,
-        )
-        if not key_available:
-            st.warning(t("gemini_health_missing_key"))
-        provider_env_overrides = build_provider_env_overrides(
-            selected_provider,
-            gemini_api_key_env,
-            gemini_session_api_key,
-        )
+            if (
+                installed_model_names
+                and st.session_state.get("selected_model_picker") not in installed_model_names
+            ):
+                st.session_state["selected_model_picker"] = dropdown_default
+            st.session_state.setdefault("manual_model_name", "")
 
-        st.markdown(f"**{t('cloud_free_runner')}**")
-        st.warning(t("cloud_free_zero_cost_warning"))
-        st.caption(t("cloud_free_limits_warning"))
-        preset_default = (
-            app_config.cloud_free.free_runner_preset
-            if app_config.cloud_free.free_runner_preset in FREE_RUNNER_PRESETS
-            else FREE_RUNNER_AUTO
-        )
-        if st.session_state.get("free_runner_preset") not in FREE_RUNNER_PRESETS:
-            st.session_state["free_runner_preset"] = preset_default
-        selected_free_runner_preset = st.selectbox(
-            t("free_runner_preset"),
-            list(FREE_RUNNER_PRESETS),
-            format_func=lambda preset: t(FREE_RUNNER_LABEL_KEYS[preset]),
-            key="free_runner_preset",
-        )
+            picker_col, manual_col, effective_col = st.columns([2, 2, 2])
+            with picker_col:
+                if installed_model_names:
+                    selected_model = st.selectbox(
+                        t("model_selector"),
+                        installed_model_names,
+                        index=installed_model_names.index(dropdown_default)
+                        if dropdown_default in installed_model_names
+                        else 0,
+                        key="selected_model_picker",
+                    )
+                else:
+                    selected_model = ""
+                    st.caption(t("no_installed_model"))
+            with manual_col:
+                manual_model_name = st.text_input(
+                    t("manual_model_name"),
+                    key="manual_model_name",
+                    placeholder=default_model,
+                    help=t("manual_model_help"),
+                )
+            effective_model = resolve_effective_model(
+                selected_model=selected_model,
+                manual_model=manual_model_name,
+                config_model=default_model,
+            )
+            model_label = provider_model_label(selected_provider, effective_model)
+            st.session_state["selected_model"] = model_label
+            with effective_col:
+                st.write(t("effective_model", model=effective_model or t("none_option")))
+            run_model_blocked = bool(models_error) or not effective_model
+        else:
+            st.markdown(f"**{t('cloud_model_settings')}**")
+            st.caption(t("cloud_model_management_note"))
+            gemini_api_key_env = st.text_input(
+                t("gemini_api_key_env"),
+                value=app_config.model.gemini.api_key_env,
+                key="gemini_api_key_env",
+                on_change=clear_session_health_result,
+                args=(GEMINI_HEALTH_SESSION_KEY,),
+            )
+            gemini_api_key_password = st.text_input(
+                t("gemini_api_key_password"),
+                type="password",
+                key="gemini_api_key_password",
+                help=t("gemini_api_key_password_help"),
+                on_change=clear_session_health_result,
+                args=(GEMINI_HEALTH_SESSION_KEY,),
+            )
+            gemini_session_api_key = gemini_api_key_password.strip()
+            gemini_config_api_key = app_config.model.gemini.api_key.strip()
+            gemini_inline_api_key = resolve_ui_gemini_api_key(
+                gemini_session_api_key,
+                gemini_config_api_key,
+            )
+            cloud_models = list(app_config.model.gemini.models or DEFAULT_GEMINI_MODELS)
+            cloud_default_model = (
+                app_config.model.name
+                if app_config.model.provider == MODEL_PROVIDER_GEMINI
+                else DEFAULT_GEMINI_MODEL
+            )
+            key_available = has_gemini_api_key_source(
+                api_key_env=gemini_api_key_env,
+                api_key_value=gemini_inline_api_key,
+            )
+            if not key_available:
+                st.warning(t("gemini_health_missing_key"))
+            provider_env_overrides = build_provider_env_overrides(
+                selected_provider,
+                gemini_api_key_env,
+                gemini_session_api_key,
+            )
 
-        discovered_models, profile_results = load_scoped_cloud_free_cache(
-            proj_path,
-            st.session_state,
-        )
+            st.markdown(f"**{t('cloud_free_runner')}**")
+            st.warning(t("cloud_free_zero_cost_warning"))
+            st.caption(t("cloud_free_limits_warning"))
+            preset_default = (
+                app_config.cloud_free.free_runner_preset
+                if app_config.cloud_free.free_runner_preset in FREE_RUNNER_PRESETS
+                else FREE_RUNNER_AUTO
+            )
+            if st.session_state.get("free_runner_preset") not in FREE_RUNNER_PRESETS:
+                st.session_state["free_runner_preset"] = preset_default
+            selected_free_runner_preset = localized_choice(
+                t("free_runner_preset"),
+                list(FREE_RUNNER_PRESETS),
+                format_func=lambda preset: label(FREE_RUNNER_LABEL_KEYS[preset]),
+                key="free_runner_preset",
+            )
 
-        discover_col, profile_col, recommendation_col = st.columns([1, 1, 3])
-        with discover_col:
-            if st.button(t("discover_free_cloud_models"), disabled=not key_available):
-                with st.spinner(t("discovering_free_cloud_models")):
-                    discovered, error = discover_free_cloud_models(
-                        api_key_env=gemini_api_key_env,
-                        api_key=gemini_inline_api_key,
+            discovered_models, profile_results = load_scoped_cloud_free_cache(
+                proj_path,
+                st.session_state,
+            )
+
+            discover_col, profile_col, recommendation_col = st.columns([1, 1, 3])
+            with discover_col:
+                if st.button(t("discover_free_cloud_models"), disabled=not key_available):
+                    with st.spinner(t("discovering_free_cloud_models")):
+                        discovered, error = discover_free_cloud_models(
+                            api_key_env=gemini_api_key_env,
+                            api_key=gemini_inline_api_key,
+                            config=app_config.cloud_free,
+                        )
+                    if error:
+                        st.error(t("cloud_free_discovery_failed", error=error))
+                    else:
+                        save_discovery_artifact(proj_path, discovered)
+                        st.session_state.pop(CLOUD_FREE_CACHE_IDENTITY_KEY, None)
+                        st.session_state[CLOUD_FREE_DISCOVERY_SESSION_KEY] = discovered
+                        discovered_models = discovered
+                        st.success(t("cloud_free_discovery_saved", count=len(discovered)))
+            with profile_col:
+                if st.button(t("profile_safe_free_models"), disabled=not key_available):
+                    profile_candidates = build_candidate_pool(
+                        discovered_models=discovered_models,
+                        configured_models=cloud_models,
                         config=app_config.cloud_free,
                     )
-                if error:
-                    st.error(t("cloud_free_discovery_failed", error=error))
-                else:
-                    save_discovery_artifact(proj_path, discovered)
+                    safe_candidates = filter_safe_text_models(
+                        profile_candidates,
+                        include_unavailable=True,
+                    )
+                    with st.spinner(t("profiling_free_cloud_models")):
+                        profiles = profile_free_cloud_models(
+                            candidates=safe_candidates,
+                            api_key_env=gemini_api_key_env,
+                            api_key=gemini_inline_api_key,
+                        )
+                    save_profile_artifact(proj_path, profiles)
                     st.session_state.pop(CLOUD_FREE_CACHE_IDENTITY_KEY, None)
-                    st.session_state[CLOUD_FREE_DISCOVERY_SESSION_KEY] = discovered
-                    discovered_models = discovered
-                    st.success(t("cloud_free_discovery_saved", count=len(discovered)))
-        with profile_col:
-            if st.button(t("profile_safe_free_models"), disabled=not key_available):
-                profile_candidates = build_candidate_pool(
-                    discovered_models=discovered_models,
-                    configured_models=cloud_models,
-                    config=app_config.cloud_free,
-                )
-                safe_candidates = filter_safe_text_models(
-                    profile_candidates,
-                    include_unavailable=True,
-                )
-                with st.spinner(t("profiling_free_cloud_models")):
-                    profiles = profile_free_cloud_models(
-                        candidates=safe_candidates,
-                        api_key_env=gemini_api_key_env,
-                        api_key=gemini_inline_api_key,
+                    st.session_state[CLOUD_FREE_PROFILE_SESSION_KEY] = profiles
+                    profile_results = profiles
+                    st.success(t("cloud_free_profile_saved", count=len(profiles)))
+
+            cloud_candidates = build_cached_candidate_pool(
+                discovered_models=discovered_models,
+                configured_models=cloud_models,
+                profiles=profile_results,
+                config=app_config.cloud_free,
+            )
+            cloud_free_recommendation = recommend_free_cloud_model(
+                candidates=cloud_candidates,
+                profiles=profile_results,
+                preset=selected_free_runner_preset,
+            )
+            with recommendation_col:
+                if cloud_free_recommendation:
+                    st.info(
+                        t(
+                            "cloud_free_recommendation",
+                            model=cloud_free_recommendation.model_id,
+                            reason=cloud_free_recommendation.reason,
+                        )
                     )
-                save_profile_artifact(proj_path, profiles)
-                st.session_state.pop(CLOUD_FREE_CACHE_IDENTITY_KEY, None)
-                st.session_state[CLOUD_FREE_PROFILE_SESSION_KEY] = profiles
-                profile_results = profiles
-                st.success(t("cloud_free_profile_saved", count=len(profiles)))
+                elif selected_free_runner_preset == FREE_RUNNER_MANUAL:
+                    st.info(t("cloud_free_manual_mode"))
+                else:
+                    st.info(t("cloud_free_no_eligible_recommendation"))
 
-        cloud_candidates = build_cached_candidate_pool(
-            discovered_models=discovered_models,
-            configured_models=cloud_models,
-            profiles=profile_results,
-            config=app_config.cloud_free,
-        )
-        cloud_free_recommendation = recommend_free_cloud_model(
-            candidates=cloud_candidates,
-            profiles=profile_results,
-            preset=selected_free_runner_preset,
-        )
-        with recommendation_col:
-            if cloud_free_recommendation:
-                st.info(
-                    t(
-                        "cloud_free_recommendation",
-                        model=cloud_free_recommendation.model_id,
-                        reason=cloud_free_recommendation.reason,
-                    )
+            selected_cloud_model = st.session_state.get("selected_cloud_model_picker")
+            if selected_cloud_model not in cloud_models:
+                selected_cloud_model = (
+                    cloud_default_model if cloud_default_model in cloud_models else cloud_models[0]
                 )
-            elif selected_free_runner_preset == FREE_RUNNER_MANUAL:
-                st.info(t("cloud_free_manual_mode"))
-            else:
-                st.info(t("cloud_free_no_eligible_recommendation"))
+                st.session_state["selected_cloud_model_picker"] = selected_cloud_model
 
-        selected_cloud_model = st.session_state.get("selected_cloud_model_picker")
-        if selected_cloud_model not in cloud_models:
-            selected_cloud_model = (
-                cloud_default_model if cloud_default_model in cloud_models else cloud_models[0]
+            cloud_picker_col, cloud_manual_col, cloud_effective_col = st.columns([2, 2, 2])
+            with cloud_picker_col:
+                selected_cloud_model = st.selectbox(
+                    t("gemini_model_selector"),
+                    cloud_models,
+                    index=cloud_models.index(selected_cloud_model),
+                    key="selected_cloud_model_picker",
+                )
+            with cloud_manual_col:
+                manual_cloud_model = st.text_input(
+                    t("manual_cloud_model_name"),
+                    key="manual_cloud_model_name",
+                    placeholder=cloud_default_model,
+                )
+            effective_model = resolve_effective_cloud_model(
+                selected_cloud_model,
+                manual_cloud_model,
+                cloud_default_model,
             )
-            st.session_state["selected_cloud_model_picker"] = selected_cloud_model
+            if (
+                selected_free_runner_preset != FREE_RUNNER_MANUAL
+                and cloud_free_recommendation is not None
+            ):
+                effective_model = cloud_free_recommendation.model_id
+            model_label = provider_model_label(selected_provider, effective_model)
+            st.session_state["selected_model"] = model_label
+            with cloud_effective_col:
+                st.write(t("effective_cloud_model", model=effective_model or t("none_option")))
+            st.caption(t("gemini_temperature_note"))
+            run_model_blocked = not effective_model or not key_available
 
-        cloud_picker_col, cloud_manual_col, cloud_effective_col = st.columns([2, 2, 2])
-        with cloud_picker_col:
-            selected_cloud_model = st.selectbox(
-                t("gemini_model_selector"),
-                cloud_models,
-                index=cloud_models.index(selected_cloud_model),
-                key="selected_cloud_model_picker",
+            selected_profile = next(
+                (
+                    profile
+                    for profile in profile_results
+                    if getattr(profile, "model_id", "") == effective_model
+                ),
+                None,
             )
-        with cloud_manual_col:
-            manual_cloud_model = st.text_input(
-                t("manual_cloud_model_name"),
-                key="manual_cloud_model_name",
-                placeholder=cloud_default_model,
+            metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+            metric_col1.metric(t("cloud_free_selected_model"), effective_model or "N/A")
+            metric_col2.metric(
+                t("cloud_free_delay"),
+                f"{initial_delay_seconds(effective_model, selected_free_runner_preset):.1f}",
             )
-        effective_model = resolve_effective_cloud_model(
-            selected_cloud_model,
-            manual_cloud_model,
-            cloud_default_model,
-        )
-        if (
-            selected_free_runner_preset != FREE_RUNNER_MANUAL
-            and cloud_free_recommendation is not None
-        ):
-            effective_model = cloud_free_recommendation.model_id
-        model_label = provider_model_label(selected_provider, effective_model)
-        st.session_state["selected_model"] = model_label
-        with cloud_effective_col:
-            st.write(t("effective_cloud_model", model=effective_model or t("none_option")))
-        st.caption(t("gemini_temperature_note"))
-        run_model_blocked = not effective_model or not key_available
+            metric_col3.metric(
+                t("cloud_free_recent_429"),
+                str(getattr(selected_profile, "rate_limited", False)),
+            )
+            metric_col4.metric(
+                t("cloud_free_rounds_hour"),
+                f"{3600 / max(initial_delay_seconds(effective_model, selected_free_runner_preset), 1) / 4:.2f}",
+            )
 
-        selected_profile = next(
-            (
-                profile
-                for profile in profile_results
-                if getattr(profile, "model_id", "") == effective_model
-            ),
-            None,
-        )
-        metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
-        metric_col1.metric(t("cloud_free_selected_model"), effective_model or "N/A")
-        metric_col2.metric(
-            t("cloud_free_delay"),
-            f"{initial_delay_seconds(effective_model, selected_free_runner_preset):.1f}",
-        )
-        metric_col3.metric(
-            t("cloud_free_recent_429"),
-            str(getattr(selected_profile, "rate_limited", False)),
-        )
-        metric_col4.metric(
-            t("cloud_free_rounds_hour"),
-            f"{3600 / max(initial_delay_seconds(effective_model, selected_free_runner_preset), 1) / 4:.2f}",
-        )
-
-        gemini_health_col, gemini_health_result_col = st.columns([1, 3])
-        gemini_health_identity = build_model_health_identity(
-            provider=MODEL_PROVIDER_GEMINI,
-            model=effective_model,
-            connection_scope=gemini_health_connection_scope(
-                api_key_env=gemini_api_key_env,
-                session_key_present=bool(gemini_session_api_key),
-                config_key_present=bool(gemini_config_api_key),
-            ),
-        )
-        with gemini_health_col:
-            if st.button(t("check_gemini_health")):
-                gemini_health = check_gemini_model_health(
-                    selected_model=effective_model,
+            gemini_health_col, gemini_health_result_col = st.columns([1, 3])
+            gemini_health_identity = build_model_health_identity(
+                provider=MODEL_PROVIDER_GEMINI,
+                model=effective_model,
+                connection_scope=gemini_health_connection_scope(
                     api_key_env=gemini_api_key_env,
-                    api_key_value=gemini_inline_api_key,
-                )
-                store_scoped_health_result(
+                    session_key_present=bool(gemini_session_api_key),
+                    config_key_present=bool(gemini_config_api_key),
+                ),
+            )
+            with gemini_health_col:
+                if st.button(t("check_gemini_health")):
+                    gemini_health = check_gemini_model_health(
+                        selected_model=effective_model,
+                        api_key_env=gemini_api_key_env,
+                        api_key_value=gemini_inline_api_key,
+                    )
+                    store_scoped_health_result(
+                        st.session_state,
+                        key=GEMINI_HEALTH_SESSION_KEY,
+                        identity=gemini_health_identity,
+                        result=gemini_health,
+                    )
+            with gemini_health_result_col:
+                gemini_health = load_scoped_health_result(
                     st.session_state,
                     key=GEMINI_HEALTH_SESSION_KEY,
                     identity=gemini_health_identity,
-                    result=gemini_health,
                 )
-        with gemini_health_result_col:
-            gemini_health = load_scoped_health_result(
-                st.session_state,
-                key=GEMINI_HEALTH_SESSION_KEY,
-                identity=gemini_health_identity,
-            )
-            if gemini_health:
-                if gemini_health["ok"]:
-                    st.success(localized_message(gemini_health))
+                if gemini_health:
+                    if gemini_health["ok"]:
+                        st.success(localized_message(gemini_health))
+                    else:
+                        st.error(localized_message(gemini_health))
                 else:
-                    st.error(localized_message(gemini_health))
-            else:
-                st.info(t("health_check_help"))
+                    st.info(t("health_check_help"))
 
-        if st.button(t("save_cloud_model")):
-            model_to_save = effective_model.strip()
-            if not model_to_save:
-                st.error(t("model_name_empty"))
-            else:
-                err = save_default_model_selection(
-                    CONFIG_PATH,
-                    provider=MODEL_PROVIDER_GEMINI,
-                    model_name=model_to_save,
-                    gemini_api_key_env=gemini_api_key_env,
+            if st.button(t("save_cloud_model")):
+                model_to_save = effective_model.strip()
+                if not model_to_save:
+                    st.error(t("model_name_empty"))
+                else:
+                    err = save_default_model_selection(
+                        CONFIG_PATH,
+                        provider=MODEL_PROVIDER_GEMINI,
+                        model_name=model_to_save,
+                        gemini_api_key_env=gemini_api_key_env,
+                    )
+                    if err:
+                        st.error(err)
+                    else:
+                        st.success(t("saved_cloud_model", model=model_to_save))
+
+        st.markdown(f"**{t('continuous_benchmark_settings')}**")
+        benchmark_preset_options = list(BENCHMARK_PRESETS)
+        if st.session_state.get("benchmark_preset") not in benchmark_preset_options:
+            st.session_state["benchmark_preset"] = "free_smoke"
+        benchmark_col, quota_col = st.columns([2, 1])
+        with benchmark_col:
+            selected_benchmark_preset = localized_choice(
+                t("benchmark_preset"),
+                benchmark_preset_options,
+                format_func=lambda preset: label(
+                    BENCHMARK_PRESET_LABEL_KEYS.get(preset, "benchmark_preset")
+                ),
+                key="benchmark_preset",
+            )
+        with quota_col:
+            selected_max_provider_quota_failures = int(
+                st.number_input(
+                    t("max_provider_quota_failures"),
+                    min_value=0,
+                    max_value=20,
+                    value=2,
+                    step=1,
+                    key="max_provider_quota_failures",
                 )
-                if err:
-                    st.error(err)
-                else:
-                    st.success(t("saved_cloud_model", model=model_to_save))
-
-    st.markdown(f"**{t('continuous_benchmark_settings')}**")
-    benchmark_preset_options = list(BENCHMARK_PRESETS)
-    if st.session_state.get("benchmark_preset") not in benchmark_preset_options:
-        st.session_state["benchmark_preset"] = "free_smoke"
-    benchmark_col, quota_col = st.columns([2, 1])
-    with benchmark_col:
-        selected_benchmark_preset = st.selectbox(
-            t("benchmark_preset"),
-            benchmark_preset_options,
-            format_func=lambda preset: t(
-                BENCHMARK_PRESET_LABEL_KEYS.get(preset, "benchmark_preset")
-            ),
-            key="benchmark_preset",
-        )
-    with quota_col:
-        selected_max_provider_quota_failures = int(
-            st.number_input(
-                t("max_provider_quota_failures"),
-                min_value=0,
-                max_value=20,
-                value=2,
-                step=1,
             )
+        configured_drafting_mode = (
+            app_config.drafting_mode
+            if app_config.drafting_mode in SUPPORTED_DRAFTING_MODES
+            else DEFAULT_DRAFTING_MODE
         )
-    configured_drafting_mode = (
-        app_config.drafting_mode
-        if app_config.drafting_mode in SUPPORTED_DRAFTING_MODES
-        else DEFAULT_DRAFTING_MODE
-    )
-    if st.session_state.get("drafting_mode") not in SUPPORTED_DRAFTING_MODES:
-        st.session_state["drafting_mode"] = configured_drafting_mode
-    selected_drafting_mode = st.selectbox(
-        t("drafting_mode"),
-        list(SUPPORTED_DRAFTING_MODES),
-        format_func=lambda mode: t(DRAFTING_MODE_LABEL_KEYS[mode]),
-        key="drafting_mode",
-    )
+        if st.session_state.get("drafting_mode") not in SUPPORTED_DRAFTING_MODES:
+            st.session_state["drafting_mode"] = configured_drafting_mode
+        selected_drafting_mode = localized_choice(
+            t("drafting_mode"),
+            list(SUPPORTED_DRAFTING_MODES),
+            format_func=lambda mode: label(DRAFTING_MODE_LABEL_KEYS[mode]),
+            key="drafting_mode",
+        )
 
     def launch_run(mode: str, success_key: str) -> None:
         result = start_background_process(
@@ -2549,325 +2682,351 @@ def main() -> None:
         render_process_result(result, success_key, model=model_label)
 
     run_buttons_disabled = run_process_blocked or run_model_blocked
-    c1, c2, c3, c4, c5, c6 = st.columns(6)
-    with c1:
-        if st.button(t("run_diagnostic"), disabled=run_buttons_disabled):
-            launch_run("diagnostic", "started_diagnostic")
-    with c2:
-        if st.button(t("run_normal"), disabled=run_buttons_disabled):
-            launch_run("normal", "started_normal")
-    with c3:
-        if st.button(t("run_continuous"), disabled=run_buttons_disabled):
-            launch_run("continuous", "started_continuous")
-    with c4:
-        if st.button(t("pause_stop_safely"), disabled=not run_active):
-            stop_signal_display = output_display_path(stop_signal_path)
-            if create_stop_signal(stop_signal_path):
-                st.warning(t("stop_signal_created", path=stop_signal_display))
-            else:
-                st.error(t("stop_signal_failed", path=stop_signal_display))
     resume_state = describe_resume_state(
         project_dir=proj_path,
         checkpoint=checkpoint,
         run_active=run_active,
         selected_model=model_label,
     )
-    with c5:
-        if st.button(
-            t("resume"),
-            disabled=run_buttons_disabled or not resume_state["can_resume"],
-        ):
-            launch_run("resume", "started_resume")
-    with c6:
-        if st.button(t("run_tests"), disabled=run_active, key="run_tests_top"):
-            st.session_state["test_result"] = run_project_tests(ROOT)
-
-    if resume_state["level"] == "success":
-        st.success(localized_message(resume_state))
-    elif resume_state["level"] == "warning":
-        st.warning(localized_message(resume_state))
-    else:
-        st.info(localized_message(resume_state))
-    resume_details = resume_state.get("details")
-    if isinstance(resume_details, dict) and resume_details:
-        st.caption(
-            t(
-                "resume_details",
-                run_id=resume_details.get("run_id", "N/A"),
-                run_root=resume_details.get("run_root", "N/A"),
-                last_completed_round=resume_details.get("last_completed_round", "N/A"),
-                next_round=resume_details.get("next_round", "N/A"),
-                stop_reason=resume_details.get("stop_reason", "N/A"),
-                can_resume=resume_details.get("can_resume", False),
-                preserved=resume_details.get("completed_round_files_preserved", False),
-                next_round_status=resume_details.get("next_round_status", "N/A"),
-                next_round_action=resume_details.get("next_round_safety_action", "N/A"),
-                next_round_path=resume_details.get("next_round_path", "N/A"),
+    with run_column:
+        st.subheader(t("run_controls"))
+        st.caption(t("current_model_summary", model=model_label))
+        with st.container():
+            run_mode = localized_choice(
+                t("run_mode"),
+                ["normal", "continuous", "diagnostic"],
+                format_func=lambda mode: label(f"mode_{mode}"),
+                key="run_mode",
+                label_visibility="collapsed",
             )
-        )
-
-    st.subheader(t("project_tests"))
-    st.caption(t("project_tests_help"))
-    test_col_left, test_col_right = st.columns([1, 3])
-    with test_col_left:
-        if st.button(t("run_tests"), disabled=run_active, key="run_tests_panel"):
-            st.session_state["test_result"] = run_project_tests(ROOT)
-    with test_col_right:
-        last_test = st.session_state.get("test_result")
-        if last_test:
-            if last_test["ok"]:
-                st.success(
-                    t(
-                        "tests_passed_detail",
-                        elapsed=last_test["elapsed"],
-                        command=last_test["command"],
-                    )
-                )
+        with st.container():
+            if st.button(
+                t("start_run"),
+                disabled=run_buttons_disabled,
+                type="primary",
+                width="stretch",
+                icon=":material/play_arrow:",
+                key="start_run",
+            ):
+                launch_run(run_mode, f"started_{run_mode}")
+        resume_col, stop_col = st.columns(2)
+        with resume_col:
+            if st.button(
+                t("resume"),
+                key="resume_run",
+                width="stretch",
+                disabled=run_buttons_disabled or not resume_state["can_resume"],
+            ):
+                launch_run("resume", "started_resume")
+        with stop_col:
+            if st.button(
+                t("pause_stop_safely"), key="stop_run", width="stretch", disabled=not run_active
+            ):
+                stop_signal_display = output_display_path(stop_signal_path)
+                if create_stop_signal(stop_signal_path):
+                    st.warning(t("stop_signal_created", path=stop_signal_display))
+                else:
+                    st.error(t("stop_signal_failed", path=stop_signal_display))
+        if run_model_blocked:
+            st.caption(t("configure_model_hint"))
+        with st.expander(t("resume_status")):
+            if resume_state["level"] == "success":
+                st.success(localized_message(resume_state))
+            elif resume_state["level"] == "warning":
+                st.warning(localized_message(resume_state))
             else:
-                returncode = last_test["returncode"]
-                st.error(
+                st.info(localized_message(resume_state))
+            resume_details = resume_state.get("details")
+            if isinstance(resume_details, dict) and resume_details:
+                st.caption(
                     t(
-                        "tests_failed_detail",
-                        elapsed=last_test["elapsed"],
-                        returncode=returncode,
+                        "resume_details",
+                        run_id=resume_details.get("run_id", "N/A"),
+                        run_root=resume_details.get("run_root", "N/A"),
+                        last_completed_round=resume_details.get("last_completed_round", "N/A"),
+                        next_round=resume_details.get("next_round", "N/A"),
+                        stop_reason=resume_details.get("stop_reason", "N/A"),
+                        can_resume=resume_details.get("can_resume", False),
+                        preserved=resume_details.get("completed_round_files_preserved", False),
+                        next_round_status=resume_details.get("next_round_status", "N/A"),
+                        next_round_action=resume_details.get("next_round_safety_action", "N/A"),
+                        next_round_path=resume_details.get("next_round_path", "N/A"),
                     )
                 )
-        else:
-            st.info(t("no_test_run"))
-    if st.session_state.get("test_result"):
-        with st.expander(t("test_output"), expanded=True):
-            st.code(st.session_state["test_result"]["output"], language="text")
+
+    with settings_tab, st.expander(t("project_tests")):
+        st.caption(t("project_tests_help"))
+        test_col_left, test_col_right = st.columns([1, 3])
+        with test_col_left:
+            if st.button(t("run_tests"), disabled=run_active, key="run_tests_panel"):
+                st.session_state["test_result"] = run_project_tests(ROOT)
+        with test_col_right:
+            last_test = st.session_state.get("test_result")
+            if last_test:
+                if last_test["ok"]:
+                    st.success(
+                        t(
+                            "tests_passed_detail",
+                            elapsed=last_test["elapsed"],
+                            command=last_test["command"],
+                        )
+                    )
+                else:
+                    returncode = last_test["returncode"]
+                    st.error(
+                        t(
+                            "tests_failed_detail",
+                            elapsed=last_test["elapsed"],
+                            returncode=returncode,
+                        )
+                    )
+            else:
+                st.info(t("no_test_run"))
+        if st.session_state.get("test_result"):
+            with st.expander(t("test_output"), expanded=True):
+                st.code(st.session_state["test_result"]["output"], language="text")
 
     if selected_provider == MODEL_PROVIDER_OLLAMA:
-        st.subheader(t("model_management"))
-        st.caption(t("model_management_help"))
-        rec = {
-            "qwen3:8b": "model_quality_balanced",
-            "llama3.2:3b": "model_smaller_if_available",
-            "phi3:mini": "model_smaller_if_available",
-            "qwen2.5:3b": "model_smaller_if_available",
-            "gemma2:2b": "model_smaller_if_available",
-        }
-        st.markdown(f"**{t('recommended_models')}**")
-        for name, desc_key in rec.items():
-            installed_tag = t("installed_tag") if name in installed_model_names else ""
-            st.write(f"- `{name}` - {t(desc_key)}{installed_tag}")
+        with settings_tab, st.expander(t("model_management")):
+            st.caption(t("model_management_help"))
+            rec = {
+                "qwen3:8b": "model_quality_balanced",
+                "llama3.2:3b": "model_smaller_if_available",
+                "phi3:mini": "model_smaller_if_available",
+                "qwen2.5:3b": "model_smaller_if_available",
+                "gemma2:2b": "model_smaller_if_available",
+            }
+            st.markdown(f"**{t('recommended_models')}**")
+            for name, desc_key in rec.items():
+                installed_tag = t("installed_tag") if name in installed_model_names else ""
+                st.write(f"- `{name}` - {t(desc_key)}{installed_tag}")
 
-        st.markdown(f"**{t('installed_models')}**")
-        if models:
-            st.dataframe(
-                [
-                    {
-                        t("models_table_name"): m["name"],
-                        t("models_table_size"): m["size"],
-                        t("models_table_modified"): m["modified"],
-                    }
-                    for m in models
-                ],
-                width="stretch",
-            )
-        else:
-            st.caption(t("no_installed_model"))
-
-        health_col, health_result_col = st.columns([1, 3])
-        ollama_health_identity = build_model_health_identity(
-            provider=MODEL_PROVIDER_OLLAMA,
-            model=effective_model,
-            connection_scope=ollama_health_connection_scope(app_config.ollama_base_url),
-        )
-        with health_col:
-            if st.button(t("check_model_health")):
-                model_health = check_model_health(
-                    provider=MODEL_PROVIDER_OLLAMA,
-                    base_url=app_config.ollama_base_url,
-                    selected_model=effective_model,
-                    installed_model_names=installed_model_names,
+            st.markdown(f"**{t('installed_models')}**")
+            if models:
+                render_dataframe(
+                    [
+                        {
+                            t("models_table_name"): m["name"],
+                            t("models_table_size"): m["size"],
+                            t("models_table_modified"): m["modified"],
+                        }
+                        for m in models
+                    ],
+                    width="stretch",
                 )
-                store_scoped_health_result(
+            else:
+                st.caption(t("no_installed_model"))
+
+            health_col, health_result_col = st.columns([1, 3])
+            ollama_health_identity = build_model_health_identity(
+                provider=MODEL_PROVIDER_OLLAMA,
+                model=effective_model,
+                connection_scope=ollama_health_connection_scope(app_config.ollama_base_url),
+            )
+            with health_col:
+                if st.button(t("check_model_health")):
+                    model_health = check_model_health(
+                        provider=MODEL_PROVIDER_OLLAMA,
+                        base_url=app_config.ollama_base_url,
+                        selected_model=effective_model,
+                        installed_model_names=installed_model_names,
+                    )
+                    store_scoped_health_result(
+                        st.session_state,
+                        key=OLLAMA_HEALTH_SESSION_KEY,
+                        identity=ollama_health_identity,
+                        result=model_health,
+                    )
+            with health_result_col:
+                model_health = load_scoped_health_result(
                     st.session_state,
                     key=OLLAMA_HEALTH_SESSION_KEY,
                     identity=ollama_health_identity,
-                    result=model_health,
                 )
-        with health_result_col:
-            model_health = load_scoped_health_result(
-                st.session_state,
-                key=OLLAMA_HEALTH_SESSION_KEY,
-                identity=ollama_health_identity,
-            )
-            if model_health:
-                if model_health["ok"]:
-                    st.success(localized_message(model_health))
+                if model_health:
+                    if model_health["ok"]:
+                        st.success(localized_message(model_health))
+                    else:
+                        st.error(localized_message(model_health))
                 else:
-                    st.error(localized_message(model_health))
-            else:
-                st.info(t("health_check_help"))
+                    st.info(t("health_check_help"))
 
-        if st.button(t("save_default_model"), disabled=bool(models_error)):
-            model_to_save = effective_model.strip()
-            if not model_to_save:
-                st.error(t("model_name_empty"))
-            else:
-                err = save_default_model_name(CONFIG_PATH, model_to_save)
-                if err:
-                    st.error(err)
+            if st.button(t("save_default_model"), disabled=bool(models_error)):
+                model_to_save = effective_model.strip()
+                if not model_to_save:
+                    st.error(t("model_name_empty"))
                 else:
-                    st.success(t("saved_default_model", model=model_to_save))
+                    err = save_default_model_name(CONFIG_PATH, model_to_save)
+                    if err:
+                        st.error(err)
+                    else:
+                        st.success(t("saved_default_model", model=model_to_save))
 
-        pull_model_name = st.text_input(t("pull_model_by_name"), value="qwen3:8b")
-        if st.button(t("pull_model"), disabled=blocked):
-            pull_model_name = pull_model_name.strip()
-            if not pull_model_name:
-                st.error(t("enter_model_name"))
-            else:
-                result = start_background_process(
-                    command=["ollama", "pull", pull_model_name],
-                    cwd=ROOT,
-                    log_path=model_job_log_path,
-                    meta_path=model_job_meta_path(proj_path),
-                    kind="model_pull",
-                    extra={"model": pull_model_name},
-                )
-                render_process_result(
-                    result,
-                    "started_pull_model",
-                    model=pull_model_name,
-                )
-
-        delete_target = st.selectbox(
-            t("delete_model"),
-            installed_model_names if installed_model_names else [DELETE_NONE],
-            format_func=lambda model: t("none_option") if model == DELETE_NONE else model,
-        )
-        confirm_delete = st.checkbox(t("confirm_delete"))
-        if st.button(t("delete_selected_model"), disabled=blocked or not installed_model_names):
-            if not confirm_delete:
-                st.error(t("confirm_delete_first"))
-            elif run_active and delete_target == str(run_meta.get("model", "")):
-                st.error(t("cannot_delete_running_model"))
-            elif delete_target == DELETE_NONE:
-                st.error(t("no_deletable_model"))
-            else:
-                result = start_background_process(
-                    command=["ollama", "rm", delete_target],
-                    cwd=ROOT,
-                    log_path=model_job_log_path,
-                    meta_path=model_job_meta_path(proj_path),
-                    kind="model_delete",
-                    extra={"model": delete_target},
-                )
-                render_process_result(
-                    result,
-                    "started_delete_model",
-                    model=delete_target,
-                )
-
-    st.subheader(t("progress_panel"))
-    auto_refresh = st.checkbox(
-        t("auto_refresh_logs"),
-        value=True,
-        key="auto_refresh_logs",
-    )
-    live_panel = st.fragment(run_every=live_refresh_interval(auto_refresh))(
-        render_live_progress_and_logs
-    )
-    live_panel(
-        proj_path=proj_path,
-        run_log_path=run_log_path,
-        model_job_log_path=model_job_log_path,
-        checkpoint_path=checkpoint_path,
-        stop_signal_path=stop_signal_path,
-        default_model=default_model,
-    )
-
-    st.subheader(t("run_metadata_summary"))
-    run_metadata_rows = [
-        {"field": t(str(row["field_key"])), "value": row["value"]}
-        for row in build_run_metadata_rows(proj_path, checkpoint)
-    ]
-    if run_metadata_rows:
-        st.dataframe(run_metadata_rows, width="stretch", hide_index=True)
-    else:
-        st.info(t("run_metadata_empty"))
-
-    render_run_analytics_dashboard(proj_path, checkpoint)
-
-    score_rows = load_score_history_rows(
-        proj_path / "score_history.json",
-        project_dir=proj_path,
-    )
-    st.subheader(t("score_history_table"))
-    if score_rows:
-        st.dataframe(score_rows, width="stretch")
-        st.caption(t("score_history_trend"))
-        st.line_chart(score_rows, x="round", y="score")
-    else:
-        st.info(t("score_history_empty"))
-
-    st.subheader(t("run_comparison"))
-    run_roots = discover_project_run_roots(proj_path)
-    if len(run_roots) < 2:
-        st.info(t("run_comparison_empty"))
-    else:
-        run_options = {
-            f"{run_root.name} - {output_display_path(run_root)}": run_root for run_root in run_roots
-        }
-        default_labels = list(run_options)[:2]
-        selected_run_labels = st.multiselect(
-            t("run_comparison_runs"),
-            list(run_options),
-            default=default_labels,
-        )
-        selected_run_roots = [run_options[label] for label in selected_run_labels]
-        if len(selected_run_roots) < 2:
-            st.info(t("run_comparison_select_two"))
-        else:
-            comparison_rows = build_run_comparison_rows(
-                selected_run_roots,
-                project_dir=proj_path,
+            pull_model_name = st.text_input(
+                t("pull_model_by_name"), value="qwen3:8b", key="pull_model_name"
             )
-            st.dataframe(comparison_rows, width="stretch", hide_index=True)
-            chart_rows = [
-                {
-                    "run_id": row["run_id"],
-                    "best_score": row["best_score"],
-                    "average_score": row["average_score"],
-                }
-                for row in comparison_rows
-                if isinstance(row.get("best_score"), (int, float))
-            ]
-            if chart_rows:
-                st.caption(t("run_comparison_score_chart"))
-                st.bar_chart(chart_rows, x="run_id", y=["best_score", "average_score"])
+            if st.button(t("pull_model"), disabled=blocked):
+                pull_model_name = pull_model_name.strip()
+                if not pull_model_name:
+                    st.error(t("enter_model_name"))
+                else:
+                    result = start_background_process(
+                        command=["ollama", "pull", pull_model_name],
+                        cwd=ROOT,
+                        log_path=model_job_log_path,
+                        meta_path=model_job_meta_path(proj_path),
+                        kind="model_pull",
+                        extra={"model": pull_model_name},
+                    )
+                    render_process_result(
+                        result,
+                        "started_pull_model",
+                        model=pull_model_name,
+                    )
 
-    st.subheader(t("output_browser"))
-    output_catalog = build_output_catalog(proj_path, checkpoint)
-    selected_output_index = st.selectbox(
-        t("output_file"),
-        range(len(output_catalog)),
-        format_func=lambda idx: (
-            t(str(output_catalog[idx]["label_key"]))
-            if output_catalog[idx]["exists"]
-            else f"{t(str(output_catalog[idx]['label_key']))}{t('not_generated_suffix')}"
-        ),
-    )
-    selected_output = output_catalog[selected_output_index]
-    selected_path = selected_output["path"]
-    if selected_path is not None:
-        st.caption(output_display_path(selected_path))
-    if not selected_output["exists"]:
-        st.info(t(str(selected_output.get("missing_key", "output_not_generated"))))
-    else:
-        content = read_file_text(selected_path)
-        if selected_output["kind"] == "json":
-            try:
-                st.json(json.loads(content))
-            except json.JSONDecodeError:
-                st.code(content, language="text")
-        elif selected_output["kind"] == "markdown":
-            st.markdown(content or t("empty_markdown"))
+            delete_target = localized_choice(
+                t("delete_model"),
+                installed_model_names if installed_model_names else [DELETE_NONE],
+                key="delete_model_target",
+                format_func=lambda model: label("none_option") if model == DELETE_NONE else model,
+            )
+            confirm_delete = st.checkbox(t("confirm_delete"), key="confirm_delete_model")
+            if st.button(t("delete_selected_model"), disabled=blocked or not installed_model_names):
+                if not confirm_delete:
+                    st.error(t("confirm_delete_first"))
+                elif run_active and delete_target == str(run_meta.get("model", "")):
+                    st.error(t("cannot_delete_running_model"))
+                elif delete_target == DELETE_NONE:
+                    st.error(t("no_deletable_model"))
+                else:
+                    result = start_background_process(
+                        command=["ollama", "rm", delete_target],
+                        cwd=ROOT,
+                        log_path=model_job_log_path,
+                        meta_path=model_job_meta_path(proj_path),
+                        kind="model_delete",
+                        extra={"model": delete_target},
+                    )
+                    render_process_result(
+                        result,
+                        "started_delete_model",
+                        model=delete_target,
+                    )
+
+    with run_column:
+        st.subheader(t("progress_panel"))
+        auto_refresh = st.checkbox(
+            t("auto_refresh_logs"),
+            value=True,
+            key="auto_refresh_logs",
+        )
+        live_panel = st.fragment(run_every=live_refresh_interval(auto_refresh))(
+            render_live_progress_and_logs
+        )
+        live_panel(
+            proj_path=proj_path,
+            run_log_path=run_log_path,
+            model_job_log_path=model_job_log_path,
+            checkpoint_path=checkpoint_path,
+            stop_signal_path=stop_signal_path,
+            default_model=default_model,
+        )
+
+    with analytics_tab, st.expander(t("run_metadata_summary")):
+        run_metadata_rows = [
+            {"field": t(str(row["field_key"])), "value": row["value"]}
+            for row in build_run_metadata_rows(proj_path, checkpoint)
+        ]
+        if run_metadata_rows:
+            render_dataframe(run_metadata_rows, width="stretch", hide_index=True)
         else:
-            st.code(content or t("empty_text"), language="text")
+            st.info(t("run_metadata_empty"))
+
+    with analytics_tab:
+        render_run_analytics_dashboard(proj_path, checkpoint)
+
+        score_rows = load_score_history_rows(
+            proj_path / "score_history.json",
+            project_dir=proj_path,
+        )
+        st.subheader(t("score_history_table"))
+        if score_rows:
+            render_chart(score_rows, x="round", y=["score"])
+            with st.expander(t("view_data")):
+                render_dataframe(score_rows, width="stretch", hide_index=True)
+        else:
+            st.info(t("score_history_empty"))
+
+        st.subheader(t("run_comparison"))
+        run_roots = discover_project_run_roots(proj_path)
+        if len(run_roots) < 2:
+            st.info(t("run_comparison_empty"))
+        else:
+            run_options = {
+                f"{run_root.name} - {output_display_path(run_root)}": run_root
+                for run_root in run_roots
+            }
+            default_labels = list(run_options)[:2]
+            selected_run_labels = st.multiselect(
+                t("run_comparison_runs"),
+                list(run_options),
+                default=default_labels,
+                key=f"compare_runs_{selected_project}",
+            )
+            selected_run_roots = [run_options[label] for label in selected_run_labels]
+            if len(selected_run_roots) < 2:
+                st.info(t("run_comparison_select_two"))
+            else:
+                comparison_rows = build_run_comparison_rows(
+                    selected_run_roots,
+                    project_dir=proj_path,
+                )
+                render_dataframe(comparison_rows, width="stretch", hide_index=True)
+                chart_rows = [
+                    {
+                        "run_id": row["run_id"],
+                        "best_score": row["best_score"],
+                        "average_score": row["average_score"],
+                    }
+                    for row in comparison_rows
+                    if isinstance(row.get("best_score"), (int, float))
+                ]
+                if chart_rows:
+                    st.caption(t("run_comparison_score_chart"))
+                    render_chart(
+                        chart_rows, x="run_id", y=["best_score", "average_score"], bar=True
+                    )
+
+    with outputs_tab:
+        st.subheader(t("output_browser"))
+        output_catalog = build_output_catalog(proj_path, checkpoint)
+        selected_output_index = localized_choice(
+            t("output_file"),
+            range(len(output_catalog)),
+            key=f"output_file_{selected_project}",
+            format_func=lambda idx: (
+                label(str(output_catalog[idx]["label_key"]))
+                if output_catalog[idx]["exists"]
+                else f"{label(str(output_catalog[idx]['label_key']))}{label('not_generated_suffix')}"
+            ),
+        )
+        selected_output = output_catalog[selected_output_index]
+        selected_path = selected_output["path"]
+        if selected_path is not None:
+            st.caption(output_display_path(selected_path))
+        if not selected_output["exists"]:
+            st.info(t(str(selected_output.get("missing_key", "output_not_generated"))))
+        else:
+            content = read_file_text(selected_path)
+            if selected_output["kind"] == "json":
+                try:
+                    st.json(json.loads(content))
+                except json.JSONDecodeError:
+                    st.code(content, language="text")
+            elif selected_output["kind"] == "markdown":
+                st.markdown(content or t("empty_markdown"))
+            else:
+                st.code(content or t("empty_text"), language="text")
 
 
 if __name__ == "__main__":

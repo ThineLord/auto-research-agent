@@ -12,10 +12,4 @@ if [[ ! -x ".venv/bin/python" ]]; then
   exit 1
 fi
 
-if ! .venv/bin/python -c "import streamlit" >/dev/null 2>&1; then
-  echo "Streamlit is not installed in .venv."
-  echo "Run: make install-dev"
-  exit 1
-fi
-
-exec .venv/bin/python -m streamlit run ui/app.py
+exec .venv/bin/python -m ui.server "$@"
