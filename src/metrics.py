@@ -115,14 +115,22 @@ def _similarity_ratio(left: str, right: str) -> float | None:
     right_norm = _normalize_similarity_text(right)
     if not left_norm or not right_norm:
         return None
+    if left_norm == right_norm:
+        return 1.0
     return round(SequenceMatcher(None, left_norm, right_norm).ratio(), 3)
 
 
 def _changed_line_count(before: str, after: str) -> int | None:
     if not before.strip() and not after.strip():
         return None
+    if before == after:
+        return 0
     before_lines = before.splitlines()
     after_lines = after.splitlines()
+    if before_lines == after_lines:
+        return 0
+    if not before_lines or not after_lines:
+        return len(before_lines) + len(after_lines)
     matcher = SequenceMatcher(None, before_lines, after_lines)
     changed = 0
     for tag, before_start, before_end, after_start, after_end in matcher.get_opcodes():

@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Performance
+
+* Artifact boundary lookup now follows path ancestors through a published index rather than
+  scanning every registered project/run. Registration retains anchor inheritance and descendant
+  rebasing, and repeated identical registration avoids rebuilding the index.
+* Dashboard log polling now reads a growing suffix through the existing safe filesystem boundary
+  instead of decoding and splitting the entire log. Unicode line separators remain supported;
+  malformed UTF-8 in unread history no longer hides otherwise valid current log lines.
+* Workspace loading shares one checkpoint and one model candidate pool across its status and four
+  preset recommendations. Each new request still reads current artifacts.
+* Run analysis reads and decodes round metrics once, sharing those entries between summary and
+  trend calculations. Identical round text also bypasses unnecessary sequence matching while
+  preserving existing metric values.
+* `make performance` compares boundary lookup, log tails, and unchanged-round metrics with their
+  original algorithms using temporary synthetic data, reporting timing and Python allocation
+  peaks separately.
+
 ### Added
 
 * `--legacy-migration-execute PROJECT --legacy-migration-evidence DIR` now performs only the

@@ -23,6 +23,7 @@ make import-check
 make repo-safety
 make test
 make check
+make performance
 python scripts/check_wheel_install.py
 ```
 
@@ -39,6 +40,28 @@ symlinks or enumerates ignored runtime artifacts, and reports only relative file
 numbers, and finding categories instead of echoing matched values.
 The worktree scan requires descriptor-relative no-follow filesystem support and fails closed when
 that support is unavailable; `--staged` remains available for inspecting the complete index.
+
+### Local performance checks
+
+`make performance` benchmarks artifact boundary lookup, log-tail display, and unchanged-round
+evolution metrics against their original algorithms. It asserts output equality, uses temporary
+synthetic inputs, and reports median elapsed time and peak Python allocations in separate
+measurements. It does not load local configuration, inspect research runs, or call a model.
+For a smaller probe, use
+`make performance ARGS="--repeats 3 --log-lines 10000 --text-lines 200"`.
+
+Positive log-tail limits inspect only the suffix needed for the requested lines. Invalid UTF-8 in
+unread history does not suppress a valid tail; invalid UTF-8 in the inspected suffix returns an
+empty log view. A very long requested line or too few lines can still require reading the whole
+file. Nonpositive limits retain the previous full-file slicing behavior.
+
+Analysis shares one metrics read between summary and trend calculation. Workspace loading shares
+one checkpoint and candidate pool within each request. Neither optimization caches artifacts
+across requests; filesystem and pending-transaction checks remain on the read path. Synthetic
+local speedups measure these operations only and do not predict end-to-end model throughput.
+The process-wide boundary index stores registered trusted anchors, with copy-on-write snapshots
+under the existing lock. Lookup walks path ancestors, so unrelated projects do not add per-read
+work. Anchor inheritance and descendant rebasing preserve the original registration rules.
 
 ## Stable Milestone Workflow
 

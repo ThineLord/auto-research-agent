@@ -50,6 +50,11 @@ def config_public() -> dict:
 def status(name: str, model: str = "") -> dict:
     path = project(name)
     checkpoint = h.read_json_file(path / "checkpoint.json")
+    return _status(path, checkpoint, model)
+
+
+def _status(path: Path, checkpoint: dict, model: str = "") -> dict:
+    """Build status from this request's validated project and checkpoint."""
     meta = h.get_active_process_meta(h.run_meta_path(path))
     log = h.tail_file_lines(path / "run.log", 120)
     return {
@@ -69,12 +74,15 @@ def workspace(name: str) -> dict:
     checkpoint = h.read_json_file(path / "checkpoint.json")
     catalog = h.build_output_catalog(path, checkpoint)
     config, _ = h.load_ui_config()
+    pool = _cloud_candidates(path, config)
     return {
-        **status(name),
+        **_status(path, checkpoint),
         "task": h.read_file_text(path / "task.md"),
         "memory": h.read_file_text(path / "memory.md"),
         "recommendations": {
-            preset: cloud_pool(path, config, preset)["recommendation"]
+            preset: h.recommend_free_cloud_model(
+                candidates=pool["candidates"], profiles=pool["profiles"], preset=preset
+            )
             for preset in h.FREE_RUNNER_PRESETS
         },
         "outputs": [
@@ -133,7 +141,7 @@ def selection(data: dict) -> tuple:
     return config, provider, model, env, key
 
 
-def cloud_pool(path: Path, config, preset: str) -> dict:
+def _cloud_candidates(path: Path, config) -> dict:
     discovered = h.load_discovery_artifact(path)
     profiles = h.load_profile_artifact(path)
     candidates = h.build_cached_candidate_pool(
@@ -142,10 +150,17 @@ def cloud_pool(path: Path, config, preset: str) -> dict:
         profiles=profiles,
         config=config.cloud_free,
     )
-    recommendation = h.recommend_free_cloud_model(
-        candidates=candidates, profiles=profiles, preset=preset
-    )
-    return {"candidates": candidates, "profiles": profiles, "recommendation": recommendation}
+    return {"candidates": candidates, "profiles": profiles}
+
+
+def cloud_pool(path: Path, config, preset: str) -> dict:
+    pool = _cloud_candidates(path, config)
+    return {
+        **pool,
+        "recommendation": h.recommend_free_cloud_model(
+            candidates=pool["candidates"], profiles=pool["profiles"], preset=preset
+        ),
+    }
 
 
 def action(data: dict) -> dict:

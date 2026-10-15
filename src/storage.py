@@ -72,7 +72,8 @@ class UnsafeArtifactPathError(OSError):
     """Raised when automatic runtime I/O encounters a link or non-regular node."""
 
 
-_ARTIFACT_BOUNDARIES: tuple[tuple[Path, Path], ...] = ()
+# Publish replacement maps under the lock; readers keep an immutable-by-convention snapshot.
+_ARTIFACT_BOUNDARIES: dict[Path, Path] = {}
 _ARTIFACT_BOUNDARIES_LOCK = RLock()
 
 
@@ -85,50 +86,40 @@ def _register_artifact_boundary(root: Path, anchor: Path) -> None:
     root = _lexical_absolute(root)
     anchor = _lexical_absolute(anchor)
     with _ARTIFACT_BOUNDARIES_LOCK:
-        inherited_matches: list[tuple[int, Path]] = []
-        for registered_root, registered_anchor in _ARTIFACT_BOUNDARIES:
-            if registered_root == root:
-                continue
-            try:
-                root.relative_to(registered_root)
-            except ValueError:
-                continue
-            inherited_matches.append((len(registered_root.parts), registered_anchor))
-        if inherited_matches:
-            anchor = max(inherited_matches, key=lambda item: item[0])[1]
+        for ancestor in root.parents:
+            if ancestor in _ARTIFACT_BOUNDARIES:
+                anchor = _ARTIFACT_BOUNDARIES[ancestor]
+                break
         try:
             root.relative_to(anchor)
         except ValueError as exc:
             raise _unsafe_path_error("boundary") from exc
 
-        boundaries: list[tuple[Path, Path]] = []
-        for registered_root, registered_anchor in _ARTIFACT_BOUNDARIES:
+        if _ARTIFACT_BOUNDARIES.get(root) == anchor:
+            return
+        boundaries: dict[Path, Path] = {}
+        for registered_root, registered_anchor in _ARTIFACT_BOUNDARIES.items():
             if registered_root == root:
                 continue
-            try:
-                registered_root.relative_to(root)
-                anchor_is_nested = registered_anchor.is_relative_to(root)
-            except ValueError:
-                anchor_is_nested = False
+            anchor_is_nested = registered_root.is_relative_to(
+                root
+            ) and registered_anchor.is_relative_to(root)
             if anchor_is_nested:
                 registered_anchor = anchor
-            boundaries.append((registered_root, registered_anchor))
-        boundaries.append((root, anchor))
-        _ARTIFACT_BOUNDARIES = tuple(boundaries)
+            boundaries[registered_root] = registered_anchor
+        boundaries[root] = anchor
+        _ARTIFACT_BOUNDARIES = boundaries
 
 
 def _registered_artifact_anchor(path: Path) -> Path | None:
     path = _lexical_absolute(path)
-    matches: list[tuple[int, Path]] = []
     with _ARTIFACT_BOUNDARIES_LOCK:
         boundaries = _ARTIFACT_BOUNDARIES
-    for root, anchor in boundaries:
-        try:
-            path.relative_to(root)
-        except ValueError:
-            continue
-        matches.append((len(root.parts), anchor))
-    return max(matches, default=(0, None), key=lambda item: item[0])[1]
+    for ancestor in (path, *path.parents):
+        anchor = boundaries.get(ancestor)
+        if anchor is not None:
+            return anchor
+    return None
 
 
 def artifact_boundary_is_registered(path: Path) -> bool:
@@ -1039,12 +1030,80 @@ def write_file_text(path: Path, content: str, *, anchor: Path | None = None) -> 
     _atomic_write_text(path, content, anchor=anchor)
 
 
+def _tail_binary_lines(file: BinaryIO, max_lines: int) -> str:
+    end = file.seek(0, os.SEEK_END)
+    window = 8192
+    while True:
+        start = max(0, end - window)
+        file.seek(start)
+        content = file.read(end - start)
+        # Include the complete leading UTF-8 character when the window cuts it.
+        # At most three preceding bytes are needed for a valid four-byte codepoint.
+        for _ in range(3):
+            if start == 0 or not content or not 0x80 <= content[0] <= 0xBF:
+                break
+            start -= 1
+            file.seek(start)
+            content = file.read(1) + content
+        lines = content.decode("utf-8").splitlines()
+        # The first line may be incomplete until we have reached the file start.
+        if start == 0 or len(lines) > max_lines:
+            return "\n".join(lines[-max_lines:])
+        # Geometric growth keeps repeated reads linear in the required suffix size.
+        window *= 2
+
+
 def tail_file_lines(path: Path, max_lines: int = 200, *, anchor: Path | None = None) -> str:
+    """Read a log tail through a safe descriptor without scanning historical lines.
+
+    Positive limits validate UTF-8 only in the inspected suffix; invalid bytes in
+    unread history do not hide valid current lines. Nonpositive limits retain the
+    historical full-file slicing behavior, including zero returning all lines.
+    """
+    if not isinstance(max_lines, int) or max_lines <= 0:
+        try:
+            lines = read_regular_text(path, missing_ok=True, anchor=anchor).splitlines()
+        except (OSError, UnicodeError):
+            return ""
+        return "\n".join(lines[-max_lines:])
+
+    path = Path(path)
+    parent_descriptor: int | None = None
+    descriptor = -1
     try:
-        lines = read_regular_text(path, missing_ok=True, anchor=anchor).splitlines()
+        parent_descriptor = _open_parent_directory(path, create=False, anchor=anchor)
+        metadata = _entry_metadata(path, parent_descriptor)
+        if metadata is None:
+            return ""
+        _validate_regular_metadata(metadata, kind="log read target")
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_BINARY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        if parent_descriptor is not None:
+            descriptor = os.open(path.name, flags, dir_fd=parent_descriptor)
+        else:
+            descriptor = os.open(path, flags)
+        opened_metadata = os.fstat(descriptor)
+        _validate_regular_metadata(opened_metadata, kind="log read target")
+        if (metadata.st_dev, metadata.st_ino) != (
+            opened_metadata.st_dev,
+            opened_metadata.st_ino,
+        ):
+            raise _unsafe_path_error("changed log read target")
+        with os.fdopen(descriptor, "rb") as file:
+            descriptor = -1
+            return _tail_binary_lines(file, max_lines)
     except (OSError, UnicodeError):
         return ""
-    return "\n".join(lines[-max_lines:])
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
 
 
 def make_run_root(project_dir: Path, *, anchor: Path | None = None) -> Path:

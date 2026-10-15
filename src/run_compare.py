@@ -110,6 +110,21 @@ def load_run_summary(
     safe_artifacts: bool = False,
     project_dir: Path | None = None,
 ) -> dict[str, Any]:
+    summary, _ = _load_run_summary_and_metrics(
+        run_root,
+        safe_artifacts=safe_artifacts,
+        project_dir=project_dir,
+    )
+    return summary
+
+
+def _load_run_summary_and_metrics(
+    run_root: Path,
+    *,
+    safe_artifacts: bool = False,
+    project_dir: Path | None = None,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Build a summary and expose its metrics snapshot for this request only."""
     run_root = Path(run_root)
     selected_project = project_dir or infer_round_commit_project_dir(run_root)
     if selected_project is not None:
@@ -237,7 +252,7 @@ def load_run_summary(
     model_label = (
         model_config.get("label") or model_config.get("name") or summary.get("model") or ""
     )
-    return {
+    result = {
         "run_id": summary.get("run_id") or run_config.get("run_id", run_root.name),
         "run_path": str(run_root),
         "run_root": str(run_root),
@@ -283,6 +298,7 @@ def load_run_summary(
         "metadata_sources": metadata_sources,
         "metadata_status": "ok" if metadata_sources else "missing",
     }
+    return result, round_metrics
 
 
 def compare_runs(

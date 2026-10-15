@@ -48,6 +48,54 @@ def test_workspace_and_save_keep_unicode_and_memory(project):
     launch.assert_not_called()
 
 
+def test_workspace_reuses_request_inputs_for_all_recommendations(project, monkeypatch):
+    root, _ = project
+    config, _ = web.h.load_ui_config()
+    expected = {
+        preset: web.cloud_pool(root, config, preset)["recommendation"]
+        for preset in web.h.FREE_RUNNER_PRESETS
+    }
+    names = (
+        "read_json_file",
+        "load_discovery_artifact",
+        "load_profile_artifact",
+        "build_cached_candidate_pool",
+    )
+    spies = {name: Mock(wraps=getattr(web.h, name)) for name in names}
+    for name, spy in spies.items():
+        monkeypatch.setattr(web.h, name, spy)
+    project_spy = Mock(wraps=web.project)
+    monkeypatch.setattr(web, "project", project_spy)
+
+    result = web.workspace("example")
+
+    assert result["recommendations"] == expected
+    project_spy.assert_called_once_with("example")
+    checkpoint_reads = [
+        call
+        for call in spies["read_json_file"].call_args_list
+        if call.args[0] == root / "checkpoint.json"
+    ]
+    assert len(checkpoint_reads) == 1
+    for name in names[1:]:
+        spies[name].assert_called_once()
+
+
+def test_workspace_refreshes_artifacts_on_each_request(project, monkeypatch):
+    root, _ = project
+    discovery = Mock(wraps=web.h.load_discovery_artifact)
+    monkeypatch.setattr(web.h, "load_discovery_artifact", discovery)
+    first = web.workspace("example")
+    web.action(payload(action="save", task="Updated brief", memory="Updated context"))
+    second = web.workspace("example")
+
+    assert first["task"] == "Research brief"
+    assert second["task"] == "Updated brief"
+    assert second["memory"] == "Updated context"
+    assert discovery.call_count == 2
+    assert all(call.args == (root,) for call in discovery.call_args_list)
+
+
 @pytest.mark.parametrize("name", ["../example", "../../", "/tmp", "missing"])
 def test_project_boundaries(project, name):
     with pytest.raises(ValueError):

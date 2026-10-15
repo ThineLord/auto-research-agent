@@ -2,29 +2,12 @@
 
 from __future__ import annotations
 
-import json
 import math
 from pathlib import Path
 from typing import Any
 
-from .round_commit_recovery import infer_round_commit_project_dir
-from .run_compare import load_run_summary
-from .storage import read_regular_text, write_json_file
-
-
-def _read_json_list(path: Path, *, safe_artifacts: bool = False) -> list[dict[str, Any]]:
-    try:
-        content = (
-            read_regular_text(path, missing_ok=True)
-            if safe_artifacts
-            else path.read_text(encoding="utf-8")
-        )
-        payload = json.loads(content) if content else []
-    except (OSError, UnicodeError, json.JSONDecodeError):
-        return []
-    if not isinstance(payload, list):
-        return []
-    return [entry for entry in payload if isinstance(entry, dict)]
+from .run_compare import _load_run_summary_and_metrics
+from .storage import write_json_file
 
 
 def _as_float(value: Any) -> float | None:
@@ -88,16 +71,10 @@ def analyze_run(
     project_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Summarize one run without provider calls or scoring reinterpretation."""
-    run_root = Path(run_root)
-    selected_project = project_dir or infer_round_commit_project_dir(run_root)
-    summary = load_run_summary(
+    summary, round_metrics = _load_run_summary_and_metrics(
         run_root,
         safe_artifacts=safe_artifacts,
-        project_dir=selected_project,
-    )
-    round_metrics = _read_json_list(
-        run_root / "round_metrics.json",
-        safe_artifacts=safe_artifacts,
+        project_dir=project_dir,
     )
     score_trend = _score_trend(round_metrics)
     return {
