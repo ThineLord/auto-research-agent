@@ -388,6 +388,7 @@ class Handler(BaseHTTPRequestHandler):
                 files = {
                     "/": "index.html",
                     "/app.js": "app.js",
+                    "/theme.js": "theme.js",
                     "/styles.css": "styles.css",
                     "/architecture.js": "architecture.js",
                     "/favicon.svg": "favicon.svg",

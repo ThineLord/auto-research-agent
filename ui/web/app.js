@@ -19,6 +19,7 @@ const paths = {
   chevron: "m14 6-6 6 6 6",
   arrow: "M4 12h16m-6-6 6 6-6 6",
   sun: "M12 3V1m0 22v-2M3 12H1m22 0h-2M5 5 3.5 3.5M19 19l1.5 1.5M5 19l-1.5 1.5M19 5l1.5-1.5M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0",
+  system: "M3 4h18v13H3zM8 21h8m-4-4v4",
   moon: "M20 14A8 8 0 0 1 10 4a8 8 0 1 0 10 10",
   language:
     "M3 5h12M9 2v3M5 5c0 7 7 10 7 10M13 5c0 6-8 11-10 11M14 21l4-10 4 10m-6-4h4",
@@ -46,8 +47,16 @@ const copy = {
     local: "本地工作区",
     collapse: "收起边栏",
     expand: "展开边栏",
-    light: "日间模式",
-    dark: "夜间模式",
+    light: "浅色模式",
+    dark: "深色模式",
+    system: "跟随系统",
+    appearance: "外观",
+    theme: "主题模式",
+    themeHelp: "选择适合你的外观，立即生效并保存在此浏览器。",
+    systemHelp: "随系统外观自动切换浅色与深色。",
+    lightHelp: "温润浅色，适合明亮环境。",
+    darkHelp: "柔和深色，适合低光环境。",
+    themeCurrent: "当前外观：{mode}",
     language: "切换为 English",
     brief: "研究任务",
     memory: "研究记忆",
@@ -172,6 +181,14 @@ const copy = {
     expand: "Expand sidebar",
     light: "Light mode",
     dark: "Dark mode",
+    system: "Use system setting",
+    appearance: "Appearance",
+    theme: "Color theme",
+    themeHelp: "Choose your appearance. Changes apply immediately and stay in this browser.",
+    systemHelp: "Automatically match your system’s light or dark appearance.",
+    lightHelp: "Warm, light tones for bright spaces.",
+    darkHelp: "Soft, dark tones for low light.",
+    themeCurrent: "Current appearance: {mode}",
     language: "切换为中文",
     brief: "Research task",
     memory: "Research memory",
@@ -296,10 +313,23 @@ let boot,
   analysis,
   outputContent = "",
   outputIndex = 0;
+function readPreference(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function savePreference(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Keep session preferences usable when browser storage is unavailable.
+  }
+}
 let state = {
-  lang: localStorage.getItem("ara-language") || "zh",
-  theme: localStorage.getItem("ara-theme") || "light",
-  collapsed: localStorage.getItem("ara-collapsed") === "true",
+  lang: readPreference("ara-language") || "zh",
+  collapsed: readPreference("ara-collapsed") === "true",
   page: "dashboard",
   editor: "task",
   setting: "connections",
@@ -307,7 +337,6 @@ let state = {
   raw: false,
 };
 if (!["zh", "en"].includes(state.lang)) state.lang = "zh";
-if (!["light", "dark"].includes(state.theme)) state.theme = "light";
 let comparisonSelection = null;
 let selected = "",
   drafts = {},
@@ -388,13 +417,38 @@ function select(name, options, value) {
 function field(label, control, full = false) {
   return `<label class="field ${full ? "full" : ""}"><span>${e(t(label))}</span>${control}</label>`;
 }
+const themeIcon = (mode) => ({ system: "system", light: "sun", dark: "moon" })[mode];
+function themeOptions(group, detailed = false) {
+  return `<div class="theme-options ${detailed ? "theme-cards" : ""}" role="radiogroup" aria-label="${t("theme")}">${["system", "light", "dark"].map((mode) => `<label class="theme-option"><input type="radio" name="${group}" value="${mode}" data-theme-preference ${window.ARATheme.preference === mode ? "checked" : ""}><span class="theme-option-content">${icon(themeIcon(mode))}<span class="theme-option-copy"><strong>${t(mode)}</strong>${detailed ? `<span>${t(`${mode}Help`)}</span>` : ""}</span><span class="theme-check">${icon("check")}</span></span></label>`).join("")}</div>`;
+}
+function themePicker() {
+  const mode = window.ARATheme.preference;
+  return `<details class="theme-picker"><summary class="nav-button" title="${t("theme")}: ${t(mode)}" aria-label="${t("theme")}: ${t(mode)}"><span data-theme-icon>${icon(themeIcon(mode))}</span><span class="nav-label" data-theme-label>${t(mode)}</span></summary><div class="theme-popover"><div class="theme-popover-title">${t("theme")}</div>${themeOptions("sidebar-theme")}</div></details>`;
+}
+function syncThemeControls() {
+  const mode = window.ARATheme.preference;
+  document.querySelectorAll("[data-theme-preference]").forEach((input) => {
+    input.checked = input.value === mode;
+  });
+  const summary = $(".theme-picker summary");
+  if (summary) {
+    summary.title = `${t("theme")}: ${t(mode)}`;
+    summary.setAttribute("aria-label", summary.title);
+    $("[data-theme-icon]").innerHTML = icon(themeIcon(mode));
+    $("[data-theme-label]").textContent = t(mode);
+  }
+  if ($("#theme-current"))
+    $("#theme-current").textContent = t("themeCurrent", {
+      mode: t(document.documentElement.dataset.theme),
+    });
+}
+document.addEventListener("ara-theme-change", syncThemeControls);
 function shell() {
   document.documentElement.lang = state.lang;
-  document.documentElement.dataset.theme = state.theme;
   $("#app").className = state.collapsed ? "collapsed" : "";
   const nav = ["dashboard", "outputs", "analytics", "settings"];
   $("#app").innerHTML =
-    `<aside class="sidebar" aria-label="${state.lang === "zh" ? "主导航" : "Main navigation"}"><a href="#dashboard" class="brand" aria-label="Auto research agent">${icon("logo")}<div class="brand-name">Auto research<span>agent</span></div></a><button class="collapse" data-action="collapse" title="${t(state.collapsed || matchMedia("(max-width:920px)").matches ? "expand" : "collapse")}" aria-label="${t(state.collapsed || matchMedia("(max-width:920px)").matches ? "expand" : "collapse")}" aria-expanded="${!state.collapsed && !matchMedia("(max-width:920px)").matches}">${icon("chevron")}</button><nav>${nav.map((n) => `<button class="nav-button" data-nav="${n}" aria-label="${t(n)}" title="${t(n)}" ${state.page === n ? 'aria-current="page"' : ""}>${icon(n)}<span class="nav-label">${t(n)}</span></button>`).join("")}</nav><div class="sidebar-bottom"><button class="nav-button" data-action="theme" title="${t(state.theme === "light" ? "dark" : "light")}" aria-label="${t(state.theme === "light" ? "dark" : "light")}">${icon(state.theme === "light" ? "moon" : "sun")}<span class="nav-label">${t(state.theme === "light" ? "dark" : "light")}</span></button><button class="nav-button" data-action="language" title="${t("language")}" aria-label="${t("language")}">${icon("language")}<span class="nav-label">${state.lang === "zh" ? "English" : "中文"}</span></button><div class="local-state"><span class="dot"></span><span>${t("local")}</span></div></div></aside><main id="content" tabindex="-1"><header class="page-header"><div><div class="breadcrumb"><span>${t("research")}</span><span class="slash">/</span><select class="project-select" id="project" aria-label="${t("project_selector")}">${boot.projects.map((p) => `<option ${p === selected ? "selected" : ""}>${e(p)}</option>`).join("")}</select></div><h1>${t(state.page)}</h1><div class="page-note">${t({ dashboard: "ready", outputs: "readyOutputs", analytics: "readyAnalytics", settings: "readySettings" }[state.page])}</div></div><div class="architecture" id="architecture"></div></header><div id="view"></div><footer class="footer"><span>AUTO RESEARCH AGENT · LOCAL</span><span>Hanzhi YOU</span></footer></main>`;
+    `<aside class="sidebar" aria-label="${state.lang === "zh" ? "主导航" : "Main navigation"}"><a href="#dashboard" class="brand" aria-label="Auto research agent">${icon("logo")}<div class="brand-name">Auto research<span>agent</span></div></a><button class="collapse" data-action="collapse" title="${t(state.collapsed || matchMedia("(max-width:920px)").matches ? "expand" : "collapse")}" aria-label="${t(state.collapsed || matchMedia("(max-width:920px)").matches ? "expand" : "collapse")}" aria-expanded="${!state.collapsed && !matchMedia("(max-width:920px)").matches}">${icon("chevron")}</button><nav>${nav.map((n) => `<button class="nav-button" data-nav="${n}" aria-label="${t(n)}" title="${t(n)}" ${state.page === n ? 'aria-current="page"' : ""}>${icon(n)}<span class="nav-label">${t(n)}</span></button>`).join("")}</nav><div class="sidebar-bottom">${themePicker()}<button class="nav-button" data-action="language" title="${t("language")}" aria-label="${t("language")}">${icon("language")}<span class="nav-label">${state.lang === "zh" ? "English" : "中文"}</span></button><div class="local-state"><span class="dot"></span><span>${t("local")}</span></div></div></aside><main id="content" tabindex="-1"><header class="page-header"><div><div class="breadcrumb"><span>${t("research")}</span><span class="slash">/</span><select class="project-select" id="project" aria-label="${t("project_selector")}">${boot.projects.map((p) => `<option ${p === selected ? "selected" : ""}>${e(p)}</option>`).join("")}</select></div><h1>${t(state.page)}</h1><div class="page-note">${t({ dashboard: "ready", outputs: "readyOutputs", analytics: "readyAnalytics", settings: "readySettings" }[state.page])}</div></div><div class="architecture" id="architecture"></div></header><div id="view"></div><footer class="footer"><span>AUTO RESEARCH AGENT · LOCAL</span><span>Hanzhi YOU</span></footer></main>`;
   architecture($("#architecture"), nav.indexOf(state.page));
   renderView();
 }
@@ -620,8 +674,17 @@ async function loadAnalytics() {
     if (state.page === "analytics") $("#view").innerHTML = empty();
   }
 }
+function revealActiveSetting() {
+  const nav = $(".settings-nav"),
+    active = nav?.querySelector(".active");
+  if (active && nav.scrollWidth > nav.clientWidth)
+    nav.scrollLeft += active.getBoundingClientRect().left
+      - nav.getBoundingClientRect().left
+      - (nav.clientWidth - active.offsetWidth) / 2;
+}
+window.addEventListener("resize", revealActiveSetting);
 function renderSettings() {
-  const sections = ["connections", "strategy", "models", "tools"];
+  const sections = ["connections", "strategy", "models", "appearance", "tools"];
   $("#view").innerHTML =
     `<div class="settings-layout"><nav class="settings-nav" aria-label="${t("settings")}">${sections.map((n) => `<button data-setting="${n}" class="${state.setting === n ? "active" : ""}">${t(n)}</button>`).join("")}</nav><section class="card settings-section" id="settings-section"></section></div>`;
   let html = `<h2>${t(state.setting)}</h2>`;
@@ -679,6 +742,8 @@ function renderSettings() {
     )}</div><p class="help">${state.lang === "zh" ? "这些选项应用于下一次研究运行。" : "These options apply to your next research run."}</p>`;
   } else if (state.setting === "models") {
     html += `<p class="help">${t("modelsHelp")}</p><div class="section-top"><h3>${t("installed")}</h3>${button("models", "refresh", "quiet", "refresh")}</div>${modelError ? `<p class="hint-banner">${e(modelError)}</p>` : ""}${installed.length ? `<div class="file-list">${installed.map((m) => `<div class="file-row"><span class="file-label" style="font-family:var(--mono)">${e(m.name)}</span><button class="icon-button danger" data-delete="${e(m.name)}" title="${t("delete")}" aria-label="${t("delete")} ${e(m.name)}">${icon("close")}</button></div>`).join("")}</div>` : `<p class="help">${t("noModels")}</p>`}<div class="subsection">${field("pullName", `<input id="pull-name" placeholder="qwen3:8b" autocomplete="off">`)}<div class="actions">${button("pull", "pull", "", "download")}</div></div><div class="actions">${button("model-logs", "logs", "quiet", "log")}</div>`;
+  } else if (state.setting === "appearance") {
+    html += `<p class="help">${t("themeHelp")}</p>${themeOptions("settings-theme", true)}<p class="help theme-current" id="theme-current" role="status">${t("themeCurrent", { mode: t(document.documentElement.dataset.theme) })}</p>`;
   } else {
     html += `<h3>${t("tests")}</h3><p class="help">${t("testsHelp")}</p><div class="actions">${button("tests", "runTests")}</div><div class="subsection"><h3>${t("location")}</h3><p class="code">projects/${e(selected)}</p></div>`;
   }
@@ -691,6 +756,7 @@ function renderSettings() {
   if (result)
     html += `<div class="result" role="status">${e(formatResult(result))}</div>`;
   $("#settings-section").innerHTML = html;
+  revealActiveSetting();
 }
 function formatResult(r) {
   if (r.message_key) return message(r);
@@ -765,7 +831,7 @@ async function act(action) {
       return;
     }
     state.collapsed = !state.collapsed;
-    localStorage.setItem("ara-collapsed", state.collapsed);
+    savePreference("ara-collapsed", state.collapsed);
     $("#app").classList.toggle("collapsed", state.collapsed);
     $(".collapse").setAttribute("aria-expanded", String(!state.collapsed));
     $(".collapse").setAttribute(
@@ -775,15 +841,9 @@ async function act(action) {
     $(".collapse").title = t(state.collapsed ? "expand" : "collapse");
     return;
   }
-  if (action === "theme") {
-    state.theme = state.theme === "light" ? "dark" : "light";
-    localStorage.setItem("ara-theme", state.theme);
-    shell();
-    return;
-  }
   if (action === "language") {
     state.lang = state.lang === "zh" ? "en" : "zh";
-    localStorage.setItem("ara-language", state.lang);
+    savePreference("ara-language", state.lang);
     shell();
     return;
   }
@@ -944,6 +1004,8 @@ async function refreshStatus() {
   }
 }
 document.addEventListener("click", async (event) => {
+  const picker = $(".theme-picker[open]");
+  if (picker && !picker.contains(event.target)) picker.open = false;
   const node = event.target.closest("button,a");
   if (!node) return;
   if (node.dataset.nav || node.classList.contains("brand")) {
@@ -1020,6 +1082,15 @@ document.addEventListener("input", (event) => {
 });
 document.addEventListener("change", (event) => {
   const node = event.target;
+  if (node.matches("[data-theme-preference]")) {
+    window.ARATheme.set(node.value);
+    const picker = node.closest(".theme-picker");
+    if (picker) {
+      picker.open = false;
+      picker.querySelector("summary").focus();
+    }
+    return;
+  }
   if (node.dataset.compare) {
     if (!comparisonSelection)
       comparisonSelection = new Set(
@@ -1065,6 +1136,13 @@ $("#panel").addEventListener("click", (event) => {
   }
 });
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && $(".theme-picker[open]")) {
+    const picker = $(".theme-picker");
+    picker.open = false;
+    picker.querySelector("summary").focus();
+    event.preventDefault();
+    return;
+  }
   if (
     event.target.dataset.editor &&
     ["ArrowLeft", "ArrowRight"].includes(event.key)
@@ -1083,7 +1161,6 @@ window.addEventListener("beforeunload", (event) => {
 });
 async function init() {
   try {
-    document.documentElement.dataset.theme = state.theme;
     boot = await api("/api/bootstrap");
     if (!boot.projects.length) {
       $("#app").innerHTML = `<div class="loading">${t("noProject")}</div>`;

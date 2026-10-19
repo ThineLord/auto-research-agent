@@ -144,7 +144,8 @@ make diagnostic ARGS="--provider gemini --model gemini-3.5-flash"
 4. 也可以直接运行项目脚本：`scripts/start_ui.sh`
 5. 在侧边栏确认 `App root` 是当前仓库根目录
 6. 在侧边栏 `Language` 选择 `English` 或 `中文`
-7. 在侧边栏 `Theme` 选择 `Day Mode` 或 `Dark Mode`
+7. 点击侧栏底部的主题入口，选择「跟随系统」「浅色模式」或「深色模式」；
+   也可以在「设置 → 外观」中选择。首次使用默认跟随系统，系统外观改变时会自动切换
 8. 如果 `config.yaml` 里的 `project_name` 存在，项目选择器默认显示该项目；否则才显示
    公开安全的 `example` 项目
 9. 在 `Model provider` / `模型来源` 选择 `Local Ollama` 或 `Cloud Gemini`
@@ -156,7 +157,10 @@ make diagnostic ARGS="--provider gemini --model gemini-3.5-flash"
 15. 点击 `Run Diagnostic / Run Normal / Run Continuous / Resume`
 16. UI 会自动传参：`--provider <provider> --model <effective_model>`
 
-语言和主题只保存在当前 Streamlit 会话里，不会改写 `config.yaml`。中文界面会保留
+默认网页 UI 的语言和主题保存在当前浏览器中，刷新后仍然生效，不会改写 `config.yaml`。
+之前手动选择的浅色或深色模式会继续保留；选择「跟随系统」后恢复自动切换。
+浏览器禁用本地存储时，主题仍可切换，但无法在刷新后保留手动选择。
+旧版 Streamlit UI 的偏好仍仅保存在当前会话中。中文界面会保留
 Ollama、模型名、命令和文件路径等技术标识，方便按错误提示继续操作。
 
 模型优先级：
