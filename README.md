@@ -26,7 +26,7 @@
 ## 快速开始
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/ThineLord/auto-research-agent.git
 cd auto-research-agent
 cp config.example.yaml config.yaml
 make install-dev
@@ -136,7 +136,7 @@ Mock mode 会复用正常 round runner，写入 `run_config.json`、`round_metri
 新朋友拿到仓库后，优先跑一条命令：
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/ThineLord/auto-research-agent.git
 cd auto-research-agent
 make bootstrap
 ```
