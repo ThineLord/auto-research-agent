@@ -244,6 +244,7 @@ def test_http_origin_token_and_asset_routes(http_server, project):
     assert "api_key" not in bootstrap["config"]
     for route in (
         "/app.js",
+        "/theme.js",
         "/architecture.js",
         "/styles.css",
         "/vendor/marked.js",
