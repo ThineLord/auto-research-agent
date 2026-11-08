@@ -33,6 +33,7 @@ RESOURCE_PAIRS = {
 _REQUIRED_SOURCE_FILES = {
     "README.md",
     "pyproject.toml",
+    "requirements/constraints.txt",
     "src/__init__.py",
     *RESOURCE_PAIRS,
     *RESOURCE_PAIRS.values(),
@@ -40,6 +41,7 @@ _REQUIRED_SOURCE_FILES = {
 _GIT_SOURCE_SPECS = [
     "README.md",
     "pyproject.toml",
+    "requirements/constraints.txt",
     "src",
     *RESOURCE_PAIRS,
 ]
@@ -159,9 +161,12 @@ def _tracked_source_paths(*, home: Path, deadline: float) -> list[str]:
         relative = Path(value)
         if relative.is_absolute() or ".." in relative.parts:
             raise WheelSmokeError("git reported an unsafe packaging input path")
-        if value not in {"README.md", "pyproject.toml", *RESOURCE_PAIRS} and not value.startswith(
-            "src/"
-        ):
+        if value not in {
+            "README.md",
+            "pyproject.toml",
+            "requirements/constraints.txt",
+            *RESOURCE_PAIRS,
+        } and not value.startswith("src/"):
             raise WheelSmokeError(f"unexpected packaging input path: {value}")
     return sorted(paths)
 
@@ -368,6 +373,7 @@ def _venv_python(venv_root: Path) -> Path:
 def _create_and_install_venv(
     venv_root: Path,
     wheel_path: Path,
+    constraints_path: Path,
     env: Mapping[str, str],
     deadline: float,
 ) -> Path:
@@ -390,6 +396,8 @@ def _create_and_install_venv(
             "--quiet",
             "--no-cache-dir",
             "--no-compile",
+            "--constraint",
+            str(constraints_path),
             str(wheel_path),
         ],
         cwd=venv_root.parent,
@@ -822,7 +830,13 @@ def main() -> int:
             pip_env = _pip_environment(temp_root)
             wheel_path = _build_wheel(source_root, wheel_root, pip_env, deadline)
             _inspect_wheel(wheel_path, expected_resources)
-            python = _create_and_install_venv(venv_root, wheel_path, pip_env, deadline)
+            python = _create_and_install_venv(
+                venv_root,
+                wheel_path,
+                source_root / "requirements" / "constraints.txt",
+                pip_env,
+                deadline,
+            )
             _exercise_install(
                 temp_root=temp_root,
                 source_root=source_root,

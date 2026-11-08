@@ -71,7 +71,13 @@ class RunConfigTests(unittest.TestCase):
         self.assertEqual(new_run["resume_sessions"], [])
         self.assertEqual(
             resumed_run["resume_sessions"],
-            [{"started_at": "2026-07-11T00:00:00+00:00", "start_round": 1}],
+            [
+                {
+                    "started_at": "2026-07-11T00:00:00+00:00",
+                    "start_round": 1,
+                    "environment": resumed_run["current_session_environment"],
+                }
+            ],
         )
 
     def test_collect_prompt_file_hashes_records_markdown_prompt_hashes(self) -> None:

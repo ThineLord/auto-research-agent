@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Pin release dependencies across supported Python variants; record installed runtime versions and optional Ollama digest, preserving initial and resumed session environments.
+
 - Validate new Judge responses against complete weighted 0–100 scoring; share the rubric across normal and diagnostic runs while retaining legacy artifact readers.
 - Use the configured Ollama HTTP endpoint consistently for model discovery, startup validation, and generation.
 

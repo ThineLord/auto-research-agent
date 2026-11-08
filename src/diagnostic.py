@@ -146,6 +146,7 @@ def run_diagnostic_mode(
         mode="diagnostic",
         model_name=model_name,
         model_provider=model_provider,
+        llm=llm,
         model_parameters=model_parameters,
         runtime_config={
             "max_rounds": 1,

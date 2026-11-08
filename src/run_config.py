@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
 
+from .run_environment import collect_run_environment
 from .storage import read_regular_text
 
 RUN_CONFIG_SCHEMA_VERSION = 1
@@ -94,6 +95,7 @@ def build_initial_run_config(
     mode: str,
     model_name: str,
     model_provider: str = "",
+    llm: object = None,
     model_parameters: Mapping[str, Any] | None = None,
     runtime_config: Mapping[str, Any] | None = None,
     topic_snapshot: Mapping[str, Any] | None = None,
@@ -105,6 +107,7 @@ def build_initial_run_config(
     existing_run_config: Mapping[str, Any] | None = None,
     resume_metadata: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    environment = collect_run_environment(llm)
     existing = dict(existing_run_config or {})
     start_time = str(existing.get("started_at") or started_at or utc_now_iso())
     current_session_started_at = started_at or utc_now_iso()
@@ -117,6 +120,7 @@ def build_initial_run_config(
             {
                 "started_at": current_session_started_at,
                 "start_round": start_round,
+                "environment": environment,
             }
         )
 
@@ -136,6 +140,12 @@ def build_initial_run_config(
 
     return {
         "schema_version": RUN_CONFIG_SCHEMA_VERSION,
+        "environment": (
+            existing.get("environment")
+            if existing or resumes_existing_run or start_round > 1
+            else environment
+        ),
+        "current_session_environment": environment,
         "run_id": run_id,
         "run_root": str(run_root),
         "mode": mode,

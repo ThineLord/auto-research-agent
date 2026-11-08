@@ -1210,6 +1210,7 @@ def run_iterative_rounds(
         mode=mode,
         model_name=model_name,
         model_provider=model_provider,
+        llm=agents.llm,
         model_parameters=model_parameters,
         runtime_config=runtime_snapshot,
         topic_snapshot=topic_snapshot,
