@@ -47,12 +47,12 @@ $(VENV_PYTHON):
 
 venv: $(VENV_PYTHON)
 
-$(INSTALL_STAMP): pyproject.toml | $(VENV_PYTHON)
-	$(VENV_PIP) install -e .
+$(INSTALL_STAMP): pyproject.toml requirements/constraints.txt | $(VENV_PYTHON)
+	$(VENV_PIP) install -c requirements/constraints.txt -e .
 	@touch $(INSTALL_STAMP)
 
-$(DEV_STAMP): pyproject.toml | $(VENV_PYTHON)
-	$(VENV_PIP) install -e ".[dev]"
+$(DEV_STAMP): pyproject.toml requirements/constraints.txt | $(VENV_PYTHON)
+	$(VENV_PIP) install -c requirements/constraints.txt -e ".[dev]"
 	@touch $(INSTALL_STAMP) $(DEV_STAMP)
 
 install: $(INSTALL_STAMP)

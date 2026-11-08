@@ -83,7 +83,14 @@ def test_run_stop_resume_outputs_and_appearance(dashboard):
     button(d.page, "resume").click()
     expect(button(d.page, "stop")).to_be_enabled(timeout=10000)
     completed(d.page)
-    assert json.loads(checkpoint.read_text())["last_completed_round"] == 3
+    checkpoint_data = json.loads(checkpoint.read_text())
+    assert checkpoint_data["last_completed_round"] == 3
+    environment = json.loads(Path(checkpoint_data["run_config"]).read_text())[
+        "current_session_environment"
+    ]
+    assert environment["ollama_model_digest"] == "a" * 64
+    assert environment["constraints_sha256"]
+    assert environment["python_version"]
     assert d.calls and all(call["model"] == "fixture:latest" for call in d.calls)
     d.page.locator('[data-nav="outputs"]').first.click()
     expect(d.page.locator("#document")).to_contain_text("Synthetic")

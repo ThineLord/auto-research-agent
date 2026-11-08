@@ -109,6 +109,7 @@ def dashboard(tmp_path, browser, request):
             "ui",
             "prompts",
             "projects",
+            "requirements",
             "pyproject.toml",
             "config.example.yaml",
         }:
