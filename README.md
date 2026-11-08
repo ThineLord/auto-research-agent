@@ -49,9 +49,9 @@ Local configuration, credentials, generated runs, and private project folders st
 
 ## Versions and documentation
 
-Current version: **0.2.0**. Releases use `vMAJOR.MINOR.PATCH` tags matched to `pyproject.toml`. Historical milestone tags remain available. Application releases and saved research artifacts have separate compatibility boundaries.
+Current version: **0.2.1**. Releases use `vMAJOR.MINOR.PATCH` tags matched to `pyproject.toml`. Historical milestone tags remain available. Application releases and saved research artifacts have separate compatibility boundaries.
 
-- [Releases](https://github.com/ThineLord/auto-research-agent/releases) · [0.2.0 notes](docs/releases/0.2.0.md) · [Changelog](CHANGELOG.md)
+- [Releases](https://github.com/ThineLord/auto-research-agent/releases) · [0.2.1 notes](docs/releases/0.2.1.md) · [Changelog](CHANGELOG.md)
 - [User README](docs/user/README.md) · [Agent README](docs/agent/README.md)
 - [Documentation map](docs/README.md) · [Version and release policy](docs/agent/releases.md)
 

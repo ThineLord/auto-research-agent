@@ -65,7 +65,7 @@ Local configuration and generated research are ignored by Git. Ignore rules are 
 
 Choose a version from [GitHub Releases](https://github.com/ThineLord/auto-research-agent/releases) and read its notes. Stop active runs, back up private work, and keep the checkout clean before switching to a release tag. Re-run `make install` after an upgrade. Do not discard local changes or overwrite configuration to update.
 
-Version **0.2.0** keeps existing runtime paths and artifact schemas. See [release notes](../releases/0.2.0.md) and the [documentation map](../README.md) for advanced commands and limits. The dashboard requires the source checkout; wheel installations provide the CLI only.
+Version **0.2.1** keeps existing runtime paths and checkpoint compatibility while adding environment metadata. See [release notes](../releases/0.2.1.md) and the [documentation map](../README.md) for advanced commands and limits. The dashboard requires the source checkout; wheel installations provide the CLI only.
 
 Saving submits only edited fields. If another tab or a run changed the same field, the dashboard shows both versions and keeps your draft; choose the latest version or explicitly replace the conflicting fields. Saves are blocked while a run owns the project or recovery is pending.
 

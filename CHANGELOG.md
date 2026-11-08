@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+No changes yet.
+
+## [0.2.1] - 2026-11-09
 - Ask Judge to emit weighted rubric points before calculating their total, with an arithmetic example; strict score validation remains unchanged.
 
 - Mark an attempt stopped when a stop request arrives after round creation but before Draft, keeping the checkpoint resumable without inventing a completed round.
@@ -13,6 +16,8 @@
 - Use the configured Ollama HTTP endpoint consistently for model discovery, startup validation, and generation.
 
 - Input saves now check field revisions under the project lock, preserve untouched memory, and show explicit conflict choices. Both dashboard editors reject stale or running-project writes.
+
+[English release notes](docs/releases/0.2.1.md) · [中文更新说明](docs/releases/0.2.1.zh-CN.md)
 
 ## [0.2.0] - 2026-11-09
 
