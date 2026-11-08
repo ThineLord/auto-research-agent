@@ -37,7 +37,8 @@ def test_stop_after_attempt_creation_remains_resumable(tmp_path, monkeypatch, st
         scoped.setattr(runner, "create_round_attempt", stop_after_create)
         stopped = runner.run_iterative_rounds(**common, mode="mock")
     checkpoint = json.loads((tmp_path / "checkpoint.json").read_text())
-    assert stopped["can_resume"] and checkpoint["can_resume"]
+    assert checkpoint["can_resume"]
+    assert json.loads((stopped["run_root"] / "run_summary.json").read_text())["can_resume"]
     assert stopped["completed_rounds"] == stop_round - 1
     assert checkpoint["stop_reason"] == "USER_STOP_REQUESTED"
     run_root = stopped["run_root"]
