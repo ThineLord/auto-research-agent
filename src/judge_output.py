@@ -7,6 +7,21 @@ import math
 import re
 from typing import Any, Dict, Optional
 
+RUBRIC_LIMITS = {
+    "novelty_and_research_value": 25,
+    "technical_clarity_and_correctness": 25,
+    "feasibility_and_implementation_realism": 20,
+    "evaluation_design_quality": 20,
+    "tomorrow_actionability": 10,
+}
+JUDGE_SCORING_INSTRUCTIONS = (
+    "Return JSON only with score, rubric, reasons, blockers, next_step. "
+    "Use a 0-100 total, NOT a 0-5 or 0-10 rating. Rubric values are earned points: "
+    + ", ".join(f"{key}: 0-{limit}" for key, limit in RUBRIC_LIMITS.items())
+    + ". score must equal the sum of all five rubric values. "
+    "reasons and blockers must be arrays of strings; next_step must be CONTINUE or STOP."
+)
+
 JUDGE_OUTPUT_SCHEMA: Dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -49,6 +64,57 @@ JUDGE_OUTPUT_SCHEMA: Dict[str, Any] = {
     "required": ["score", "rubric", "reasons", "blockers", "next_step"],
     "additionalProperties": False,
 }
+
+for _key, _limit in RUBRIC_LIMITS.items():
+    JUDGE_OUTPUT_SCHEMA["properties"]["rubric"]["properties"][_key].update(
+        minimum=0, maximum=_limit
+    )
+
+
+class InvalidJudgeOutput(RuntimeError):
+    """A new provider response violated the scoring contract."""
+
+
+def validate_new_judge_output(text: str) -> str:
+    """Validate new responses; legacy artifact parsers below remain permissive."""
+
+    def reject_duplicates(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate key")
+            result[key] = value
+        return result
+
+    try:
+        payload = json.loads(text, object_pairs_hook=reject_duplicates)
+        if not isinstance(payload, dict) or set(payload) != set(JUDGE_OUTPUT_SCHEMA["required"]):
+            raise ValueError("required fields")
+        rubric = payload["rubric"]
+        if not isinstance(rubric, dict) or set(rubric) != set(RUBRIC_LIMITS):
+            raise ValueError("rubric fields")
+        for key, maximum in {"score": 100, **RUBRIC_LIMITS}.items():
+            value = payload["score"] if key == "score" else rubric[key]
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError("numeric points required")
+            if not math.isfinite(value) or not 0 <= value <= maximum:
+                raise ValueError("points out of range")
+        if not math.isclose(payload["score"], sum(rubric.values()), abs_tol=0.01, rel_tol=0):
+            raise ValueError("score must equal rubric sum")
+        for key in ("reasons", "blockers"):
+            if not isinstance(payload[key], list) or any(
+                not isinstance(v, str) for v in payload[key]
+            ):
+                raise ValueError("string arrays required")
+        if payload["next_step"] not in ("CONTINUE", "STOP"):
+            raise ValueError("next_step")
+    except (ValueError, TypeError, OverflowError, RecursionError) as exc:
+        # Do not echo provider text (which can contain private task material).
+        raise InvalidJudgeOutput(
+            "Invalid Judge output: complete 0-100 JSON scoring required"
+        ) from exc
+    return text
+
 
 _LEGACY_SCORE_RE = re.compile(
     r"\bSCORE:\s*([-+]?[0-9]+(?:\.[0-9]+)?)\b",

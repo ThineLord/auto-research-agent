@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Validate new Judge responses against complete weighted 0–100 scoring; share the rubric across normal and diagnostic runs while retaining legacy artifact readers.
+
 - Input saves now check field revisions under the project lock, preserve untouched memory, and show explicit conflict choices. Both dashboard editors reject stale or running-project writes.
 
 ## [0.2.0] - 2026-11-09

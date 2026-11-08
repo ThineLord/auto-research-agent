@@ -13,7 +13,7 @@ from .agents import ResearchAgents
 from .cloud_free import CloudFreeDailyQuotaExhausted, next_pacific_reset_heuristic
 from .config import DEFAULT_DRAFTING_MODE
 from .constants import STOP_CLOUD_DAILY_QUOTA, STOP_MAX_ROUNDS
-from .judge_output import parse_judge_rubric
+from .judge_output import JUDGE_SCORING_INSTRUCTIONS, parse_judge_rubric
 from .llm import LLMClientProtocol
 from .metrics import build_agent_io_metrics, summarize_agent_io_metrics, summarize_round_metrics
 from .round_commit import (
@@ -132,10 +132,7 @@ def run_diagnostic_mode(
         revise_prompt=(
             "Revise the draft using review feedback. Return concise implementation-oriented output."
         ),
-        judge_prompt=(
-            "Score the revised output quickly. Return JSON only with keys: "
-            "score, rubric, reasons, blockers, next_step."
-        ),
+        judge_prompt=JUDGE_SCORING_INSTRUCTIONS,
         temperature=0.2,
         top_p=0.8,
         topic_context=topic_context,
