@@ -1,0 +1,476 @@
+# Detailed workflow reference (historical)
+
+Preserved from the pre-0.2.0 README. Start with the [current user guide](../user/README.zh-CN.md). Model examples and old validation statements are historical, not current provider availability or release acceptance. Commands run from the repository root.
+
+# auto-research-agent
+
+一个支持本地 Ollama 与云端 Google Gemini 的小型研究循环助手：`Draft -> Review -> Revise -> Judge`。
+适合做学术研究规划草案、迭代改写与快速评分。
+
+详细新手说明请先看：`docs/reference/user-guide.zh-CN.md`。
+开发、测试和架构说明请看：`docs/reference/development.md`。
+稳定里程碑能力摘要请看：`CHANGELOG.md`。
+
+## 你只需要知道这几件事
+
+- 主要输入文件：`projects/example/task.md`
+- 启动前先做一次快速检查：
+  - `make diagnostic`
+- 正常有界运行：
+  - `make run`
+- 文献综述模式（本地确定性，不调用模型）：
+  - `make survey`
+- Mock demo 模式（确定性、不调用模型、适合 CI/docs）：
+  - `make mock`
+- 推荐默认模型：
+  - `qwen3:8b`
+- 稳定回退模型：
+  - `llama3.1:8b`
+
+## 快速开始
+
+```bash
+git clone https://github.com/ThineLord/auto-research-agent.git
+cd auto-research-agent
+cp config.example.yaml config.yaml
+make install-dev
+ollama pull qwen3:8b
+# 可选强化模型
+ollama pull qwen3:14b
+ollama pull deepseek-r1:8b
+# 保留稳定回退
+ollama pull llama3.1:8b
+make diagnostic ARGS="--provider ollama --model qwen3:8b"
+make run
+```
+
+如果只想验证 artifact 写入而不安装 Ollama、不设置 Gemini key，可以跑确定性的 mock demo：
+
+```bash
+make mock
+make mock ARGS="--max-rounds 1"
+```
+
+Mock mode 会复用正常 round runner，写入 `run_config.json`、`round_metrics.json`、
+`run_summary.json`、`checkpoint.json` 和 `score_history.json`，但 provider 记录为 `mock`，
+不会调用 Ollama、Gemini、网络或 API key。默认只跑 2 轮；需要时用 `--max-rounds` 覆盖。
+
+从本仓库构建的 wheel 或 source distribution 做非 editable 安装后，也可以在一个空的可写
+目录运行 `auto-research-agent --mock --max-rounds 1`。首次隐式使用默认 example 项目时，CLI
+会把公开示例 `task.md` 写入当前目录的 `projects/example/`；不会创建 `config.yaml`，也不会
+覆盖已有或显式选择的项目。真实 provider 运行仍需要在该工作目录准备本地配置和项目输入。
+
+## Stable Workflow
+
+当前稳定里程碑的推荐工作流：
+
+1. `make bootstrap`：准备新 checkout，安装依赖，并跑一次真实 diagnostic smoke。
+2. `make mock`：不调用 provider，确定性写出正常 run artifacts，适合 CI/docs/demo。
+3. `make diagnostic`：调用真实 provider 跑 1 轮，验证模型、prompt 和落盘路径。
+4. `make run`：按 `config.yaml` / CLI override 启动普通有界研究 run。
+5. `make resume`：只在 checkpoint 可恢复且下一轮目录安全时继续同一个旧 run。
+6. `make survey`：本地 deterministic 文献综述模式，不调用 Ollama/Gemini/API key。
+7. `.venv/bin/python -m src.main --compare-runs ...`：比较两个或多个 run。
+8. `.venv/bin/python -m src.main --analyze-run ...`：无 provider 调用地检查单个 run。
+9. `.venv/bin/python -m src.main --legacy-migration-preview example`：只读分类一个旧项目的
+   history 状态，不执行迁移。
+10. `.venv/bin/python -m src.main --legacy-migration-execute example
+    --legacy-migration-evidence migration-evidence/example`：只对严格符合条件的缺失 history
+    twin 执行显式 exact-copy。
+11. `make ui`：用本地网页界面查看输入、进度、latest metadata、analytics dashboard、run comparison 和 outputs。
+
+稳定里程碑的几个边界：
+
+- Mock mode 只是 demo/CI/docs smoke；真实研究结论请用 `make diagnostic` / `make run`。
+- 数值 CLI override 会使用与配置相同的安全边界；`nan`、`inf`、负值、超限重试/延时/
+  prompt 大小，以及最终 `max_delay_seconds < min_delay_seconds` 的组合会在项目或 provider
+  初始化前以状态 2 停止，而不会静默钳制。
+- `estimated_*_tokens` 是基于可见字符数的保守估算，不是 provider 账单 token。
+- `--legacy-migration-preview PROJECT` 只接受 `projects/` 下一个显式项目名，不扫描其他项目，
+  不读取 provider/config，不取得或清理运行锁，也不创建、复制、修复或删除 artifact。报告中的
+  `execution_authorized` 始终为 `false`；`eligible_candidate` 也不是执行授权。
+- `--legacy-migration-execute PROJECT --legacy-migration-evidence DIR` 只接受
+  `exact_missing_history_twin`。它取得项目锁、先创建 owner-only evidence bundle，再以
+  create-only 方式复制精确源 bytes；不会填补 sparse/partial/string-round history，不会改写
+  checkpoint、结果或 source，也不会实现 rollback。中断后的固定 transaction 会在下次取得锁的
+  runner 入口无 provider 地 roll-forward；冲突代际保留原文件并 fail closed。
+- Rubric summaries 只是 Judge 已返回结构化子项的趋势汇总，不是新的 benchmark 分数。
+- `make resume` 会继续 checkpoint 指向的旧 run；`make run` 会新建 run，即使旧 `best_output.md` 可作为上下文。
+- 新运行会把未完成轮次写入 `partial_rounds/` 的只增 attempt；中断或免费层配额暂停后，
+  resume 会保留旧 attempt 并从 draft 重试该轮。没有可信 attempt manifest 的旧式非空
+  `round_NN` 仍会 fail-safe 阻塞，避免覆盖 partial/uncheckpointed 输出。
+- 如果成功轮次在跨文件 history/state 提交中断，项目目录会保留固定的 round transaction
+  journal。下一次 normal/continuous/session/resume/mock 入口会先取得项目锁并在 provider
+  预检前完成无网络恢复；preview/UI 只报告状态，不会自行写入。恢复完成前，analytics、
+  benchmark report 和 UI 中依赖该代 artifact 的视图会拒绝混合读取；若检测到人工编辑或未知
+  代际则保留全部证据并 fail closed。
+- Diagnostic 的单轮 history、metrics、summary、final config 和 checkpoint 也使用独立的
+  checkpoint-last transaction；下一次取得项目锁后会在 provider/client 初始化前恢复。
+  配额发生在第一轮完成前时继续复用零轮 finalization transaction。只读界面不会擅自恢复，
+  pending/conflict 状态下会拒绝混合代际的 analytics。
+- resume 会保留并追加同一 run 的既有 metrics/score history、best-round 和上一轮上下文；如果既有
+  history 无法安全解析、互相冲突或包含重复/未来轮次，会在写入任何 run artifact 前 fail-safe
+  阻塞，并让 CLI 返回非零状态。
+- checkpoint 的 `run_root` 必须是当前项目 `runs/<run_id>` 下既有的绝对目录；相对路径、跨项目路径、
+  路径穿越和普通文件会在扫描该目录前阻塞。resume 会进一步检查它要读取的
+  config/legacy manifest/summary/metrics/history、上一轮上下文和本次计划写入的所有 round 目录，
+  拒绝逃逸符号链接或无效文件类型；UI 使用同一 preview 并禁用不安全 checkpoint 的 Resume 按钮。
+- UI 的 latest metadata、analytics 和 output browser 只从验证后的 checkpoint run root 派生固定
+  artifact 文件名；checkpoint/summary 中冗余的外部路径不会参与选址，不安全的 run/round 文件会显示
+  为不可用而不会被读取。普通运行也会拒绝链接的 project/task、固定 artifact 叶节点、自动输出目录和
+  特殊文件；配置好的 `project/runs` 外部存储链接仍会解析到真实目录后使用。
+- POSIX 上自动 artifact 的读取、追加、替换和目录创建会从可信的 `projects/` 或已解析 run-storage
+  锚点逐层执行不跟随链接的 descriptor-relative 操作，进程内线程/UI rerun 共享该边界，嵌套 run
+  会继承项目锚点。锚点以上的工作区祖先仍属于可信本地文件系统边界；同 UID 恶意进程把一个真实目录
+  entry 换成另一个真实目录、打开后再制造 hard link 等主动攻击不在保证范围内。Windows 会拒绝静态
+  链接/特殊节点，但不承诺抵抗并发恶意路径替换。显式
+  `--analyze-run` / `--compare-runs` 输入和输出仍是用户授权路径。
+
+## What To Demo First
+
+给新用户演示时建议按这个顺序：
+
+1. `make bootstrap`
+2. `make mock`
+3. `make ui`
+4. 在 UI 里查看 `Latest run metadata`、`Run analytics dashboard`、`Run comparison` 和 `Output browser`
+
+## Friend Quickstart / 朋友快速开始
+
+新朋友拿到仓库后，优先跑一条命令：
+
+```bash
+git clone https://github.com/ThineLord/auto-research-agent.git
+cd auto-research-agent
+make bootstrap
+```
+
+`make bootstrap` 会检查 `python3`、`make` 和 `ollama`，在缺少本地配置时复制
+`config.example.yaml` 到 `config.yaml`，创建 `.venv`，安装依赖，检查推荐模型
+`qwen3:8b`，然后跑一次 `make diagnostic`。
+
+如果还没下载推荐模型，先执行：
+
+```bash
+ollama pull qwen3:8b
+make bootstrap
+```
+
+已有 `config.yaml` 不会被覆盖。脚本会从当前仓库位置自动推断路径，不依赖任何个人本机目录。
+
+## 输入文件说明
+
+- `projects/example/task.md`：你的研究任务（必填，最小输入）
+- `projects/<project>/memory.md`：历史上下文记忆（可选，程序会自动维护）
+- `config.example.yaml`：安全示例配置
+- `config.yaml`：本地运行参数（复制示例后生成，不提交）
+
+## 配置安全检查
+
+第一次运行前先创建本地配置：
+
+```bash
+cp config.example.yaml config.yaml
+```
+
+启动 CLI 或 UI 时会先校验 `config.yaml`。未知字段、错误类型、超出范围的数值、无效
+URL 或无效项目名会直接报出具体字段，避免运行到一半才失败。当前推荐格式是嵌套的
+`model:` 配置；兼容旧格式 `model: qwen3:8b`，也兼容旧的顶层 `temperature` 和
+`timeout_seconds`，但嵌套 `model:` 里的值会优先生效。`model.max_prompt_chars`
+用于在本地模型收到过长 prompt 前快速失败，避免反复等待长时间 Ollama 超时。
+
+`topic:` 配置决定通用提示词收到的项目主题上下文。当前仓库里的 `projects/example` 是示例
+项目；如果换成新研究方向，请新建 `projects/<name>/`，修改 `project_name`，并同步更新
+`topic.title`、`topic.description` 和 `topic.keywords`。
+
+`drafting_mode` 控制每轮 Draft 如何使用上一轮上下文，默认 `best_guided` 保持原行为。
+也可以用 CLI 临时覆盖：
+
+```bash
+make run ARGS="--drafting-mode fresh_from_task_with_review"
+make run ARGS="--drafting-mode continue_from_previous_draft"
+```
+
+## 模型建议（Ollama）
+
+- `qwen3:8b`：推荐默认模型（当前默认值），速度和质量平衡
+- 如果已经安装，可尝试更小的本地模型：
+  - `llama3.2:3b`
+  - `phi3:mini`
+  - `qwen2.5:3b`
+  - `gemma2:2b`
+
+模型切换（CLI 覆盖）示例：
+
+```bash
+make run ARGS="--model qwen3:8b"
+make diagnostic ARGS="--provider ollama --model llama3.2:3b"
+make run ARGS="--model phi3:mini"
+```
+
+## 云端 Gemini
+
+图形界面现在可以在 `Model provider` / `模型来源` 中选择 `Local Ollama` 或
+`Cloud Gemini`。本地模式保持原来的 Ollama 模型刷新、拉取、删除、健康检查和运行流程；
+云端模式不会查询 Ollama，也不要求本机安装本地模型。
+
+推荐通过环境变量提供 Gemini API key：
+
+```bash
+export GEMINI_API_KEY="..."
+make diagnostic ARGS="--provider gemini --model gemini-3.5-flash"
+```
+
+UI 里的 Gemini password 输入框只用于当前浏览器页面内存 和本次启动的子进程，不会保存到
+`config.yaml`、命令行、运行 meta、checkpoint 或日志。点击 `Save Cloud Model as Default`
+只会保存 provider、模型名和 API key 环境变量名。
+
+Cloud Free Runner 会按免费额度做模型发现、profile、串行 pacing 和重试。当前 profiling 后的
+长跑推荐是 `gemma-4-26b-a4b-it`；质量推荐是 `gemini-3.5-flash`，但它在免费额度下可能进入
+backoff。零成本长时间运行优先用 `Auto: best zero-cost long-run` 或
+`Volume free: high-TPM/Gemma or Flash-Lite`，`Quality free: Gemini 3.5 Flash` 更适合短的高质量测试。
+遇到免费层 429 时，backoff、checkpoint 和之后 resume 是预期行为，不代表功能失败。
+
+Benchmark 运行请优先使用安全 preset，而不是直接把免费 Gemini 跑成 25 轮长测：
+
+```bash
+make continuous ARGS="--provider gemini --benchmark-preset free_smoke"
+make continuous ARGS="--provider gemini --benchmark-preset free_eval"
+make continuous ARGS="--provider gemini --benchmark-preset paid_benchmark"
+```
+
+Preset 轮数：`free_smoke=4`、`free_eval=5`、`paid_benchmark=25`、`stress_test=50`。
+启动前 CLI 会估算每轮 LLM calls 和总 calls；Gemini 下如果超过保守低免费额度，会打印 warning。
+连续 provider quota/rate-limit 失败默认 2 轮后自动停止，stop reason 为
+`PROVIDER_QUOTA_EXHAUSTED`，避免继续生成大量无意义失败轮。
+
+当前第一版云端 provider 只支持 Google Gemini。不支持 Vertex AI、OpenAI compatibility、
+streaming、tools/search/function calling 或 Interactions API 迁移。真实 Gemini 在线测试需要
+你下一轮提供 API key、要测的模型（例如 `gemini-3.5-flash`）和运行模式，建议先跑
+Diagnostic。
+
+## 先看哪个输出
+
+先看：`projects/example/best_output.md`
+再看：`projects/example/runs/<run_id>/round_xx/` 里的 4 个阶段文件。
+如果要复现实验环境，再看同一 run 目录下的 `run_config.json`，其中记录 provider/model、
+轮数和运行时配置、topic 快照、prompt 文件 SHA-256、Git commit、开始/结束时间、停止原因和
+resume eligibility。
+同一 run 目录还会写 `run_summary.json` 和 `round_metrics.json`，用于查看总览、每轮耗时、
+错误标记、每个 agent 的输入/输出字符统计、估算 token 数、Judge rubric 子项与趋势汇总（如果 Judge 返回了结构化 JSON），
+以及 draft/revised/judge 文本相对上一轮的相似度和低变化轮次提示。
+如果要对比多个 run，可用 CLI：
+
+```bash
+.venv/bin/python -m src.main --compare-runs projects/example/runs/<run_a> projects/example/runs/<run_b>
+.venv/bin/python -m src.main --compare-runs projects/example/runs/<run_a> projects/example/runs/<run_b> --compare-output projects/example/run_comparison.json
+```
+
+比较会读取 `run_config.json`、`run_summary.json`、`round_metrics.json`，并兼容旧
+`run_manifest.json`。
+如果只想汇总单个 run 的分数趋势、rubric、相似度、错误/超时和估算 token，可用：
+
+```bash
+.venv/bin/python -m src.main --analyze-run projects/example/runs/<run_id>
+.venv/bin/python -m src.main --analyze-run projects/example/runs/<run_id> --analyze-output projects/example/run_analysis.json
+```
+
+如果要检查旧项目的两份 history 是否完整、一致或仅缺少一个可精确复制的 twin，可运行：
+
+```bash
+.venv/bin/python -m src.main --legacy-migration-preview example
+```
+
+该命令只输出固定、路径脱敏的分类报告。它不会扫描其他项目、恢复 transaction、清理 lock
+或执行迁移。确认报告为 `exact_missing_history_twin` 后，可显式运行：
+
+```bash
+.venv/bin/python -m src.main \
+  --legacy-migration-execute example \
+  --legacy-migration-evidence migration-evidence/example
+```
+
+evidence 目录必须尚不存在，并且必须位于所选项目目录之外。命令在 config/provider 初始化前
+运行，只复制现有 history 的精确 UTF-8 bytes 到缺失的固定 twin，并生成
+`source_history.json`、`manifest.json` 和 `receipt.json`。其他分类不会写入 evidence 或项目；
+rollback、批量扫描、partial repair 和 canonical adoption 均不在该命令范围内。
+
+## 常用命令
+
+- 安装开发与 CI 检查工具
+  - `make install-dev`
+- 本地完整检查（格式、lint、导入、测试）
+  - `make check`
+- 自动格式化 Python 代码
+  - `make format`
+- 基础诊断（1 轮、快速验证）
+  - `make diagnostic`
+- 正常有界运行（按 `max_rounds` 停止）
+  - `make run`
+- 会话模式（包含 objective/plan/report）
+  - `make session`
+- 文献综述模式（收集、去重、主题/缺口分析、相关工作草稿）
+  - `make survey`
+- Mock demo（确定性、不调用模型、写正常 run artifacts）
+  - `make mock`
+- 连续运行
+  - `make continuous`
+- 从检查点恢复
+  - `make resume`
+- 启动本地图形界面
+  - `make ui`
+  - 或运行项目自带脚本：`scripts/start_ui.sh`
+
+直接调用入口也可以使用：
+
+```bash
+.venv/bin/python -m src.main --diagnostic
+.venv/bin/python -m src.main --survey
+.venv/bin/python -m src.main --mock
+.venv/bin/auto-research-agent --diagnostic
+```
+
+## Literature Survey Mode
+
+Survey mode turns the selected project into a local literature-survey workspace. It scans existing
+project files and saved run outputs, normalizes paper metadata, deduplicates papers, extracts
+themes/gaps/future directions, and writes:
+
+- `projects/<project>/survey/survey_report.md`
+- `projects/<project>/survey/paper_metadata.json`
+- `projects/<project>/survey/related_work.md`
+- `projects/<project>/survey/survey_manifest.json`
+
+DOI/arXiv identifiers are normalized during deduplication, and the JSON artifacts include
+metadata-quality counts for missing authors, years, venues, and durable identifiers.
+
+It does not call Ollama or Gemini. Configure source scanning under `literature_survey:` in
+`config.yaml`. Full docs: `docs/reference/literature-survey.md`.
+
+## CI / 开发检查
+
+GitHub Actions 会在推送到 `master`、`codex/**` 分支以及提交到 `master` 的 PR 时运行。
+CI 使用 Python 3.10 和 3.13，并在两个版本上执行本地完整检查：
+
+```bash
+make check
+```
+
+这个命令会检查 Ruff 格式、Ruff lint、基础导入、Git 跟踪文件中的个人路径/高置信密钥模式，
+以及测试套件。CI 还会运行 `python scripts/check_wheel_install.py`：它只把明确的 Git 跟踪
+打包输入复制到临时目录，构建一个 wheel，在全新虚拟环境中验证导入来源、内置资源、
+console/module help 和一轮确定性 mock，然后删除临时环境。这个附加检查不构建或上传
+source distribution，也不会启动 Ollama、调用 Gemini 或运行需要模型的研究流程。
+
+## Graphical UI
+
+- 启动：
+  - `cd auto-research-agent`
+  - `make ui`
+  - 或直接运行：`scripts/start_ui.sh`
+- 页面结构：
+  - `Workspace / 工作台`：任务编辑、背景记忆、运行控制和进展概览
+  - `Outputs / 研究成果`：浏览 Markdown、JSON 和日志等已有成果
+  - `Run analytics / 运行分析`：评分与耗时图表、运行对比、元数据及明细数据
+  - `Settings / 设置`：模型来源、运行策略、模型管理和唯一的项目测试入口
+- 新界面由本机 Python HTTP 服务提供，默认地址 `http://127.0.0.1:8501`，仅绑定回环地址。
+  - 可用 `scripts/start_ui.sh --port 8502` 更改端口；无需 Node 构建或外部 CDN。
+  - 固定侧栏可收起为图标列，底部直接切换中英文和日间／夜间主题；偏好保存在本机浏览器。
+  - 任务与研究记忆共用编辑区，放大编辑器和日志以覆盖面板展示，不挤压主布局。
+  - 切换页面、语言、主题或项目会保留当前页面中的未保存草稿；刷新前会提示。
+  - 运行前自动保存当前任务和研究记忆。模型操作、项目测试均需显式点击。
+  - 设置 → 工作区工具显示项目位置；API 密钥不写入浏览器存储或配置文件。
+  - 页面与折线图共用主题变量；三维线稿文字随导航切换视角，并尊重减少动态效果设置。
+- 前端文件在 `ui/web/`，本地 API 在 `ui/server.py`；继续复用原有运行、安全存储及恢复逻辑。
+  `ui/app.py` 保留旧版 Streamlit 界面和已验证的辅助函数，默认启动入口已改为新界面。
+- 选择模型：
+  - 在「设置 → 模型连接」选择本地 Ollama 或云端 Gemini，输入模型名称或从候选列表中选择。
+  - 「检查连接」验证当前模型，「设为默认模型」保存选择。
+  - Gemini 支持临时密钥、环境变量、缓存推荐，以及显式触发的模型发现和能力探测。
+- 模型管理：
+  - 在「设置 → 模型管理」刷新已安装列表、下载模型或查看模型操作日志。
+  - 删除时必须输入完整模型名称确认；运行或模型操作进行中会阻止删除。
+- 输入任务：
+  - 默认打开配置中的项目，缺失时回到可用项目。
+  - 在「研究任务／研究记忆」页签中编辑输入，再点击「保存修改」。
+- 开始运行：
+  - 在工作台选择标准、连续或诊断模式，然后点击 `Start research / 开始研究`
+  - UI 会把当前 provider 和模型自动传给后端（例如 `--provider ollama --model qwen3:8b`
+    或 `--provider gemini --model gemini-3.5-flash`）
+  - Gemini password 只通过子进程环境变量传递，不会进入命令行或 meta JSON
+- 运行项目测试：
+  - 在「设置 → 工作区工具」里点击 `Run tests / 运行测试`
+  - 会执行当前环境的 `pytest -q`，并在页面显示通过/失败和完整输出
+- 安全停止：
+  - 点击 `Safe stop / 安全停止`（创建 `STOP_REQUESTED`，后端在安全点退出）
+- 恢复：
+  - 点击 `Resume`（等价 `.venv/bin/python -m src.main --resume`）
+- 看结果：
+  - 「运行分析 → 运行元数据」 会汇总最近一次 run 的 provider/model、drafting mode、Git commit、stop reason、best score 和 artifact 路径
+  - 「运行分析」 会用现有 artifacts 显示 score、rubric、相似度/evolution、timeout/error、agent 耗时和估算 token 趋势；缺少旧字段时显示部分状态而不是报错
+  - 「运行分析 → 运行比较」展示最近的 run，比较模型、drafting mode、轮数、最佳/平均分、停止原因、超时/错误数量、agent 耗时、估算 token 数、修订相似度和 rubric 子项均值
+  - 先看 `projects/example/best_output.md`
+  - 再看 `projects/example/runs/<run_id>/round_xx/`
+  - 复现信息看 `projects/example/runs/<run_id>/run_config.json`
+  - 汇总指标看 `projects/example/runs/<run_id>/run_summary.json`，其中包含总 runtime、agent runtime、估算 input/output/total tokens、timeout/error counts
+  - 每轮耗时、错误标志、per-agent `agent_io_metrics` 和 `evolution_metrics` 看 `projects/example/runs/<run_id>/round_metrics.json`
+  - 实时状态看 `projects/example/checkpoint.json`
+  - 实时日志看 `projects/example/run.log`
+
+推荐模型：
+
+- `qwen3:8b`：默认质量均衡
+- 如果已安装，可尝试较小模型：`llama3.2:3b`、`phi3:mini`、`qwen2.5:3b`、`gemma2:2b`
+
+模型异常提示：
+
+- 模型未下载：会提示 `Model <name> is not installed. Run: ollama pull <name>`
+- Ollama 不可用：会提示 `Ollama is not available ...`
+- 没有检测到模型：先运行 `ollama pull qwen3:8b`，或安装适合本机的小模型后刷新列表
+
+## 关于“连续运行 / 安全停止 / 恢复”
+
+- 连续运行：`make continuous`
+- 安全停止：
+  - `Ctrl+C`：进程退出状态为 130；若 runner 在受保护的 agent 执行阶段捕获中断，会先完成
+    可恢复的 checkpoint、run summary/config 和 interrupted report
+  - 或创建 `projects/example/STOP_REQUESTED`（UI 按钮会自动创建）：在安全点正常退出，状态为 0
+- 恢复：`make resume`（读取 `projects/example/checkpoint.json`）
+- `make resume` 会继续 checkpoint 指向的旧 run，从下一轮开始写入同一个 run 目录；已完成轮次文件会保留。
+- checkpoint 如果显式包含 `run_id`，它必须与 canonical run 目录名一致；旧 manifest 的创建期
+  provenance 和未知扩展字段会保留，无法无损读取时 resume 会在写入前停止。
+- 新运行的未完成轮次保存在 `partial_rounds/round_NN/attempt_*`；resume 会验证并保留旧
+  attempt，再从 draft 创建新 attempt。没有可信 manifest 的旧式非空 `round_NN` 仍会
+  fail-safe 停止，且不会自动移动、删除或覆盖。
+- 普通 `make run` 会新建一个 run；如果 `best_output.md` 已存在，默认 drafting mode 可能把它作为 previous-best context，但这不是 resume。
+- 进度不会丢：进行中的阶段写入只增 attempt，四阶段完整验证后才发布为 `runs/round_xx`；
+  checkpoint、run_config 和 run_summary 会记录恢复诊断
+
+## 哪些文件不要提交
+
+这些是运行生成物或本地私有文件，默认已被 `.gitignore` 忽略：
+
+- `projects/*/runs/`
+- `projects/*/best_output.md`
+- `projects/*/score_history.json`
+- `projects/*/research_state.json`
+- `projects/*/current_plan.md`
+- `projects/*/final_session_report.md`
+- `projects/*/run.log`
+- `projects/*/memory.md`
+- `config.yaml`
+- 不要提交真实 API key、`.env`、含密钥的本地配置或运行输出
+- `projects/*/checkpoint.json`
+- `projects/*/interrupted_report.md`
+- `projects/*/STOP_REQUESTED`
+- `.env` / `.env.*`（保留 `.env.example`）
+- `.venv/`
+
+## 推送到 GitHub（稳定版本交接）
+
+```bash
+git status
+git add .
+git commit -m "Add user guide and safe run controls"
+git push
+```

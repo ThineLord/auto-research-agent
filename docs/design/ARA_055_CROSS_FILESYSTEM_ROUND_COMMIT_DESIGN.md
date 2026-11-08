@@ -532,7 +532,7 @@ and approval.
 6. **Diagnostic integration**
    - only if separately approved after the iterative path is stable.
 7. **Legacy migration**
-   - design is complete in `docs/ARA_055_LEGACY_MIGRATION_DESIGN.md`;
+   - design is complete in `docs/design/ARA_055_LEGACY_MIGRATION_DESIGN.md`;
    - discovery implementation, execution, and rollback remain separately approval-gated.
 
 Each package should be a separate small commit with a clean recovery point. Runtime packages 2-6

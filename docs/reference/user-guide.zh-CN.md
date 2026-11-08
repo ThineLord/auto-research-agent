@@ -1,3 +1,5 @@
+> Detailed reference retained from before 0.2.0. Start with the [current Chinese user README](../user/README.zh-CN.md). Historical provider/model examples are not live availability guarantees. Run commands from the repository root.
+
 # USER GUIDE
 
 这份文档面向第一次使用本项目的人，按“输入 -> 运行 -> 看结果 -> 提交 GitHub”来走。

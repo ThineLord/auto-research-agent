@@ -9,7 +9,7 @@ DEV_STAMP := $(VENV)/.install-dev.stamp
 
 .DEFAULT_GOAL := help
 
-.PHONY: help bootstrap venv install install-dev format format-check lint import-check repo-safety test check ci performance run diagnostic continuous resume session survey mock ui
+.PHONY: help bootstrap venv install install-dev format format-check lint import-check repo-safety release-check test check ci performance run diagnostic continuous resume session survey mock ui
 
 help:
 	@printf "%s\n" \
@@ -22,6 +22,7 @@ help:
 		"  make lint          Run Ruff lint checks" \
 		"  make import-check  Import all project modules" \
 		"  make repo-safety   Scan tracked files for personal paths and secrets" \
+		"  make release-check Check versions and tracked documentation links" \
 		"  make test          Run the automated test suite" \
 		"  make check         Run formatting, lint, imports, safety, and tests" \
 		"  make performance   Benchmark local hot paths with synthetic data" \
@@ -79,7 +80,10 @@ repo-safety: install-dev
 test: install-dev
 	$(VENV_PYTHON) -m pytest -q
 
-check: format-check lint import-check repo-safety test
+release-check: install-dev
+	$(VENV_PYTHON) scripts/check_release.py
+
+check: format-check lint import-check repo-safety release-check test
 
 ci: check
 

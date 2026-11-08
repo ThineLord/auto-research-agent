@@ -1,3 +1,5 @@
+> Detailed reference retained from before 0.2.0. Start with the [current Chinese user README](../user/README.zh-CN.md). Historical provider/model examples are not live availability guarantees. Run commands from the repository root.
+
 # Auto Research Agent 快速上手指南
 
 ## 1. 项目一句话说明
@@ -361,8 +363,8 @@ similarity/evolution、timeout/error、agent timing 和 estimated tokens。它�
 主要根目录：
 
 - `README.md`：项目总览、常用命令、UI 说明。
-- `docs/USER_GUIDE.md`：已有用户指南。
-- `docs/DEVELOPER_GUIDE.md`：已有开发者指南。
+- `docs/reference/user-guide.zh-CN.md`：已有用户指南。
+- `docs/reference/development.md`：已有开发者指南。
 - `config.example.yaml`：安全示例配置。
 - `config.yaml`：本地主配置，包含 provider/model、Ollama URL、Gemini 设置、项目名、topic、轮数、停止条件、runtime、survey 配置；不提交。
 - `Makefile`：安装、测试、运行、UI 的命令入口。

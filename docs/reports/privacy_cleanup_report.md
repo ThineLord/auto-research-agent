@@ -54,7 +54,7 @@ cp projects/example/memory.example.md projects/<project>/memory.md
 
 - `ui/app.py` no longer defaults to a user home path for the canonical root. It now defaults to the current repository root and only uses `AUTO_RESEARCH_AGENT_ROOT` when explicitly set.
 - `tests/test_config.py` now validates `config.example.yaml` instead of relying on private `config.yaml`.
-- `README.md`, `docs/USER_GUIDE.md`, `docs/quickstart_zh.md`, and `docs/runbook_zh.md` were changed to use relative, public-safe commands.
+- `README.md`, `docs/reference/user-guide.zh-CN.md`, `docs/reference/quickstart.zh-CN.md`, and `docs/reference/runbook.zh-CN.md` were changed to use relative, public-safe commands.
 
 ## 6. Verification
 

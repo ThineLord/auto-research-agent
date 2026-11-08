@@ -77,8 +77,8 @@ The release-facing workflow is intentionally small:
 8. `python -m src.main --analyze-run ...`
 9. `make ui`
 
-Keep release documentation aligned with `README.md`, `CHANGELOG.md`, `docs/USER_GUIDE.md`,
-`docs/quickstart_zh.md`, and `docs/runbook_zh.md`. Release packaging should not change provider
+Keep release documentation aligned with `README.md`, `CHANGELOG.md`, `docs/reference/user-guide.zh-CN.md`,
+`docs/reference/quickstart.zh-CN.md`, and `docs/reference/runbook.zh-CN.md`. Release packaging should not change provider
 behavior, prompt semantics, scoring semantics, benchmark behavior, or artifact schemas.
 
 ## Architecture
