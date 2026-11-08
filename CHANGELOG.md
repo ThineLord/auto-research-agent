@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Ask Judge to emit weighted rubric points before calculating their total, with an arithmetic example; strict score validation remains unchanged.
+
 - Mark an attempt stopped when a stop request arrives after round creation but before Draft, keeping the checkpoint resumable without inventing a completed round.
 
 - Pin release dependencies across supported Python variants; record installed runtime versions and optional Ollama digest, preserving initial and resumed session environments.
