@@ -15,6 +15,13 @@
 !/example/memory.example.md
 !/example/literature_survey_sources.md
 
+# Keep the old tracked example task through Git upgrades; all old research stays private.
+!/projects/
+/projects/*
+!/projects/example/
+/projects/example/*
+!/projects/example/task.md
+
 # Application-local development files and secrets
 __pycache__/
 *.py[cod]

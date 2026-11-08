@@ -38,6 +38,7 @@ cd auto-research-agent
 auto-research-agent/
 ├── app/                 程序、依赖、测试和维护文档
 ├── example/             公开示例研究
+├── projects/example/    仅保留旧 Git 升级所需的任务兼容文件
 ├── research-topic-a/    网页中新建的研究方向
 ├── research-topic-b/    另一个独立研究方向
 ├── README.md

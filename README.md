@@ -38,6 +38,7 @@ Open **[http://127.0.0.1:8501/](http://127.0.0.1:8501/)** and keep the server ru
 auto-research-agent/
 ├── app/                 application, dependencies, tests and documentation
 ├── example/             public starter research
+├── projects/example/    one compatibility task file for old Git upgrades
 ├── research-topic-a/    your research (created from the dashboard)
 ├── research-topic-b/    another independent research
 ├── README.md

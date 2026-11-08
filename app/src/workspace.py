@@ -11,6 +11,7 @@ from .storage import (
     ensure_artifact_directory,
     list_artifact_directories,
     read_json_file,
+    read_regular_text,
     write_json_file,
 )
 
@@ -66,6 +67,21 @@ def validate_project_name(name: str) -> str:
     return name
 
 
+def _unused_legacy_example(root: Path, legacy: Path) -> bool:
+    """Only the untouched tracked compatibility stub may yield to the flat example."""
+    if legacy.name != "example":
+        return False
+    try:
+        if {path.name for path in legacy.iterdir()} != {"task.md"}:
+            return False
+        template = Path(__file__).parent / "_bundled" / "projects" / "example" / "task.md"
+        return read_regular_text(legacy / "task.md", anchor=root) == template.read_text() and bool(
+            read_regular_text(root / "example" / "task.md", anchor=root).strip()
+        )
+    except (OSError, UnicodeError):
+        return False
+
+
 def resolve_project_dir(root: Path, name: str) -> Path:
     """Legacy wins even if invalid: never silently substitute a different project."""
     validate_project_reference(name)
@@ -75,7 +91,8 @@ def resolve_project_dir(root: Path, name: str) -> Path:
         ensure_artifact_directory(legacy, anchor=root)
         if os.path.lexists(legacy / name):
             ensure_artifact_directory(legacy / name, anchor=root)
-            return legacy / name
+            if not _unused_legacy_example(root, legacy / name):
+                return legacy / name
     validate_project_name(name)
     if name.casefold() in RESERVED:
         raise ValueError("This folder name is reserved for application files.")
@@ -113,7 +130,7 @@ def discover_projects(root: Path) -> list[str]:
 
 def create_project(root: Path, name: str, task: str) -> Path:
     """Publish a complete new flat project atomically, with no replacement or migration."""
-    from .package_resources import _rename_directory_noreplace
+    from .package_resources import _fsync_directory, _rename_directory_noreplace
 
     validate_project_name(name)
     if name.casefold() in RESERVED:
@@ -138,7 +155,9 @@ def create_project(root: Path, name: str, task: str) -> Path:
         # Check the legacy namespace again before atomic publication.
         if os.path.lexists(legacy / name):
             raise FileExistsError("A legacy project with this name already exists.")
+        _fsync_directory(staging)
         _rename_directory_noreplace(staging, target)
+        _fsync_directory(root)
     finally:
         if staging.exists():
             shutil.rmtree(staging)

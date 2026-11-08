@@ -164,12 +164,21 @@ def dashboard(tmp_path, browser, request):
             assert process.poll() is None, (tmp_path / "server.log").read_text()
             return False
 
-    def restart_server():
-        nonlocal process
+    def restart_server(workspace=None):
+        nonlocal process, project
         process.terminate()
         process.wait(timeout=10)
+        if workspace is not None:
+            project = workspace / "projects" / "example"
         process = subprocess.Popen(
-            [sys.executable, "-m", "ui.server", "--port", str(port)],
+            [
+                sys.executable,
+                "-m",
+                "ui.server",
+                "--port",
+                str(port),
+                *(["--workspace", str(workspace)] if workspace is not None else []),
+            ],
             cwd=source,
             env=env,
             stdout=log,

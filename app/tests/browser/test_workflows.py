@@ -146,26 +146,17 @@ def test_v022_legacy_run_resumes_in_place(dashboard):
     probe = subprocess.run(["git", "rev-parse", "--verify", tag], cwd=root, capture_output=True)
     if probe.returncode:
         pytest.skip("Historical compatibility test requires fetched v0.2.2 tag")
-    names = subprocess.check_output(
-        [
-            "git",
-            "ls-tree",
-            "-r",
-            "--name-only",
-            tag,
-            "--",
-            "src",
-            "prompts",
-            "config.example.yaml",
-            "pyproject.toml",
-        ],
-        cwd=root,
-        text=True,
-    ).splitlines()
-    for name in names:
-        target = d.workspace_root / name
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(subprocess.check_output(["git", "show", f"{tag}:{name}"], cwd=root))
+    import shutil
+
+    upgrade = d.workspace_root.parent / "git-upgrade"
+    subprocess.run(
+        ["git", "clone", "--quiet", "--shared", "--no-checkout", str(root), str(upgrade)],
+        check=True,
+    )
+    subprocess.run(["git", "checkout", "--quiet", tag], cwd=upgrade, check=True)
+    shutil.copy2(d.workspace_root / "config.yaml", upgrade / "config.yaml")
+    d.workspace_root = upgrade
+    d.project = upgrade / "projects" / "example"
     # The old source discovers projects/example in its original physical workspace.
     process = subprocess.Popen(
         [sys.executable, "-m", "src.main", "--project", "example", "--max-rounds", "3"],
@@ -200,6 +191,16 @@ def test_v022_legacy_run_resumes_in_place(dashboard):
     run_root = Path(checkpoint["run_root"])
     prior = {p: p.read_bytes() for p in (run_root / "round_01").glob("*") if p.is_file()}
     assert prior
+    preserved = {
+        p: p.read_bytes()
+        for p in d.project.rglob("*")
+        if p.is_file()
+        and p.name not in {"README.md", "memory.example.md", "literature_survey_sources.md"}
+    }
+    head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+    subprocess.run(["git", "checkout", "--quiet", head], cwd=upgrade, check=True)
+    assert all(p.is_file() and p.read_bytes() == value for p, value in preserved.items())
+    d.restart(workspace=upgrade)
     d.page.reload()
     expect(button(d.page, "resume")).to_be_enabled(timeout=30000)
     button(d.page, "resume").click()
@@ -214,4 +215,5 @@ def test_v022_legacy_run_resumes_in_place(dashboard):
     updated = json.loads((d.project / "checkpoint.json").read_text())
     assert updated["run_root"] == str(run_root)
     assert all(p.read_bytes() == value for p, value in prior.items())
-    assert not (d.workspace_root / "example").exists()
+    assert (d.workspace_root / "example" / "task.md").is_file()
+    assert d.project == d.workspace_root / "projects" / "example"

@@ -196,3 +196,20 @@ def test_old_project_names_remain_readable_but_not_creatable(tmp_path, name):
     result = cli(tmp_path, "--mock", "--project", name, "--max-rounds", "1")
     assert result.returncode == 0, result.stdout + result.stderr
     assert (legacy / "checkpoint.json").is_file()
+
+
+def test_unused_compatibility_stub_yields_only_when_old_data_absent(tmp_path):
+    legacy = tmp_path / "projects" / "example"
+    legacy.mkdir(parents=True)
+    task = (APP / "src" / "_bundled" / "projects" / "example" / "task.md").read_text()
+    (legacy / "task.md").write_text(task)
+    flat = tmp_path / "example"
+    flat.mkdir()
+    (flat / "task.md").write_text("New example task")
+    assert resolve_project_dir(tmp_path, "example") == flat
+    assert discover_projects(tmp_path) == ["example"]
+    (legacy / "memory.md").write_text("Old research memory")
+    assert resolve_project_dir(tmp_path, "example") == legacy
+    (legacy / "memory.md").unlink()
+    (legacy / "task.md").write_text("A customized old task")
+    assert resolve_project_dir(tmp_path, "example") == legacy

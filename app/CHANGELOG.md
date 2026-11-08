@@ -9,6 +9,7 @@ No changes yet.
 - Group application code, dependencies, tests, prompts and documentation under `app/`; add the root `start` launcher and retain root Make targets as forwarding commands.
 - Create sibling research folders from the existing dashboard selector or CLI; persist selection across restarts and share project resolution across UI/CLI.
 - Load legacy `projects/<name>/` in place with deterministic legacy precedence and no automatic relocation; reject unsafe names, linked paths and occupied creation targets.
+- Retain the old tracked example task through real Git upgrades; only the unused public compatibility stub yields to the top-level example.
 - Keep checkpoints and artifact formats unchanged, and isolate private workspace data from Git and wheel inputs.
 - Document explicit upgrade/rollback boundaries; 0.2.x does not discover new sibling projects.
 
