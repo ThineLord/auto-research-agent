@@ -13,6 +13,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+from src.input_editing import InputEditConflict, read_inputs, save_inputs
 from ui import app as h
 from ui.i18n import TRANSLATIONS
 
@@ -77,8 +78,7 @@ def workspace(name: str) -> dict:
     pool = _cloud_candidates(path, config)
     return {
         **_status(path, checkpoint),
-        "task": h.read_file_text(path / "task.md"),
-        "memory": h.read_file_text(path / "memory.md"),
+        **read_inputs(path),
         "recommendations": {
             preset: h.recommend_free_cloud_model(
                 candidates=pool["candidates"], profiles=pool["profiles"], preset=preset
@@ -167,12 +167,8 @@ def action(data: dict) -> dict:
     path = project(str(data.get("project", "")))
     operation = data.get("action")
     if operation == "save":
-        if not isinstance(data.get("task"), str) or not isinstance(data.get("memory"), str):
-            raise ValueError("Invalid input")
-        h.ensure_artifact_paths_safe((path / "task.md", path / "memory.md"))
-        h.write_file_text(path / "task.md", data["task"])
-        h.write_file_text(path / "memory.md", data["memory"])
-        return {"message_key": "input_saved"}
+        inputs = save_inputs(path, data.get("changes"), data.get("revisions"))
+        return {"message_key": "input_saved", **inputs}
     active = h.get_active_process_meta(h.run_meta_path(path))
     job = h.get_active_process_meta(h.model_job_meta_path(path))
     if operation == "stop":
@@ -427,6 +423,8 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 ACTION_LOCK.release()
             self.respond(result)
+        except InputEditConflict as exc:
+            self.respond({"error": exc.code, "code": exc.code, "current": exc.current}, 409)
         except (ValueError, OSError, TypeError, KeyError) as exc:
             self.respond({"error": str(exc)}, 400)
 

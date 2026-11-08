@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-Changes after 0.2.0 will be recorded here until the next version is prepared.
+- Input saves now check field revisions under the project lock, preserve untouched memory, and show explicit conflict choices. Both dashboard editors reject stale or running-project writes.
 
 ## [0.2.0] - 2026-11-09
 

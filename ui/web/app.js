@@ -63,6 +63,13 @@ const copy = {
     saved: "已保存",
     unsaved: "有未保存的修改",
     save: "保存修改",
+    input_conflict: "文件已被其他操作更新。请比较版本后选择如何处理；你的草稿仍保留。",
+    input_busy: "项目正在运行或保存，请停止运行后重试。草稿已保留。",
+    input_recovery_pending: "项目有待恢复的写入，请先恢复运行，再保存输入。",
+    latestInputs: "使用最新版本（放弃本地草稿）",
+    replaceInputs: "用我的草稿替换冲突字段",
+    serverVersion: "最新保存的版本",
+    myVersion: "我的草稿",
     run: "运行",
     idle: "待机",
     active: "运行中",
@@ -195,6 +202,13 @@ const copy = {
     saved: "Saved",
     unsaved: "Unsaved changes",
     save: "Save changes",
+    input_conflict: "Files changed elsewhere. Compare versions before choosing; your draft is preserved.",
+    input_busy: "The project is running or saving. Stop the run and retry; your draft is preserved.",
+    input_recovery_pending: "A pending write needs recovery. Resume the run before saving inputs.",
+    latestInputs: "Use latest version (discard local draft)",
+    replaceInputs: "Replace conflicting fields with my draft",
+    serverVersion: "Latest saved version",
+    myVersion: "My draft",
     run: "Run",
     idle: "Idle",
     active: "Running",
@@ -387,7 +401,11 @@ async function api(route, body) {
       : {},
   );
   const value = await response.json();
-  if (!response.ok) throw Error(value.error || t("error"));
+  if (!response.ok) {
+    const error = Error(value.code ? t(value.code) : value.error || t("error"));
+    error.current = value.current;
+    throw error;
+  }
   return value;
 }
 function query(route) {
@@ -790,14 +808,7 @@ async function loadProject(name) {
     const value = await api(query("workspace"));
     if (current !== version) return;
     data = value;
-    if (!drafts[name])
-      drafts[name] = {
-        task: value.task,
-        memory: value.memory,
-        savedTask: value.task,
-        savedMemory: value.memory,
-        dirty: false,
-      };
+    mergeInputs(name, value);
     renderView();
   } catch (err) {
     if (current === version) {
@@ -806,15 +817,43 @@ async function loadProject(name) {
     }
   }
 }
+let inputConflict = null;
+const savedKey = (field) => field === "task" ? "savedTask" : "savedMemory";
+function mergeInputs(name, value, focusedField = null) {
+  const draft = drafts[name] ||= { revisions: {}, dirty: false };
+  for (const field of ["task", "memory"]) {
+    const key = savedKey(field);
+    // A focused textarea must keep its old revision until its visible text is refreshed.
+    if (field === focusedField) continue;
+    if (draft[field] === undefined || draft[field] === draft[key]) {
+      draft[field] = draft[key] = value[field];
+      draft.revisions[field] = value.revisions[field];
+    }
+  }
+  draft.dirty = ["task", "memory"].some(f => draft[f] !== draft[savedKey(f)]);
+}
 async function save() {
-  const project = selected,
-    draft = drafts[project],
-    task = draft.task,
-    memory = draft.memory;
-  const result = await operate("save", { task, memory });
-  draft.savedTask = task;
-  draft.savedMemory = memory;
-  draft.dirty = draft.task !== task || draft.memory !== memory;
+  const project = selected, draft = drafts[project];
+  const changes = Object.fromEntries(["task", "memory"]
+    .filter(f => draft[f] !== draft[savedKey(f)]).map(f => [f, draft[f]]));
+  if (!Object.keys(changes).length) return;
+  let result;
+  try {
+    result = await operate("save", { changes, revisions: { ...draft.revisions } });
+  } catch (error) {
+    if (error.current && selected === project) {
+      inputConflict = { project, current: error.current, fields: Object.keys(changes) };
+      openPanel(t("input_conflict"), Object.keys(changes).map(field =>
+        `<h3>${t(field === "task" ? "brief" : "memory")}</h3><h4>${t("serverVersion")}</h4><pre>${e(error.current[field])}</pre><h4>${t("myVersion")}</h4><pre>${e(draft[field])}</pre>`).join("") +
+        `<div class="actions">${button("latest-inputs", "latestInputs")}${button("replace-inputs", "replaceInputs", "danger")}${button("close", "cancel")}</div>`);
+    }
+    throw error;
+  }
+  for (const field of Object.keys(changes)) {
+    draft[savedKey(field)] = changes[field];
+    draft.revisions[field] = result.revisions[field];
+  }
+  mergeInputs(project, result); // Preserve edits made while the request was in flight.
   toast(message(result));
   if (selected === project && state.page === "dashboard") renderDashboard();
 }
@@ -900,7 +939,21 @@ async function act(action) {
   }
   toast(t("busy"));
   try {
-    if (action === "save") await save();
+    if (action === "latest-inputs" || action === "replace-inputs") {
+      if (!inputConflict || inputConflict.project !== selected) return;
+      const { current, fields } = inputConflict;
+      const draft = drafts[selected];
+      for (const field of action === "latest-inputs" ? ["task", "memory"] : fields) {
+        draft[savedKey(field)] = current[field];
+        draft.revisions[field] = current.revisions[field];
+        if (action === "latest-inputs") draft[field] = current[field];
+      }
+      mergeInputs(selected, current);
+      $("#panel").close();
+      inputConflict = null;
+      if (action === "replace-inputs") await save();
+      if (state.page === "dashboard") renderDashboard();
+    } else if (action === "save") await save();
     else if (["run", "resume"].includes(action)) {
       if (drafts[selected].dirty) await save();
       if (initiatingProject !== selected) throw Error(t("error"));
@@ -995,6 +1048,9 @@ async function refreshStatus() {
       const w = await api(query("workspace"));
       if (p === selected) {
         data.outputs = w.outputs;
+        const focused = !!$("#panel[open] #large-editor") || ["editor", "large-editor"].includes(document.activeElement?.id);
+        mergeInputs(p, w, focused ? state.editor : null);
+        if (state.page === "dashboard" && !focused) renderDashboard();
         if (state.page === "outputs") renderOutputs();
         if (state.page === "analytics") renderAnalytics();
       }

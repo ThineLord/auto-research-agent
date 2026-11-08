@@ -76,7 +76,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "memory.md is optional and ignored by Git. Saving will create a local memory file."
         ),
         "save_input": "Save brief",
-        "input_saved": "task.md and memory.md saved.",
+        "input_saved": "Changed inputs saved.",
+        "input_edit_conflict": "Inputs changed elsewhere or the project is busy. Your draft is preserved. Copy it before reloading the latest inputs.",
+        "reload_inputs": "Reload latest inputs (discard this draft)",
         "input_save_failed": (
             "Input save did not complete; inspect the project files before retrying because a "
             "partial update may have occurred."
@@ -516,7 +518,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "task_missing_help": "task.md 还不存在。点击保存后会为当前项目创建它。",
         "memory_optional_help": "memory.md 是可选文件，并且会被 Git 忽略。点击保存后才会创建本地记忆文件。",
         "save_input": "保存任务",
-        "input_saved": "task.md 和 memory.md 已保存。",
+        "input_saved": "已保存修改的输入。",
+        "input_edit_conflict": "输入已被其他操作更新或项目忙碌。草稿已保留；重新载入前请复制需要保留的内容。",
+        "reload_inputs": "重新载入最新输入（放弃当前草稿）",
         "input_save_failed": "输入保存未完成；重试前请检查项目文件，可能发生了部分更新。",
         "unsafe_project_paths": "此项目的运行时 artifact 路径不安全或当前不可用。",
         "run_controls": "开始探索",

@@ -36,13 +36,21 @@ def payload(**changes):
     return {"project": "example", "provider": "ollama", "model": "qwen3:8b", **changes}
 
 
+def save_payload(**changes):
+    return payload(
+        action="save",
+        changes=changes,
+        revisions=web.read_inputs(web.project("example"))["revisions"],
+    )
+
+
 def test_workspace_and_save_keep_unicode_and_memory(project):
     root, launch = project
     current = web.workspace("example")
     assert current["task"] == "Research brief"
     assert current["memory"] == "Context"
     assert current["resume"]["can_resume"] is False
-    web.action(payload(action="save", task="研究目标 / Research", memory="背景"))
+    web.action(save_payload(task="研究目标 / Research", memory="背景"))
     assert (root / "task.md").read_text() == "研究目标 / Research"
     assert (root / "memory.md").read_text() == "背景"
     launch.assert_not_called()
@@ -86,7 +94,7 @@ def test_workspace_refreshes_artifacts_on_each_request(project, monkeypatch):
     discovery = Mock(wraps=web.h.load_discovery_artifact)
     monkeypatch.setattr(web.h, "load_discovery_artifact", discovery)
     first = web.workspace("example")
-    web.action(payload(action="save", task="Updated brief", memory="Updated context"))
+    web.action(save_payload(task="Updated brief", memory="Updated context"))
     second = web.workspace("example")
 
     assert first["task"] == "Research brief"
@@ -109,7 +117,7 @@ def test_symlinked_input_is_not_written(project, tmp_path):
     (root / "task.md").unlink()
     (root / "task.md").symlink_to(outside)
     with pytest.raises(OSError):
-        web.action(payload(action="save", task="Changed", memory="Changed"))
+        web.action(save_payload(task="Changed", memory="Changed"))
     assert outside.read_text() == "Keep me"
     assert (root / "memory.md").read_text() == "Context"
 
@@ -256,7 +264,7 @@ def test_http_origin_token_and_asset_routes(http_server, project):
         assert request(port, "GET", route)[0] == 200
     assert request(port, "GET", "/config.yaml")[0] == 404
     assert request(port, "GET", "/api/bootstrap", headers={"Host": "evil.test"})[0] == 403
-    body = json.dumps(payload(action="save", task="Updated", memory="Updated context"))
+    body = json.dumps(save_payload(task="Updated", memory="Updated context"))
     assert request(port, "POST", "/api/action", body)[0] == 403
     token = {"X-Dashboard-Token": bootstrap["token"]}
     assert (
@@ -265,3 +273,14 @@ def test_http_origin_token_and_asset_routes(http_server, project):
     )
     assert request(port, "POST", "/api/action", body, token)[0] == 200
     assert project[0].joinpath("task.md").read_text() == "Updated"
+
+
+def test_http_conflict_returns_latest_inputs_without_writes(http_server, project):
+    body = save_payload(task="Second editor", memory="Stale memory")
+    (project[0] / "memory.md").write_text("New round evidence")
+    status, response, _ = request(
+        http_server, "POST", "/api/action", json.dumps(body), {"X-Dashboard-Token": web.TOKEN}
+    )
+    assert status == 409
+    assert json.loads(response)["current"]["memory"] == "New round evidence"
+    assert (project[0] / "task.md").read_text() == "Research brief"
