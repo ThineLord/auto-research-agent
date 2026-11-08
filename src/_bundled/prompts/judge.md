@@ -15,12 +15,11 @@ Instructions:
 2. Penalize generic statements that lack concrete technical content.
 3. Reward explicit, testable, implementable plans.
 4. Return JSON only. Do not include markdown, code fences, commentary, or extra text.
-5. Rubric values are earned points within the limits above; score must equal their sum.
+5. Assign rubric points first, emit rubric before score, then add those exact values for the total. For example, 20 + 20 + 15 + 15 + 10 = 80, not 90. Do not estimate an independent overall score.
 6. Set next_step to "STOP" only if the plan is already strong and actionable.
 
 Output JSON shape:
 {
-  "score": <number from 0 to 100>,
   "rubric": {
     "novelty_and_research_value": <number>,
     "technical_clarity_and_correctness": <number>,
@@ -28,6 +27,7 @@ Output JSON shape:
     "evaluation_design_quality": <number>,
     "tomorrow_actionability": <number>
   },
+  "score": <sum of the five rubric values, from 0 to 100>,
   "reasons": ["<reason 1>", "<reason 2>", "<reason 3>"],
   "blockers": ["<remaining blocker 1>", "<remaining blocker 2>"],
   "next_step": "CONTINUE"
