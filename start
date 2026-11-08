@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+WORKSPACE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd "${WORKSPACE_DIR}/app"
+if [[ ! -x .venv/bin/python && -z "${PYTHON:-}" ]]; then
+  for candidate in python3.13 python3.12 python3.11 python3.10 python3; do
+    if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import sys; raise SystemExit(sys.version_info < (3, 10))' 2>/dev/null; then
+      export PYTHON="$candidate"
+      break
+    fi
+  done
+fi
+make install
+exec .venv/bin/python -m ui.server "$@"
