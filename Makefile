@@ -85,6 +85,10 @@ release-check: install-dev
 
 check: format-check lint import-check repo-safety release-check test
 
+.PHONY: browser-test
+browser-test:
+	$(VENV_PYTHON) -m pytest -q browser_tests
+
 ci: check
 
 performance: install

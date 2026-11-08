@@ -46,3 +46,5 @@ make check
 ## 发布与交接
 
 遵循[版本规则](releases.zh-CN.md)（[English](releases.md)）。合并提交的 CI 通过后再打标签、发布。不要上传私人研究、移动已有标签，或把合并成功等同于发布成功。交接提供 PR、版本、发布链接、检查结果和未解决限制；达到用户要求后结束。
+
+浏览器回归：安装 `.[dev,browser]`，执行 `python -m playwright install chromium webkit`，再运行 `make browser-test` 和 `ARA_BROWSER=webkit make browser-test`。测试在临时源码副本中启动真实仪表盘与 CLI，模型调用指向本地模拟服务；覆盖保存冲突、聚焦／展开编辑器后台刷新、停止续跑、输出、分析及语言持久化。CI 在两种引擎运行并上传 `output/browser/` 截图。WebKit 覆盖不等于验证原生 Safari 应用。

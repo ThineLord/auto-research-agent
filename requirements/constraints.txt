@@ -16,6 +16,7 @@ gitdb==4.0.12
 gitpython==3.1.50
 google-auth==2.53.0
 google-genai==2.7.0
+greenlet==3.5.6
 h11==0.16.0
 httpcore==1.0.9
 httptools==0.7.1
@@ -36,6 +37,7 @@ packaging==26.2
 pandas==2.3.3 ; python_full_version < '3.11'
 pandas==3.0.3 ; python_full_version >= '3.11'
 pillow==12.2.0
+playwright==1.56.0
 pluggy==1.6.0
 protobuf==7.34.1
 pyarrow==24.0.0
@@ -45,6 +47,7 @@ pycparser==3.0 ; implementation_name != 'PyPy' and platform_python_implementatio
 pydantic==2.13.4
 pydantic-core==2.46.4
 pydeck==0.9.2
+pyee==13.0.1
 pygments==2.20.0
 pytest==9.0.3
 python-dateutil==2.9.0.post0
