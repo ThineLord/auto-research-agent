@@ -1337,62 +1337,19 @@ release_run_lock(handle)
         )
         self.assertEqual(models, [{"name": "qwen3:8b", "id": "first", "size": "", "modified": ""}])
 
-    def test_query_ollama_models_parses_success_and_reports_missing_binary(self) -> None:
-        result = SimpleNamespace(
-            returncode=0,
-            stdout=(
-                "NAME           ID              SIZE      MODIFIED\n"
-                "qwen3:8b       abc123          4.7 GB    2 days ago\n"
-                "llama3.1:8b    def456          4.9 GB    yesterday\n"
-            ),
-            stderr="",
-        )
-
-        with patch.object(config_module.subprocess, "run", return_value=result):
-            models, error = query_ollama_models()
-
-        self.assertIsNone(error)
-        self.assertEqual([model["name"] for model in models], ["llama3.1:8b", "qwen3:8b"])
-        self.assertEqual(models[1]["id"], "abc123")
-        self.assertEqual(models[0]["modified"], "yesterday")
-
-        with patch.object(config_module.subprocess, "run", return_value=result):
-            names, error = list_installed_ollama_models()
-
-        self.assertIsNone(error)
-        self.assertEqual(names, ["llama3.1:8b", "qwen3:8b"])
-
-        with (
-            patch.object(config_module.subprocess, "run", side_effect=FileNotFoundError),
-            patch.object(
-                config_module,
-                "query_ollama_api_models",
-                return_value=([], "api down"),
-            ),
-        ):
-            models, error = query_ollama_models()
-
-        self.assertEqual(models, [])
-        self.assertIn("Ollama is not installed", error or "")
-
-    def test_query_ollama_models_falls_back_to_api_when_command_fails(self) -> None:
-        result = SimpleNamespace(returncode=1, stdout="", stderr="service down")
-
-        with (
-            patch.object(config_module.subprocess, "run", return_value=result),
-            patch.object(
-                config_module,
-                "query_ollama_api_models",
-                return_value=(
-                    [{"name": "phi3:mini", "id": "", "size": "", "modified": ""}],
-                    None,
-                ),
-            ),
-        ):
-            models, error = query_ollama_models()
-
-        self.assertIsNone(error)
-        self.assertEqual([model["name"] for model in models], ["phi3:mini"])
+    def test_query_ollama_models_uses_configured_api(self) -> None:
+        models = [{"name": "endpoint-only:latest", "id": "digest", "size": "1", "modified": ""}]
+        with patch.object(
+            config_module, "query_ollama_api_models", return_value=(models, None)
+        ) as query:
+            found, error = query_ollama_models(base_url="http://localhost:11435", timeout_seconds=7)
+            self.assertEqual(found, models)
+            self.assertIsNone(error)
+            query.assert_called_once_with(base_url="http://localhost:11435", timeout_seconds=7)
+        with patch.object(config_module, "query_ollama_api_models", return_value=(models, None)):
+            names, error = list_installed_ollama_models(base_url="http://localhost:11435")
+            self.assertEqual(names, ["endpoint-only:latest"])
+            self.assertIsNone(error)
 
     def test_query_ollama_api_error_redacts_private_endpoint(self) -> None:
         private_values = ("fixture-user", "private-token", "private-route", "query-private-token")
@@ -1455,14 +1412,7 @@ release_run_lock(handle)
             "https://fixture-user:private-token@localhost:11434/"
             "private-route?key=query-private-token"
         )
-        result = SimpleNamespace(
-            returncode=9,
-            stdout="",
-            stderr=f"command failed for {endpoint}",
-        )
-
         with (
-            patch.object(config_module.subprocess, "run", return_value=result),
             patch.object(
                 config_module,
                 "urlopen",
@@ -1474,7 +1424,6 @@ release_run_lock(handle)
             models, error = query_ollama_models(base_url=endpoint)
 
         self.assertEqual(models, [])
-        self.assertIn("ollama list failed with status 9", error or "")
         self.assertIn("https://localhost:11434", error or "")
         for private_value in private_values:
             with self.subTest(private_value=private_value):

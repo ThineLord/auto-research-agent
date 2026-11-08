@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Use the configured Ollama HTTP endpoint consistently for model discovery, startup validation, and generation.
+
 - Input saves now check field revisions under the project lock, preserve untouched memory, and show explicit conflict choices. Both dashboard editors reject stale or running-project writes.
 
 ## [0.2.0] - 2026-11-09
