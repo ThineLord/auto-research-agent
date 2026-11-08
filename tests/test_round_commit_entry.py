@@ -239,7 +239,7 @@ class RoundCommitEntryTests(unittest.TestCase):
                 patch.object(
                     cli_module,
                     "list_installed_ollama_models",
-                    side_effect=lambda: (
+                    side_effect=lambda **kwargs: (
                         events.append("provider") or ["qwen3:8b"],
                         None,
                     ),
@@ -311,7 +311,7 @@ class RoundCommitEntryTests(unittest.TestCase):
                 patch.object(
                     cli_module,
                     "list_installed_ollama_models",
-                    side_effect=lambda: (
+                    side_effect=lambda **kwargs: (
                         events.append("provider") or ["qwen3:8b"],
                         None,
                     ),
