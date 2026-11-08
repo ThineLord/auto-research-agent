@@ -68,3 +68,5 @@ Choose a version from [GitHub Releases](https://github.com/ThineLord/auto-resear
 Version **0.2.0** keeps existing runtime paths and artifact schemas. See [release notes](../releases/0.2.0.md) and the [documentation map](../README.md) for advanced commands and limits. The dashboard requires the source checkout; wheel installations provide the CLI only.
 
 Saving submits only edited fields. If another tab or a run changed the same field, the dashboard shows both versions and keeps your draft; choose the latest version or explicitly replace the conflicting fields. Saves are blocked while a run owns the project or recovery is pending.
+
+Model discovery, startup validation, and generation all use `ollama_base_url` from the application configuration. `OLLAMA_HOST` does not override this address.

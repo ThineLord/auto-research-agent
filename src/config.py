@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import math
 import re
-import subprocess
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from http.client import HTTPException
@@ -953,39 +952,18 @@ def query_ollama_models(
     timeout_seconds: int = 10,
     base_url: str = DEFAULT_OLLAMA_BASE_URL,
 ) -> Tuple[List[Dict[str, str]], Optional[str]]:
-    command_error: str | None = None
-    try:
-        result = subprocess.run(
-            ["ollama", "list"],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=timeout_seconds,
-        )
-    except FileNotFoundError:
-        command_error = "Ollama is not installed or not in PATH."
-    except subprocess.SubprocessError:
-        command_error = "Failed to run ollama list."
-    else:
-        if result.returncode == 0:
-            return parse_ollama_list_output(result.stdout), None
-        if isinstance(result.returncode, int):
-            command_error = f"ollama list failed with status {result.returncode}."
-        else:
-            command_error = "ollama list failed."
+    """Discover models at the same explicit endpoint used for generation.
 
-    api_models, api_error = query_ollama_api_models(
-        base_url=base_url,
-        timeout_seconds=timeout_seconds,
-    )
-    if api_error is None:
-        return api_models, None
-
-    return [], f"Ollama is not available: {command_error}; API fallback failed: {api_error}"
+    A successful local CLI is not evidence about a configured remote/proxied server.
+    HTTP also avoids inheriting an unrelated OLLAMA_HOST from the shell.
+    """
+    return query_ollama_api_models(base_url=base_url, timeout_seconds=timeout_seconds)
 
 
-def list_installed_ollama_models() -> Tuple[List[str], Optional[str]]:
-    models, error = query_ollama_models()
+def list_installed_ollama_models(
+    base_url: str = DEFAULT_OLLAMA_BASE_URL,
+) -> Tuple[List[str], Optional[str]]:
+    models, error = query_ollama_models(base_url=base_url)
     if error:
         return [], error
     return [model["name"] for model in models], None
