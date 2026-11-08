@@ -10,6 +10,10 @@ Auto Research Agent runs **Draft → Review → Revise → Judge** with local Ol
 
 **For agents:** read [AGENTS.md](AGENTS.md), then the [agent README](docs/agent/README.md).
 
+![Research workspace with task editor, run controls and saved results](docs/assets/workspace-en.png)
+
+*The local dashboard, showing a synthetic demo task. Scores are model feedback, not research validation.*
+
 ## Three steps
 
 1. **Define a task.** Use the public example or create a separate project under `projects/`.
@@ -30,28 +34,20 @@ make ui
 
 Open **[http://127.0.0.1:8501/](http://127.0.0.1:8501/)** and keep the server running. In an existing checkout, reuse its configuration and environment. Starting the dashboard does not start a research run. Real runs need a configured provider; `make mock` demonstrates saved outputs without model calls. See the [user guide](docs/user/README.md) before running a real task.
 
-## Where things live
+## Explore the repository
 
-```text
-auto-research-agent/
-├── src/                 research workflow and command-line application
-├── ui/                  local dashboard
-├── prompts/             Draft / Review / Revise / Judge templates
-├── projects/            public example and ignored local research projects
-├── docs/                user, agent, release, reference, and design documents
-├── scripts/             setup, validation, and performance tools
-├── tests/               automated checks
-├── AGENTS.md            agent entry and maintenance rules
-└── CHANGELOG.md         changes by version
-```
+| Build and run | Learn and maintain |
+| --- | --- |
+| [Workflow](src/) · [Dashboard](ui/) · [Prompts](prompts/) | [User guide](docs/user/README.md) · [Documentation](docs/README.md) |
+| [Example project](projects/example/) · [Tests](tests/) | [Agent guide](docs/agent/README.md) · [Tools](scripts/) |
 
-Local configuration, credentials, generated runs, and private project folders stay out of Git by default. The application stores run artifacts on your computer; Gemini sends model inputs to its cloud provider when selected.
+Local configuration, credentials, generated runs, and private projects stay out of Git by default. Gemini sends model inputs to its cloud provider when selected.
 
 ## Versions and documentation
 
-Current version: **0.2.1**. Releases use `vMAJOR.MINOR.PATCH` tags matched to `pyproject.toml`. Historical milestone tags remain available. Application releases and saved research artifacts have separate compatibility boundaries.
+Current version: **0.2.2**. Releases use `vMAJOR.MINOR.PATCH` tags matched to `pyproject.toml`. Historical milestone tags remain available. Application releases and saved research artifacts have separate compatibility boundaries.
 
-- [Releases](https://github.com/ThineLord/auto-research-agent/releases) · [0.2.1 notes](docs/releases/0.2.1.md) · [Changelog](CHANGELOG.md)
+- [Releases](https://github.com/ThineLord/auto-research-agent/releases) · [0.2.2 notes](docs/releases/0.2.2.md) · [Changelog](CHANGELOG.md)
 - [User README](docs/user/README.md) · [Agent README](docs/agent/README.md)
 - [Documentation map](docs/README.md) · [Version and release policy](docs/agent/releases.md)
 

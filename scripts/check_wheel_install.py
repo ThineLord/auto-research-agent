@@ -33,7 +33,7 @@ RESOURCE_PAIRS = {
 _REQUIRED_SOURCE_FILES = {
     "README.md",
     "pyproject.toml",
-    "requirements/constraints.txt",
+    "scripts/dependencies/constraints.txt",
     "src/__init__.py",
     *RESOURCE_PAIRS,
     *RESOURCE_PAIRS.values(),
@@ -41,7 +41,7 @@ _REQUIRED_SOURCE_FILES = {
 _GIT_SOURCE_SPECS = [
     "README.md",
     "pyproject.toml",
-    "requirements/constraints.txt",
+    "scripts/dependencies/constraints.txt",
     "src",
     *RESOURCE_PAIRS,
 ]
@@ -164,7 +164,7 @@ def _tracked_source_paths(*, home: Path, deadline: float) -> list[str]:
         if value not in {
             "README.md",
             "pyproject.toml",
-            "requirements/constraints.txt",
+            "scripts/dependencies/constraints.txt",
             *RESOURCE_PAIRS,
         } and not value.startswith("src/"):
             raise WheelSmokeError(f"unexpected packaging input path: {value}")
@@ -833,7 +833,7 @@ def main() -> int:
             python = _create_and_install_venv(
                 venv_root,
                 wheel_path,
-                source_root / "requirements" / "constraints.txt",
+                source_root / "scripts" / "dependencies" / "constraints.txt",
                 pip_env,
                 deadline,
             )

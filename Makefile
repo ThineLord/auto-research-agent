@@ -47,12 +47,12 @@ $(VENV_PYTHON):
 
 venv: $(VENV_PYTHON)
 
-$(INSTALL_STAMP): pyproject.toml requirements/constraints.txt | $(VENV_PYTHON)
-	$(VENV_PIP) install -c requirements/constraints.txt -e .
+$(INSTALL_STAMP): pyproject.toml scripts/dependencies/constraints.txt | $(VENV_PYTHON)
+	$(VENV_PIP) install -c scripts/dependencies/constraints.txt -e .
 	@touch $(INSTALL_STAMP)
 
-$(DEV_STAMP): pyproject.toml requirements/constraints.txt | $(VENV_PYTHON)
-	$(VENV_PIP) install -c requirements/constraints.txt -e ".[dev]"
+$(DEV_STAMP): pyproject.toml scripts/dependencies/constraints.txt | $(VENV_PYTHON)
+	$(VENV_PIP) install -c scripts/dependencies/constraints.txt -e ".[dev]"
 	@touch $(INSTALL_STAMP) $(DEV_STAMP)
 
 install: $(INSTALL_STAMP)
@@ -87,7 +87,7 @@ check: format-check lint import-check repo-safety release-check test
 
 .PHONY: browser-test
 browser-test:
-	$(VENV_PYTHON) -m pytest -q browser_tests
+	$(VENV_PYTHON) -m pytest -q tests/browser
 
 ci: check
 

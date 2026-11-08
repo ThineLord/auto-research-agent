@@ -21,7 +21,7 @@ from playwright.sync_api import sync_playwright
 
 from src.runtime import get_active_process_meta
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture(params=[os.environ.get("ARA_BROWSER", "chromium")])
@@ -104,15 +104,18 @@ def dashboard(tmp_path, browser, request):
     tracked = subprocess.check_output(["git", "ls-files", "-z"], cwd=ROOT).decode().split("\0")
     for name in filter(None, tracked):
         original = ROOT / name
-        if original.is_file() and name.split("/")[0] in {
-            "src",
-            "ui",
-            "prompts",
-            "projects",
-            "requirements",
-            "pyproject.toml",
-            "config.example.yaml",
-        }:
+        if original.is_file() and (
+            name == "scripts/dependencies/constraints.txt"
+            or name.split("/")[0]
+            in {
+                "src",
+                "ui",
+                "prompts",
+                "projects",
+                "pyproject.toml",
+                "config.example.yaml",
+            }
+        ):
             target = source / name
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(original, target)

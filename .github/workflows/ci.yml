@@ -37,7 +37,7 @@ jobs:
           cache: pip
 
       - name: Install project with development tools
-        run: python -m pip install -c requirements/constraints.txt -e ".[dev]"
+        run: python -m pip install -c scripts/dependencies/constraints.txt -e ".[dev]"
 
       - name: Build and smoke-test isolated wheel
         run: python scripts/check_wheel_install.py
@@ -77,10 +77,10 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-      - run: python -m pip install -c requirements/constraints.txt -e ".[dev,browser]"
+      - run: python -m pip install -c scripts/dependencies/constraints.txt -e ".[dev,browser]"
       - run: python -m playwright install --with-deps ${{ matrix.browser }}
-      - run: python -m ruff check browser_tests && python -m ruff format --check browser_tests
-      - run: python -m pytest -q browser_tests
+      - run: python -m ruff check tests/browser && python -m ruff format --check tests/browser
+      - run: python -m pytest -q tests/browser
         env:
           ARA_BROWSER: ${{ matrix.browser }}
       - uses: actions/upload-artifact@v4

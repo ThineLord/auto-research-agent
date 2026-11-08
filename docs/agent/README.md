@@ -8,7 +8,7 @@ Codex coordinates implementation and repository management. Subagents independen
 
 1. Read `AGENTS.md`, the current user request, and `git status --short --branch`.
 2. Fetch `origin`, identify the current default branch (`master`), and inspect local changes before branching. Preserve uncommitted work and ignored research data.
-3. Read the [user README](../user/README.md), [development reference](../reference/development.md), and relevant code. Use `.codex/` only for historical context; its old task queue is not a new instruction.
+3. Read the [user README](../user/README.md), [development reference](../reference/development.md), and relevant code. Use `docs/archive/codex/` only for historical context; its old task queue is not a new instruction.
 4. Create a `codex/` branch. Keep implementation bounded by the requested outcome.
 
 ## File ownership
@@ -22,7 +22,7 @@ Codex coordinates implementation and repository management. Subagents independen
 | `docs/user/`, `docs/agent/` | Current bilingual instructions |
 | `docs/reference/`, `docs/design/` | Detailed command, architecture, and design material |
 | `docs/releases/` | Version-specific bilingual release notes |
-| `docs/archive/`, `.codex/` | Historical evidence; not current release acceptance |
+| `docs/archive/` | Historical evidence; not current release acceptance |
 | `output/`, `outputs/`, local config | Ignored local data; never add as release assets |
 
 ## Implement and validate
@@ -47,4 +47,4 @@ When merging is authorized, a separate merge subagent verifies the PR identity, 
 
 Follow the [release policy](releases.md) ([中文](releases.zh-CN.md)). Verify the merged commit's CI before tagging and publishing. Never publish local/private research, move existing tags, or infer a successful release from a successful merge. Report the PR, version, release link, checks, and any limitations. Stop once the requested work is accepted and published.
 
-Browser regression: install with `python -m pip install -c requirements/constraints.txt -e ".[dev,browser]"`, run `python -m playwright install chromium webkit`, then `make browser-test` and `ARA_BROWSER=webkit make browser-test`. Tests launch the actual dashboard and CLI in disposable source copies with a loopback model fixture; they cover save conflicts, focused/expanded editor refresh, stop/resume, outputs, analytics, and language persistence. CI runs both engines and uploads screenshots from `output/browser/`. WebKit coverage is not a claim of testing the native Safari application.
+Browser regression: install with `python -m pip install -c scripts/dependencies/constraints.txt -e ".[dev,browser]"`, run `python -m playwright install chromium webkit`, then `make browser-test` and `ARA_BROWSER=webkit make browser-test`. Tests launch the actual dashboard and CLI in disposable source copies with a loopback model fixture; they cover save conflicts, focused/expanded editor refresh, stop/resume, outputs, analytics, and language persistence. CI runs both engines and uploads screenshots from `output/browser/`. WebKit coverage is not a claim of testing the native Safari application.

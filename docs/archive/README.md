@@ -17,4 +17,4 @@ These files preserve earlier work and validation. They are not the current task 
 | `docs/literature_survey_mode.md` | [Literature survey reference](../reference/literature-survey.md) |
 | `docs/ARA_*_DESIGN.md` | [Design directory](../design/README.md) |
 
-The tested `.codex/` records remain in place; see their [scope notice](../../.codex/README.md). Start new work from the [current agent README](../agent/README.md), and use the [current changelog](../../CHANGELOG.md) for version boundaries.
+The tested agent records moved intact from `.codex/` to `docs/archive/codex/` in 0.2.2; see their [scope notice](codex/README.md). Paths inside historical records describe their original checkout. Start new work from the [current agent README](../agent/README.md), and use the [current changelog](../../CHANGELOG.md) for version boundaries.

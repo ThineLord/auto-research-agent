@@ -357,3 +357,13 @@ include metadata-quality counts plus representative theme groups.
 
 Avoid committing runtime outputs such as `runs/`, `best_output.md`, `checkpoint.json`, logs, or
 local environment files.
+
+## Repository layout (0.2.2)
+
+- `tests/browser/` contains optional browser regression tests. Default `pytest` collects the Python suite; `make browser-test` explicitly selects browser tests after installing browser dependencies.
+- `scripts/dependencies/` contains release constraints and their maintenance guide. `make install` and `make install-dev` use these automatically. The redundant root `requirements.txt` shim was removed; use `make install-dev` instead of `pip install -r requirements.txt`.
+- `docs/archive/codex/` preserves historical agent records. References inside those records retain their original paths.
+- `docs/assets/` contains the curated, public-demo README screenshots. Generated test captures stay ignored under `output/`.
+- The unused `.env.example` template was removed. The legacy Streamlit UI still accepts an explicitly exported `AUTO_RESEARCH_AGENT_ROOT` when launched from another directory; ordinary dashboard startup uses `make ui` and does not need it. No `.env` loader is provided.
+
+Runtime paths (`src/`, `ui/`, `prompts/`, `projects/`, `config.yaml`) and private research are unaffected.
