@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+No changes yet.
+
+## [0.2.1] - 2026-11-09
+
 - Pin release dependencies across supported Python variants; record installed runtime versions and optional Ollama digest, preserving initial and resumed session environments.
 - Add isolated real-browser regression CI for Chromium and WebKit covering editing conflicts, background refresh, run/stop/resume, outputs and preferences.
 
@@ -9,6 +13,8 @@
 - Use the configured Ollama HTTP endpoint consistently for model discovery, startup validation, and generation.
 
 - Input saves now check field revisions under the project lock, preserve untouched memory, and show explicit conflict choices. Both dashboard editors reject stale or running-project writes.
+
+[English release notes](docs/releases/0.2.1.md) · [中文更新说明](docs/releases/0.2.1.zh-CN.md)
 
 ## [0.2.0] - 2026-11-09
 

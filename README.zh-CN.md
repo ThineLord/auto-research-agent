@@ -49,9 +49,9 @@ auto-research-agent/
 
 ## 版本与文档
 
-当前版本：**0.2.0**。发布使用 `v主版本.次版本.修订版本` 标签，与 `pyproject.toml` 保持一致，历史里程碑标签保留。应用版本与研究产物的数据兼容边界分别管理。
+当前版本：**0.2.1**。发布使用 `v主版本.次版本.修订版本` 标签，与 `pyproject.toml` 保持一致，历史里程碑标签保留。应用版本与研究产物的数据兼容边界分别管理。
 
-- [版本发布](https://github.com/ThineLord/auto-research-agent/releases) · [0.2.0 更新说明](docs/releases/0.2.0.zh-CN.md) · [变更记录](CHANGELOG.md)
+- [版本发布](https://github.com/ThineLord/auto-research-agent/releases) · [0.2.1 更新说明](docs/releases/0.2.1.zh-CN.md) · [变更记录](CHANGELOG.md)
 - [用户 README](docs/user/README.zh-CN.md) · [Agent README](docs/agent/README.zh-CN.md)
 - [文档导航](docs/README.md) · [版本与发布规则](docs/agent/releases.zh-CN.md)
 
