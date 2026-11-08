@@ -8,7 +8,7 @@ Choose your audience and language. Commands in these documents run from the repo
 | Installation and use | [User README](user/README.md) | [用户 README](user/README.zh-CN.md) |
 | Repository maintenance | [Agent README](agent/README.md) | [Agent README](agent/README.zh-CN.md) |
 | Versions and releases | [Release policy](agent/releases.md) | [版本规则](agent/releases.zh-CN.md) |
-| Version 0.2.1 | [Release notes](releases/0.2.1.md) | [更新说明](releases/0.2.1.zh-CN.md) |
+| Version 0.2.2 | [Release notes](releases/0.2.2.md) | [更新说明](releases/0.2.2.zh-CN.md) |
 
 ## Detailed references
 
@@ -21,4 +21,4 @@ Choose your audience and language. Commands in these documents run from the repo
 - [Historical reports and path migration](archive/README.md)
 - [Public repository cleanup report](reports/privacy_cleanup_report.md)
 
-`user/` and `agent/` are the current starting points. `reference/` holds deeper technical material; historical model examples are not live availability claims. `releases/` records version boundaries. `archive/` and `.codex/` hold dated evidence, not current acceptance results. Private research stays in ignored project folders.
+`user/` and `agent/` are the current starting points. `reference/` holds deeper technical material; historical model examples are not live availability claims. `releases/` records version boundaries. `archive/` (including `archive/codex/`) hold dated evidence, not current acceptance results. Private research stays in ignored project folders.

@@ -369,7 +369,7 @@ similarity/evolution、timeout/error、agent timing 和 estimated tokens。它�
 - `config.yaml`：本地主配置，包含 provider/model、Ollama URL、Gemini 设置、项目名、topic、轮数、停止条件、runtime、survey 配置；不提交。
 - `Makefile`：安装、测试、运行、UI 的命令入口。
 - `pyproject.toml`：Python 包配置和依赖。
-- `requirements.txt`：兼容旧安装方式，指向 `-e .[dev]`。
+- `scripts/dependencies/constraints.txt`：发布依赖约束；通过 `make install-dev` 安装开发环境。
 - `prompts/`：四个 agent 的系统提示词。
 - `projects/example/`：公开安全的示例项目输入和模板；运行输出和状态文件不提交。
 - `scripts/`：辅助脚本，目前有 import check 和 UI 启动脚本。

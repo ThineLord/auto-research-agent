@@ -12,8 +12,8 @@ Read the [agent README](docs/agent/README.md) ([简体中文](docs/agent/README.
 ## Files and evidence
 
 - Preserve `src/`, `ui/`, `prompts/`, configuration and `projects/` runtime paths. Inspect an existing project before changing it; never overwrite a task, config, output, checkpoint, or private project to tidy the repository.
-- Keep credentials, local configuration, generated outputs, browser captures, and private research out of commits and release assets. Stage explicit paths and inspect the diff.
-- Current instructions live here and in `docs/agent/`. `.codex/` and `docs/archive/` preserve historical evidence; they do not authorize reopening old tasks, running providers, or merging changes. Keep the tested `.codex/` record structure intact.
+- Keep credentials, local configuration, generated outputs, incidental browser captures, and private research out of commits and release assets. Curated public-demo screenshots belong in `docs/assets/`; inspect them for private data before staging. Stage explicit paths and inspect the diff.
+- Current instructions live here and in `docs/agent/`. `docs/archive/` (including `codex/`) preserve historical evidence; they do not authorize reopening old tasks, running providers, or merging changes. Keep the tested `docs/archive/codex/` record structure intact.
 - Do not claim real-provider validation from mock tests or scientific validity from model scores. Ordinary repository checks must not call a model.
 
 ## Changes and releases

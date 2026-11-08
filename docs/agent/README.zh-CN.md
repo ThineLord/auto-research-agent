@@ -8,7 +8,7 @@ Codex 负责实现、组织和仓库管理。Subagents 负责独立 review 和�
 
 1. 阅读 `AGENTS.md`、当前用户要求和 `git status --short --branch`。
 2. 获取最新 `origin`，确认默认分支 `master`，建立分支前检查本地改动，保留未提交文件和被忽略的研究数据。
-3. 阅读[用户 README](../user/README.zh-CN.md)、[开发参考](../reference/development.md)和相关源码。`.codex/` 仅提供历史上下文，旧任务队列不代表新的执行要求。
+3. 阅读[用户 README](../user/README.zh-CN.md)、[开发参考](../reference/development.md)和相关源码。`docs/archive/codex/` 仅提供历史上下文，旧任务队列不代表新的执行要求。
 4. 建立 `codex/` 分支，围绕用户要求完成实现。
 
 ## 文件归属
@@ -22,7 +22,7 @@ Codex 负责实现、组织和仓库管理。Subagents 负责独立 review 和�
 | `docs/user/`、`docs/agent/` | 当前中英文使用与维护文档 |
 | `docs/reference/`、`docs/design/` | 命令、架构和设计细节 |
 | `docs/releases/` | 各版本中英文发布说明 |
-| `docs/archive/`、`.codex/` | 历史证据，不代表当前版本验收 |
+| `docs/archive/` | 历史证据，不代表当前版本验收 |
 | `output/`、`outputs/`、本地配置 | 被忽略的本地数据，不作为发布附件 |
 
 ## 实现与验证
@@ -47,4 +47,4 @@ make check
 
 遵循[版本规则](releases.zh-CN.md)（[English](releases.md)）。合并提交的 CI 通过后再打标签、发布。不要上传私人研究、移动已有标签，或把合并成功等同于发布成功。交接提供 PR、版本、发布链接、检查结果和未解决限制；达到用户要求后结束。
 
-浏览器回归：通过 `python -m pip install -c requirements/constraints.txt -e ".[dev,browser]"` 安装，执行 `python -m playwright install chromium webkit`，再运行 `make browser-test` 和 `ARA_BROWSER=webkit make browser-test`。测试在临时源码副本中启动真实仪表盘与 CLI，模型调用指向本地模拟服务；覆盖保存冲突、聚焦／展开编辑器后台刷新、停止续跑、输出、分析及语言持久化。CI 在两种引擎运行并上传 `output/browser/` 截图。WebKit 覆盖不等于验证原生 Safari 应用。
+浏览器回归：通过 `python -m pip install -c scripts/dependencies/constraints.txt -e ".[dev,browser]"` 安装，执行 `python -m playwright install chromium webkit`，再运行 `make browser-test` 和 `ARA_BROWSER=webkit make browser-test`。测试在临时源码副本中启动真实仪表盘与 CLI，模型调用指向本地模拟服务；覆盖保存冲突、聚焦／展开编辑器后台刷新、停止续跑、输出、分析及语言持久化。CI 在两种引擎运行并上传 `output/browser/` 截图。WebKit 覆盖不等于验证原生 Safari 应用。

@@ -23,7 +23,9 @@ def installed_version(name: str) -> str | None:
 
 def collect_run_environment(llm: object = None) -> dict:
     """Report versions, never environment variables, endpoint URLs or error bodies."""
-    constraints = Path(__file__).resolve().parents[1] / "requirements" / "constraints.txt"
+    constraints = (
+        Path(__file__).resolve().parents[1] / "scripts" / "dependencies" / "constraints.txt"
+    )
     try:
         constraints_hash = hashlib.sha256(constraints.read_bytes()).hexdigest()
     except OSError:

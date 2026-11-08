@@ -10,6 +10,10 @@
 
 **Agent 入口：**先读 [AGENTS.md](AGENTS.md)，再读 [Agent README](docs/agent/README.zh-CN.md)。
 
+![研究工作台：任务编辑、运行控制与已保存结果](docs/assets/workspace-zh.png)
+
+*本地工作台，展示公开演示任务。评分是模型反馈，不代表研究结论已经验证。*
+
 ## 三步使用
 
 1. **写下任务。**使用公开示例，或在 `projects/` 下建立独立研究项目。
@@ -30,28 +34,20 @@ make ui
 
 打开 **[http://127.0.0.1:8501/](http://127.0.0.1:8501/)**，使用期间保持服务运行。已有项目请复用原有配置和环境。打开工作台不会自动开始研究；真实运行需要配置模型来源，`make mock` 可在不调用模型的情况下演示成果保存。运行实际任务前请阅读[用户指南](docs/user/README.zh-CN.md)。
 
-## 文件位置
+## 仓库导航
 
-```text
-auto-research-agent/
-├── src/                 研究流程与命令行程序
-├── ui/                  本地网页工作台
-├── prompts/             起草、审查、修改、评分提示词
-├── projects/            公开示例与 Git 忽略的本地研究项目
-├── docs/                用户、Agent、版本、参考和设计文档
-├── scripts/             安装、验证与性能工具
-├── tests/               自动检查
-├── AGENTS.md            Agent 入口和维护规则
-└── CHANGELOG.md         按版本记录的变更
-```
+| 开发与运行 | 使用与维护 |
+| --- | --- |
+| [研究流程](src/) · [网页工作台](ui/) · [提示词](prompts/) | [用户指南](docs/user/README.zh-CN.md) · [文档导航](docs/README.md) |
+| [示例项目](projects/example/) · [测试](tests/) | [Agent 指南](docs/agent/README.zh-CN.md) · [维护工具](scripts/) |
 
-本地配置、密钥、运行产物和私人项目默认不进入 Git。成果保存在本机；选择 Gemini 时，模型输入会发送给云端服务。
+本地配置、密钥、运行产物和私人项目默认不进入 Git。选择 Gemini 时，模型输入会发送给云端服务。
 
 ## 版本与文档
 
-当前版本：**0.2.1**。发布使用 `v主版本.次版本.修订版本` 标签，与 `pyproject.toml` 保持一致，历史里程碑标签保留。应用版本与研究产物的数据兼容边界分别管理。
+当前版本：**0.2.2**。发布使用 `v主版本.次版本.修订版本` 标签，与 `pyproject.toml` 保持一致，历史里程碑标签保留。应用版本与研究产物的数据兼容边界分别管理。
 
-- [版本发布](https://github.com/ThineLord/auto-research-agent/releases) · [0.2.1 更新说明](docs/releases/0.2.1.zh-CN.md) · [变更记录](CHANGELOG.md)
+- [版本发布](https://github.com/ThineLord/auto-research-agent/releases) · [0.2.2 更新说明](docs/releases/0.2.2.zh-CN.md) · [变更记录](CHANGELOG.md)
 - [用户 README](docs/user/README.zh-CN.md) · [Agent README](docs/agent/README.zh-CN.md)
 - [文档导航](docs/README.md) · [版本与发布规则](docs/agent/releases.zh-CN.md)
 

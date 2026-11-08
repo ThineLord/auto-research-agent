@@ -434,7 +434,7 @@ agent elapsed seconds、estimated tokens、平均 revised 相似度、低变化�
 - `projects/*/interrupted_report.md`
 - `projects/*/memory.md`
 - `config.yaml`
-- `.env` / `.env.*`（保留 `.env.example`）
+- `.env` / `.env.*`
 - `.venv/`
 
 ## 推送当前稳定状态到 GitHub

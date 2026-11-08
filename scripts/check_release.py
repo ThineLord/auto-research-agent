@@ -49,7 +49,7 @@ def markdown_link_errors(root: Path, tracked: list[str]) -> list[str]:
     root = root.resolve()
     tracked_set = set(tracked)
     for name in tracked:
-        if not name.endswith(".md") or name.startswith((".codex/", "docs/archive/")):
+        if not name.endswith(".md") or name.startswith("docs/archive/"):
             continue
         path = root / name
         if not path.is_file():

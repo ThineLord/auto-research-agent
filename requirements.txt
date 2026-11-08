@@ -1,3 +1,0 @@
-# Compatibility shim for older setup instructions.
-# Preferred setup: make install-dev
--e .[dev]

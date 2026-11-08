@@ -12,7 +12,6 @@ ENV/
 # Environment and local configuration
 .env
 .env.*
-!.env.example
 config.yaml
 config.local.yaml
 settings.local.json

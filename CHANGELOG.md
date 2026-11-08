@@ -4,6 +4,15 @@
 
 No changes yet.
 
+## [0.2.2] - 2026-11-09
+
+- Reduce the repository root from 22 to 17 tracked entries: archive historical agent records, group browser tests under `tests/`, and put dependency constraints under `scripts/dependencies/`.
+- Remove the redundant `requirements.txt` shim and unused `.env.example`; document `make install-dev` and the optional legacy UI environment variable.
+- Add one real dashboard screenshot per language to the concise bilingual homepages, with a compact repository navigation table.
+- Update CI, wheel checks, environment fingerprints and documentation for the new locations. Preserve runtime paths, research artifacts and dependency versions.
+
+[English release notes](docs/releases/0.2.2.md) · [中文更新说明](docs/releases/0.2.2.zh-CN.md)
+
 ## [0.2.1] - 2026-11-09
 - Ask Judge to emit weighted rubric points before calculating their total, with an arithmetic example; strict score validation remains unchanged.
 

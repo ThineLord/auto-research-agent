@@ -6,10 +6,10 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CURRENT_STATE = REPO_ROOT / ".codex" / "CURRENT_STATE.md"
-TASK_QUEUE = REPO_ROOT / ".codex" / "TASK_QUEUE.md"
-LAST_VALIDATION = REPO_ROOT / ".codex" / "LAST_VALIDATION.json"
-RESUME_INSTRUCTIONS = REPO_ROOT / ".codex" / "RESUME_INSTRUCTIONS.md"
+CURRENT_STATE = REPO_ROOT / "docs" / "archive" / "codex" / "CURRENT_STATE.md"
+TASK_QUEUE = REPO_ROOT / "docs" / "archive" / "codex" / "TASK_QUEUE.md"
+LAST_VALIDATION = REPO_ROOT / "docs" / "archive" / "codex" / "LAST_VALIDATION.json"
+RESUME_INSTRUCTIONS = REPO_ROOT / "docs" / "archive" / "codex" / "RESUME_INSTRUCTIONS.md"
 
 
 def _markdown_section(document: str, heading: str) -> str:
