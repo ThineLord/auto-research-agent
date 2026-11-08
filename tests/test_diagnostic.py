@@ -29,8 +29,11 @@ class FakeDiagnosticLLM:
                 {
                     "score": 81,
                     "rubric": {
-                        "evaluation_design_quality": 12,
-                        "tomorrow_actionability": 13,
+                        "novelty_and_research_value": 20,
+                        "technical_clarity_and_correctness": 21,
+                        "feasibility_and_implementation_realism": 16,
+                        "evaluation_design_quality": 16,
+                        "tomorrow_actionability": 8,
                     },
                     "reasons": ["provider-free diagnostic fixture"],
                     "blockers": [],

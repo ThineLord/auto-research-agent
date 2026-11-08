@@ -69,4 +69,5 @@ Version **0.2.0** keeps existing runtime paths and artifact schemas. See [releas
 
 Saving submits only edited fields. If another tab or a run changed the same field, the dashboard shows both versions and keeps your draft; choose the latest version or explicitly replace the conflicting fields. Saves are blocked while a run owns the project or recovery is pending.
 
+New Judge responses must contain all five weighted rubric fields (25/25/20/20/10), a matching 0–100 total, reasons, blockers, and `CONTINUE`/`STOP`. Invalid responses count as failed scoring and cannot replace the best output. Diagnostic mode uses the same scoring contract. Existing historical score records remain readable; scores are model judgments, not evidence of scientific validity.
 Model discovery, startup validation, and generation all use `ollama_base_url` from the application configuration. `OLLAMA_HOST` does not override this address.

@@ -113,16 +113,15 @@ class MockResearchAgents:
     def judge(self, *, task: str, memory: str, revised_output: str) -> str:
         round_index = _extract_round_index(revised_output)
         score = min(95, 70 + round_index * 3)
-        rubric_value = min(20, 12 + round_index)
         return json.dumps(
             {
                 "score": score,
                 "rubric": {
-                    "novelty_and_research_value": rubric_value,
-                    "technical_clarity_and_correctness": rubric_value + 1,
-                    "feasibility_and_implementation_realism": rubric_value + 2,
-                    "evaluation_design_quality": rubric_value,
-                    "tomorrow_actionability": rubric_value + 1,
+                    "novelty_and_research_value": score * 0.25,
+                    "technical_clarity_and_correctness": score * 0.25,
+                    "feasibility_and_implementation_realism": score * 0.20,
+                    "evaluation_design_quality": score * 0.20,
+                    "tomorrow_actionability": score * 0.10,
                 },
                 "reasons": [
                     "Synthetic deterministic score for provider-free artifact smoke testing.",

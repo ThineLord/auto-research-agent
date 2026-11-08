@@ -15,7 +15,8 @@ Instructions:
 2. Penalize generic statements that lack concrete technical content.
 3. Reward explicit, testable, implementable plans.
 4. Return JSON only. Do not include markdown, code fences, commentary, or extra text.
-5. Set next_step to "STOP" only if the plan is already strong and actionable.
+5. Rubric values are earned points within the limits above; score must equal their sum.
+6. Set next_step to "STOP" only if the plan is already strong and actionable.
 
 Output JSON shape:
 {

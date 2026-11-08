@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .config import DRAFTING_MODE_BEST_GUIDED, DRAFTING_MODE_CONTINUE_FROM_PREVIOUS
-from .judge_output import JUDGE_OUTPUT_SCHEMA
+from .judge_output import JUDGE_OUTPUT_SCHEMA, JUDGE_SCORING_INSTRUCTIONS, validate_new_judge_output
 from .llm import LLMClientProtocol
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,10 @@ class ResearchAgents:
     temperature: float
     top_p: float
     topic_context: str = ""
+
+    def __post_init__(self) -> None:
+        if JUDGE_SCORING_INSTRUCTIONS not in self.judge_prompt:
+            self.judge_prompt += "\n\n" + JUDGE_SCORING_INSTRUCTIONS
 
     @classmethod
     def from_prompt_dir(
@@ -179,7 +183,7 @@ class ResearchAgents:
                 "memory_words": len(memory.split()),
             },
         )
-        return self.llm.generate(
+        output = self.llm.generate(
             agent_name="judge",
             system_prompt=self.judge_prompt,
             user_prompt=prompt,
@@ -187,3 +191,5 @@ class ResearchAgents:
             top_p=self.top_p,
             response_format=JUDGE_OUTPUT_SCHEMA,
         )
+
+        return validate_new_judge_output(output)
