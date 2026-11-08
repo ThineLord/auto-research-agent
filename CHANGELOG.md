@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Mark an attempt stopped when a stop request arrives after round creation but before Draft, keeping the checkpoint resumable without inventing a completed round.
+
 - Pin release dependencies across supported Python variants; record installed runtime versions and optional Ollama digest, preserving initial and resumed session environments.
 - Add isolated real-browser regression CI for Chromium and WebKit covering editing conflicts, background refresh, run/stop/resume, outputs and preferences.
 

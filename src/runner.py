@@ -1453,6 +1453,7 @@ def run_iterative_rounds(
 
             if _stop_requested(stop_signal_path):
                 stop_reason = STOP_USER_REQUESTED
+                _stop_current_attempt(STOP_USER_REQUESTED)
                 _log(
                     console,
                     log_path,
