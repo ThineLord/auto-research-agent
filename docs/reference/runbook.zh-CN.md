@@ -1,3 +1,5 @@
+> Detailed reference retained from before 0.2.0. Start with the [current Chinese user README](../user/README.zh-CN.md). Historical provider/model examples are not live availability guarantees. Run commands from the repository root.
+
 # Auto Research Agent 安全实验 Runbook
 
 目标：今天安全跑一个小实验，能看到输出、打开 UI、理解结果，并且不覆盖已有 runs。

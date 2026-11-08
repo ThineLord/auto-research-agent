@@ -85,3 +85,7 @@ projects/*
 # Local/generated reports; keep the public cleanup report trackable.
 docs/reports/*
 !docs/reports/privacy_cleanup_report.md
+
+# Local browser captures and generated review output
+/output/
+/.playwright-cli/
