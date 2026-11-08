@@ -1,90 +1,46 @@
-# Python cache and bytecode
+# Workspace root: only explicit application/public entry points are publishable.
+/*
+!/.gitignore
+!/.github/
+!/AGENTS.md
+!/README.md
+!/README.zh-CN.md
+!/Makefile
+!/start
+!/app/
+!/example/
+/example/*
+!/example/README.md
+!/example/task.md
+!/example/memory.example.md
+!/example/literature_survey_sources.md
+
+# Keep the old tracked example task through Git upgrades; all old research stays private.
+!/projects/
+/projects/*
+!/projects/example/
+/projects/example/*
+!/projects/example/task.md
+
+# Application-local development files and secrets
 __pycache__/
 *.py[cod]
-*$py.class
-
-# Virtual environments
 .venv/
 venv/
-env/
-ENV/
-
-# Environment and local configuration
 .env
 .env.*
 config.yaml
 config.local.yaml
 settings.local.json
-
-# Build and packaging
 build/
 dist/
 *.egg-info/
-
-# Editor / OS
 .DS_Store
-.idea/
-.vscode/
-
-# Python/test/tool caches
 .pytest_cache/
 .ruff_cache/
 .cache/
-cache/
-
-# Logs and generated artifacts
 *.log
-/runs/
-/outputs/
-/artifacts/
-/logs/
-/reports/
-projects/*/runs/
-projects/*/outputs/
-projects/*/artifacts/
-projects/*/logs/
-projects/*/cache/
-projects/*/memory.md
-projects/*/best_output.md
-projects/*/score_history.json
-projects/*/research_state.json
-projects/*/run_analysis.json
-projects/*/run_comparison.json
-projects/*/current_plan.md
-projects/*/final_session_report.md
-projects/*/survey/
-projects/*/run.log
-projects/*/checkpoint.json
-projects/*/interrupted_report.md
-projects/*/STOP_REQUESTED
-projects/*/active_run.json
-projects/*/active_run.guard
-projects/*/ui_run_process.json
-projects/*/*.pdf
-*.pdf
-*.jsonl
-*.sqlite
-*.db
-*.pkl
-*.pt
-*.bin
-*.ckpt
-*.tar
-*.tar.gz
-*.zip
-
-# Keep only the public-safe example project tracked by default.
-projects/*
-!projects/example/
-!projects/example/README.md
-!projects/example/task.md
-!projects/example/memory.example.md
-!projects/example/literature_survey_sources.md
-
-# Local/generated reports; keep the public cleanup report trackable.
-docs/reports/*
-!docs/reports/privacy_cleanup_report.md
-
-# Local browser captures and generated review output
-/output/
-/.playwright-cli/
+/app/output/
+/app/.playwright-cli/
+/app/docs/reports/*
+!/app/docs/reports/privacy_cleanup_report.md
