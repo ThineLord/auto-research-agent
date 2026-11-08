@@ -17,6 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+browser = ["playwright==1.56.0"]
 dev = [
     "pytest",
     "ruff",

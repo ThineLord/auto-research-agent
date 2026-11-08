@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add isolated real-browser regression CI for Chromium and WebKit covering editing conflicts, background refresh, run/stop/resume, outputs and preferences.
+
 - Validate new Judge responses against complete weighted 0–100 scoring; share the rubric across normal and diagnostic runs while retaining legacy artifact readers.
 - Use the configured Ollama HTTP endpoint consistently for model discovery, startup validation, and generation.
 

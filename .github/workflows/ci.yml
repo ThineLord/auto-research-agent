@@ -62,3 +62,29 @@ jobs:
 
       - name: Check release metadata and documentation links
         run: python scripts/check_release.py
+
+  browser:
+    name: Browser ${{ matrix.browser }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: python -m pip install -e ".[dev,browser]"
+      - run: python -m playwright install --with-deps ${{ matrix.browser }}
+      - run: python -m ruff check browser_tests && python -m ruff format --check browser_tests
+      - run: python -m pytest -q browser_tests
+        env:
+          ARA_BROWSER: ${{ matrix.browser }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-${{ matrix.browser }}
+          path: output/browser/
