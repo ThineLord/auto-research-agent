@@ -1467,7 +1467,7 @@ project_dir.mkdir(parents=True)
 (project_dir / "checkpoint.json").write_bytes(b"\\xff\\xfe")
 cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, Path.cwd(), root, True)
 cli.load_app_config = lambda path: AppConfig()
-cli.list_installed_ollama_models = lambda: (["qwen3:8b"], None)
+cli.list_installed_ollama_models = lambda **_: (["qwen3:8b"], None)
 cli.create_llm_client = lambda **kwargs: SimpleNamespace(timeout_seconds=1)
 cli.ResearchAgents.from_prompt_dir = lambda **kwargs: SimpleNamespace()
 sys.argv = ["auto-research-agent", "--resume", "--project", "selected"]
@@ -1523,7 +1523,7 @@ class UnexpectedAgents:
 
 cli.resolve_runtime_layout = lambda **kwargs: RuntimeLayout(root, Path.cwd(), root, True)
 cli.load_app_config = lambda path: AppConfig()
-cli.list_installed_ollama_models = lambda: (["qwen3:8b"], None)
+cli.list_installed_ollama_models = lambda **_: (["qwen3:8b"], None)
 cli.create_llm_client = lambda **kwargs: SimpleNamespace(timeout_seconds=1)
 cli.ResearchAgents.from_prompt_dir = lambda **kwargs: UnexpectedAgents()
 sys.argv = ["auto-research-agent", "--resume", "--project", "selected"]

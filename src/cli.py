@@ -822,9 +822,10 @@ def _validate_model_provider_startup(
     model_name: str,
     gemini_api_key_env: str,
     effective_gemini_api_key: str,
+    ollama_base_url: str,
 ) -> None:
     if provider == MODEL_PROVIDER_OLLAMA:
-        installed_models, ollama_error = list_installed_ollama_models()
+        installed_models, ollama_error = list_installed_ollama_models(base_url=ollama_base_url)
         if ollama_error:
             console.print(f"[red]{ollama_error}[/red]")
             console.print("[yellow]Start Ollama service, then retry.[/yellow]")
@@ -1148,6 +1149,7 @@ def main() -> None:
             model_name=model_name,
             gemini_api_key_env=gemini_api_key_env,
             effective_gemini_api_key=effective_gemini_api_key,
+            ollama_base_url=base_url,
         )
 
     if args.cloud_free_discover:
@@ -1311,6 +1313,7 @@ def main() -> None:
             model_name=model_name,
             gemini_api_key_env=gemini_api_key_env,
             effective_gemini_api_key=effective_gemini_api_key,
+            ollama_base_url=base_url,
         )
         llm = create_llm_client(
             provider=provider,

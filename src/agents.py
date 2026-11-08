@@ -28,6 +28,10 @@ class ResearchAgents:
     top_p: float
     topic_context: str = ""
 
+    def __post_init__(self) -> None:
+        if JUDGE_SCORING_INSTRUCTIONS not in self.judge_prompt:
+            self.judge_prompt += "\n\n" + JUDGE_SCORING_INSTRUCTIONS
+
     @classmethod
     def from_prompt_dir(
         cls,
@@ -181,7 +185,7 @@ class ResearchAgents:
         )
         output = self.llm.generate(
             agent_name="judge",
-            system_prompt=self.judge_prompt + "\n\n" + JUDGE_SCORING_INSTRUCTIONS,
+            system_prompt=self.judge_prompt,
             user_prompt=prompt,
             temperature=self.temperature,
             top_p=self.top_p,
