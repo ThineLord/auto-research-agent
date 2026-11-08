@@ -15,21 +15,18 @@ RUBRIC_LIMITS = {
     "tomorrow_actionability": 10,
 }
 JUDGE_SCORING_INSTRUCTIONS = (
-    "Return JSON only with score, rubric, reasons, blockers, next_step. "
+    "Return JSON only with rubric, score, reasons, blockers, next_step. "
     "Use a 0-100 total, NOT a 0-5 or 0-10 rating. Rubric values are earned points: "
     + ", ".join(f"{key}: 0-{limit}" for key, limit in RUBRIC_LIMITS.items())
-    + ". score must equal the sum of all five rubric values. "
+    + ". First assign the five rubric points. Emit rubric before score, then calculate score "
+    "by adding those exact values. Example: 20 + 20 + 15 + 15 + 10 = 80, not 90. "
+    "Do not estimate a separate overall score. "
     "reasons and blockers must be arrays of strings; next_step must be CONTINUE or STOP."
 )
 
 JUDGE_OUTPUT_SCHEMA: Dict[str, Any] = {
     "type": "object",
     "properties": {
-        "score": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 100,
-        },
         "rubric": {
             "type": "object",
             "properties": {
@@ -47,6 +44,11 @@ JUDGE_OUTPUT_SCHEMA: Dict[str, Any] = {
                 "tomorrow_actionability",
             ],
             "additionalProperties": False,
+        },
+        "score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
         },
         "reasons": {
             "type": "array",
