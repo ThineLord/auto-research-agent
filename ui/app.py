@@ -58,6 +58,7 @@ from src.config import (
     save_default_model_selection,
 )
 from src.constants import UI_GEMINI_API_KEY_ENV
+from src.input_editing import InputEditConflict, read_inputs, save_inputs
 from src.llm import GeminiClient
 from src.resume import build_resume_preview
 from src.resume_safety import (
@@ -81,7 +82,6 @@ from src.runtime import (
 from src.storage import (
     artifact_path_exists,
     artifact_path_is_safe,
-    ensure_artifact_paths_safe,
     ensure_project_runtime_paths_safe,
     list_artifact_directories,
     read_file_text,
@@ -2208,9 +2208,24 @@ def main() -> None:
         with st.container(border=True, key="brief_card"):
             st.subheader(t("input_editor_task"))
             st.caption(t("task_editor_help"))
+            input_key = f"input_snapshot_{selected_project}"
+            if input_key not in st.session_state:
+                st.session_state[input_key] = read_inputs(proj_path)
+            if st.button(t("reload_inputs"), key=f"reload_{selected_project}"):
+                st.session_state[input_key] = read_inputs(proj_path)
+                for field in ("task", "memory"):
+                    st.session_state[f"{field}_editor_{selected_project}"] = st.session_state[
+                        input_key
+                    ][field]
+            if st.session_state.pop(f"refresh_{input_key}", False):
+                for field in ("task", "memory"):
+                    st.session_state[f"{field}_editor_{selected_project}"] = st.session_state[
+                        input_key
+                    ][field]
+            input_base = st.session_state[input_key]
             task_text = st.text_area(
                 t("input_editor_task"),
-                value=input_text_or_placeholder(task_path, "task_placeholder"),
+                value=input_base["task"],
                 height=270,
                 key=f"task_editor_{selected_project}",
                 label_visibility="collapsed",
@@ -2220,7 +2235,7 @@ def main() -> None:
             with st.expander(t("input_editor_memory")):
                 memory_text = st.text_area(
                     t("input_editor_memory"),
-                    value=input_text_or_placeholder(memory_path, "memory_placeholder"),
+                    value=input_base["memory"],
                     height=220,
                     key=f"memory_editor_{selected_project}",
                     label_visibility="collapsed",
@@ -2229,13 +2244,22 @@ def main() -> None:
                     st.caption(t("memory_optional_help"))
             if st.button(t("save_input"), key="save_input", icon=":material/check:"):
                 try:
-                    ensure_artifact_paths_safe((task_path, memory_path))
-                    write_file_text(task_path, task_text)
-                    write_file_text(memory_path, memory_text)
+                    changes = {
+                        field: value
+                        for field, value in {"task": task_text, "memory": memory_text}.items()
+                        if value != input_base[field]
+                    }
+                    if changes:
+                        st.session_state[input_key] = save_inputs(
+                            proj_path, changes, input_base["revisions"]
+                        )
+                except InputEditConflict:
+                    st.error(t("input_edit_conflict"))
                 except OSError:
                     st.error(t("input_save_failed"))
                 else:
-                    st.success(t("input_saved"))
+                    st.session_state[f"refresh_{input_key}"] = True
+                    st.rerun()
 
     with settings_tab:
         st.subheader(t("model_settings_title"))
