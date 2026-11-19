@@ -207,6 +207,41 @@ def test_cloud_key_goes_only_to_child_environment(project, monkeypatch):
     assert (root / "task.md").read_text() == "Research brief"
 
 
+def test_output_api_exposes_missing_key_and_keeps_readable_text(project):
+    root, _ = project
+    (root / "best_output.md").write_text("Synthetic.\n", encoding="utf-8")
+    workspace = web.workspace("example")
+    metrics = next(
+        row for row in workspace["outputs"] if row["label_key"] == "output_round_metrics"
+    )
+    best = next(row for row in workspace["outputs"] if row["label_key"] == "output_best")
+    assert metrics["exists"] is False
+    assert metrics["missing_key"] == "missing_round_metrics"
+    assert best["exists"] is True
+    metrics_body = web.output("example", metrics["id"])
+    best_body = web.output("example", best["id"])
+    assert metrics_body == {
+        "content": "",
+        "exists": False,
+        "missing_key": "missing_round_metrics",
+    }
+    assert best_body["exists"] is True
+    assert best_body["content"] == "Synthetic.\n"
+    assert "missing_key" in best_body
+
+    (root / ".round_commit_transaction.json").write_text("{not a journal", encoding="utf-8")
+    (root / "best_output.md").write_text("Synthetic.\n", encoding="utf-8")
+    blocked = web.workspace("example")
+    blocked_best = next(row for row in blocked["outputs"] if row["label_key"] == "output_best")
+    assert blocked_best["exists"] is False
+    assert blocked_best["missing_key"] == "round_commit_recovery_conflict"
+    blocked_body = web.output("example", blocked_best["id"])
+    assert blocked_body["exists"] is False
+    assert blocked_body["content"] == ""
+    assert blocked_body["missing_key"] == "round_commit_recovery_conflict"
+    assert "Synthetic." not in blocked_body["content"]
+
+
 def test_output_catalog_controls_read_access(project, tmp_path):
     root, _ = project
     (root / "best_output.md").write_text("# Output\n\nResult")

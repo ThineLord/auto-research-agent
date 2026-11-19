@@ -2,7 +2,12 @@
 
 ## Unreleased
 
-No changes yet.
+- Reject an empty `--create-project` name before starting a run or writing to a project.
+- Generate recovery commands for the interrupted project and workspace, preserving its provider, model and round limit. An interrupted offline mock offers a new offline mock run.
+- Identify corrupt and unreadable checkpoints before checking the model provider during CLI resume.
+- Explain missing or recovery-blocked outputs in the dashboard. Blocked downloads no longer save empty files, and late responses from a previous project leave the selected output alone.
+- Correct the default example path in project initialization errors and the development guide.
+- Run the Chromium and WebKit CI jobs on Ubuntu 24.04 for compatibility with the pinned Playwright release.
 
 ## [0.3.0] - 2026-11-09
 

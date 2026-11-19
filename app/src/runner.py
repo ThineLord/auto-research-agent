@@ -6,6 +6,8 @@ import hashlib
 import json
 import math
 import re
+import shlex
+import sys
 import time
 from datetime import datetime
 from difflib import SequenceMatcher
@@ -21,6 +23,7 @@ from .config import (
     DRAFTING_MODE_BEST_GUIDED,
     DRAFTING_MODE_CONTINUE_FROM_PREVIOUS,
     DRAFTING_MODE_FRESH_WITH_REVIEW,
+    MODEL_PROVIDER_GEMINI,
 )
 from .constants import (
     STOP_CLOUD_DAILY_QUOTA,
@@ -946,6 +949,199 @@ def _resume_metadata_for_checkpoint(
     return metadata
 
 
+def _package_main_path(argv0: Path) -> bool:
+    try:
+        resolved = argv0.resolve()
+    except OSError:
+        return False
+    return resolved.name == "main.py" and resolved.parent.name == "src"
+
+
+def _shell_path(path: Path) -> str:
+    """Quote a path without following a virtualenv interpreter symlink."""
+
+    absolute = path if path.is_absolute() else path.absolute()
+    return shlex.quote(str(absolute))
+
+
+def _cli_invocation_executable() -> str | None:
+    """Executable that restarts this process from any working directory."""
+
+    argv0 = Path(sys.argv[0])
+    try:
+        if argv0.name == "auto-research-agent" and argv0.is_file():
+            return _shell_path(argv0)
+    except OSError:
+        return None
+    if not _package_main_path(argv0):
+        return None
+    sibling = Path(sys.executable).parent / "auto-research-agent"
+    if not sibling.is_absolute():
+        sibling = sibling.absolute()
+    try:
+        if sibling.is_file():
+            return _shell_path(sibling)
+    except OSError:
+        pass
+    return f"{_shell_path(Path(sys.executable))} -m src.main"
+
+
+def _layout_resume_executable(repo_root: Path | None) -> str:
+    if repo_root is not None:
+        app_root = repo_root / "app"
+        if (app_root / "pyproject.toml").is_file() and (app_root / "src" / "cli.py").is_file():
+            script = app_root / ".venv" / "bin" / "auto-research-agent"
+            try:
+                if script.is_file():
+                    return _shell_path(script)
+            except OSError:
+                pass
+            return "app/.venv/bin/auto-research-agent"
+        if (repo_root / "pyproject.toml").is_file() and (repo_root / "src" / "cli.py").is_file():
+            python = repo_root / ".venv" / "bin" / "python"
+            try:
+                if python.is_file():
+                    return f"{_shell_path(python)} -m src.main"
+            except OSError:
+                pass
+            return ".venv/bin/python -m src.main"
+    return "auto-research-agent"
+
+
+def _attached_option(flag: str, value: str) -> str:
+    """One shell word, so leading dashes, spaces, and quotes stay a value."""
+
+    return f"{flag}={shlex.quote(value)}"
+
+
+def _install_defines_workspace(repo_root: Path | None) -> bool:
+    if repo_root is None:
+        return False
+    app_root = repo_root / "app"
+    if (app_root / "pyproject.toml").is_file() and (app_root / "src" / "cli.py").is_file():
+        return True
+    return (repo_root / "pyproject.toml").is_file() and (repo_root / "src" / "cli.py").is_file()
+
+
+def _workspace_to_record(
+    repo_root: Path | None,
+    explicit_workspace: Path | None,
+    source_layout: bool | None,
+) -> Path | None:
+    if explicit_workspace is not None:
+        return explicit_workspace
+    follows_install = (
+        source_layout if source_layout is not None else _install_defines_workspace(repo_root)
+    )
+    if follows_install:
+        return None
+    return repo_root
+
+
+def _workspace_option(workspace: Path) -> str:
+    try:
+        text = str(Path(workspace).expanduser().resolve())
+    except OSError:
+        text = str(workspace)
+    return _attached_option("--workspace", text)
+
+
+def _resume_invocation(
+    project_dir: Path,
+    repo_root: Path | None,
+    *,
+    explicit_workspace: Path | None,
+    source_layout: bool | None,
+    primary_flag: str,
+    provider: str | None = None,
+    model: str | None = None,
+    max_rounds: int | None = None,
+) -> str | None:
+    if not isinstance(max_rounds, int) or isinstance(max_rounds, bool) or max_rounds < 1:
+        return None
+    executable = _cli_invocation_executable() or _layout_resume_executable(repo_root)
+    parts = [
+        executable,
+        primary_flag,
+        _attached_option("--project", project_dir.name),
+    ]
+    if provider is not None or model is not None:
+        if not provider or not model:
+            return None
+        # format_model_label namespaces Gemini labels and preserves Ollama tags verbatim.
+        bare_model = model.removeprefix("gemini:") if provider == MODEL_PROVIDER_GEMINI else model
+        if not bare_model:
+            return None
+        parts.append(_attached_option("--provider", provider))
+        parts.append(_attached_option("--model", bare_model))
+    parts.append(f"--max-rounds={max_rounds}")
+    workspace = _workspace_to_record(repo_root, explicit_workspace, source_layout)
+    if workspace is not None:
+        parts.append(_workspace_option(workspace))
+    return " ".join(parts)
+
+
+def format_safe_resume_command(
+    project_dir: Path,
+    repo_root: Path | None,
+    *,
+    explicit_workspace: Path | None = None,
+    source_layout: bool | None = None,
+    provider: str | None = None,
+    model: str | None = None,
+    max_rounds: int | None = None,
+) -> str | None:
+    """Shell command that repeats this run's service, model, and round cap.
+
+    Returns ``None`` when those parameters cannot be pinned. A bare ``--resume``
+    can switch provider or relax the round budget, so it is not a safe command.
+    The executable is the console script that started this process. Wheel
+    installs that used the current directory repeat that workspace. Project names
+    are attached with ``=`` so a leading dash, spaces, or quotes remain one value.
+    Credentials are never included.
+    """
+
+    if not provider or not model:
+        return None
+    return _resume_invocation(
+        project_dir,
+        repo_root,
+        explicit_workspace=explicit_workspace,
+        source_layout=source_layout,
+        primary_flag="--resume",
+        provider=provider,
+        model=model,
+        max_rounds=max_rounds,
+    )
+
+
+def format_mock_recovery_note(
+    project_dir: Path,
+    repo_root: Path | None,
+    *,
+    explicit_workspace: Path | None = None,
+    source_layout: bool | None = None,
+    max_rounds: int | None = None,
+) -> str:
+    """Tell the user to restart an offline mock. Never offer ``--resume``."""
+
+    command = _resume_invocation(
+        project_dir,
+        repo_root,
+        explicit_workspace=explicit_workspace,
+        source_layout=source_layout,
+        primary_flag="--mock",
+        max_rounds=max_rounds,
+    )
+    note = (
+        "This interrupted run was an offline mock. Restart it with an offline mock only. "
+        "Do not use --resume; that starts a real provider and is not a safe recovery."
+    )
+    if command is None:
+        return note
+    return f"{note} `{command}`"
+
+
 def run_iterative_rounds(
     *,
     console: Console,
@@ -976,6 +1172,8 @@ def run_iterative_rounds(
     max_consecutive_draft_timeouts: int = 1,
     max_consecutive_provider_quota_failures: int = 2,
     resume_metadata: Optional[Dict[str, Any]] = None,
+    explicit_workspace: Optional[Path] = None,
+    source_layout: Optional[bool] = None,
 ) -> Dict[str, Any]:
     if max_rounds < 1:
         raise ValueError("max_rounds must be >= 1")
@@ -2276,13 +2474,43 @@ def run_iterative_rounds(
     run_config = finalized_run_config
 
     if stop_reason in {STOP_USER_REQUESTED, STOP_MANUAL_INTERRUPT}:
+        recovery_note = None
+        if mode == "mock":
+            resume_command = ""
+            recovery_note = format_mock_recovery_note(
+                project_dir,
+                repo_root,
+                explicit_workspace=explicit_workspace,
+                source_layout=source_layout,
+                max_rounds=max_rounds,
+            )
+        else:
+            resume_command = (
+                format_safe_resume_command(
+                    project_dir,
+                    repo_root,
+                    explicit_workspace=explicit_workspace,
+                    source_layout=source_layout,
+                    provider=model_provider,
+                    model=model_name,
+                    max_rounds=max_rounds,
+                )
+                or ""
+            )
+            if not resume_command:
+                recovery_note = (
+                    "Provider, model, and the round cap must be specified again. "
+                    "A bare --resume can switch service or relax the round budget "
+                    "and is not a safe recovery."
+                )
         write_interrupted_report(
             report_path=interrupted_report_path,
             last_completed_round=completed_rounds,
             last_successful_agent=last_successful_agent,
             best_score=max(0.0, best_score),
             best_output_path=best_output_path,
-            resume_command=".venv/bin/python -m src.main --resume",
+            resume_command=resume_command,
+            recovery_note=recovery_note,
             stop_time=datetime.now().isoformat(),
             repo_root=repo_root,
         )

@@ -80,7 +80,7 @@ from .package_resources import (
     validate_generation_resources,
 )
 from .project_input import ProjectInputError, load_project_input
-from .resume import run_resume_mode
+from .resume import checkpoint_read_problem, run_resume_mode
 from .round_commit_recovery import (
     RoundCommitReadError,
     classify_diagnostic_finalize_recovery,
@@ -879,7 +879,8 @@ def main() -> None:
         console.print(f"[red]Package resource error: {exc}[/red]")
         raise SystemExit(_EXIT_STARTUP_ERROR) from None
     root = layout.workspace_root
-    if getattr(args, "create_project", None):
+    explicit_workspace = getattr(args, "workspace", None)
+    if getattr(args, "create_project", None) is not None:
         try:
             path = create_project(root, args.create_project, args.task or "")
             console.print(f"Created project: {path}")
@@ -1156,6 +1157,8 @@ def main() -> None:
                 git_root=layout.git_root,
                 drafting_mode=drafting_mode,
                 max_consecutive_provider_quota_failures=max_provider_quota_failures,
+                explicit_workspace=explicit_workspace,
+                source_layout=layout.source_layout,
             )
         except KeyboardInterrupt:
             console.print(
@@ -1331,6 +1334,11 @@ def main() -> None:
             project_dir=project_dir,
             run_lock_handle=run_lock_path,
         )
+        if args.resume:
+            checkpoint_problem = checkpoint_read_problem(project_dir)
+            if checkpoint_problem:
+                console.print(f"[red]Cannot resume: {checkpoint_problem}.[/red]")
+                raise SystemExit(_EXIT_STARTUP_ERROR)
         _validate_model_provider_startup(
             args=args,
             console=console,
@@ -1383,6 +1391,8 @@ def main() -> None:
                     git_root=layout.git_root,
                     drafting_mode=drafting_mode,
                     max_consecutive_provider_quota_failures=max_provider_quota_failures,
+                    explicit_workspace=explicit_workspace,
+                    source_layout=layout.source_layout,
                 )
             except ResumeHistoryError:
                 raise SystemExit(2) from None
@@ -1415,6 +1425,8 @@ def main() -> None:
                 git_root=layout.git_root,
                 drafting_mode=drafting_mode,
                 max_consecutive_provider_quota_failures=max_provider_quota_failures,
+                explicit_workspace=explicit_workspace,
+                source_layout=layout.source_layout,
             )
             return
 
@@ -1463,6 +1475,8 @@ def main() -> None:
                 git_root=layout.git_root,
                 drafting_mode=drafting_mode,
                 max_consecutive_provider_quota_failures=max_provider_quota_failures,
+                explicit_workspace=explicit_workspace,
+                source_layout=layout.source_layout,
             )
             return
 
@@ -1488,6 +1502,8 @@ def main() -> None:
             git_root=layout.git_root,
             drafting_mode=drafting_mode,
             max_consecutive_provider_quota_failures=max_provider_quota_failures,
+            explicit_workspace=explicit_workspace,
+            source_layout=layout.source_layout,
         )
     except KeyboardInterrupt:
         console.print(

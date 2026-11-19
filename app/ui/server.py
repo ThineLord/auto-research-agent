@@ -94,6 +94,7 @@ def workspace(name: str) -> dict:
                 "exists": row["exists"],
                 "kind": row["kind"],
                 "path": h.output_display_path(row["path"]) if row["path"] is not None else "",
+                "missing_key": row.get("missing_key") or "output_not_generated",
             }
             for i, row in enumerate(catalog)
         ],
@@ -106,9 +107,14 @@ def output(name: str, index: int) -> dict:
     if index < 0 or index >= len(catalog):
         raise ValueError("Unknown output")
     row = catalog[index]
+    missing_key = row.get("missing_key") or "output_not_generated"
     if not row["exists"] or row["path"] is None:
-        return {"content": "", "exists": False}
-    return {"content": h.read_regular_text(row["path"], missing_ok=False), "exists": True}
+        return {"content": "", "exists": False, "missing_key": missing_key}
+    return {
+        "content": h.read_regular_text(row["path"], missing_ok=False),
+        "exists": True,
+        "missing_key": missing_key,
+    }
 
 
 def analytics(name: str) -> dict:

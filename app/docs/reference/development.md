@@ -102,13 +102,13 @@ CLI exit-status contract:
   interrupted report before propagating the interrupt. Interrupts outside that protected phase do
   not promise the same artifact completeness.
 
-Source checkouts and editable installs keep the checkout root as both resource root and writable
-workspace. Non-editable wheel/source-distribution installs instead read an explicit package-data
-allowlist (`config.example.yaml`, four canonical prompts, and the example task) while using the
-current directory as the writable workspace. Only an installed, implicit default `--mock` run may
-atomically seed a wholly missing `projects/example/task.md`; existing or explicitly selected
-projects are never overwritten. Installed runs leave source Git provenance empty rather than
-recording an unrelated workspace repository.
+Source checkouts and editable installs read resources from `app/` and use the parent directory as
+the writable workspace. Non-editable wheel installs read the packaged allowlist
+(`config.example.yaml`, four canonical prompts, and the example task) and use the current directory
+as the writable workspace. Only an installed, implicit default `--mock` run may atomically seed a
+wholly missing `example/task.md`; existing or explicitly selected projects are never overwritten.
+Installed runs leave source Git provenance empty rather than recording an unrelated workspace
+repository.
 
 Core modules:
 
@@ -136,8 +136,8 @@ Core modules:
 - `ui/app.py` is the Streamlit UI for editing inputs, running workflows, checking model health,
   watching progress, and browsing outputs.
 
-Generated project artifacts live under `projects/<project_name>/` and are ignored by git when they
-are runtime outputs.
+Generated project artifacts live under the selected project directory (`<workspace>/<name>/`, or an
+existing legacy `projects/<name>/`) and are ignored by git when they are runtime outputs.
 
 ### Automatic artifact filesystem boundary
 
@@ -211,8 +211,9 @@ topic:
 The selected mode is written into `checkpoint.json`, `score_history.json`, and
 `runs/<run_id>/run_config.json`.
 
-The tracked `projects/example` folder is the sample project. To work on another topic, create a new
-folder under `projects/`, point `project_name` at it, and update the `topic` block plus `task.md`.
+The public sample project is the top-level `example/` folder. `projects/example/task.md` remains
+only as the tracked compatibility stub for old Git upgrades. To work on another topic, create a
+sibling folder, point the selection at it, and update the `topic` block plus `task.md`.
 The UI uses the configured `project_name` as its initial selection when that folder exists, and
 falls back to the public-safe example only when the configured project is unavailable.
 

@@ -1867,14 +1867,19 @@ def write_interrupted_report(
     stop_time: str,
     repo_root: Path | None = None,
     anchor: Path | None = None,
+    recovery_note: str | None = None,
 ) -> None:
+    if recovery_note:
+        recovery_line = f"- recovery: {recovery_note}\n"
+    else:
+        recovery_line = f"- safe resume command: `{resume_command}`\n"
     content = (
         "# Interrupted Report\n\n"
         f"- last completed round: {last_completed_round}\n"
         f"- last successful agent: {last_successful_agent}\n"
         f"- best score so far: {best_score:.2f}\n"
         f"- best output path: {display_path(best_output_path, repo_root)}\n"
-        f"- safe resume command: `{resume_command}`\n"
+        f"{recovery_line}"
         f"- stop time: {stop_time}\n"
     )
     write_text(report_path, content, anchor=anchor)

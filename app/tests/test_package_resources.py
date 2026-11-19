@@ -668,6 +668,57 @@ main()
             if projects_dir.exists():
                 self.assertEqual(list(projects_dir.iterdir()), [])
 
+    def test_seed_diagnostics_name_the_flat_example_project(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp)
+            layout = RuntimeLayout(
+                workspace_root=workspace,
+                resource_root=REPO_ROOT / "src" / "_bundled",
+                git_root=None,
+                source_layout=False,
+            )
+            blocked = workspace / "blocked"
+            blocked.write_text("not a directory", encoding="utf-8")
+
+            def resolve_under_file(root: Path, name: str) -> Path:
+                del root, name
+                return blocked / "example"
+
+            with (
+                patch("src.workspace.resolve_project_dir", side_effect=resolve_under_file),
+                self.assertRaises(package_resources.PackageResourceError) as raised,
+            ):
+                seed_default_mock_project(
+                    layout,
+                    mock_mode=True,
+                    project_name="example",
+                    explicit_project=False,
+                )
+
+            message = str(raised.exception)
+            self.assertIn("parent of blocked/example", message)
+            self.assertNotIn("projects/", message)
+            self.assertEqual(list(workspace.iterdir()), [blocked])
+
+            with (
+                patch(
+                    "src.package_resources.tempfile.mkdtemp",
+                    side_effect=OSError("disk"),
+                ),
+                self.assertRaises(package_resources.PackageResourceError) as raised,
+            ):
+                seed_default_mock_project(
+                    layout,
+                    mock_mode=True,
+                    project_name="example",
+                    explicit_project=False,
+                )
+
+            message = str(raised.exception)
+            self.assertIn("example/task.md", message)
+            self.assertNotIn("projects/example", message)
+            self.assertFalse((workspace / "example").exists())
+
     def test_seed_publish_never_replaces_a_racing_empty_project(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             workspace = Path(tmp)
