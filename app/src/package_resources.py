@@ -246,11 +246,18 @@ def seed_default_mock_project(
 
     project_dir = resolve_project_dir(layout.workspace_root, DEFAULT_PROJECT_NAME)
     projects_dir = project_dir.parent
+    try:
+        seeded_project = (
+            project_dir.resolve().relative_to(layout.workspace_root.resolve()).as_posix()
+        )
+    except (OSError, ValueError):
+        seeded_project = project_dir.name
     if os.path.lexists(project_dir):
         return False
     if os.path.lexists(projects_dir) and (projects_dir.is_symlink() or not projects_dir.is_dir()):
         raise PackageResourceError(
-            "Cannot seed the default mock project because workspace projects/ is not a directory."
+            "Cannot seed the default mock project because the parent of "
+            f"{seeded_project} is not a directory."
         )
 
     try:
@@ -271,8 +278,8 @@ def seed_default_mock_project(
             except FileExistsError:
                 if projects_dir.is_symlink() or not projects_dir.is_dir():
                     raise PackageResourceError(
-                        "Cannot seed the default mock project because workspace projects/ "
-                        "is not a directory."
+                        "Cannot seed the default mock project because the parent of "
+                        f"{seeded_project} is not a directory."
                     ) from None
 
         staging_dir = Path(
@@ -317,7 +324,7 @@ def seed_default_mock_project(
             raise
         if isinstance(exc, OSError):
             raise PackageResourceError(
-                "Could not seed projects/example/task.md in the current workspace."
+                f"Could not seed {seeded_project}/task.md in the current workspace."
             ) from exc
         raise
     return True

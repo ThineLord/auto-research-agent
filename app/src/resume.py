@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 from pathlib import Path
 from typing import Any, Sequence
@@ -29,6 +30,7 @@ from .storage import (
     ensure_project_runtime_paths_safe,
     list_artifact_entry_names,
     read_json_file,
+    read_regular_text,
 )
 
 ROUND_OUTPUT_FILES = ("01_draft.md", "02_review.md", "03_revised.md", "04_judge.md")
@@ -89,6 +91,34 @@ def _display_path(path: Path, root: Path | None) -> str:
         except (OSError, RuntimeError, ValueError):
             pass
     return f"<repo>/{path.name}"
+
+
+def checkpoint_read_problem(project_dir: Path) -> str | None:
+    """Distinguish a corrupt or unreadable checkpoint from a missing one.
+
+    Missing and empty files stay on the existing resume preview path. A file
+    that cannot be decoded, or that cannot be opened, must not be described as
+    absent.
+    """
+
+    path = project_dir / "checkpoint.json"
+    try:
+        content = read_regular_text(path, missing_ok=False, anchor=project_dir)
+    except FileNotFoundError:
+        return None
+    except UnicodeError:
+        return "checkpoint.json is corrupt"
+    except OSError:
+        return "checkpoint.json is unreadable"
+    if not content.strip():
+        return None
+    try:
+        data = json.loads(content)
+    except (ValueError, RecursionError):
+        return "checkpoint.json is corrupt"
+    if not isinstance(data, dict):
+        return "checkpoint.json is corrupt"
+    return None
 
 
 def inspect_next_round_directory(
@@ -486,10 +516,15 @@ def run_resume_mode(
     git_root: GitRootSetting = INHERIT_GIT_ROOT,
     drafting_mode: str = DEFAULT_DRAFTING_MODE,
     max_consecutive_provider_quota_failures: int = 2,
+    explicit_workspace: Path | None = None,
 ) -> bool:
     # Establish the project trust boundary before the first automatic artifact read.
     # ``build_resume_preview`` repeats this check so it remains safe as a public helper.
     ensure_project_runtime_paths_safe(project_dir)
+    checkpoint_problem = checkpoint_read_problem(project_dir)
+    if checkpoint_problem:
+        console.print(f"[red]Cannot resume: {checkpoint_problem}.[/red]")
+        return False
     checkpoint_path = project_dir / "checkpoint.json"
     checkpoint = read_json_file(checkpoint_path)
     preview = build_resume_preview(
@@ -540,6 +575,7 @@ def run_resume_mode(
             drafting_mode=drafting_mode,
             max_consecutive_provider_quota_failures=max_consecutive_provider_quota_failures,
             resume_metadata=preview,
+            explicit_workspace=explicit_workspace,
         )
         return True
     except ResumeHistoryError as exc:

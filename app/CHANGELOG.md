@@ -2,7 +2,13 @@
 
 ## Unreleased
 
-No changes yet.
+- Reject an empty `--create-project` value at startup and leave the workspace unchanged.
+- Write interrupted-report resume commands that repeat an explicit `--workspace`, shell-quote project names, and invoke the console script that started the process. Wheel installs name `auto-research-agent` instead of a checkout virtualenv.
+- Report a corrupt or unreadable `checkpoint.json` from `--resume` before any provider check, instead of treating it as missing.
+- Show each Outputs catalog `missing_key` in the local dashboard, including recovery blockers and missing run files.
+- Align default-project seed diagnostics and the development guide with flat `example/` projects.
+
+Scanned and left unchanged: `--create-project` only creates the project. The documented next mock passes `--project`, so a later run without `--project` still names `example` and does not modify the new project. Survey files stay out of the Outputs catalog.
 
 ## [0.3.0] - 2026-11-09
 

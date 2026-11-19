@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -135,6 +137,174 @@ def test_api_first_start_create_switch_and_restart(tmp_path, monkeypatch):
     assert server.workspace("topic-a")["task"] == "Edited alpha"
     assert server.workspace("topic-b")["task"].strip() == "Task topic-b"
     assert server.workspace("topic-a")["project_path"] == "topic-a"
+
+
+def test_empty_create_project_rejects_startup_without_writes(tmp_path):
+    project = tmp_path / "example"
+    project.mkdir()
+    (project / "task.md").write_text("synthetic task\n")
+    before = hashes(tmp_path)
+    result = cli(
+        tmp_path,
+        "--create-project",
+        "",
+        "--task",
+        "Synthetic",
+        "--mock",
+        "--max-rounds",
+        "1",
+    )
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "Project creation error" in result.stdout
+    assert "checkpoint.json" not in result.stdout
+    assert hashes(tmp_path) == before
+    assert not (project / "checkpoint.json").exists()
+
+
+def test_create_project_does_not_change_persistent_selection(tmp_path):
+    example = tmp_path / "example"
+    example.mkdir()
+    (example / "task.md").write_text("example task\n")
+    created = cli(tmp_path, "--create-project", "demo", "--task", "Synthetic")
+    assert created.returncode == 0, created.stdout + created.stderr
+    assert not (tmp_path / ".ara-workspace.json").exists()
+    result = cli(tmp_path, "--mock", "--max-rounds", "1")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "name=example" in result.stdout
+    assert (example / "checkpoint.json").is_file()
+    assert not (tmp_path / "demo" / "checkpoint.json").exists()
+
+
+def test_interrupted_report_resume_command_locates_workspace(tmp_path):
+    app_root = tmp_path / "app"
+    (app_root / "src").mkdir(parents=True)
+    (app_root / "pyproject.toml").write_text("[project]\nname='synthetic'\n")
+    (app_root / "src" / "cli.py").write_text("# marker\n")
+    (tmp_path / ".venv" / "bin").mkdir(parents=True)
+    leftover = tmp_path / ".venv" / "bin" / "python"
+    marker = tmp_path / "leftover-ran"
+    leftover.write_text(f"#!/bin/sh\ntouch {shlex.quote(str(marker))}\necho LEFTOVER\nexit 42\n")
+    leftover.chmod(0o755)
+    (tmp_path / "config.yaml").write_text((APP / "config.example.yaml").read_text())
+    name = "demo topic"
+    result = cli(tmp_path, "--create-project", name, "--task", "Synthetic interrupt recovery")
+    assert result.returncode == 0, result.stdout + result.stderr
+    (tmp_path / name / "STOP_REQUESTED").write_text("")
+    result = cli(tmp_path, "--project", name, "--mock", "--max-rounds", "1")
+    assert result.returncode == 0, result.stdout + result.stderr
+    report = (tmp_path / name / "interrupted_report.md").read_text()
+    command = report.split("- safe resume command: `", 1)[1].split("`", 1)[0]
+    parsed = shlex.split(command)
+    assert parsed[parsed.index("--project") + 1] == name
+    assert Path(parsed[parsed.index("--workspace") + 1]).resolve() == tmp_path.resolve()
+    assert Path(parsed[0]).name == "auto-research-agent"
+    assert parsed[0] != str(leftover)
+    assert ".venv/bin/python -m src.main" not in command
+    assert not command.startswith("app/.venv/bin/")
+    (tmp_path / name / "checkpoint.json").write_text("{not json")
+    other = tmp_path / "elsewhere"
+    other.mkdir()
+    resumed = subprocess.run(
+        parsed,
+        cwd=other,
+        capture_output=True,
+        text=True,
+        timeout=40,
+    )
+    assert resumed.returncode == 2, resumed.stdout + resumed.stderr
+    assert f"name={name}" in resumed.stdout
+    assert "checkpoint.json is corrupt" in resumed.stdout
+    assert "Ollama" not in resumed.stdout
+    assert not marker.exists()
+
+
+def test_wheel_resume_command_locates_explicit_workspace(tmp_path):
+    from src.runner import format_safe_resume_command
+
+    name = "wheel topic"
+    project = tmp_path / name
+    project.mkdir()
+    (project / "task.md").write_text("Synthetic task\n")
+    (project / "checkpoint.json").write_text("{not json")
+    (tmp_path / "config.yaml").write_text((APP / "config.example.yaml").read_text())
+    command = format_safe_resume_command(project, tmp_path, explicit_workspace=tmp_path)
+    assert command.startswith("auto-research-agent ")
+    assert ".venv" not in command
+    assert "src.main" not in command
+    parsed = shlex.split(command)
+    assert parsed[parsed.index("--project") + 1] == name
+    assert Path(parsed[parsed.index("--workspace") + 1]).resolve() == tmp_path.resolve()
+    env = os.environ.copy()
+    env["PATH"] = str(APP / ".venv" / "bin") + os.pathsep + env.get("PATH", "")
+    other = tmp_path / "elsewhere"
+    other.mkdir()
+    resumed = subprocess.run(
+        parsed,
+        cwd=other,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=40,
+    )
+    assert resumed.returncode == 2, resumed.stdout + resumed.stderr
+    assert f"name={name}" in resumed.stdout
+    assert "checkpoint.json is corrupt" in resumed.stdout
+    assert "Ollama" not in resumed.stdout
+
+
+def test_resume_names_corrupt_or_unreadable_checkpoint(tmp_path):
+    config = tmp_path / "config.yaml"
+    config.write_text((APP / "config.example.yaml").read_text())
+    project = tmp_path / "demo"
+    project.mkdir()
+    (project / "task.md").write_text("Synthetic task\n")
+    (project / "checkpoint.json").write_text("{not json")
+    result = cli(tmp_path, "--project", "demo", "--resume")
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "checkpoint.json is corrupt" in result.stdout
+    assert "missing or empty" not in result.stdout
+    assert "Ollama" not in result.stdout
+    assert not (project / "runs").exists()
+
+    if os.geteuid() == 0:
+        return
+    locked = project / "checkpoint.json"
+    locked.write_text('{"can_resume": true}\n')
+    locked.chmod(0)
+    try:
+        result = cli(tmp_path, "--project", "demo", "--resume")
+    finally:
+        locked.chmod(0o600)
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "checkpoint.json is unreadable" in result.stdout
+    assert "missing or empty" not in result.stdout
+    assert not (project / "runs").exists()
+
+
+def test_resume_command_names_wheel_script_without_a_checkout_venv(tmp_path):
+    from src.runner import format_safe_resume_command
+
+    project = tmp_path / "demo"
+    project.mkdir()
+    assert (
+        format_safe_resume_command(project, tmp_path)
+        == "auto-research-agent --resume --project demo"
+    )
+    spaced = tmp_path / "demo topic"
+    spaced.mkdir()
+    workspace = tmp_path / "nested ws"
+    quoted = format_safe_resume_command(spaced, tmp_path, explicit_workspace=workspace)
+    assert quoted == (
+        "auto-research-agent --resume --project 'demo topic' --workspace "
+        + shlex.quote(str(workspace.resolve()))
+    )
+    (tmp_path / "pyproject.toml").write_text("[project]\n")
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "cli.py").write_text("# marker\n")
+    assert (
+        format_safe_resume_command(project, tmp_path)
+        == ".venv/bin/python -m src.main --resume --project demo"
+    )
 
 
 def test_cli_creation_and_git_privacy(tmp_path):

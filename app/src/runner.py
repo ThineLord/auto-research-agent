@@ -6,6 +6,8 @@ import hashlib
 import json
 import math
 import re
+import shlex
+import sys
 import time
 from datetime import datetime
 from difflib import SequenceMatcher
@@ -946,6 +948,91 @@ def _resume_metadata_for_checkpoint(
     return metadata
 
 
+def _package_main_path(argv0: Path) -> bool:
+    try:
+        resolved = argv0.resolve()
+    except OSError:
+        return False
+    return resolved.name == "main.py" and resolved.parent.name == "src"
+
+
+def _shell_path(path: Path) -> str:
+    """Quote a path without following a virtualenv interpreter symlink."""
+
+    absolute = path if path.is_absolute() else path.absolute()
+    return shlex.quote(str(absolute))
+
+
+def _cli_invocation_executable() -> str | None:
+    """Executable that restarts this process from any working directory."""
+
+    argv0 = Path(sys.argv[0])
+    try:
+        if argv0.name == "auto-research-agent" and argv0.is_file():
+            return _shell_path(argv0)
+    except OSError:
+        return None
+    if not _package_main_path(argv0):
+        return None
+    sibling = Path(sys.executable).parent / "auto-research-agent"
+    if not sibling.is_absolute():
+        sibling = sibling.absolute()
+    try:
+        if sibling.is_file():
+            return _shell_path(sibling)
+    except OSError:
+        pass
+    return f"{_shell_path(Path(sys.executable))} -m src.main"
+
+
+def _layout_resume_executable(repo_root: Path | None) -> str:
+    if repo_root is not None:
+        app_root = repo_root / "app"
+        if (app_root / "pyproject.toml").is_file() and (app_root / "src" / "cli.py").is_file():
+            script = app_root / ".venv" / "bin" / "auto-research-agent"
+            try:
+                if script.is_file():
+                    return _shell_path(script)
+            except OSError:
+                pass
+            return "app/.venv/bin/auto-research-agent"
+        if (repo_root / "pyproject.toml").is_file() and (repo_root / "src" / "cli.py").is_file():
+            python = repo_root / ".venv" / "bin" / "python"
+            try:
+                if python.is_file():
+                    return f"{_shell_path(python)} -m src.main"
+            except OSError:
+                pass
+            return ".venv/bin/python -m src.main"
+    return "auto-research-agent"
+
+
+def format_safe_resume_command(
+    project_dir: Path,
+    repo_root: Path | None,
+    *,
+    explicit_workspace: Path | None = None,
+) -> str:
+    """Shell command that resumes this project without calling a provider itself.
+
+    The command uses the console script that started this process, so a wheel
+    install and a source checkout both avoid a leftover root virtualenv. When
+    ``--workspace`` was passed, that path is repeated and shell-quoted. Project
+    names, including names that contain spaces, are shell-quoted too.
+    """
+
+    project_arg = shlex.quote(project_dir.name)
+    executable = _cli_invocation_executable() or _layout_resume_executable(repo_root)
+    command = f"{executable} --resume --project {project_arg}"
+    if explicit_workspace is not None:
+        try:
+            workspace_arg = str(Path(explicit_workspace).expanduser().resolve())
+        except OSError:
+            workspace_arg = str(explicit_workspace)
+        command += " --workspace " + shlex.quote(workspace_arg)
+    return command
+
+
 def run_iterative_rounds(
     *,
     console: Console,
@@ -976,6 +1063,7 @@ def run_iterative_rounds(
     max_consecutive_draft_timeouts: int = 1,
     max_consecutive_provider_quota_failures: int = 2,
     resume_metadata: Optional[Dict[str, Any]] = None,
+    explicit_workspace: Optional[Path] = None,
 ) -> Dict[str, Any]:
     if max_rounds < 1:
         raise ValueError("max_rounds must be >= 1")
@@ -2282,7 +2370,11 @@ def run_iterative_rounds(
             last_successful_agent=last_successful_agent,
             best_score=max(0.0, best_score),
             best_output_path=best_output_path,
-            resume_command=".venv/bin/python -m src.main --resume",
+            resume_command=format_safe_resume_command(
+                project_dir,
+                repo_root,
+                explicit_workspace=explicit_workspace,
+            ),
             stop_time=datetime.now().isoformat(),
             repo_root=repo_root,
         )

@@ -226,6 +226,7 @@ def run_session_mode(
     git_root: GitRootSetting = INHERIT_GIT_ROOT,
     drafting_mode: str = DEFAULT_DRAFTING_MODE,
     max_consecutive_provider_quota_failures: int = 2,
+    explicit_workspace: Path | None = None,
 ) -> None:
     ensure_project_runtime_paths_safe(project_dir)
     console.rule("Research Session Mode")
@@ -287,6 +288,7 @@ def run_session_mode(
         git_root=git_root,
         drafting_mode=drafting_mode,
         max_consecutive_provider_quota_failures=max_consecutive_provider_quota_failures,
+        explicit_workspace=explicit_workspace,
     )
 
     research_state_path = project_dir / "research_state.json"
