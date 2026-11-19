@@ -525,25 +525,18 @@ function renderOutputs() {
     `<div class="outputs-layout"><div class="file-list" aria-label="${t("outputs")}">${data.outputs.map((o) => `<button data-output="${o.id}" class="file-row ${o.id === outputIndex ? "active" : ""}" title="${e(o.exists ? o.path : t(o.missing_key || "output_not_generated"))}">${icon("outputs")}<span class="file-label">${e(t(o.label_key))}</span>${o.exists ? "" : `<span class="empty-dot" title="${e(t(o.missing_key || "output_not_generated"))}"></span>`}</button>`).join("")}</div><section class="card document-card"><div class="document-bar"><span>${e(t(row.label_key))}</span><div class="header-tools">${row.kind === "markdown" ? button("raw", state.raw ? "rendered" : "source", "quiet") : ""}<button class="icon-button" data-action="download" title="${t("download")}" aria-label="${t("download")}" ${!row.exists ? "disabled" : ""}>${icon("download")}</button></div></div><div class="document-path">${e(row.path)}</div><div id="document">${row.exists ? `<div class="loading">${t("loading")}</div>` : outputGap(row)}</div></section></div>`;
   if (row.exists) loadOutput(row);
 }
+function isCurrentOutput(row) {
+  return state.page === "outputs" && data?.outputs.includes(row) && outputIndex === row.id;
+}
 function syncMissingOutput(row, missingKey) {
-  const current = data.outputs.find((item) => item.id === (row?.id ?? outputIndex));
-  if (current) {
-    current.exists = false;
-    current.missing_key =
-      missingKey || current.missing_key || "output_not_generated";
-  }
-  if (state.page === "outputs") renderOutputs();
+  row.exists = false;
+  row.missing_key = missingKey || row.missing_key || "output_not_generated";
+  renderOutputs();
 }
 async function loadOutput(row) {
-  const project = selected;
   try {
     const result = await api(`${query("output")}&id=${row.id}`);
-    if (
-      selected !== project ||
-      state.page !== "outputs" ||
-      outputIndex !== row.id
-    )
-      return;
+    if (!isCurrentOutput(row)) return;
     outputContent = result.content;
     if (!result.exists) {
       syncMissingOutput(row, result.missing_key);
@@ -552,7 +545,7 @@ async function loadOutput(row) {
     $("#document").innerHTML =
       `<article class="document">${row.kind === "markdown" && !state.raw ? markdown(result.content) : `<pre>${e(result.content)}</pre>`}</article>`;
   } catch (err) {
-    if ($("#document"))
+    if (isCurrentOutput(row))
       $("#document").innerHTML =
         `<div class="empty-state">${e(err.message)}</div>`;
   }
@@ -939,6 +932,7 @@ async function act(action) {
   if (action === "download") {
     const row = data.outputs.find((o) => o.id === outputIndex);
     const value = await api(`${query("output")}&id=${outputIndex}`);
+    if (!isCurrentOutput(row)) return;
     if (!value.exists) {
       syncMissingOutput(row, value.missing_key);
       return;

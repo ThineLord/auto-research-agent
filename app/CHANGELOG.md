@@ -2,16 +2,12 @@
 
 ## Unreleased
 
-- Reject an empty `--create-project` value at startup and leave the workspace unchanged.
-- Write interrupted-report resume commands that repeat an explicit `--workspace`, shell-quote project names, and invoke the console script that started the process. Wheel installs name `auto-research-agent` instead of a checkout virtualenv. A wheel that used the current directory also records that workspace. Project values are attached with `=`, so a leading dash, spaces, or quotes stay one argument. The command pins the interrupted provider, model, and round cap, and never includes credentials. When those parameters cannot be reconstructed, the report says to specify them again instead of offering a bare `--resume`.
-- An interrupted mock says to restart an offline mock and does not offer `--resume`.
-- Pin the browser CI jobs to `ubuntu-24.04`.
-- Disable Outputs download after a file becomes unreadable, and do not save an empty file when the download itself is blocked.
-- Report a corrupt or unreadable `checkpoint.json` from `--resume` before any provider check, instead of treating it as missing.
-- Show each Outputs catalog `missing_key` in the local dashboard, including recovery blockers and missing run files.
-- Align default-project seed diagnostics and the development guide with flat `example/` projects.
-
-Scanned and left unchanged: `--create-project` only creates the project. The documented next mock passes `--project`, so a later run without `--project` still names `example` and does not modify the new project. Survey files stay out of the Outputs catalog.
+- Reject an empty `--create-project` name before starting a run or writing to a project.
+- Generate recovery commands for the interrupted project and workspace, preserving its provider, model and round limit. An interrupted offline mock offers a new offline mock run.
+- Identify corrupt and unreadable checkpoints before checking the model provider during CLI resume.
+- Explain missing or recovery-blocked outputs in the dashboard. Blocked downloads no longer save empty files, and late responses from a previous project leave the selected output alone.
+- Correct the default example path in project initialization errors and the development guide.
+- Run the Chromium and WebKit CI jobs on Ubuntu 24.04 for compatibility with the pinned Playwright release.
 
 ## [0.3.0] - 2026-11-09
 

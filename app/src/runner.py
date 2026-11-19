@@ -23,6 +23,7 @@ from .config import (
     DRAFTING_MODE_BEST_GUIDED,
     DRAFTING_MODE_CONTINUE_FROM_PREVIOUS,
     DRAFTING_MODE_FRESH_WITH_REVIEW,
+    MODEL_PROVIDER_GEMINI,
 )
 from .constants import (
     STOP_CLOUD_DAILY_QUOTA,
@@ -1013,13 +1014,6 @@ def _attached_option(flag: str, value: str) -> str:
     return f"{flag}={shlex.quote(value)}"
 
 
-def _bare_model_name(provider: str, model_name: str) -> str:
-    prefix = f"{provider.strip().lower()}:"
-    if prefix != ":" and model_name.startswith(prefix):
-        return model_name[len(prefix) :]
-    return model_name
-
-
 def _install_defines_workspace(repo_root: Path | None) -> bool:
     if repo_root is None:
         return False
@@ -1074,7 +1068,8 @@ def _resume_invocation(
     if provider is not None or model is not None:
         if not provider or not model:
             return None
-        bare_model = _bare_model_name(provider, model)
+        # format_model_label namespaces Gemini labels and preserves Ollama tags verbatim.
+        bare_model = model.removeprefix("gemini:") if provider == MODEL_PROVIDER_GEMINI else model
         if not bare_model:
             return None
         parts.append(_attached_option("--provider", provider))

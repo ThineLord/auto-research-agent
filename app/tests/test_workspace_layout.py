@@ -450,9 +450,9 @@ def test_normal_interrupt_pins_provider_model_and_rounds(tmp_path):
     assert "--max-rounds=1" in cloud
     assert "qwen3:8b" not in cloud
     assert "api_key" not in cloud
-    local = interrupt(model_name="qwen3:8b", model_provider="ollama", max_rounds=2)
+    local = interrupt(model_name="ollama:latest", model_provider="ollama", max_rounds=2)
     assert "--provider=ollama" in local
-    assert "--model=qwen3:8b" in local
+    assert "--model=ollama:latest" in local
     assert "--max-rounds=2" in local
     assert "--provider=gemini" not in local
     missing = interrupt(model_name="", model_provider="", max_rounds=1)
