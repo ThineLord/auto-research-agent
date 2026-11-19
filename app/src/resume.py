@@ -517,6 +517,7 @@ def run_resume_mode(
     drafting_mode: str = DEFAULT_DRAFTING_MODE,
     max_consecutive_provider_quota_failures: int = 2,
     explicit_workspace: Path | None = None,
+    source_layout: bool | None = None,
 ) -> bool:
     # Establish the project trust boundary before the first automatic artifact read.
     # ``build_resume_preview`` repeats this check so it remains safe as a public helper.
@@ -576,6 +577,7 @@ def run_resume_mode(
             max_consecutive_provider_quota_failures=max_consecutive_provider_quota_failures,
             resume_metadata=preview,
             explicit_workspace=explicit_workspace,
+            source_layout=source_layout,
         )
         return True
     except ResumeHistoryError as exc:

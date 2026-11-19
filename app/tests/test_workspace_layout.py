@@ -193,28 +193,38 @@ def test_interrupted_report_resume_command_locates_workspace(tmp_path):
     result = cli(tmp_path, "--project", name, "--mock", "--max-rounds", "1")
     assert result.returncode == 0, result.stdout + result.stderr
     report = (tmp_path / name / "interrupted_report.md").read_text()
-    command = report.split("- safe resume command: `", 1)[1].split("`", 1)[0]
+    assert "- recovery:" in report
+    assert "offline mock" in report
+    assert "Do not use --resume" in report
+    command = report.split("`", 2)[1]
     parsed = shlex.split(command)
-    assert parsed[parsed.index("--project") + 1] == name
-    assert Path(parsed[parsed.index("--workspace") + 1]).resolve() == tmp_path.resolve()
+    assert "--mock" in parsed
+    assert "--resume" not in command
+    assert (
+        next(token for token in parsed if token.startswith("--project=")).split("=", 1)[1] == name
+    )
+    assert (
+        Path(
+            next(token for token in parsed if token.startswith("--workspace=")).split("=", 1)[1]
+        ).resolve()
+        == tmp_path.resolve()
+    )
     assert Path(parsed[0]).name == "auto-research-agent"
     assert parsed[0] != str(leftover)
     assert ".venv/bin/python -m src.main" not in command
-    assert not command.startswith("app/.venv/bin/")
-    (tmp_path / name / "checkpoint.json").write_text("{not json")
     other = tmp_path / "elsewhere"
     other.mkdir()
-    resumed = subprocess.run(
+    restarted = subprocess.run(
         parsed,
         cwd=other,
         capture_output=True,
         text=True,
         timeout=40,
     )
-    assert resumed.returncode == 2, resumed.stdout + resumed.stderr
-    assert f"name={name}" in resumed.stdout
-    assert "checkpoint.json is corrupt" in resumed.stdout
-    assert "Ollama" not in resumed.stdout
+    assert restarted.returncode == 0, restarted.stdout + restarted.stderr
+    assert "Mock mode:" in restarted.stdout
+    assert f"name={name}" in restarted.stdout
+    assert "Failed to query Ollama" not in restarted.stdout
     assert not marker.exists()
 
 
@@ -227,13 +237,32 @@ def test_wheel_resume_command_locates_explicit_workspace(tmp_path):
     (project / "task.md").write_text("Synthetic task\n")
     (project / "checkpoint.json").write_text("{not json")
     (tmp_path / "config.yaml").write_text((APP / "config.example.yaml").read_text())
-    command = format_safe_resume_command(project, tmp_path, explicit_workspace=tmp_path)
+    command = format_safe_resume_command(
+        project,
+        tmp_path,
+        explicit_workspace=tmp_path,
+        provider="gemini",
+        model="gemini:synthetic-original",
+        max_rounds=1,
+    )
+    assert command is not None
     assert command.startswith("auto-research-agent ")
     assert ".venv" not in command
     assert "src.main" not in command
+    assert "api_key" not in command
     parsed = shlex.split(command)
-    assert parsed[parsed.index("--project") + 1] == name
-    assert Path(parsed[parsed.index("--workspace") + 1]).resolve() == tmp_path.resolve()
+    assert (
+        next(token for token in parsed if token.startswith("--project=")).split("=", 1)[1] == name
+    )
+    assert (
+        Path(
+            next(token for token in parsed if token.startswith("--workspace=")).split("=", 1)[1]
+        ).resolve()
+        == tmp_path.resolve()
+    )
+    assert "--provider=gemini" in parsed
+    assert "--model=synthetic-original" in parsed
+    assert "--max-rounds=1" in parsed
     env = os.environ.copy()
     env["PATH"] = str(APP / ".venv" / "bin") + os.pathsep + env.get("PATH", "")
     other = tmp_path / "elsewhere"
@@ -286,25 +315,150 @@ def test_resume_command_names_wheel_script_without_a_checkout_venv(tmp_path):
 
     project = tmp_path / "demo"
     project.mkdir()
-    assert (
-        format_safe_resume_command(project, tmp_path)
-        == "auto-research-agent --resume --project demo"
+    assert format_safe_resume_command(project, tmp_path) is None
+    command = format_safe_resume_command(
+        project,
+        tmp_path,
+        provider="ollama",
+        model="qwen3:8b",
+        max_rounds=5,
+        source_layout=False,
     )
-    spaced = tmp_path / "demo topic"
+    assert command is not None
+    assert command.startswith("auto-research-agent --resume ")
+    assert "--project=demo" in command
+    assert "--provider=ollama" in command
+    assert "--model=qwen3:8b" in command
+    assert "--max-rounds=5" in command
+    assert f"--workspace={shlex.quote(str(tmp_path.resolve()))}" in command
+    spaced = tmp_path / "o'reilly lab"
     spaced.mkdir()
     workspace = tmp_path / "nested ws"
-    quoted = format_safe_resume_command(spaced, tmp_path, explicit_workspace=workspace)
-    assert quoted == (
-        "auto-research-agent --resume --project 'demo topic' --workspace "
-        + shlex.quote(str(workspace.resolve()))
+    quoted = format_safe_resume_command(
+        spaced,
+        tmp_path,
+        explicit_workspace=workspace,
+        provider="gemini",
+        model="synthetic-original",
+        max_rounds=1,
     )
+    assert quoted is not None
+    parsed = shlex.split(quoted)
+    from src.cli import parse_args
+
+    namespace = parse_args(parsed[1:])
+    assert namespace.project == "o'reilly lab"
+    assert namespace.provider == "gemini"
+    assert namespace.model == "synthetic-original"
+    assert namespace.max_rounds == 1
+    assert namespace.workspace.resolve() == workspace.resolve()
     (tmp_path / "pyproject.toml").write_text("[project]\n")
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "cli.py").write_text("# marker\n")
-    assert (
-        format_safe_resume_command(project, tmp_path)
-        == ".venv/bin/python -m src.main --resume --project demo"
+    source_command = format_safe_resume_command(
+        project,
+        tmp_path,
+        provider="ollama",
+        model="qwen3:8b",
+        max_rounds=5,
     )
+    assert source_command is not None
+    assert source_command.startswith(".venv/bin/python -m src.main --resume ")
+    assert "--project=demo" in source_command
+    assert "--workspace" not in source_command
+
+
+def test_leading_dash_project_keeps_original_wheel_workspace(tmp_path):
+    from src.cli import parse_args
+    from src.runner import format_safe_resume_command
+
+    rejected = cli(tmp_path, "--project", "-lab", "--mock", "--max-rounds", "1")
+    assert rejected.returncode == 2, rejected.stdout + rejected.stderr
+    assert "expected one argument" in rejected.stderr
+    project = tmp_path / "-lab"
+    project.mkdir()
+    (project / "task.md").write_text("Dash task\n")
+    (project / "checkpoint.json").write_text("{not json")
+    (tmp_path / "config.yaml").write_text((APP / "config.example.yaml").read_text())
+    command = format_safe_resume_command(
+        project,
+        tmp_path,
+        source_layout=False,
+        provider="gemini",
+        model="synthetic-original",
+        max_rounds=1,
+    )
+    assert command is not None
+    assert "--project=-lab" in command
+    parsed = shlex.split(command)
+    namespace = parse_args(parsed[1:])
+    assert namespace.project == "-lab"
+    assert namespace.max_rounds == 1
+    decoy = tmp_path / "decoy"
+    (decoy / "-lab").mkdir(parents=True)
+    ((decoy / "-lab") / "task.md").write_text("Decoy task\n")
+    (decoy / "config.yaml").write_text((APP / "config.example.yaml").read_text())
+    env = os.environ.copy()
+    env["PATH"] = str(APP / ".venv" / "bin") + os.pathsep + env.get("PATH", "")
+    resumed = subprocess.run(parsed, cwd=decoy, env=env, capture_output=True, text=True, timeout=40)
+    assert resumed.returncode == 2, resumed.stdout + resumed.stderr
+    assert "name=-lab" in resumed.stdout
+    assert "title=Dash task" in resumed.stdout
+    assert "Decoy" not in resumed.stdout
+    assert "Ollama" not in resumed.stdout
+    assert "checkpoint.json is corrupt" in resumed.stdout
+
+
+def test_normal_interrupt_pins_provider_model_and_rounds(tmp_path):
+    from rich.console import Console
+
+    from src.mock_run import build_mock_agents
+    from src.runner import run_iterative_rounds
+
+    project = tmp_path / "demo"
+    project.mkdir()
+    (project / "memory.md").write_text("")
+    (project / "task.md").write_text("Synthetic\n")
+
+    def interrupt(**changes):
+        (project / "STOP_REQUESTED").write_text("")
+        settings = {
+            "model_name": "gemini:synthetic-original",
+            "model_provider": "gemini",
+            "max_rounds": 1,
+        }
+        settings.update(changes)
+        run_iterative_rounds(
+            console=Console(quiet=True),
+            agents=build_mock_agents(),
+            task_text="Synthetic",
+            project_dir=project,
+            memory_path=project / "memory.md",
+            mode="normal",
+            stop_if_no_improvement_rounds=2,
+            global_max_runtime_seconds=60,
+            per_agent_timeout_seconds=1,
+            repo_root=tmp_path,
+            source_layout=False,
+            **settings,
+        )
+        return (project / "interrupted_report.md").read_text()
+
+    cloud = interrupt()
+    assert "--provider=gemini" in cloud
+    assert "--model=synthetic-original" in cloud
+    assert "--max-rounds=1" in cloud
+    assert "qwen3:8b" not in cloud
+    assert "api_key" not in cloud
+    local = interrupt(model_name="qwen3:8b", model_provider="ollama", max_rounds=2)
+    assert "--provider=ollama" in local
+    assert "--model=qwen3:8b" in local
+    assert "--max-rounds=2" in local
+    assert "--provider=gemini" not in local
+    missing = interrupt(model_name="", model_provider="", max_rounds=1)
+    assert "must be specified again" in missing
+    assert "safe resume command" not in missing
+    assert "`" not in missing
 
 
 def test_cli_creation_and_git_privacy(tmp_path):

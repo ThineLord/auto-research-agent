@@ -1158,6 +1158,7 @@ def main() -> None:
                 drafting_mode=drafting_mode,
                 max_consecutive_provider_quota_failures=max_provider_quota_failures,
                 explicit_workspace=explicit_workspace,
+                source_layout=layout.source_layout,
             )
         except KeyboardInterrupt:
             console.print(
@@ -1391,6 +1392,7 @@ def main() -> None:
                     drafting_mode=drafting_mode,
                     max_consecutive_provider_quota_failures=max_provider_quota_failures,
                     explicit_workspace=explicit_workspace,
+                    source_layout=layout.source_layout,
                 )
             except ResumeHistoryError:
                 raise SystemExit(2) from None
@@ -1424,6 +1426,7 @@ def main() -> None:
                 drafting_mode=drafting_mode,
                 max_consecutive_provider_quota_failures=max_provider_quota_failures,
                 explicit_workspace=explicit_workspace,
+                source_layout=layout.source_layout,
             )
             return
 
@@ -1473,6 +1476,7 @@ def main() -> None:
                 drafting_mode=drafting_mode,
                 max_consecutive_provider_quota_failures=max_provider_quota_failures,
                 explicit_workspace=explicit_workspace,
+                source_layout=layout.source_layout,
             )
             return
 
@@ -1499,6 +1503,7 @@ def main() -> None:
             drafting_mode=drafting_mode,
             max_consecutive_provider_quota_failures=max_provider_quota_failures,
             explicit_workspace=explicit_workspace,
+            source_layout=layout.source_layout,
         )
     except KeyboardInterrupt:
         console.print(
