@@ -34,7 +34,7 @@ app/.venv/bin/auto-research-agent --create-project demo --task "A small syntheti
 make mock ARGS="--project demo --max-rounds 1"
 ```
 
-Choose a new folder name if `demo` already exists; do not overwrite it. Select that project in the dashboard to inspect its outputs. A mock result demonstrates the application, not a research finding. An interrupted mock stays marked resumable, but `make resume` and the dashboard Resume button will not continue it: those start a real provider. Start a new offline mock instead.
+Choose a new folder name if `demo` already exists; do not overwrite it. Select that project in the dashboard to inspect its outputs. A mock result demonstrates the application, not a research finding. An interrupted mock stays marked resumable, but `make resume` and the dashboard Resume button will not continue it: those start a real provider. Start a new offline mock instead. Resuming that same explicit project still gives this guidance when `config.yaml` is missing. A real provider model named `mock` remains a normal resume.
 
 ## Run your own task
 

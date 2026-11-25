@@ -327,8 +327,18 @@ only to exercise normal artifact writing for CI/docs smoke runs. A stopped mock 
 still say `can_resume` is true. Ordinary `--resume`, including a switch onto Gemini or Ollama,
 refuses that checkpoint before provider precheck and before it generates or modifies run
 artifacts. The shared preview, CLI, and dashboard resume action use the same refusal and tell the
-user to start a new offline mock. Real-provider pause and resume, including a non-mock model
-switch, keep the existing path.
+user to start a new offline mock. Strong evidence is mock mode, the mock provider, or
+provider-free mock metadata. A historical record that only repeats the model name `mock` or
+`mock-deterministic` is still refused, but an explicit normal run whose provider is already
+Ollama or Gemini keeps that name and stays on the real resume path. If `config.yaml` is
+missing, ordinary resume of the explicitly selected offline mock explains the new mock command
+and does not select another project or contact a provider; a missing or invalid config for any
+other resume is unchanged. An existing finalization conflict, pending transaction, or unsafe
+path keeps that block's own guidance, so the mock hint cannot hide it or claim that a new mock
+can start on top of the block. When resume recovers a pending finalization under the project
+lock and that recovery reveals a mock checkpoint, the same refusal runs again before any
+provider operation. Real-provider pause and resume, including a non-mock model switch, keep
+the existing path.
 The Resume control uses checkpoint metadata to preview run id/root, last completed round, next
 round, stop reason, resume eligibility, completed-round preservation, and next-round directory
 status before launching `--resume`. A non-empty next-round directory is treated as partial or
