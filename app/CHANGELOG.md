@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Refresh an already-open dashboard after an external CLI run finishes between polls, including Research Outputs and run-comparison checkboxes. Polling still skips unchanged catalogs and does not reread output files on every tick.
 - Reject an empty `--create-project` name before starting a run or writing to a project.
 - Generate recovery commands for the interrupted project and workspace, preserving its provider, model and round limit. An interrupted offline mock offers a new offline mock run.
 - Identify corrupt and unreadable checkpoints before checking the model provider during CLI resume.
