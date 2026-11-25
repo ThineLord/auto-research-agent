@@ -166,6 +166,34 @@ def _free_port() -> int:
         return int(sock.getsockname()[1])
 
 
+def _occupy_loopback(port: int) -> socket.socket | None:
+    """Listen on port when it is free. An existing listener is left running."""
+    sock = socket.socket()
+    try:
+        sock.bind(("127.0.0.1", port))
+        sock.listen(1)
+    except OSError:
+        sock.close()
+        return None
+    return sock
+
+
+def _install_zero_argument_port_probe(checkout: Path, port: int, argv_log: Path) -> None:
+    """Record the shell argv, then bind a free port from the fixture interpreter.
+
+    ./start is still executed with no arguments. The wrapper sees that empty
+    forwarding as `-m ui.server` and is the only place that adds `--port`.
+    """
+    wrapper = checkout / "app" / ".venv" / "bin" / "python"
+    wrapper.write_text(
+        "#!/usr/bin/env bash\n"
+        f"printf '%s\\n' \"$@\" > {shlex.quote(str(argv_log))}\n"
+        f'exec {shlex.quote(sys.executable)} "$@" --port {shlex.quote(str(port))}\n',
+        encoding="utf-8",
+    )
+    wrapper.chmod(0o755)
+
+
 def _read_ready(proc: subprocess.Popen[bytes], timeout: float = 60) -> str:
     assert proc.stdout is not None
     chunks: list[bytes] = []
@@ -342,18 +370,32 @@ def test_start_with_no_arguments_uses_checkout_root(tmp_path: Path) -> None:
     caller.mkdir()
     home = tmp_path / "home"
     home.mkdir()
+    # The shell contract is zero arguments, so the product default stays 8501.
+    # Hold that port when it is free; a dashboard already listening there stays up.
+    # The temporary interpreter injects a different port after argv is recorded.
+    occupied = _occupy_loopback(8501)
+    port = _free_port()
+    argv_log = tmp_path / "python-argv.txt"
+    _install_zero_argument_port_probe(checkout, port, argv_log)
     checkout_before = _files(checkout)
-    started = _launch(checkout / "start", caller, [], home)
     try:
-        assert "unbound variable" not in started.output
-        assert started.port == 8501
-        payload = started.bootstrap()
-        assert payload["projects"] == ["example"]
-        assert _files(checkout) - checkout_before == INIT_FILES
-        assert not (checkout / "app" / "config.yaml").exists()
-        assert list(caller.iterdir()) == []
+        started = _launch(checkout / "start", caller, [], home)
+        try:
+            assert "unbound variable" not in started.output
+            assert argv_log.read_text(encoding="utf-8").splitlines() == ["-m", "ui.server"]
+            assert started.port == port
+            if occupied is not None:
+                assert port != 8501
+            payload = started.bootstrap()
+            assert payload["projects"] == ["example"]
+            assert _files(checkout) - checkout_before == INIT_FILES
+            assert not (checkout / "app" / "config.yaml").exists()
+            assert list(caller.iterdir()) == []
+        finally:
+            started.close()
     finally:
-        started.close()
+        if occupied is not None:
+            occupied.close()
 
 
 def test_start_missing_workspace_value_exits(tmp_path: Path) -> None:
