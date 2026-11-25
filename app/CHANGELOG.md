@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Ignore a late same-project analytics response after a newer refresh. An older success cannot replace the newer comparison, and an older or stale error cannot clear it. Idle polls still do not reread analytics.
 - Refresh an already-open dashboard after an external CLI run finishes between polls, including Research Outputs and run-comparison checkboxes. Polling still skips unchanged catalogs and does not reread output files on every tick.
 - Reject an empty `--create-project` name before starting a run or writing to a project.
 - Generate recovery commands for the interrupted project and workspace, preserving its provider, model and round limit. An interrupted offline mock offers a new offline mock run.

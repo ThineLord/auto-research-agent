@@ -361,7 +361,8 @@ let selected = "",
   modelError = "",
   result = null,
   runningAction = false,
-  version = 0;
+  version = 0,
+  analyticsRequest = 0;
 const t = (key, args = {}) => {
   let value =
     copy[state.lang][key] ?? boot?.translations?.[state.lang]?.[key] ?? key;
@@ -690,17 +691,33 @@ function renderAnalytics() {
   $("#view").innerHTML =
     `${analysis.available ? `<div class="analytics-cards">${analysis.cards.map((c) => `<div class="card"><span class="metric-label">${e(t(c.label_key))}</span><span class="metric-value">${e(display(c.value))}</span></div>`).join("")}</div>` : ""}<div class="data-tabs">${tabs.map((n) => `<button data-chart="${n}" class="${state.chart === n ? "active" : ""}">${t(n)}</button>`).join("")}</div><section class="card">${analysis.blocked_reason ? `<p class="hint-banner">${e(t(analysis.blocked_reason))}</p>` : ""}${comparisonPicker}${actual.length ? `${!["metadata", "comparison"].includes(state.chart) ? chart(actual) : ""}${table(actual)}` : empty()}</section>`;
 }
+function invalidateAnalytics() {
+  // `version` changes on project switch only. A same-project refresh must also
+  // retire analytics requests that are already in flight.
+  analysis = null;
+  analyticsRequest += 1;
+}
+function analyticsIsCurrent(project, projectVersion, request) {
+  return (
+    project === selected &&
+    projectVersion === version &&
+    request === analyticsRequest
+  );
+}
 async function loadAnalytics() {
-  const p = selected;
-  const current = version;
+  const project = selected;
+  const projectVersion = version;
+  const request = ++analyticsRequest;
   try {
     const value = await api(query("analytics"));
-    if (p !== selected || current !== version) return;
+    if (!analyticsIsCurrent(project, projectVersion, request)) return;
     analysis = value;
     if (state.page === "analytics") renderAnalytics();
   } catch (err) {
+    if (!analyticsIsCurrent(project, projectVersion, request)) return;
     toast(err.message, true);
-    if (state.page === "analytics") $("#view").innerHTML = empty();
+    if (state.page === "analytics" && analysis == null)
+      $("#view").innerHTML = empty();
   }
 }
 function revealActiveSetting() {
@@ -811,7 +828,7 @@ async function loadProject(name) {
   const current = ++version;
   selected = name;
   data = null;
-  analysis = null;
+  invalidateAnalytics();
   syncedGeneration = "";
   comparisonSelection = null;
   outputIndex = 0;
@@ -1099,7 +1116,7 @@ async function syncSettledResearch(project, current) {
   const focused = editorFocused();
   mergeInputs(project, workspace, focused ? state.editor : null);
   syncedGeneration = researchGeneration(workspace);
-  analysis = null;
+  invalidateAnalytics();
   const outputsChanged = outputSignature(data.outputs) !== previousOutputs;
   if (state.page === "dashboard") {
     if (focused) updateOutputCount();
