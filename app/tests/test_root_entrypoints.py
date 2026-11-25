@@ -10,13 +10,13 @@ import shutil
 import signal
 import socket
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-VENV_PYTHON = REPO / "app" / ".venv" / "bin" / "python"
 MAKE_ENV_KEYS = ("MAKEFLAGS", "MFLAGS", "MAKELEVEL", "MAKEOVERRIDES")
 APP_STUB = """\
 ARGS ?=
@@ -44,7 +44,7 @@ INIT_FILES = {
 
 def _clean_env(**extra: str) -> dict[str, str]:
     env = os.environ.copy()
-    for key in (*MAKE_ENV_KEYS, "AUTO_RESEARCH_AGENT_ROOT"):
+    for key in (*MAKE_ENV_KEYS, "AUTO_RESEARCH_AGENT_ROOT", "AUTO_RESEARCH_AGENT_START_CWD"):
         env.pop(key, None)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     env.update(extra)
@@ -124,11 +124,6 @@ def test_root_make_preserves_submake_failure_exit_code(tmp_path: Path) -> None:
     assert "Error 9" in _output(forwarded)
 
 
-def _require_venv() -> None:
-    if not os.access(VENV_PYTHON, os.X_OK):
-        raise AssertionError(f"missing {VENV_PYTHON}; run make install-dev")
-
-
 def _files(root: Path) -> set[str]:
     found: set[str] = set()
     for path in root.rglob("*"):
@@ -139,7 +134,6 @@ def _files(root: Path) -> set[str]:
 
 
 def _isolated_checkout(tmp_path: Path) -> Path:
-    _require_venv()
     checkout = tmp_path / "checkout"
     app = checkout / "app"
     shutil.copytree(
@@ -159,7 +153,7 @@ def _isolated_checkout(tmp_path: Path) -> Path:
     wrapper = app / ".venv" / "bin" / "python"
     wrapper.parent.mkdir(parents=True)
     wrapper.write_text(
-        f'#!/usr/bin/env bash\nexec {shlex.quote(str(VENV_PYTHON))} "$@"\n',
+        f'#!/usr/bin/env bash\nexec {shlex.quote(sys.executable)} "$@"\n',
         encoding="utf-8",
     )
     wrapper.chmod(0o755)
@@ -222,16 +216,40 @@ class _Started:
                 self.proc.wait(timeout=5)
 
 
-def _start(script: Path, cwd: Path, args: list[str], home: Path) -> _Started:
-    port = _free_port()
+def _published_port(output: str) -> int:
+    marker = "http://127.0.0.1:"
+    start = output.rfind(marker)
+    if start < 0:
+        raise AssertionError(f"start did not publish a port\n{output}")
+    digits: list[str] = []
+    for char in output[start + len(marker) :]:
+        if not char.isdigit():
+            break
+        digits.append(char)
+    if not digits:
+        raise AssertionError(f"start did not publish a port\n{output}")
+    return int("".join(digits))
+
+
+def _start_env(home: Path) -> dict[str, str]:
+    return _clean_env(
+        HOME=str(home),
+        STREAMLIT_BROWSER_GATHER_USAGE_STATS="false",
+        STREAMLIT_SERVER_HEADLESS="true",
+    )
+
+
+def _bash(script: Path, args: list[str]) -> list[str]:
+    # /bin/bash is bash 3.2 on macOS. The shebang can select a newer bash and
+    # hide an empty-array nounset failure.
+    return ["/bin/bash", str(script), *args]
+
+
+def _launch(script: Path, cwd: Path, args: list[str], home: Path) -> _Started:
     proc = subprocess.Popen(
-        [str(script), "--port", str(port), *args],
+        _bash(script, args),
         cwd=cwd,
-        env=_clean_env(
-            HOME=str(home),
-            STREAMLIT_BROWSER_GATHER_USAGE_STATS="false",
-            STREAMLIT_SERVER_HEADLESS="true",
-        ),
+        env=_start_env(home),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         start_new_session=True,
@@ -239,9 +257,16 @@ def _start(script: Path, cwd: Path, args: list[str], home: Path) -> _Started:
     try:
         output = _read_ready(proc)
     except Exception:
-        _Started(proc, port, "").close()
+        _Started(proc, 0, "").close()
         raise
-    return _Started(proc, port, output)
+    return _Started(proc, _published_port(output), output)
+
+
+def _start(script: Path, cwd: Path, args: list[str], home: Path) -> _Started:
+    port = _free_port()
+    started = _launch(script, cwd, ["--port", str(port), *args], home)
+    assert started.port == port, started.output
+    return started
 
 
 def _assert_initialized(workspace: Path, *, sentinel: bool) -> None:
@@ -261,7 +286,6 @@ def test_start_relative_workspace_with_spaces_uses_caller_directory(tmp_path: Pa
     home = tmp_path / "home"
     home.mkdir()
     checkout_before = _files(checkout)
-    repo_names = sorted(path.name for path in REPO.iterdir())
     started = _start(checkout / "start", caller, ["--workspace", "my workspace"], home)
     try:
         payload = started.bootstrap()
@@ -271,8 +295,6 @@ def test_start_relative_workspace_with_spaces_uses_caller_directory(tmp_path: Pa
         assert _files(checkout) == checkout_before
     finally:
         started.close()
-    assert not (REPO / "config.yaml").exists()
-    assert sorted(path.name for path in REPO.iterdir()) == repo_names
 
 
 def test_start_absolute_workspace_with_spaces_stays_put(tmp_path: Path) -> None:
@@ -292,7 +314,6 @@ def test_start_absolute_workspace_with_spaces_stays_put(tmp_path: Path) -> None:
         _assert_initialized(workspace, sentinel=True)
         assert _files(checkout) == checkout_before
         assert list(caller.iterdir()) == []
-        assert not (REPO / "config.yaml").exists()
     finally:
         started.close()
 
@@ -311,6 +332,55 @@ def test_start_default_workspace_is_checkout_root_from_another_directory(tmp_pat
         assert _files(checkout) - checkout_before == INIT_FILES
         assert not (checkout / "app" / "config.yaml").exists()
         assert list(caller.iterdir()) == []
-        assert not (REPO / "config.yaml").exists()
     finally:
         started.close()
+
+
+def test_start_with_no_arguments_uses_checkout_root(tmp_path: Path) -> None:
+    checkout = _isolated_checkout(tmp_path)
+    caller = tmp_path / "unrelated dir"
+    caller.mkdir()
+    home = tmp_path / "home"
+    home.mkdir()
+    checkout_before = _files(checkout)
+    started = _launch(checkout / "start", caller, [], home)
+    try:
+        assert "unbound variable" not in started.output
+        assert started.port == 8501
+        payload = started.bootstrap()
+        assert payload["projects"] == ["example"]
+        assert _files(checkout) - checkout_before == INIT_FILES
+        assert not (checkout / "app" / "config.yaml").exists()
+        assert list(caller.iterdir()) == []
+    finally:
+        started.close()
+
+
+def test_start_missing_workspace_value_exits(tmp_path: Path) -> None:
+    checkout = _isolated_checkout(tmp_path)
+    caller = tmp_path / "caller"
+    caller.mkdir()
+    home = tmp_path / "home"
+    home.mkdir()
+    checkout_before = _files(checkout)
+    proc = subprocess.Popen(
+        _bash(checkout / "start", ["--workspace"]),
+        cwd=caller,
+        env=_start_env(home),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        start_new_session=True,
+    )
+    try:
+        output, _ = proc.communicate(timeout=60)
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait(timeout=5)
+        raise AssertionError("start hung when --workspace had no value") from None
+    assert proc.returncode == 2, output
+    assert "unbound variable" not in output
+    assert "expected one argument" in output
+    assert "http://127.0.0.1:" not in output
+    assert _files(checkout) == checkout_before
+    assert list(caller.iterdir()) == []

@@ -1,39 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 WORKSPACE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-# Resolve a relative --workspace before cd. The server runs with cwd app/, so
-# a caller-relative path would otherwise be resolved against app/.
-CALLER_DIR="$(pwd)"
-args=()
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --workspace)
-      if [[ $# -lt 2 ]]; then
-        args+=("$1")
-        shift
-        break
-      fi
-      value="$2"
-      if [[ -n "$value" && "$value" != /* ]]; then
-        value="${CALLER_DIR}/${value}"
-      fi
-      args+=("--workspace" "$value")
-      shift 2
-      ;;
-    --workspace=*)
-      value="${1#--workspace=}"
-      if [[ -n "$value" && "$value" != /* ]]; then
-        value="${CALLER_DIR}/${value}"
-      fi
-      args+=("--workspace=${value}")
-      shift
-      ;;
-    *)
-      args+=("$1")
-      shift
-      ;;
-  esac
-done
+# This start only. The server resolves an explicit --workspace against the
+# caller's directory after argparse. The shell passes arguments through:
+# bash 3.2 with nounset rejects an empty array expansion, so `./start`
+# with no arguments must not build one. With no --workspace, the server
+# still uses the parent of app/. Absolute paths are not rewritten here.
+export AUTO_RESEARCH_AGENT_START_CWD="$(pwd)"
 cd "${WORKSPACE_DIR}/app"
 if [[ ! -x .venv/bin/python && -z "${PYTHON:-}" ]]; then
   for candidate in python3.13 python3.12 python3.11 python3.10 python3; do
@@ -44,4 +17,4 @@ if [[ ! -x .venv/bin/python && -z "${PYTHON:-}" ]]; then
   done
 fi
 make install
-exec .venv/bin/python -m ui.server "${args[@]}"
+exec .venv/bin/python -m ui.server "$@"
