@@ -342,7 +342,10 @@ are unavailable. Configuration lives under `literature_survey:` in `config.yaml`
 
 Generated survey artifacts live under `projects/<project>/survey/` by default and are ignored by
 git. Keep example or golden outputs under `docs/examples/` instead of committing local project
-survey output.
+survey output. Collection skips that default group, the rest of the configured output
+directory, and the explicit `--survey-output` group (report, related work, metadata, and
+manifest) in both flat and legacy projects. Other project markdown stays eligible. Recorded source paths stay workspace-relative, including distinct run
+directories for same-named flat-project drafts.
 
 Survey metadata artifacts are expected to stay deterministic and schema-additive: parsers normalize
 DOI/arXiv aliases for deduplication, and both `paper_metadata.json` and `survey_manifest.json`

@@ -35,6 +35,18 @@ Survey mode reads existing markdown and text sources under the selected project.
 - simple frontmatter-like `---` metadata blocks
 - DOI and arXiv identifiers in tables, metadata blocks, links, or reference text
 
+Generated survey artifacts are not scanned again. The skipped group is the report,
+`related_work.md`, `paper_metadata.json`, and `survey_manifest.json`, both under the
+default `output_dir` (normally `survey/`) and beside an explicit `--survey-output`
+path. The configured output directory itself is also left unread. The same rule applies
+in a flat project folder and in a legacy `projects/<project>/` folder. Other markdown,
+including other top-level project files, is still read.
+
+Manifest `source_files`, paper `source_paths`, and the report's source list are
+workspace-relative and do not contain absolute paths. A flat project keeps the run
+directory, so drafts that share a filename stay distinct. Legacy projects keep paths
+under `projects/<project>/`.
+
 ## Outputs
 
 The workflow writes:

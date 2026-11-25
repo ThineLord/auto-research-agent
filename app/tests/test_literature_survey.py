@@ -18,6 +18,14 @@ from src.literature_survey import (
 )
 from src.project_input import load_project_input
 
+EXAMPLE_DIR = Path(__file__).resolve().parents[2] / "example"
+PUBLIC_EXAMPLE_TITLES = {
+    "MemGPT: Towards LLMs as Operating Systems",
+    "Privacy Attacks for Long-Term Agent Memory",
+    "MemoryAgentBench: Evaluating Long-Term Agent Memory",
+    "Membership Inference Attacks Against Machine Learning Models",
+}
+
 
 class LiteratureSurveyTests(unittest.TestCase):
     @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlinks are unavailable")
@@ -354,6 +362,329 @@ Topics: agent memory
             )
             self.assertNotIn(raw_root, output)
             self.assertNotIn(raw_root, serialized_artifacts)
+
+    def test_repeated_custom_survey_ignores_generated_artifacts(self) -> None:
+        for layout in ("flat", "legacy"):
+            with self.subTest(layout=layout):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    project_dir = _prepare_public_example(root, layout)
+                    _write_paper_block(
+                        project_dir / "custom_survey.md",
+                        "Seeded Custom Survey Paper",
+                    )
+                    _write_paper_block(
+                        project_dir / "related_work.md",
+                        "Seeded Custom Related Work Paper",
+                    )
+                    _write_paper_block(
+                        project_dir / "survey" / "survey_report.md",
+                        "Seeded Default Survey Paper",
+                    )
+                    _write_paper_block(
+                        project_dir / "survey" / "related_work.md",
+                        "Seeded Default Related Work Paper",
+                    )
+                    project_input = load_project_input(
+                        root=root,
+                        project_name="example",
+                        explicit_project=True,
+                    )
+                    snapshots = [
+                        _survey_snapshot(
+                            _run_custom_survey(project_input, project_dir / "custom_survey.md")
+                        )
+                        for _ in range(3)
+                    ]
+
+                    self.assertEqual(snapshots[0], snapshots[1])
+                    self.assertEqual(snapshots[1], snapshots[2])
+                    (
+                        paper_count,
+                        quality,
+                        manifest_count,
+                        manifest_quality,
+                        sources,
+                        paper_sources,
+                    ) = snapshots[0]
+                    self.assertEqual(paper_count, 4)
+                    self.assertEqual(manifest_count, 4)
+                    self.assertEqual(quality["paper_count"], 4)
+                    self.assertEqual(manifest_quality, quality)
+                    self.assertEqual(set(paper_sources), PUBLIC_EXAMPLE_TITLES)
+                    prefix = "projects/example" if layout == "legacy" else "example"
+                    self.assertEqual(
+                        sources,
+                        (
+                            f"{prefix}/literature_survey_sources.md",
+                            f"{prefix}/task.md",
+                        ),
+                    )
+                    serialized = json.dumps(snapshots)
+                    self.assertNotIn("Seeded Custom Survey Paper", serialized)
+                    self.assertNotIn("Seeded Custom Related Work Paper", serialized)
+                    self.assertNotIn("Seeded Default Survey Paper", serialized)
+                    self.assertNotIn("Seeded Default Related Work Paper", serialized)
+                    self.assertNotIn("custom_survey.md", serialized)
+                    self.assertNotIn("related_work.md", serialized)
+                    self.assertNotIn(str(root), serialized)
+
+    def test_other_project_markdown_stays_a_source_across_repeated_surveys(self) -> None:
+        for layout in ("flat", "legacy"):
+            with self.subTest(layout=layout):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    project_dir = _prepare_public_example(root, layout)
+                    _write_paper_block(project_dir / "field_notes.md", "Kept User Field Note")
+                    project_input = load_project_input(
+                        root=root,
+                        project_name="example",
+                        explicit_project=True,
+                    )
+                    snapshots = [
+                        _survey_snapshot(
+                            _run_custom_survey(project_input, project_dir / "custom_survey.md")
+                        )
+                        for _ in range(3)
+                    ]
+
+                    self.assertEqual(snapshots[0], snapshots[1])
+                    self.assertEqual(snapshots[1], snapshots[2])
+                    paper_count, quality, _manifest_count, manifest_quality, sources, titles = (
+                        snapshots[0]
+                    )
+                    self.assertEqual(paper_count, 5)
+                    self.assertEqual(quality, manifest_quality)
+                    self.assertEqual(quality["paper_count"], 5)
+                    self.assertIn("Kept User Field Note", titles)
+                    prefix = "projects/example" if layout == "legacy" else "example"
+                    self.assertEqual(
+                        sources,
+                        (
+                            f"{prefix}/field_notes.md",
+                            f"{prefix}/literature_survey_sources.md",
+                            f"{prefix}/task.md",
+                        ),
+                    )
+
+    def test_default_output_skips_survey_dir_and_keeps_user_related_work(self) -> None:
+        for layout in ("flat", "legacy"):
+            with self.subTest(layout=layout):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    project_dir = _prepare_public_example(root, layout)
+                    _write_paper_block(project_dir / "related_work.md", "Kept User Related Work")
+                    _write_paper_block(project_dir / "reading_list.md", "Kept User Reading List")
+                    _write_paper_block(
+                        project_dir / "survey" / "survey_report.md",
+                        "Seeded Default Survey Paper",
+                    )
+                    _write_paper_block(
+                        project_dir / "survey" / "related_work.md",
+                        "Seeded Default Related Work Paper",
+                    )
+                    project_input = load_project_input(
+                        root=root,
+                        project_name="example",
+                        explicit_project=True,
+                    )
+                    config = LiteratureSurveyConfig(source_globs=("**/*.md",))
+                    snapshots = [
+                        _survey_snapshot(
+                            run_literature_survey_mode(
+                                console=Console(),
+                                project_input=project_input,
+                                config=config,
+                            )
+                        )
+                        for _ in range(3)
+                    ]
+
+                    self.assertEqual(snapshots[0], snapshots[1])
+                    self.assertEqual(snapshots[1], snapshots[2])
+                    paper_count, quality, _manifest_count, manifest_quality, sources, titles = (
+                        snapshots[0]
+                    )
+                    self.assertEqual(paper_count, 6)
+                    self.assertEqual(quality, manifest_quality)
+                    self.assertIn("Kept User Related Work", titles)
+                    self.assertIn("Kept User Reading List", titles)
+                    self.assertNotIn("Seeded Default Survey Paper", titles)
+                    self.assertNotIn("Seeded Default Related Work Paper", titles)
+                    prefix = "projects/example" if layout == "legacy" else "example"
+                    self.assertEqual(
+                        sources,
+                        (
+                            f"{prefix}/literature_survey_sources.md",
+                            f"{prefix}/reading_list.md",
+                            f"{prefix}/related_work.md",
+                            f"{prefix}/task.md",
+                        ),
+                    )
+                    self.assertFalse(any("/survey/" in source for source in sources))
+
+    def test_explicit_nested_report_skips_only_its_artifact_group(self) -> None:
+        for layout in ("flat", "legacy"):
+            with self.subTest(layout=layout):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    project_dir = _prepare_public_example(root, layout)
+                    _write_paper_block(
+                        project_dir / "outputs" / "kept_source.md",
+                        "Kept Nested User Source",
+                    )
+                    _write_paper_block(
+                        project_dir / "outputs" / "custom_survey.md",
+                        "Seeded Nested Survey Paper",
+                    )
+                    _write_paper_block(
+                        project_dir / "outputs" / "related_work.md",
+                        "Seeded Nested Related Work Paper",
+                    )
+                    project_input = load_project_input(
+                        root=root,
+                        project_name="example",
+                        explicit_project=True,
+                    )
+                    report_path = project_dir / "outputs" / "custom_survey.md"
+                    snapshots = [
+                        _survey_snapshot(_run_custom_survey(project_input, report_path))
+                        for _ in range(3)
+                    ]
+
+                    self.assertEqual(snapshots[0], snapshots[1])
+                    self.assertEqual(snapshots[1], snapshots[2])
+                    paper_count, quality, _manifest_count, manifest_quality, sources, titles = (
+                        snapshots[0]
+                    )
+                    self.assertEqual(paper_count, 5)
+                    self.assertEqual(quality, manifest_quality)
+                    self.assertIn("Kept Nested User Source", titles)
+                    self.assertNotIn("Seeded Nested Survey Paper", titles)
+                    self.assertNotIn("Seeded Nested Related Work Paper", titles)
+                    prefix = "projects/example" if layout == "legacy" else "example"
+                    self.assertEqual(
+                        sources,
+                        (
+                            f"{prefix}/literature_survey_sources.md",
+                            f"{prefix}/outputs/kept_source.md",
+                            f"{prefix}/task.md",
+                        ),
+                    )
+
+    def test_flat_and_legacy_source_paths_keep_run_directories(self) -> None:
+        drafts = {
+            "run-one": "Run One Distinct Draft Paper",
+            "run-two": "Run Two Distinct Draft Paper",
+        }
+        for layout in ("flat", "legacy"):
+            with self.subTest(layout=layout):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    project_dir = _project_dir(root, layout, "survey_demo")
+                    project_dir.mkdir(parents=True)
+                    (project_dir / "task.md").write_text("# Survey\n", encoding="utf-8")
+                    for run_name, title in drafts.items():
+                        draft = project_dir / "runs" / run_name / "round_01" / "01_draft.md"
+                        _write_paper_block(draft, title)
+                    project_input = load_project_input(
+                        root=root,
+                        project_name="survey_demo",
+                        explicit_project=True,
+                    )
+                    snapshots = []
+                    reports = []
+                    consoles = []
+                    for _ in range(2):
+                        console = Console(record=True, width=200)
+                        result = run_literature_survey_mode(
+                            console=console,
+                            project_input=project_input,
+                            config=LiteratureSurveyConfig(),
+                        )
+                        snapshots.append(_survey_snapshot(result))
+                        reports.append(result.report_path.read_text(encoding="utf-8"))
+                        consoles.append(console.export_text(styles=False))
+
+                    self.assertEqual(snapshots[0], snapshots[1])
+                    metadata = json.loads(
+                        (project_dir / "survey" / "paper_metadata.json").read_text(encoding="utf-8")
+                    )
+                    by_title = {
+                        paper["title"]: paper["source_paths"] for paper in metadata["papers"]
+                    }
+                    prefix = "projects/survey_demo" if layout == "legacy" else "survey_demo"
+                    expected = {
+                        title: [f"{prefix}/runs/{run_name}/round_01/01_draft.md"]
+                        for run_name, title in drafts.items()
+                    }
+                    self.assertEqual(
+                        {title: by_title[title] for title in drafts.values()},
+                        expected,
+                    )
+                    metadata_text = (project_dir / "survey" / "paper_metadata.json").read_text(
+                        encoding="utf-8"
+                    )
+                    manifest_text = (project_dir / "survey" / "survey_manifest.json").read_text(
+                        encoding="utf-8"
+                    )
+                    rendered = "\n".join(reports + consoles) + metadata_text + manifest_text
+                    self.assertNotIn("<repo>/01_draft.md", rendered)
+                    self.assertNotIn(str(root), rendered)
+                    for run_name in drafts:
+                        relative = f"{prefix}/runs/{run_name}/round_01/01_draft.md"
+                        self.assertIn(relative, reports[0])
+                        self.assertIn(relative, snapshots[0][4])
+
+
+def _project_dir(root: Path, layout: str, name: str) -> Path:
+    if layout == "legacy":
+        return root / "projects" / name
+    if layout == "flat":
+        return root / name
+    raise AssertionError(layout)
+
+
+def _prepare_public_example(root: Path, layout: str) -> Path:
+    project_dir = _project_dir(root, layout, "example")
+    project_dir.mkdir(parents=True)
+    for name in ("task.md", "literature_survey_sources.md"):
+        (project_dir / name).write_text(
+            (EXAMPLE_DIR / name).read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+    return project_dir
+
+
+def _write_paper_block(path: Path, title: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f"Title: {title}\nAuthors: Survey Fixture\nYear: 2016\nVenue: Fixture\n",
+        encoding="utf-8",
+    )
+
+
+def _run_custom_survey(project_input, report_path: Path):
+    return run_literature_survey_mode(
+        console=Console(),
+        project_input=project_input,
+        config=LiteratureSurveyConfig(),
+        output_path=report_path,
+    )
+
+
+def _survey_snapshot(result):
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+    manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+    titles = tuple(paper["title"] for paper in metadata["papers"])
+    return (
+        metadata["paper_count"],
+        metadata["metadata_quality"],
+        manifest["paper_count"],
+        manifest["metadata_quality"],
+        tuple(manifest["source_files"]),
+        titles,
+    )
 
 
 if __name__ == "__main__":
