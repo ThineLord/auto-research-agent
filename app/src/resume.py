@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 import math
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from rich.console import Console
 
 from .agents import ResearchAgents
 from .config import DEFAULT_DRAFTING_MODE
+from .mock_run import MOCK_MODEL_NAME, MOCK_MODEL_PROVIDER
 from .resume_safety import (
     RESUME_PATH_MESSAGES,
     RUN_ID_MISMATCH,
@@ -22,8 +23,8 @@ from .resume_safety import (
 )
 from .round_attempts import classify_round_recovery
 from .round_commit_recovery import round_commit_read_blocker
-from .run_config import INHERIT_GIT_ROOT, GitRootSetting
-from .runner import ResumeHistoryError, run_iterative_rounds
+from .run_config import INHERIT_GIT_ROOT, GitRootSetting, read_run_config
+from .runner import ResumeHistoryError, format_mock_recovery_note, run_iterative_rounds
 from .storage import (
     artifact_path_exists,
     artifact_path_is_safe,
@@ -35,6 +36,8 @@ from .storage import (
 
 ROUND_OUTPUT_FILES = ("01_draft.md", "02_review.md", "03_revised.md", "04_judge.md")
 NEXT_ROUND_FAIL_SAFE_ACTION = "fail_safe_require_user_action"
+OFFLINE_MOCK_BLOCKED_REASON = "offline_mock"
+_OFFLINE_MOCK_MODEL_NAMES = frozenset({MOCK_MODEL_NAME, MOCK_MODEL_PROVIDER})
 
 
 def _safe_int(value: Any, default: int = 0) -> int:
@@ -221,7 +224,111 @@ def inspect_next_round_directory(
     }
 
 
-def build_resume_preview(
+def _is_offline_mock_model(value: Any) -> bool:
+    if isinstance(value, str):
+        return value in _OFFLINE_MOCK_MODEL_NAMES
+    if isinstance(value, dict):
+        names = {
+            item
+            for item in (value.get("provider"), value.get("name"), value.get("label"))
+            if isinstance(item, str)
+        }
+        if names & _OFFLINE_MOCK_MODEL_NAMES:
+            return True
+        if value.get("provider_free") is True:
+            return True
+    return False
+
+
+def _record_is_offline_mock(record: Any) -> bool:
+    if not isinstance(record, dict):
+        return False
+    if record.get("mode") == MOCK_MODEL_PROVIDER or record.get("provider") == MOCK_MODEL_PROVIDER:
+        return True
+    if _is_offline_mock_model(record.get("model")):
+        return True
+    project = record.get("project")
+    if isinstance(project, dict):
+        mock_mode = project.get("mock_mode")
+        if isinstance(mock_mode, dict) and (
+            mock_mode.get("provider_free") is True or mock_mode.get("deterministic") is True
+        ):
+            return True
+    return False
+
+
+def _positive_round_cap(value: Any) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        return None
+    return value
+
+
+def _round_cap_from_record(record: Mapping[str, Any]) -> int | None:
+    direct = _positive_round_cap(record.get("max_rounds"))
+    if direct is not None:
+        return direct
+    runtime = record.get("runtime")
+    if isinstance(runtime, dict):
+        return _positive_round_cap(runtime.get("max_rounds"))
+    return None
+
+
+def _linked_run_record(project_dir: Path, checkpoint: Mapping[str, Any]) -> dict[str, Any]:
+    run_root, error = validate_resume_run_root(
+        project_dir=project_dir,
+        run_root_value=checkpoint.get("run_root"),
+    )
+    if error or run_root is None:
+        return {}
+    config_path = run_root / "run_config.json"
+    manifest_path = run_root / "run_manifest.json"
+    if not resume_artifact_links_are_safe(
+        parent_dir=run_root,
+        paths=(config_path, manifest_path),
+    ):
+        return {}
+    return read_run_config(run_root, safe_artifacts=True, anchor=run_root)
+
+
+def offline_mock_resume_block(
+    *,
+    project_dir: Path,
+    checkpoint: Mapping[str, Any] | None = None,
+    repo_root: Path | None = None,
+    explicit_workspace: Path | None = None,
+    source_layout: bool | None = None,
+) -> dict[str, str] | None:
+    """Refuse ordinary resume of an offline mock before any provider or run write.
+
+    The returned message tells the user to start a new offline mock. ``command`` is
+    empty when the round cap cannot be pinned.
+    """
+
+    ensure_project_runtime_paths_safe(project_dir)
+    if checkpoint is None:
+        checkpoint = read_json_file(project_dir / "checkpoint.json", anchor=project_dir)
+    if not isinstance(checkpoint, Mapping):
+        return None
+    run_record = _linked_run_record(project_dir, checkpoint)
+    if not _record_is_offline_mock(checkpoint) and not _record_is_offline_mock(run_record):
+        return None
+    max_rounds = _round_cap_from_record(run_record)
+    if max_rounds is None:
+        max_rounds = _round_cap_from_record(checkpoint)
+    message = format_mock_recovery_note(
+        project_dir,
+        repo_root,
+        explicit_workspace=explicit_workspace,
+        source_layout=source_layout,
+        max_rounds=max_rounds,
+    )
+    command = ""
+    if "`" in message:
+        command = message.split("`", 2)[1]
+    return {"message": message, "command": command}
+
+
+def _build_resume_preview(
     *,
     project_dir: Path,
     checkpoint: dict[str, Any],
@@ -472,6 +579,38 @@ def build_resume_preview(
         "resume existing run from checkpoint; completed round files will be preserved"
     )
     return preview
+
+
+def build_resume_preview(
+    *,
+    project_dir: Path,
+    checkpoint: dict[str, Any],
+    repo_root: Path | None = None,
+    explicit_workspace: Path | None = None,
+    source_layout: bool | None = None,
+) -> dict[str, Any]:
+    """Preview one resume, refusing ordinary continuation of an offline mock."""
+
+    preview = _build_resume_preview(
+        project_dir=project_dir,
+        checkpoint=checkpoint,
+        repo_root=repo_root,
+    )
+    block = offline_mock_resume_block(
+        project_dir=project_dir,
+        checkpoint=checkpoint,
+        repo_root=repo_root,
+        explicit_workspace=explicit_workspace,
+        source_layout=source_layout,
+    )
+    if block is None:
+        return preview
+    refused = dict(preview)
+    refused["can_resume"] = False
+    refused["blocked_reason"] = OFFLINE_MOCK_BLOCKED_REASON
+    refused["message"] = block["message"]
+    refused["mock_restart_command"] = block["command"]
+    return refused
 
 
 def _print_resume_preview(console: Console, preview: dict[str, Any]) -> None:

@@ -80,7 +80,7 @@ from .package_resources import (
     validate_generation_resources,
 )
 from .project_input import ProjectInputError, load_project_input
-from .resume import checkpoint_read_problem, run_resume_mode
+from .resume import checkpoint_read_problem, offline_mock_resume_block, run_resume_mode
 from .round_commit_recovery import (
     RoundCommitReadError,
     classify_diagnostic_finalize_recovery,
@@ -1059,6 +1059,19 @@ def main() -> None:
                 "unavailable.[/red]"
             )
         raise SystemExit(_EXIT_STARTUP_ERROR) from None
+
+    if args.resume:
+        # A stopped mock stays resumable in its checkpoint, but ordinary resume would
+        # build a real client and append that provider's output to the mock run.
+        mock_block = offline_mock_resume_block(
+            project_dir=project_dir,
+            repo_root=root,
+            explicit_workspace=explicit_workspace,
+            source_layout=layout.source_layout,
+        )
+        if mock_block is not None:
+            console.print(f"[red]Cannot resume: {mock_block['message']}[/red]")
+            raise SystemExit(_EXIT_STARTUP_ERROR)
 
     if getattr(args, "survey", False):
         survey_output = getattr(args, "survey_output", None)

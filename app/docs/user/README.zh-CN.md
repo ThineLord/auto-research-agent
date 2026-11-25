@@ -34,7 +34,7 @@ app/.venv/bin/auto-research-agent --create-project demo --task "A small syntheti
 make mock ARGS="--project demo --max-rounds 1"
 ```
 
-如果 `demo` 已存在，改用新目录名，不要覆盖原文件。在工作台选择该项目查看成果。Mock 结果仅用于检查程序，不是研究发现。
+如果 `demo` 已存在，改用新目录名，不要覆盖原文件。在工作台选择该项目查看成果。Mock 结果仅用于检查程序，不是研究发现。中断的 mock 仍会标记为可恢复，但 `make resume` 和工作台的恢复按钮不会继续它：那会启动真实模型服务。请重新开始一次离线 mock。
 
 ## 运行自己的任务
 

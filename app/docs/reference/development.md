@@ -323,7 +323,12 @@ a discovery result; `execution_authorized` remains false.
 The CLI `--mock` path dispatches after project input resolution and before provider validation. It
 must remain deterministic, provider-free, and schema-additive: no Ollama discovery, Gemini key
 checks, network calls, prompt changes, or scoring-semantic changes. The synthetic Judge score exists
-only to exercise normal artifact writing for CI/docs smoke runs.
+only to exercise normal artifact writing for CI/docs smoke runs. A stopped mock checkpoint may
+still say `can_resume` is true. Ordinary `--resume`, including a switch onto Gemini or Ollama,
+refuses that checkpoint before provider precheck and before it generates or modifies run
+artifacts. The shared preview, CLI, and dashboard resume action use the same refusal and tell the
+user to start a new offline mock. Real-provider pause and resume, including a non-mock model
+switch, keep the existing path.
 The Resume control uses checkpoint metadata to preview run id/root, last completed round, next
 round, stop reason, resume eligibility, completed-round preservation, and next-round directory
 status before launching `--resume`. A non-empty next-round directory is treated as partial or
