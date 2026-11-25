@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 WORKSPACE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# This start only. The server resolves an explicit --workspace against the
+# caller's directory after argparse. The shell passes arguments through:
+# bash 3.2 with nounset rejects an empty array expansion, so `./start`
+# with no arguments must not build one. With no --workspace, the server
+# still uses the parent of app/. Absolute paths are not rewritten here.
+export AUTO_RESEARCH_AGENT_START_CWD="$(pwd)"
 cd "${WORKSPACE_DIR}/app"
 if [[ ! -x .venv/bin/python && -z "${PYTHON:-}" ]]; then
   for candidate in python3.13 python3.12 python3.11 python3.10 python3; do

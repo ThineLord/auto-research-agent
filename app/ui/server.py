@@ -6,6 +6,7 @@ import argparse
 import dataclasses
 import json
 import mimetypes
+import os
 import re
 import secrets
 import threading
@@ -21,6 +22,8 @@ from ui.i18n import TRANSLATIONS
 WEB = Path(__file__).with_name("web")
 TOKEN = secrets.token_urlsafe(32)
 ACTION_LOCK = threading.Lock()
+# Set by ./start for the server process it execs, then removed before serving.
+START_CALLER_CWD_ENV = "AUTO_RESEARCH_AGENT_START_CWD"
 
 
 def project(name: str) -> Path:
@@ -467,6 +470,27 @@ def initialize_workspace():
             pass
 
 
+def apply_explicit_workspace(workspace: Path | None) -> None:
+    """Resolve one explicit --workspace after argparse.
+
+    ./start changes into app/ and records the caller directory for this
+    process only. A relative path is resolved against that directory. An
+    absolute path is not joined with it. With no --workspace, the parent of
+    app/ remains the workspace.
+    """
+    caller = os.environ.pop(START_CALLER_CWD_ENV, "")
+    if not workspace:
+        return
+    if workspace.is_absolute() or not caller:
+        selected = workspace
+    else:
+        selected = Path(caller) / workspace
+    resolved = selected.resolve()
+    h.ROOT = resolved
+    h.CONFIG_PATH = resolved / "config.yaml"
+    h.CANONICAL_ROOT = resolved
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8501)
@@ -474,10 +498,7 @@ def main():
         "--workspace", type=Path, help="Explicit workspace folder; defaults to the app parent."
     )
     args = parser.parse_args()
-    if args.workspace:
-        h.ROOT = args.workspace.resolve()
-        h.CONFIG_PATH = h.ROOT / "config.yaml"
-        h.CANONICAL_ROOT = h.ROOT
+    apply_explicit_workspace(args.workspace)
     initialize_workspace()
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     print(f"Auto research agent · http://127.0.0.1:{args.port}", flush=True)
