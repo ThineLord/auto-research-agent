@@ -268,26 +268,40 @@ def _strong_offline_mock(record: Mapping[str, Any]) -> bool:
     return False
 
 
+def _text_in(value: Any, options: frozenset[str]) -> bool:
+    """Set membership only after the parsed JSON value is known to be text."""
+
+    return isinstance(value, str) and value in options
+
+
 def _name_only_offline_mock(record: Mapping[str, Any]) -> bool:
     """Historical fallback: the model name alone, with no provider proof."""
 
     model = record.get("model")
     if isinstance(model, str):
-        return model in _OFFLINE_MOCK_MODEL_NAMES
+        return _text_in(model, _OFFLINE_MOCK_MODEL_NAMES)
     if isinstance(model, dict):
-        return any(model.get(key) in _OFFLINE_MOCK_MODEL_NAMES for key in ("name", "label"))
+        return any(_text_in(model.get(key), _OFFLINE_MOCK_MODEL_NAMES) for key in ("name", "label"))
     return False
 
 
-def _proven_real_provider(record: Mapping[str, Any]) -> bool:
-    return record.get("mode") in _REAL_RUN_MODES and _record_provider(record) in _REAL_PROVIDERS
+def _explicit_real_mode(record: Mapping[str, Any]) -> bool:
+    return _text_in(record.get("mode"), _REAL_RUN_MODES)
+
+
+def _explicit_real_provider(record: Mapping[str, Any]) -> bool:
+    return _text_in(_record_provider(record), _REAL_PROVIDERS)
 
 
 def _records_are_offline_mock(*records: Any) -> bool:
+    """Combine same-run evidence. Strong mock proof still outranks a real provider."""
+
     present = [record for record in records if isinstance(record, Mapping) and record]
     if any(_strong_offline_mock(record) for record in present):
         return True
-    if any(_proven_real_provider(record) for record in present):
+    real_mode = any(_explicit_real_mode(record) for record in present)
+    real_provider = any(_explicit_real_provider(record) for record in present)
+    if real_mode and real_provider:
         return False
     return any(_name_only_offline_mock(record) for record in present)
 
@@ -369,12 +383,22 @@ def _combine_same_run_records(
     return combined
 
 
+def _offline_manifest_evidence(manifest: Mapping[str, Any]) -> dict[str, Any]:
+    """Read mock evidence from a manifest without presenting it as a repaired config."""
+
+    if not manifest or not _strong_offline_mock(manifest):
+        return {}
+    kept = ("mode", "provider", "model", "project", "max_rounds", "runtime")
+    return {key: manifest[key] for key in kept if key in manifest}
+
+
 def _linked_run_record(project_dir: Path, checkpoint: Mapping[str, Any]) -> dict[str, Any]:
     """Read one run's config and manifest after the checkpoint path is verified.
 
     A readable ``run_config.json`` used to hide ``run_manifest.json``. Missing mode
     or model is filled from that same run's manifest. A conflicting run id or path
-    is ignored, and an unreadable config still hides the manifest.
+    is ignored. A damaged config is left unchanged: the manifest is not copied over
+    it, and it is consulted only when that same run already shows an offline mock.
     """
 
     run_root, error = validate_resume_run_root(
@@ -391,13 +415,13 @@ def _linked_run_record(project_dir: Path, checkpoint: Mapping[str, Any]) -> dict
     ):
         return {}
     config_state, config = _read_linked_json(config_path, run_root)
-    if config_state == "invalid":
-        return {}
-    if config_state == "object" and not _same_run_record(config, run_root):
-        config = {}
     manifest_state, manifest = _read_linked_json(manifest_path, run_root)
     if manifest_state != "object" or not _same_run_record(manifest, run_root):
         manifest = {}
+    if config_state == "invalid":
+        return _offline_manifest_evidence(manifest)
+    if config_state == "object" and not _same_run_record(config, run_root):
+        config = {}
     if not config and not manifest:
         return {}
     return _combine_same_run_records(config, manifest)
@@ -415,9 +439,10 @@ def offline_mock_resume_block(
 
     Strong evidence is mock mode, the mock provider, or provider-free mock metadata.
     A historical model name of ``mock`` or ``mock-deterministic`` is only a fallback,
-    and it does not override a run that already records a real provider. The returned
-    message tells the user to start a new offline mock. ``command`` is empty when the
-    round cap cannot be pinned.
+    and it does not override explicit real mode and provider evidence from the same
+    run, even when those fields sit on different records. The returned message tells
+    the user to start a new offline mock. ``command`` is empty when the round cap
+    cannot be pinned.
     """
 
     ensure_project_runtime_paths_safe(project_dir)

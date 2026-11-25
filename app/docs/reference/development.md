@@ -330,7 +330,11 @@ artifacts. The shared preview, CLI, and dashboard resume action use the same ref
 user to start a new offline mock. Strong evidence is mock mode, the mock provider, or
 provider-free mock metadata. A historical record that only repeats the model name `mock` or
 `mock-deterministic` is still refused, but an explicit normal run whose provider is already
-Ollama or Gemini keeps that name and stays on the real resume path. If `config.yaml` is
+Ollama or Gemini keeps that name and stays on the real resume path. That mode and provider
+may be recorded on different same-run files. A truncated `run_config.json` does not hide an
+explicit same-run mock manifest, and the manifest is not written back over the damaged file.
+Non-string mode or model name fields are ignored by this check, so dashboard status and an
+existing recovery block still load. If `config.yaml` is
 missing, ordinary resume of the explicitly selected offline mock explains the new mock command
 and does not select another project or contact a provider; a missing or invalid config for any
 other resume is unchanged. An existing finalization conflict, pending transaction, or unsafe

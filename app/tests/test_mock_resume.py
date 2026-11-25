@@ -797,3 +797,158 @@ def test_recovered_finalization_mock_is_refused_before_provider_precheck(
     precheck.assert_not_called()
     run_rounds.assert_not_called()
     assert hashes(project) == recovered
+
+
+def test_truncated_run_config_still_refuses_same_run_mock_manifest(tmp_path, monkeypatch):
+    project, run_root = _old_project(
+        tmp_path,
+        {},
+        {
+            "run_config.json": "{",
+            "run_manifest.json": json.dumps(
+                {"run_id": "old-mock", "mode": "mock", "model": "mock-deterministic"}
+            ),
+        },
+    )
+    config_path = run_root / "run_config.json"
+    assert config_path.read_text(encoding="utf-8") == "{"
+    saved = json.loads((project / "checkpoint.json").read_text(encoding="utf-8"))
+    assert "mode" not in saved
+    assert "model" not in saved
+    before = hashes(project)
+    preview = build_resume_preview(project_dir=project, checkpoint=saved, repo_root=tmp_path)
+    assert preview["can_resume"] is False
+    assert preview["blocked_reason"] == OFFLINE_MOCK_BLOCKED_REASON
+    assert "offline mock" in preview["message"]
+    assert config_path.read_text(encoding="utf-8") == "{"
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            sys.executable,
+            "--workspace",
+            str(tmp_path),
+            "--project",
+            "demo",
+            "--resume",
+            "--provider",
+            "gemini",
+            "--model",
+            "gemini-2.5-flash",
+        ],
+    )
+    with (
+        patch.object(cli_module, "create_llm_client") as create_client,
+        patch.object(cli_module, "_validate_model_provider_startup") as precheck,
+        patch.object(cli_module, "run_resume_mode") as resume_mode,
+        patch("src.resume.run_iterative_rounds") as run_rounds,
+        pytest.raises(SystemExit) as raised,
+    ):
+        cli_module.main()
+    assert raised.value.code == 2
+    create_client.assert_not_called()
+    precheck.assert_not_called()
+    resume_mode.assert_not_called()
+    run_rounds.assert_not_called()
+    assert hashes(project) == before
+    assert config_path.read_text(encoding="utf-8") == "{"
+
+
+def test_non_string_mode_and_model_fields_still_load_status(tmp_path, monkeypatch):
+    project, _run_root = _old_project(
+        tmp_path,
+        {
+            "mode": ["normal"],
+            "model": {"name": ["mock"], "label": {"text": "mock"}},
+        },
+        {
+            "run_config.json": json.dumps(
+                {
+                    "run_id": "old-mock",
+                    "mode": {"value": "normal"},
+                    "model": {
+                        "provider": "ollama",
+                        "name": ["mock"],
+                        "label": {"text": "mock"},
+                    },
+                }
+            )
+        },
+    )
+    monkeypatch.setattr(ui_app, "ROOT", tmp_path)
+    monkeypatch.setattr(ui_app, "CONFIG_PATH", tmp_path / "config.yaml")
+    status = web.status("demo", "gemini:gemini-2.5-flash")
+    assert status["progress"]["can_resume"] is True
+    assert status["resume"]["message_key"] == "resume_available"
+    assert "offline mock" not in status["resume"]["message"]
+
+    (project / RUN_FINALIZE_JOURNAL_NAME).write_text("{}\n", encoding="utf-8")
+    conflict = web.status("demo", "gemini:gemini-2.5-flash")
+    assert conflict["resume"]["can_resume"] is False
+    assert conflict["resume"]["message_key"] == "finalization_conflict"
+    assert "inspect" in conflict["resume"]["message"]
+    assert "offline mock" not in conflict["resume"]["message"]
+
+
+def test_split_normal_mode_and_ollama_provider_is_not_offline_mock(tmp_path, monkeypatch, capsys):
+    project, run_root = _old_project(
+        tmp_path,
+        {"mode": "normal"},
+        {
+            "run_config.json": json.dumps(
+                {
+                    "run_id": "old-mock",
+                    "model": {"provider": "ollama", "name": "mock"},
+                }
+            )
+        },
+    )
+    saved = json.loads((project / "checkpoint.json").read_text(encoding="utf-8"))
+    assert saved["mode"] == "normal"
+    assert "model" not in saved
+    config = json.loads((run_root / "run_config.json").read_text(encoding="utf-8"))
+    assert "mode" not in config
+    assert config["model"] == {"provider": "ollama", "name": "mock"}
+    before_checkpoint = (project / "checkpoint.json").read_bytes()
+    before_config = (run_root / "run_config.json").read_bytes()
+    preview = build_resume_preview(project_dir=project, checkpoint=saved, repo_root=tmp_path)
+    assert preview["can_resume"] is True
+    assert preview.get("blocked_reason") != OFFLINE_MOCK_BLOCKED_REASON
+    dashboard = ui_app.describe_resume_state(
+        project_dir=project,
+        checkpoint=saved,
+        run_active=False,
+        selected_model="gemini:gemini-2.5-flash",
+    )
+    assert dashboard["can_resume"] is True
+    assert dashboard["message_key"] == "resume_available"
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            sys.executable,
+            "--workspace",
+            str(tmp_path),
+            "--project",
+            "demo",
+            "--resume",
+            "--provider",
+            "gemini",
+            "--model",
+            "gemini-2.5-flash",
+        ],
+    )
+    with pytest.raises(SystemExit) as raised:
+        cli_module.main()
+    assert raised.value.code == 2
+    output = capsys.readouterr().out
+    assert "offline mock" not in output
+    assert "Gemini API key is missing" in output
+    assert (project / "checkpoint.json").read_bytes() == before_checkpoint
+    assert (run_root / "run_config.json").read_bytes() == before_config
