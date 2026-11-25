@@ -326,7 +326,8 @@ let boot,
   data,
   analysis,
   outputContent = "",
-  outputIndex = 0;
+  outputIndex = 0,
+  syncedGeneration = "";
 function readPreference(key) {
   try {
     return localStorage.getItem(key);
@@ -360,7 +361,8 @@ let selected = "",
   modelError = "",
   result = null,
   runningAction = false,
-  version = 0;
+  version = 0,
+  analyticsRequest = 0;
 const t = (key, args = {}) => {
   let value =
     copy[state.lang][key] ?? boot?.translations?.[state.lang]?.[key] ?? key;
@@ -508,7 +510,7 @@ function renderDashboard() {
       )
       .join(
         "",
-      )}</div><button class="icon-button" data-action="editor" title="${t("fullEditor")}" aria-label="${t("fullEditor")}">${icon("expand")}</button></div><textarea id="editor" aria-label="${t(state.editor === "task" ? "brief" : "memory")}" spellcheck="false" placeholder="${t(state.editor === "task" ? "editorHelp" : "memoryHelp")}">${e(draft[state.editor])}</textarea><div class="editor-footer"><span class="saved-label" id="save-state">${icon("check")}${t(draft.dirty ? "unsaved" : "saved")}</span>${button("save", "save", "", "check")}</div></div><div class="metrics-strip"><div class="metric"><span class="metric-label">${t("stage")}</span><span id="stage" class="metric-value small">${e(localizedStage(p.stage))}</span></div><div class="metric"><span class="metric-label">${t("round")}</span><span id="round" class="metric-value">${e(display(p.round))}</span></div><div class="metric"><span class="metric-label">${t("score")}</span><span id="score" class="metric-value">${e(display(p.best_score))}</span></div></div><div class="recent-bar"><span>${t("allOutputs")} <span class="eyebrow">${String(data.outputs.filter((o) => o.exists).length).padStart(2, "0")}</span></span><button class="quiet" data-nav="outputs">${t("viewOutputs")}${icon("arrow")}</button></div></section><aside class="card run-card"><div class="section-top"><h2>${t("run")}</h2><span class="status-pill" id="run-status"><span class="dot"></span>${t(p.run_active ? "active" : "idle")}</span></div><span class="eyebrow">${t("model")}</span><div class="run-model">${e(effectiveModel())}</div><label for="mode" class="sr-only">${t("mode")}</label>${select(
+      )}</div><button class="icon-button" data-action="editor" title="${t("fullEditor")}" aria-label="${t("fullEditor")}">${icon("expand")}</button></div><textarea id="editor" aria-label="${t(state.editor === "task" ? "brief" : "memory")}" spellcheck="false" placeholder="${t(state.editor === "task" ? "editorHelp" : "memoryHelp")}">${e(draft[state.editor])}</textarea><div class="editor-footer"><span class="saved-label" id="save-state">${icon("check")}${t(draft.dirty ? "unsaved" : "saved")}</span>${button("save", "save", "", "check")}</div></div><div class="metrics-strip"><div class="metric"><span class="metric-label">${t("stage")}</span><span id="stage" class="metric-value small">${e(localizedStage(p.stage))}</span></div><div class="metric"><span class="metric-label">${t("round")}</span><span id="round" class="metric-value">${e(display(p.round))}</span></div><div class="metric"><span class="metric-label">${t("score")}</span><span id="score" class="metric-value">${e(display(p.best_score))}</span></div></div><div class="recent-bar"><span>${t("allOutputs")} <span class="eyebrow" id="output-count">${String(data.outputs.filter((o) => o.exists).length).padStart(2, "0")}</span></span><button class="quiet" data-nav="outputs">${t("viewOutputs")}${icon("arrow")}</button></div></section><aside class="card run-card"><div class="section-top"><h2>${t("run")}</h2><span class="status-pill" id="run-status"><span class="dot"></span>${t(p.run_active ? "active" : "idle")}</span></div><span class="eyebrow">${t("model")}</span><div class="run-model">${e(effectiveModel())}</div><label for="mode" class="sr-only">${t("mode")}</label>${select(
       "mode",
       [
         ["normal", "normal"],
@@ -689,16 +691,33 @@ function renderAnalytics() {
   $("#view").innerHTML =
     `${analysis.available ? `<div class="analytics-cards">${analysis.cards.map((c) => `<div class="card"><span class="metric-label">${e(t(c.label_key))}</span><span class="metric-value">${e(display(c.value))}</span></div>`).join("")}</div>` : ""}<div class="data-tabs">${tabs.map((n) => `<button data-chart="${n}" class="${state.chart === n ? "active" : ""}">${t(n)}</button>`).join("")}</div><section class="card">${analysis.blocked_reason ? `<p class="hint-banner">${e(t(analysis.blocked_reason))}</p>` : ""}${comparisonPicker}${actual.length ? `${!["metadata", "comparison"].includes(state.chart) ? chart(actual) : ""}${table(actual)}` : empty()}</section>`;
 }
+function invalidateAnalytics() {
+  // `version` changes on project switch only. A same-project refresh must also
+  // retire analytics requests that are already in flight.
+  analysis = null;
+  analyticsRequest += 1;
+}
+function analyticsIsCurrent(project, projectVersion, request) {
+  return (
+    project === selected &&
+    projectVersion === version &&
+    request === analyticsRequest
+  );
+}
 async function loadAnalytics() {
-  const p = selected;
+  const project = selected;
+  const projectVersion = version;
+  const request = ++analyticsRequest;
   try {
     const value = await api(query("analytics"));
-    if (p !== selected) return;
+    if (!analyticsIsCurrent(project, projectVersion, request)) return;
     analysis = value;
     if (state.page === "analytics") renderAnalytics();
   } catch (err) {
+    if (!analyticsIsCurrent(project, projectVersion, request)) return;
     toast(err.message, true);
-    if (state.page === "analytics") $("#view").innerHTML = empty();
+    if (state.page === "analytics" && analysis == null)
+      $("#view").innerHTML = empty();
   }
 }
 function revealActiveSetting() {
@@ -809,7 +828,8 @@ async function loadProject(name) {
   const current = ++version;
   selected = name;
   data = null;
-  analysis = null;
+  invalidateAnalytics();
+  syncedGeneration = "";
   comparisonSelection = null;
   outputIndex = 0;
   result = null;
@@ -821,6 +841,7 @@ async function loadProject(name) {
     const value = await api(query("workspace"));
     if (current !== version) return;
     data = value;
+    syncedGeneration = researchGeneration(value);
     mergeInputs(name, value);
     renderView();
   } catch (err) {
@@ -1043,14 +1064,82 @@ async function act(action) {
     if (state.page === "dashboard") await refreshStatus();
   }
 }
+function researchGeneration(snapshot) {
+  // Checkpoint identity only. Log tails and recovery journals change without a new result.
+  const progress = snapshot?.progress || {};
+  const details = snapshot?.resume?.details || {};
+  return JSON.stringify([
+    progress.round,
+    progress.best_score,
+    progress.stop_reason,
+    progress.last_successful_agent,
+    progress.can_resume,
+    progress.mode,
+    progress.model,
+    progress.drafting_mode,
+    details.run_id ?? null,
+    details.run_root ?? null,
+    details.last_completed_round ?? null,
+  ]);
+}
+function outputSignature(outputs) {
+  return JSON.stringify(
+    (outputs || []).map((row) => [
+      row.id,
+      row.label_key,
+      row.exists,
+      row.kind,
+      row.path,
+      row.missing_key,
+    ]),
+  );
+}
+function updateOutputCount() {
+  const node = $("#output-count");
+  if (node)
+    node.textContent = String(
+      data.outputs.filter((row) => row.exists).length,
+    ).padStart(2, "0");
+}
+function editorFocused() {
+  return (
+    !!$("#panel[open] #large-editor") ||
+    ["editor", "large-editor"].includes(document.activeElement?.id)
+  );
+}
+async function syncSettledResearch(project, current) {
+  if (project !== selected || current !== version || !data) return;
+  const workspace = await api(query("workspace"));
+  if (project !== selected || current !== version || !data) return;
+  const previousOutputs = outputSignature(data.outputs);
+  data.outputs = workspace.outputs;
+  const focused = editorFocused();
+  mergeInputs(project, workspace, focused ? state.editor : null);
+  syncedGeneration = researchGeneration(workspace);
+  invalidateAnalytics();
+  const outputsChanged = outputSignature(data.outputs) !== previousOutputs;
+  if (state.page === "dashboard") {
+    if (focused) updateOutputCount();
+    else renderDashboard();
+  }
+  if (state.page === "outputs") {
+    if (outputsChanged) renderOutputs();
+    else {
+      const row = data.outputs.find((item) => item.id === outputIndex);
+      if (row?.exists) loadOutput(row);
+    }
+  }
+  if (state.page === "analytics") renderAnalytics();
+}
 async function refreshStatus() {
   if (!selected || !data) return;
-  const p = selected;
+  const project = selected;
+  const current = version;
   try {
     const updated = await api(
       `${query("status")}&model=${encodeURIComponent(prefs.provider === "gemini" ? `gemini:${effectiveModel()}` : prefs.model)}`,
     );
-    if (p !== selected) return;
+    if (project !== selected || current !== version || !data) return;
     const wasActive = data.progress.run_active;
     Object.assign(data, updated);
     if (state.page === "dashboard") {
@@ -1074,18 +1163,12 @@ async function refreshStatus() {
       $("#live-log").textContent =
         ($("#live-log").dataset.model === "true" ? data.model_log : data.log) ||
         t("noLogs");
-    if (wasActive && !data.progress.run_active) {
-      analysis = null;
-      const w = await api(query("workspace"));
-      if (p === selected) {
-        data.outputs = w.outputs;
-        const focused = !!$("#panel[open] #large-editor") || ["editor", "large-editor"].includes(document.activeElement?.id);
-        mergeInputs(p, w, focused ? state.editor : null);
-        if (state.page === "dashboard" && !focused) renderDashboard();
-        if (state.page === "outputs") renderOutputs();
-        if (state.page === "analytics") renderAnalytics();
-      }
-    }
+    // An external run can finish between polls and never be sampled as active.
+    const idle = !data.progress.run_active;
+    const settled =
+      (wasActive && idle) ||
+      (idle && researchGeneration(data) !== syncedGeneration);
+    if (settled) await syncSettledResearch(project, current);
   } catch {
     if ($("#run-status")) $("#run-status").textContent = t("offline");
   }
