@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 import math
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from rich.console import Console
 
 from .agents import ResearchAgents
-from .config import DEFAULT_DRAFTING_MODE
+from .config import DEFAULT_DRAFTING_MODE, MODEL_PROVIDER_GEMINI, MODEL_PROVIDER_OLLAMA
+from .mock_run import MOCK_MODEL_NAME, MOCK_MODEL_PROVIDER
 from .resume_safety import (
     RESUME_PATH_MESSAGES,
     RUN_ID_MISMATCH,
@@ -23,7 +24,7 @@ from .resume_safety import (
 from .round_attempts import classify_round_recovery
 from .round_commit_recovery import round_commit_read_blocker
 from .run_config import INHERIT_GIT_ROOT, GitRootSetting
-from .runner import ResumeHistoryError, run_iterative_rounds
+from .runner import ResumeHistoryError, format_mock_recovery_note, run_iterative_rounds
 from .storage import (
     artifact_path_exists,
     artifact_path_is_safe,
@@ -35,6 +36,8 @@ from .storage import (
 
 ROUND_OUTPUT_FILES = ("01_draft.md", "02_review.md", "03_revised.md", "04_judge.md")
 NEXT_ROUND_FAIL_SAFE_ACTION = "fail_safe_require_user_action"
+OFFLINE_MOCK_BLOCKED_REASON = "offline_mock"
+_OFFLINE_MOCK_MODEL_NAMES = frozenset({MOCK_MODEL_NAME, MOCK_MODEL_PROVIDER})
 
 
 def _safe_int(value: Any, default: int = 0) -> int:
@@ -221,7 +224,252 @@ def inspect_next_round_directory(
     }
 
 
-def build_resume_preview(
+_REAL_PROVIDERS = frozenset({MODEL_PROVIDER_OLLAMA, MODEL_PROVIDER_GEMINI})
+_REAL_RUN_MODES = frozenset({"normal", "continuous", "diagnostic", "session", "resume"})
+_RESUME_BLOCK_PREFIXES = (
+    "finalization_",
+    "diagnostic_finalization_",
+    "round_commit_",
+    "legacy_migration_",
+)
+
+
+def _value_missing(value: Any) -> bool:
+    return value is None or value in ("", {}, [])
+
+
+def _record_provider(record: Mapping[str, Any]) -> str:
+    provider = record.get("provider")
+    if isinstance(provider, str) and provider:
+        return provider
+    model = record.get("model")
+    if isinstance(model, dict):
+        model_provider = model.get("provider")
+        if isinstance(model_provider, str):
+            return model_provider
+    return ""
+
+
+def _strong_offline_mock(record: Mapping[str, Any]) -> bool:
+    if record.get("mode") == MOCK_MODEL_PROVIDER or record.get("provider") == MOCK_MODEL_PROVIDER:
+        return True
+    model = record.get("model")
+    if isinstance(model, dict) and (
+        model.get("provider") == MOCK_MODEL_PROVIDER or model.get("provider_free") is True
+    ):
+        return True
+    project = record.get("project")
+    if isinstance(project, dict):
+        mock_mode = project.get("mock_mode")
+        if isinstance(mock_mode, dict) and (
+            mock_mode.get("provider_free") is True or mock_mode.get("deterministic") is True
+        ):
+            return True
+    return False
+
+
+def _text_in(value: Any, options: frozenset[str]) -> bool:
+    """Set membership only after the parsed JSON value is known to be text."""
+
+    return isinstance(value, str) and value in options
+
+
+def _name_only_offline_mock(record: Mapping[str, Any]) -> bool:
+    """Historical fallback: the model name alone, with no provider proof."""
+
+    model = record.get("model")
+    if isinstance(model, str):
+        return _text_in(model, _OFFLINE_MOCK_MODEL_NAMES)
+    if isinstance(model, dict):
+        return any(_text_in(model.get(key), _OFFLINE_MOCK_MODEL_NAMES) for key in ("name", "label"))
+    return False
+
+
+def _explicit_real_mode(record: Mapping[str, Any]) -> bool:
+    return _text_in(record.get("mode"), _REAL_RUN_MODES)
+
+
+def _explicit_real_provider(record: Mapping[str, Any]) -> bool:
+    return _text_in(_record_provider(record), _REAL_PROVIDERS)
+
+
+def _records_are_offline_mock(*records: Any) -> bool:
+    """Combine same-run evidence. Strong mock proof still outranks a real provider."""
+
+    present = [record for record in records if isinstance(record, Mapping) and record]
+    if any(_strong_offline_mock(record) for record in present):
+        return True
+    real_mode = any(_explicit_real_mode(record) for record in present)
+    real_provider = any(_explicit_real_provider(record) for record in present)
+    if real_mode and real_provider:
+        return False
+    return any(_name_only_offline_mock(record) for record in present)
+
+
+def _positive_round_cap(value: Any) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        return None
+    return value
+
+
+def _round_cap_from_record(record: Mapping[str, Any]) -> int | None:
+    direct = _positive_round_cap(record.get("max_rounds"))
+    if direct is not None:
+        return direct
+    runtime = record.get("runtime")
+    if isinstance(runtime, dict):
+        return _positive_round_cap(runtime.get("max_rounds"))
+    return None
+
+
+def _read_linked_json(path: Path, anchor: Path) -> tuple[str, dict[str, Any]]:
+    try:
+        content = read_regular_text(path, missing_ok=False, anchor=anchor)
+    except FileNotFoundError:
+        return "missing", {}
+    except (OSError, UnicodeError):
+        return "invalid", {}
+    try:
+        data = json.loads(content)
+    except (ValueError, RecursionError):
+        return "invalid", {}
+    if not isinstance(data, dict):
+        return "invalid", {}
+    return "object", data
+
+
+def _same_run_record(record: Mapping[str, Any], run_root: Path) -> bool:
+    """True when this file does not name a different run or path."""
+
+    run_id = record.get("run_id")
+    if run_id not in (None, ""):
+        if not isinstance(run_id, str) or run_id != run_root.name:
+            return False
+    root_value = record.get("run_root")
+    if root_value in (None, ""):
+        return True
+    if not isinstance(root_value, str):
+        return False
+    try:
+        recorded = Path(root_value).expanduser().resolve(strict=False)
+        return recorded == run_root.resolve(strict=False)
+    except (OSError, RuntimeError, ValueError):
+        return False
+
+
+def _combine_same_run_records(
+    config: Mapping[str, Any],
+    manifest: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Fill gaps from the manifest. Values already stored in run_config win."""
+
+    combined = dict(manifest)
+    for key, value in config.items():
+        if key == "runtime":
+            continue
+        if not _value_missing(value) or key not in combined:
+            combined[key] = value
+    runtime: dict[str, Any] = {}
+    manifest_runtime = manifest.get("runtime")
+    config_runtime = config.get("runtime")
+    if isinstance(manifest_runtime, dict):
+        runtime.update(manifest_runtime)
+    if isinstance(config_runtime, dict):
+        for key, value in config_runtime.items():
+            if not _value_missing(value) or key not in runtime:
+                runtime[key] = value
+    if runtime:
+        combined["runtime"] = runtime
+    return combined
+
+
+def _offline_manifest_evidence(manifest: Mapping[str, Any]) -> dict[str, Any]:
+    """Read mock evidence from a manifest without presenting it as a repaired config."""
+
+    if not manifest or not _strong_offline_mock(manifest):
+        return {}
+    kept = ("mode", "provider", "model", "project", "max_rounds", "runtime")
+    return {key: manifest[key] for key in kept if key in manifest}
+
+
+def _linked_run_record(project_dir: Path, checkpoint: Mapping[str, Any]) -> dict[str, Any]:
+    """Read one run's config and manifest after the checkpoint path is verified.
+
+    A readable ``run_config.json`` used to hide ``run_manifest.json``. Missing mode
+    or model is filled from that same run's manifest. A conflicting run id or path
+    is ignored. A damaged config is left unchanged: the manifest is not copied over
+    it, and it is consulted only when that same run already shows an offline mock.
+    """
+
+    run_root, error = validate_resume_run_root(
+        project_dir=project_dir,
+        run_root_value=checkpoint.get("run_root"),
+    )
+    if error or run_root is None:
+        return {}
+    config_path = run_root / "run_config.json"
+    manifest_path = run_root / "run_manifest.json"
+    if not resume_artifact_links_are_safe(
+        parent_dir=run_root,
+        paths=(config_path, manifest_path),
+    ):
+        return {}
+    config_state, config = _read_linked_json(config_path, run_root)
+    manifest_state, manifest = _read_linked_json(manifest_path, run_root)
+    if manifest_state != "object" or not _same_run_record(manifest, run_root):
+        manifest = {}
+    if config_state == "invalid":
+        return _offline_manifest_evidence(manifest)
+    if config_state == "object" and not _same_run_record(config, run_root):
+        config = {}
+    if not config and not manifest:
+        return {}
+    return _combine_same_run_records(config, manifest)
+
+
+def offline_mock_resume_block(
+    *,
+    project_dir: Path,
+    checkpoint: Mapping[str, Any] | None = None,
+    repo_root: Path | None = None,
+    explicit_workspace: Path | None = None,
+    source_layout: bool | None = None,
+) -> dict[str, str] | None:
+    """Refuse ordinary resume of an offline mock before any provider or run write.
+
+    Strong evidence is mock mode, the mock provider, or provider-free mock metadata.
+    A historical model name of ``mock`` or ``mock-deterministic`` is only a fallback,
+    and it does not override explicit real mode and provider evidence from the same
+    run, even when those fields sit on different records. The returned message tells
+    the user to start a new offline mock. ``command`` is empty when the round cap
+    cannot be pinned.
+    """
+
+    ensure_project_runtime_paths_safe(project_dir)
+    if checkpoint is None:
+        checkpoint = read_json_file(project_dir / "checkpoint.json", anchor=project_dir)
+    if not isinstance(checkpoint, Mapping):
+        return None
+    run_record = _linked_run_record(project_dir, checkpoint)
+    if not _records_are_offline_mock(checkpoint, run_record):
+        return None
+    max_rounds = _round_cap_from_record(run_record)
+    if max_rounds is None:
+        max_rounds = _round_cap_from_record(checkpoint)
+    message = format_mock_recovery_note(
+        project_dir,
+        repo_root,
+        explicit_workspace=explicit_workspace,
+        source_layout=source_layout,
+        max_rounds=max_rounds,
+    )
+    command = ""
+    if "`" in message:
+        command = message.split("`", 2)[1]
+    return {"message": message, "command": command}
+
+
+def _build_resume_preview(
     *,
     project_dir: Path,
     checkpoint: dict[str, Any],
@@ -472,6 +720,89 @@ def build_resume_preview(
         "resume existing run from checkpoint; completed round files will be preserved"
     )
     return preview
+
+
+def _resume_block_outranks_mock(preview: Mapping[str, Any]) -> bool:
+    """Transaction, conflict, and path blocks keep their own recovery guidance."""
+
+    reason = preview.get("blocked_reason")
+    if not isinstance(reason, str) or reason in {"", OFFLINE_MOCK_BLOCKED_REASON}:
+        return False
+    if reason in RESUME_PATH_MESSAGES or reason.startswith(_RESUME_BLOCK_PREFIXES):
+        return True
+    return bool(preview.get("next_round_blocks_resume")) and preview.get("can_resume") is False
+
+
+def build_resume_preview(
+    *,
+    project_dir: Path,
+    checkpoint: dict[str, Any],
+    repo_root: Path | None = None,
+    explicit_workspace: Path | None = None,
+    source_layout: bool | None = None,
+) -> dict[str, Any]:
+    """Preview one resume, refusing ordinary continuation of an offline mock."""
+
+    preview = _build_resume_preview(
+        project_dir=project_dir,
+        checkpoint=checkpoint,
+        repo_root=repo_root,
+    )
+    if _resume_block_outranks_mock(preview):
+        return preview
+    block = offline_mock_resume_block(
+        project_dir=project_dir,
+        checkpoint=checkpoint,
+        repo_root=repo_root,
+        explicit_workspace=explicit_workspace,
+        source_layout=source_layout,
+    )
+    if block is None:
+        return preview
+    refused = dict(preview)
+    refused["can_resume"] = False
+    refused["blocked_reason"] = OFFLINE_MOCK_BLOCKED_REASON
+    refused["message"] = block["message"]
+    refused["mock_restart_command"] = block["command"]
+    return refused
+
+
+def ordinary_resume_refusal(
+    *,
+    project_dir: Path,
+    repo_root: Path | None = None,
+    explicit_workspace: Path | None = None,
+    source_layout: bool | None = None,
+) -> str | None:
+    """Stop ordinary resume before a provider operation when a mock is visible.
+
+    A complete offline mock is refused without writing. An existing transaction,
+    conflict, or path block keeps that block's guidance instead of suggesting a
+    new mock on top of it. When the checkpoint does not yet show a mock, return
+    None so in-lock recovery can run; call this again on the recovered checkpoint.
+    """
+
+    block = offline_mock_resume_block(
+        project_dir=project_dir,
+        repo_root=repo_root,
+        explicit_workspace=explicit_workspace,
+        source_layout=source_layout,
+    )
+    if block is None:
+        return None
+    checkpoint = read_json_file(project_dir / "checkpoint.json", anchor=project_dir)
+    preview = build_resume_preview(
+        project_dir=project_dir,
+        checkpoint=checkpoint,
+        repo_root=repo_root,
+        explicit_workspace=explicit_workspace,
+        source_layout=source_layout,
+    )
+    if _resume_block_outranks_mock(preview):
+        message = preview.get("message")
+        if isinstance(message, str) and message:
+            return message
+    return block["message"]
 
 
 def _print_resume_preview(console: Console, preview: dict[str, Any]) -> None:
