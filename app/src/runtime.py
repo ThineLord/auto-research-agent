@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import errno
+import hashlib
 import os
 import stat
 import struct
@@ -10,6 +11,7 @@ import subprocess
 import sys
 import time
 import uuid
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -29,13 +31,18 @@ from .storage import (
     open_append_text_file,
     open_binary_update_file,
     read_json_file,
+    read_regular_text_bounded,
     unlink_artifact_file,
+    write_file_text,
+    write_file_text_publish_only,
     write_json_file,
 )
 
 RUN_PROCESS_META_FILENAME = "ui_run_process.json"
 MODEL_JOB_PROCESS_META_FILENAME = "ui_model_job_process.json"
 RUN_LOCK_GUARD_FILENAME = "active_run.guard"
+STOP_GUARD_FILENAME = "active_stop.guard"
+_DASHBOARD_STOP = "ARA_DASHBOARD_STOP_V1 "
 RUN_LOCK_SCHEMA_VERSION = 1
 MAX_PROCESS_ID = (1 << 32) - 1
 # Research modes that hold the run guard. Diagnostic is live but does not read
@@ -77,6 +84,7 @@ class RunLockHandle:
     pid: int
     guard_device: int
     guard_inode: int
+    mode: str
     _guard_file: BinaryIO = field(repr=False, compare=False)
 
     def __fspath__(self) -> str:
@@ -102,6 +110,47 @@ def log_run(console: Console, log_path: Path, mode: str, message: str) -> None:
     append_log_line(log_path, line)
 
 
+@contextmanager
+def _stop_guard(project_dir: Path):
+    """Serialize dashboard stop publication, run handoff, and the last stop check."""
+    with open_binary_update_file(
+        project_dir / STOP_GUARD_FILENAME, anchor=project_dir.parent
+    ) as guard:
+        if os.name == "nt":
+            import msvcrt
+
+            guard.seek(0)
+            msvcrt.locking(guard.fileno(), msvcrt.LK_LOCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(guard.fileno(), fcntl.LOCK_EX)
+        yield  # Closing the descriptor releases the lock, including on exceptions.
+
+
+def _dashboard_marker(path: Path) -> str | None:
+    """None means absent; the empty string represents any pre-existing manual marker."""
+    try:
+        text = read_regular_text_bounded(path, max_bytes=256, anchor=path.parent.parent)
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError):
+        return "" if artifact_path_exists(path, allow_directory=True) else None
+    return text.rstrip("\n") if text.startswith(_DASHBOARD_STOP) else ""
+
+
+def _ui_marker(meta: dict) -> str:
+    return _DASHBOARD_STOP + ui_run_generation(meta)
+
+
+def ui_run_generation(meta: dict) -> str:
+    return f"ui {meta.get('pid')} {meta.get('started_at', '')}"
+
+
+def _owner_marker(token: str) -> str:
+    return _DASHBOARD_STOP + token
+
+
 def stop_requested(stop_signal_path: Path) -> bool:
     if not artifact_boundary_is_registered(stop_signal_path):
         try:
@@ -111,7 +160,66 @@ def stop_requested(stop_signal_path: Path) -> bool:
             )
         except OSError:
             return False
-    return artifact_path_exists(stop_signal_path, allow_directory=True)
+    if not artifact_path_exists(stop_signal_path, allow_directory=True):
+        return False
+    marker = _dashboard_marker(stop_signal_path)
+    if not marker:
+        return marker == ""
+    project = stop_signal_path.parent
+    lock = read_json_file(project / RUN_LOCK_FILENAME)
+    if isinstance(lock.get("owner_token"), str) and marker == _owner_marker(lock["owner_token"]):
+        return True
+    ui = get_active_process_meta(run_meta_path(project), cleanup=False)
+    return bool(ui and marker == _ui_marker(ui) and (not lock or lock.get("pid") == ui["pid"]))
+
+
+def request_dashboard_stop(project: Path, expected: dict) -> None:
+    """Revalidate the selected generation while its stop window cannot close."""
+    with _stop_guard(project):
+        cli = read_live_cli_run(project)
+        ui = get_active_process_meta(run_meta_path(project), cleanup=False)
+        current = cli if expected.get("kind") == "cli_run" else ui
+        if current is ui and ui:
+            current = {**ui, "generation": ui_run_generation(ui)}
+        if not current or any(
+            current.get(key) != expected.get(key) for key in ("pid", "started_at", "generation")
+        ):
+            raise ValueError("No active run")
+        lock = read_json_file(project / RUN_LOCK_FILENAME)
+        if not run_accepts_cooperative_stop(current) or (
+            lock
+            and (
+                lock.get("pid") != current.get("pid")
+                or lock.get("mode") not in STOPPABLE_RUN_MODES
+                or lock.get("stoppable") is False
+            )
+        ):
+            raise ValueError("This run cannot be stopped safely")
+        token = lock.get("owner_token")
+        marker = _owner_marker(token) if isinstance(token, str) and token else _ui_marker(current)
+        path = project / "STOP_REQUESTED"
+        existing = _dashboard_marker(path)
+        if existing is None:
+            try:
+                write_file_text_publish_only(path, marker + "\n", anchor=project.parent)
+            except FileExistsError:
+                pass  # A manual marker published concurrently already requests a stop.
+        elif existing and existing != marker:
+            write_file_text(path, marker + "\n", anchor=project.parent)
+
+
+def close_run_stop_window(handle: RunLockHandle | None) -> bool:
+    """Close the window before finalizing, and observe any already accepted stop."""
+    if not isinstance(handle, RunLockHandle):
+        return False
+    project = handle.path.parent
+    with _stop_guard(project):
+        if not run_lock_handle_is_current(project, handle):
+            return False
+        meta = read_json_file(handle.path)
+        meta["stoppable"] = False
+        write_json_file(handle.path, meta)
+        return stop_requested(project / "STOP_REQUESTED")
 
 
 def is_pid_running(pid: int) -> bool:
@@ -742,7 +850,8 @@ def _live_cli_run_record(project_dir: Path) -> Dict[str, Any]:
         "model": model,
         "started_at": started if isinstance(started, str) else "",
         "kind": "cli_run",
-        "stoppable": mode in STOPPABLE_RUN_MODES,
+        "generation": hashlib.sha256(owner.encode()).hexdigest(),
+        "stoppable": mode in STOPPABLE_RUN_MODES and lock_data.get("stoppable") is not False,
         "command": " ".join(part for part in (mode, model) if part),
     }
 
@@ -878,19 +987,32 @@ def acquire_run_lock(
     owner_token = uuid.uuid4().hex
     pid = os.getpid()
     try:
-        write_json_file(
-            lock_path,
-            {
-                "schema_version": RUN_LOCK_SCHEMA_VERSION,
-                "owner_token": owner_token,
-                "pid": pid,
-                "guard_device": guard_device,
-                "guard_inode": guard_inode,
-                "mode": mode,
-                "model": model_name,
-                "started_at": datetime.now().isoformat(),
-            },
-        )
+        with _stop_guard(project_dir) if mode in LIVE_RESEARCH_MODES else nullcontext():
+            if mode in LIVE_RESEARCH_MODES:
+                # Recover after a crash, or adopt a UI request made before its child acquired the guard.
+                path = project_dir / "STOP_REQUESTED"
+                previous = _dashboard_marker(path)
+                if previous:
+                    ui = get_active_process_meta(run_meta_path(project_dir), cleanup=False)
+                    if ui.get("pid") == pid and previous == _ui_marker(ui):
+                        write_file_text(
+                            path, _owner_marker(owner_token) + "\n", anchor=project_dir.parent
+                        )
+                    else:
+                        unlink_artifact_file(path)
+            write_json_file(
+                lock_path,
+                {
+                    "schema_version": RUN_LOCK_SCHEMA_VERSION,
+                    "owner_token": owner_token,
+                    "pid": pid,
+                    "guard_device": guard_device,
+                    "guard_inode": guard_inode,
+                    "mode": mode,
+                    "model": model_name,
+                    "started_at": datetime.now().isoformat(),
+                },
+            )
     except Exception as exc:  # noqa: BLE001
         _close_guard(guard_file)
         return None, f"Run lock metadata could not be written: {exc.__class__.__name__}."
@@ -902,6 +1024,7 @@ def acquire_run_lock(
             pid=pid,
             guard_device=guard_device,
             guard_inode=guard_inode,
+            mode=mode,
             _guard_file=guard_file,
         ),
         None,
@@ -950,18 +1073,17 @@ def release_run_lock(lock_handle: Optional[RunLockHandle | Path]) -> None:
             pass
         return
     try:
-        lock_data, regular_or_missing = _lock_metadata(lock_handle.path)
-        if (
-            regular_or_missing
-            and lock_data.get("owner_token") == lock_handle.owner_token
-            and _parse_lock_pid(lock_data.get("pid")) == lock_handle.pid
-            and _metadata_guard_matches(
-                lock_data,
-                lock_handle.guard_device,
-                lock_handle.guard_inode,
-            )
-        ):
-            unlink_artifact_file(lock_handle.path)
+        project = lock_handle.path.parent
+        with _stop_guard(project) if lock_handle.mode in LIVE_RESEARCH_MODES else nullcontext():
+            if run_lock_handle_is_current(project, lock_handle):
+                if lock_handle.mode in LIVE_RESEARCH_MODES:
+                    path = project / "STOP_REQUESTED"
+                    if _dashboard_marker(path) == _owner_marker(lock_handle.owner_token):
+                        unlink_artifact_file(path)
+                    ui_path = run_meta_path(project)
+                    if read_json_file(ui_path).get("pid") == lock_handle.pid:
+                        unlink_artifact_file(ui_path)
+                unlink_artifact_file(lock_handle.path)
     except OSError:
         pass
     finally:

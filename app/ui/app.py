@@ -10,7 +10,6 @@ import stat
 import sys
 from collections.abc import Mapping, MutableMapping
 from dataclasses import replace
-from datetime import datetime
 from functools import partial
 from pathlib import Path
 from typing import Any, Sequence
@@ -84,13 +83,15 @@ from src.runtime import (
     get_active_process_meta,
     model_job_meta_path,
     read_live_cli_run,
+    request_dashboard_stop,
     run_accepts_cooperative_stop,
     run_meta_path,
     run_project_tests,
     start_background_process,
+    stop_requested,
+    ui_run_generation,
 )
 from src.storage import (
-    artifact_path_exists,
     artifact_path_is_safe,
     ensure_project_runtime_paths_safe,
     list_artifact_directories,
@@ -892,72 +893,12 @@ def get_active_run_meta(project_dir: Path, *, cleanup: bool = True) -> dict[str,
     """Prefer a live UI-started process, then a verified CLI research run."""
     recorded = get_active_process_meta(run_meta_path(project_dir), cleanup=cleanup)
     if recorded:
-        if not isinstance(recorded.get("stoppable"), bool):
-            recorded = dict(recorded)
-            recorded["stoppable"] = run_accepts_cooperative_stop(recorded)
-        return recorded
+        lock = read_json_file(project_dir / "active_run.json")
+        stoppable = run_accepts_cooperative_stop(recorded)
+        if lock and lock.get("pid") == recorded.get("pid"):
+            stoppable = stoppable and run_accepts_cooperative_stop(lock)
+        return {**recorded, "stoppable": stoppable, "generation": ui_run_generation(recorded)}
     return read_live_cli_run(project_dir)
-
-
-_RUN_LOG_LINE = re.compile(
-    r"^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \| mode=\S+ \| (?P<body>.*)$"
-)
-
-
-def _run_log_started_second(started_at: object) -> datetime | None:
-    if not isinstance(started_at, str):
-        return None
-    text = started_at.strip()
-    if not text:
-        return None
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if parsed.tzinfo is not None:
-        parsed = parsed.astimezone().replace(tzinfo=None)
-    return parsed.replace(microsecond=0)
-
-
-def live_run_has_committed_summary(log_text: str, started_at: object) -> bool:
-    """True after this live run has logged run_summary and will not read a new stop."""
-    started = _run_log_started_second(started_at)
-    if started is None or not log_text:
-        return False
-    seen_start = False
-    committed = False
-    for raw_line in log_text.splitlines():
-        match = _RUN_LOG_LINE.match(raw_line.strip())
-        if match is None:
-            continue
-        try:
-            stamped = datetime.strptime(match.group("ts"), "%Y-%m-%d %H:%M:%S")
-        except ValueError:
-            continue
-        if stamped < started:
-            continue
-        body = match.group("body")
-        if body.startswith("run_start "):
-            seen_start = True
-            committed = False
-        elif seen_start and body.startswith("run_summary completed_rounds="):
-            committed = True
-    return committed
-
-
-def cooperative_stop_can_be_requested(project_dir: Path, run_meta: Mapping[str, Any]) -> bool:
-    """False when a new STOP_REQUESTED file would not be consumed by this run."""
-    if not run_accepts_cooperative_stop(run_meta):
-        return False
-    try:
-        log_text = read_regular_text(
-            project_dir / "run.log",
-            missing_ok=True,
-            anchor=project_dir.parent,
-        )
-    except (OSError, UnicodeError):
-        return True
-    return not live_run_has_committed_summary(log_text, run_meta.get("started_at"))
 
 
 def infer_running_stage(
@@ -1012,9 +953,8 @@ def infer_running_stage(
         "stop_reason": checkpoint.get("stop_reason", "N/A"),
         "can_resume": bool(checkpoint.get("can_resume", False)),
         "drafting_mode": run_meta.get("drafting_mode") or checkpoint.get("drafting_mode", "N/A"),
-        "stoppable": bool(run_active)
-        and run_accepts_cooperative_stop(run_meta)
-        and not live_run_has_committed_summary(log_text, run_meta.get("started_at")),
+        "generation": run_meta.get("generation") if run_active else None,
+        "stoppable": bool(run_active) and run_accepts_cooperative_stop(run_meta),
     }
 
 
@@ -2288,7 +2228,7 @@ def render_live_progress_and_logs(
         st.write(
             t(
                 "stop_signal_present",
-                present=artifact_path_exists(stop_signal_path, allow_directory=True),
+                present=stop_requested(stop_signal_path),
             )
         )
         st.write(t("selected_model", model=st.session_state.get("selected_model", default_model)))
@@ -2930,7 +2870,7 @@ def main() -> None:
             ):
                 launch_run("resume", "started_resume")
         with stop_col:
-            can_stop = run_active and cooperative_stop_can_be_requested(proj_path, run_meta)
+            can_stop = run_active and run_accepts_cooperative_stop(run_meta)
             if st.button(
                 t("pause_stop_safely"),
                 key="stop_run",
@@ -2938,10 +2878,12 @@ def main() -> None:
                 disabled=not can_stop,
             ):
                 stop_signal_display = output_display_path(stop_signal_path)
-                if can_stop and create_stop_signal(stop_signal_path):
-                    st.warning(t("stop_signal_created", path=stop_signal_display))
-                else:
+                try:
+                    request_dashboard_stop(proj_path, run_meta)
+                except (OSError, ValueError):
                     st.error(t("stop_signal_failed", path=stop_signal_display))
+                else:
+                    st.warning(t("stop_signal_created", path=stop_signal_display))
         if run_model_blocked:
             st.caption(t("configure_model_hint"))
         with st.expander(t("resume_status")):

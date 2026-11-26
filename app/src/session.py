@@ -12,6 +12,7 @@ from .config import DEFAULT_DRAFTING_MODE
 from .llm import LLMClientProtocol
 from .run_config import INHERIT_GIT_ROOT, GitRootSetting
 from .runner import run_iterative_rounds
+from .runtime import RunLockHandle
 from .storage import (
     display_path,
     ensure_project_runtime_paths_safe,
@@ -228,6 +229,7 @@ def run_session_mode(
     max_consecutive_provider_quota_failures: int = 2,
     explicit_workspace: Path | None = None,
     source_layout: bool | None = None,
+    run_lock_handle: RunLockHandle | None = None,
 ) -> None:
     ensure_project_runtime_paths_safe(project_dir)
     console.rule("Research Session Mode")
@@ -291,6 +293,7 @@ def run_session_mode(
         max_consecutive_provider_quota_failures=max_consecutive_provider_quota_failures,
         explicit_workspace=explicit_workspace,
         source_layout=source_layout,
+        run_lock_handle=run_lock_handle,
     )
 
     research_state_path = project_dir / "research_state.json"

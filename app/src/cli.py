@@ -1197,6 +1197,7 @@ def main() -> None:
             )
             agents = build_mock_agents(topic_context=topic_context)
             run_iterative_rounds(
+                run_lock_handle=run_lock_path,
                 console=console,
                 agents=agents,
                 task_text=task_text,
@@ -1441,6 +1442,7 @@ def main() -> None:
         if args.resume:
             try:
                 resume_started = run_resume_mode(
+                    run_lock_handle=run_lock_path,
                     console=console,
                     agents=agents,
                     task_text=task_text,
@@ -1472,6 +1474,7 @@ def main() -> None:
 
         if args.continuous:
             run_iterative_rounds(
+                run_lock_handle=run_lock_path,
                 console=console,
                 agents=agents,
                 task_text=task_text,
@@ -1522,6 +1525,7 @@ def main() -> None:
 
         if args.session:
             run_session_mode(
+                run_lock_handle=run_lock_path,
                 console=console,
                 llm=llm,
                 agents=agents,
@@ -1551,6 +1555,7 @@ def main() -> None:
             return
 
         run_iterative_rounds(
+            run_lock_handle=run_lock_path,
             console=console,
             agents=agents,
             task_text=task_text,

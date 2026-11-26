@@ -240,12 +240,12 @@ flock result only when that PID still has the guard inode open. A live PID by it
 run. Live research modes are mock, normal, continuous, diagnostic, session, and resume.
 Stoppable modes are mock, normal, continuous, session, and resume; the stop is the existing
 `STOP_REQUESTED` signal. Diagnostic stays visible and is refused before any stop file is written,
-because that mode does not consume the signal. A stoppable run that has already logged
-`run_summary` is refused the same way while it still holds the guard and winds down; a new
-signal would not be consumed by that run. A stop requested before that line is still written
-and consumed. An existing manual `STOP_REQUESTED` file is left untouched. On macOS the lock
-check imports `ctypes.util` explicitly, because `import ctypes` alone does not provide
-`find_library` in a clean interpreter. Ownerless metadata and edit or maintenance locks
+because that mode does not consume the signal. A dashboard stop belongs to one acquisition of
+the project lock. Publication, finalization and release coordinate through the short-lived lock on
+`active_stop.guard`. The runner closes its stop window before writing its summary, and the API
+and dashboard use the same state independently of log length. The browser sends the generation it displayed when requesting a stop. A startup failure or process exit
+discards that run's dashboard request. A crash cannot transfer the request to a later run.
+Manually created `STOP_REQUESTED` files retain their ordinary behavior. Ownerless metadata and edit or maintenance locks
 (`input_edit`, `literature_survey`, `legacy_history_migration`) are not runs. A model list, a
 health check, and a cloud action that only reads the local cache do not take the dashboard
 operation lock and do not delete process records, so stopping one verified run is not held

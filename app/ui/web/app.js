@@ -1015,7 +1015,7 @@ async function act(action) {
       toast(t("starting"));
       await refreshStatus();
     } else if (action === "stop") {
-      const r = await operate("stop");
+      const r = await operate("stop", { generation: data.progress.generation });
       toast(message(r));
       await refreshStatus();
     } else if (action === "pull") {

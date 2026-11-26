@@ -54,6 +54,7 @@ PROJECT_RUNTIME_FILE_NAMES = (
     "STOP_REQUESTED",
     "active_run.json",
     "active_run.guard",
+    "active_stop.guard",
     "ui_run_process.json",
     "ui_model_job_process.json",
     "provider_events.jsonl",

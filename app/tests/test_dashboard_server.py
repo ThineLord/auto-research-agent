@@ -1123,7 +1123,12 @@ def test_winding_down_stop_is_refused_and_the_next_mock_finishes(http_server, pr
         mock_model_parameters,
     )
     from src.runner import run_iterative_rounds
-    from src.runtime import acquire_run_lock, get_active_process_meta, release_run_lock
+    from src.runtime import (
+        acquire_run_lock,
+        close_run_stop_window,
+        get_active_process_meta,
+        release_run_lock,
+    )
 
     root, _launch = project
     monkeypatch.setattr(web.h, "get_active_process_meta", get_active_process_meta)
@@ -1163,12 +1168,22 @@ def test_winding_down_stop_is_refused_and_the_next_mock_finishes(http_server, pr
             token,
         )
         assert accepted == 200
+        stale, _, _ = request(
+            http_server,
+            "POST",
+            "/api/action",
+            json.dumps(payload(action="stop", generation="previous-run")),
+            token,
+        )
+        assert stale == 400
         assert (root / "STOP_REQUESTED").is_file()
         assert not (other / "STOP_REQUESTED").exists()
         (root / "STOP_REQUESTED").unlink()
 
         with (root / "run.log").open("a", encoding="utf-8") as log:
+            log.writelines(_log_line(started, "agent=judge status=ok") for _ in range(300))
             log.write(_log_line(started, summary))
+        assert close_run_stop_window(handle) is False
         winding = web.status("example")
         assert winding["progress"]["run_active"] is True
         assert winding["progress"]["mode"] == "mock"
@@ -1214,7 +1229,7 @@ def test_winding_down_stop_is_refused_and_the_next_mock_finishes(http_server, pr
         release_run_lock(other_handle)
 
     assert web.status("example")["progress"]["run_active"] is False
-    assert (other / "STOP_REQUESTED").is_file()
+    assert not (other / "STOP_REQUESTED").exists()
     console = Console(file=StringIO(), force_terminal=False, width=80)
     prompt_dir = root.parent / "prompts"
     prompt_dir.mkdir()
@@ -1241,7 +1256,7 @@ def test_winding_down_stop_is_refused_and_the_next_mock_finishes(http_server, pr
     assert result["stop_reason"] == "MAX_ROUNDS"
     assert result["completed_rounds"] == 1
     assert not (root / "STOP_REQUESTED").exists()
-    assert (other / "STOP_REQUESTED").is_file()
+    assert not (other / "STOP_REQUESTED").exists()
 
 
 def test_ui_diagnostic_refuses_stop_and_a_normal_ui_run_still_writes_it(project, monkeypatch):
@@ -1269,3 +1284,79 @@ def test_ui_diagnostic_refuses_stop_and_a_normal_ui_run_still_writes_it(project,
     stopped = web.action({"action": "stop", "project": "example"})
     assert stopped["message_key"] == "stop_signal_created"
     assert (root / "STOP_REQUESTED").is_file()
+
+
+def test_stop_during_failed_cli_preflight_does_not_reach_next_run(
+    http_server, project, monkeypatch
+):
+    from src.runtime import get_active_process_meta
+
+    root, _ = project
+    monkeypatch.setattr(web.h, "get_active_process_meta", get_active_process_meta)
+    entered = threading.Event()
+    release = threading.Event()
+
+    class MissingModel(BaseHTTPRequestHandler):
+        def do_GET(self):
+            assert self.path == "/api/tags"
+            entered.set()
+            release.wait(10)
+            body = b'{"models":[]}'
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *_args):
+            pass
+
+    fake = ThreadingHTTPServer(("127.0.0.1", 0), MissingModel)
+    thread = threading.Thread(target=fake.serve_forever, daemon=True)
+    thread.start()
+    _point_config_at(fake.server_address[1])
+    base = [
+        sys.executable,
+        "-m",
+        "src.main",
+        "--workspace",
+        str(web.h.ROOT),
+        "--project",
+        "example",
+    ]
+    child = subprocess.Popen(
+        base + ["--provider", "ollama", "--model", "missing-fixture"],
+        cwd=web.h.APP_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    try:
+        assert entered.wait(8)
+        status, _, _ = request(
+            http_server,
+            "POST",
+            "/api/action",
+            json.dumps(payload(action="stop")),
+            {"X-Dashboard-Token": web.TOKEN},
+        )
+        assert status == 200
+        assert (root / "STOP_REQUESTED").is_file()
+        release.set()
+        output, _ = child.communicate(timeout=10)
+        assert child.returncode == 2 and b"not installed" in output
+        assert not (root / "STOP_REQUESTED").exists()
+    finally:
+        release.set()
+        if child.poll() is None:
+            child.kill()
+            child.wait()
+        fake.shutdown()
+        fake.server_close()
+        thread.join()
+    subprocess.run(
+        base + ["--mock", "--max-rounds", "1"],
+        cwd=web.h.APP_ROOT,
+        capture_output=True,
+        check=True,
+        timeout=15,
+    )
+    assert web.h.read_json_file(root / "checkpoint.json")["stop_reason"] == "MAX_ROUNDS"

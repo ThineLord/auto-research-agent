@@ -1148,7 +1148,9 @@ from src.runtime import acquire_run_lock, release_run_lock
 
 root, ready, release = map(Path, sys.argv[1:])
 handle, error = acquire_run_lock(root, mode="run", model_name="child")
-ready.write_text("ok" if handle is not None and error is None else "failed")
+partial = ready.with_suffix(".tmp")
+partial.write_text("ok" if handle is not None and error is None else "failed")
+partial.replace(ready)
 deadline = time.monotonic() + 5
 while not release.exists() and time.monotonic() < deadline:
     time.sleep(0.01)
@@ -1387,45 +1389,39 @@ except OSError:
             return
         self.assertIsNone(error, error)
 
-    def test_committed_summary_is_only_the_live_run(self) -> None:
-        import ui.app as ui_app
-
-        started = "2026-11-26T02:16:28.123456"
-        summary = (
-            "run_summary completed_rounds=1 stop_reason=MAX_ROUNDS "
-            "best_score=N/A last_successful_agent=judge"
-        )
-        previous = (
-            "2026-11-26 02:16:20 | mode=mock | run_start run_id=old\n"
-            f"2026-11-26 02:16:20 | mode=mock | {summary}\n"
-        )
-        current_start = "2026-11-26 02:16:28 | mode=mock | run_start run_id=current\n"
-        current_summary = f"2026-11-26 02:16:28 | mode=mock | {summary}\n"
-        self.assertFalse(ui_app.live_run_has_committed_summary(previous + current_start, started))
-        committed = previous + current_start + current_summary
-        self.assertTrue(ui_app.live_run_has_committed_summary(committed, started))
-        self.assertFalse(
-            ui_app.live_run_has_committed_summary(
-                committed + "2026-11-26 02:16:28 | mode=mock | run_start run_id=next\n",
-                started,
-            )
-        )
-        self.assertFalse(ui_app.live_run_has_committed_summary(committed, ""))
-        self.assertFalse(ui_app.live_run_has_committed_summary("", started))
-
+    def test_scoped_stop_cannot_reach_another_generation_and_manual_stop_survives(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            project = Path(tmp) / "example"
-            project.mkdir()
-            meta = {"mode": "mock", "stoppable": True, "started_at": started}
-            self.assertTrue(ui_app.cooperative_stop_can_be_requested(project, meta))
-            (project / "run.log").write_text(committed, encoding="utf-8")
-            self.assertFalse(ui_app.cooperative_stop_can_be_requested(project, meta))
-            manual = project / "STOP_REQUESTED"
-            manual.write_text("STOP_REQUESTED\n", encoding="utf-8")
-            self.assertFalse(ui_app.cooperative_stop_can_be_requested(project, meta))
-            self.assertEqual(manual.read_text(encoding="utf-8"), "STOP_REQUESTED\n")
-            diagnostic = {"mode": "diagnostic", "stoppable": False, "started_at": started}
-            self.assertFalse(ui_app.cooperative_stop_can_be_requested(project, diagnostic))
+            project = Path(tmp)
+            path = project / "STOP_REQUESTED"
+            first, error = acquire_run_lock(project, mode="mock", model_name="m")
+            self.assertIsNone(error)
+            try:
+                previous = runtime_module.read_live_cli_run(project)
+                runtime_module.request_dashboard_stop(project, previous)
+                saved = path.read_text()
+                self.assertTrue(stop_requested(path))
+            finally:
+                release_run_lock(first)
+            self.assertFalse(path.exists())
+            path.write_text(saved)  # e.g. a request left by a process crash
+            self.assertFalse(stop_requested(path))
+            second, error = acquire_run_lock(project, mode="mock", model_name="m")
+            self.assertIsNone(error)
+            try:
+                self.assertFalse(path.exists())
+                with self.assertRaisesRegex(ValueError, "No active run"):
+                    runtime_module.request_dashboard_stop(project, previous)
+                path.touch()
+                self.assertTrue(stop_requested(path))
+                runtime_module.request_dashboard_stop(
+                    project, runtime_module.read_live_cli_run(project)
+                )
+                self.assertEqual(path.read_bytes(), b"")
+                self.assertTrue(runtime_module.close_run_stop_window(second))
+                self.assertFalse(runtime_module.read_live_cli_run(project)["stoppable"])
+            finally:
+                release_run_lock(second)
+            self.assertEqual(path.read_bytes(), b"")
 
     def test_process_meta_cleanup_leaves_a_record_replaced_during_the_read(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

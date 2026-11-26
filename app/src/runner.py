@@ -82,6 +82,7 @@ from .run_config import (
     finalize_run_config,
     read_run_config,
 )
+from .runtime import RunLockHandle, close_run_stop_window
 from .runtime import log_run as _log
 from .runtime import stop_requested as _stop_requested
 from .storage import (
@@ -1174,6 +1175,7 @@ def run_iterative_rounds(
     resume_metadata: Optional[Dict[str, Any]] = None,
     explicit_workspace: Optional[Path] = None,
     source_layout: Optional[bool] = None,
+    run_lock_handle: RunLockHandle | None = None,
 ) -> Dict[str, Any]:
     if max_rounds < 1:
         raise ValueError("max_rounds must be >= 1")
@@ -2288,6 +2290,10 @@ def run_iterative_rounds(
         _log(console, log_path, mode, f"round_exit round={round_index}")
     else:
         stop_reason = STOP_MAX_ROUNDS
+
+    accepted_stop = close_run_stop_window(run_lock_handle)
+    if accepted_stop and stop_reason in {STOP_MAX_ROUNDS, STOP_NO_IMPROVEMENT}:
+        stop_reason = STOP_USER_REQUESTED
 
     if stop_reason == STOP_MAX_ROUNDS and invalid_score_seen and completed_rounds == 1:
         stop_reason = STOP_INVALID_SCORE

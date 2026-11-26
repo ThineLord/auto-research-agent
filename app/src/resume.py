@@ -25,6 +25,7 @@ from .round_attempts import classify_round_recovery
 from .round_commit_recovery import round_commit_read_blocker
 from .run_config import INHERIT_GIT_ROOT, GitRootSetting
 from .runner import ResumeHistoryError, format_mock_recovery_note, run_iterative_rounds
+from .runtime import RunLockHandle
 from .storage import (
     artifact_path_exists,
     artifact_path_is_safe,
@@ -849,6 +850,7 @@ def run_resume_mode(
     max_consecutive_provider_quota_failures: int = 2,
     explicit_workspace: Path | None = None,
     source_layout: bool | None = None,
+    run_lock_handle: RunLockHandle | None = None,
 ) -> bool:
     # Establish the project trust boundary before the first automatic artifact read.
     # ``build_resume_preview`` repeats this check so it remains safe as a public helper.
@@ -909,6 +911,7 @@ def run_resume_mode(
             resume_metadata=preview,
             explicit_workspace=explicit_workspace,
             source_layout=source_layout,
+            run_lock_handle=run_lock_handle,
         )
         return True
     except ResumeHistoryError as exc:
