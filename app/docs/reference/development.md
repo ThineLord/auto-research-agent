@@ -14,7 +14,7 @@ make install-dev
 
 `make venv`, `make install`, `make install-dev`, and `./start` require Python 3.10 or newer. They
 use the first supported interpreter on `PATH`: `python3.13`, `python3.12`, `python3.11`,
-`python3.10`, then `python3` and `python`. Pass `PYTHON=python3.13` to choose one, or `VENV=` to
+`python3.10`, then `python3` and `python`. Pass `PYTHON=python3.13` to choose one, or `VENV=path` to
 place the environment somewhere else. `./start` and Make use that environment's Python for the
 install and for the command that follows it, including when `app/.venv` does not exist. A path
 with spaces or quotes is one path. A qualified environment keeps working when `PYTHON` is also
@@ -25,8 +25,8 @@ environment, and an environment whose pip is missing are left in place. The mess
 to keep the directory or move it aside and recreate it. A missing pip can be what an interrupted
 ensurepip leaves behind; the repair command prints that environment's absolute Python path, so it
 runs from the repository root. An empty `VENV` is rejected before any file is created. `PIP_TARGET`,
-`PIP_PREFIX`, `PIP_ROOT`, a truthy `PIP_USER`, and a pip configuration that sets `target`, `prefix`,
-`root`, or `user` are rejected before installation. The selected environment is stamped only after
+`PIP_PREFIX`, `PIP_ROOT`, `PIP_PYTHON`, a truthy `PIP_USER`, and dry runs are rejected before installation.
+The check uses the selected pip’s effective options, including settings in layered configuration files. The selected environment is stamped only after
 that install command succeeds.
 
 Model-backed research workflows can run against local Ollama or cloud Gemini, while Literature

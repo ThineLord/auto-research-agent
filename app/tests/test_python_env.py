@@ -404,6 +404,8 @@ _REDIRECT_ENV_KEYS = (
     "PIP_PREFIX",
     "PIP_ROOT",
     "PIP_TARGET",
+    "PIP_PYTHON",
+    "PIP_DRY_RUN",
     "PIP_USER",
 )
 
@@ -700,33 +702,6 @@ def _ensurepip_command(output: str) -> str:
     return lines[0]
 
 
-def _supported_venv_builder() -> str:
-    """Prefer 3.13. Any supported 3.10+ interpreter can build the without-pip fixture."""
-    for name in ("python3.13", "python3.12", "python3.11", "python3.10", "python3", "python"):
-        resolved = shutil.which(name)
-        if resolved is None:
-            continue
-        probe = subprocess.run(
-            [resolved, "-c", "import sys; print('%d.%d' % sys.version_info[:2])"],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if probe.returncode != 0:
-            continue
-        major_text, minor_text = probe.stdout.strip().split(".")
-        if (int(major_text), int(minor_text)) >= (3, 10):
-            return resolved
-    raise AssertionError("no supported interpreter for the without-pip fixture")
-
-
-def _remove_path(path: Path) -> None:
-    if path.is_symlink() or path.is_file():
-        path.unlink()
-    elif path.exists():
-        shutil.rmtree(path)
-
-
 def _relative_entries(root: Path) -> set[str]:
     entries: set[str] = set()
     for dirpath, dirnames, filenames in os.walk(root):
@@ -744,87 +719,80 @@ def _site_names(venv: Path) -> set[str]:
 
 
 def test_repo_root_ensurepip_command_repairs_and_retries(tmp_path: Path) -> None:
-    displaced = tmp_path / "displaced-app-venv"
-    moved = APP_VENV.exists() or APP_VENV.is_symlink()
-    if moved:
-        shutil.move(APP_VENV, displaced)
+    checkout = _mini_checkout(tmp_path)
+    shutil.copy2(REPO / "Makefile", checkout / "Makefile")
+    venv = checkout / "app" / ".venv"
     env = _real_env()
-    try:
-        builder = _supported_venv_builder()
-        created = subprocess.run(
-            [builder, "-m", "venv", "--without-pip", str(APP_VENV)],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        assert created.returncode == 0, created.stderr
-        refused = subprocess.run(
-            ["make", "install-dev"],
-            cwd=REPO,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=120,
-        )
-        output = _output(refused)
-        assert refused.returncode == 2, output
-        assert "pip is missing" in output
-        assert not (APP_VENV / ".install.stamp").exists()
-        assert not (APP_VENV / ".install-dev.stamp").exists()
-        repair = _ensurepip_command(output)
-        repair_python = Path(shlex.split(repair)[0])
-        assert repair_python.is_absolute()
-        assert repair_python.resolve() == (APP_VENV / "bin" / "python").resolve()
-        assert repair.endswith("-m ensurepip --upgrade")
-        ran = subprocess.run(
-            ["bash", "-c", repair],
-            cwd=REPO,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=120,
-        )
-        assert ran.returncode == 0, _output(ran)
-        checked = subprocess.run(
-            [
-                str(APP_VENV / "bin" / "python"),
-                "-c",
-                "import pip, sys\nprint(sys.prefix)\nprint(pip.__file__)",
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        assert checked.returncode == 0, checked.stderr
-        prefix, pip_file = checked.stdout.splitlines()
-        assert Path(prefix).resolve() == APP_VENV.resolve()
-        assert Path(pip_file).resolve().is_relative_to(APP_VENV.resolve())
+    created = subprocess.run(
+        [sys.executable, "-m", "venv", "--without-pip", str(venv)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert created.returncode == 0, created.stderr
+    refused = subprocess.run(
+        ["make", "install-dev"],
+        cwd=checkout,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+    output = _output(refused)
+    assert refused.returncode == 2, output
+    assert "pip is missing" in output
+    assert not (venv / ".install.stamp").exists()
+    assert not (venv / ".install-dev.stamp").exists()
+    repair = _ensurepip_command(output)
+    repair_python = Path(shlex.split(repair)[0])
+    assert repair_python.is_absolute()
+    assert repair_python.resolve() == (venv / "bin" / "python").resolve()
+    assert repair.endswith("-m ensurepip --upgrade")
+    ran = subprocess.run(
+        ["bash", "-c", repair],
+        cwd=checkout,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+    assert ran.returncode == 0, _output(ran)
+    checked = subprocess.run(
+        [
+            str(venv / "bin" / "python"),
+            "-c",
+            "import pip, sys\nprint(sys.prefix)\nprint(pip.__file__)",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert checked.returncode == 0, checked.stderr
+    prefix, pip_file = checked.stdout.splitlines()
+    assert Path(prefix).resolve() == venv.resolve()
+    assert Path(pip_file).resolve().is_relative_to(venv.resolve())
 
-        log = tmp_path / "retry-pip.log"
-        _patch_pip_main(APP_VENV, log, 0)
-        retry = subprocess.run(
-            ["make", "install-dev"],
-            cwd=REPO,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=120,
-        )
-        assert retry.returncode == 0, _output(retry)
-        assert "pip is missing" not in _output(retry)
-        assert (APP_VENV / ".install.stamp").is_file()
-        assert (APP_VENV / ".install-dev.stamp").is_file()
-        recorded = log.read_text(encoding="utf-8")
-        assert "install" in recorded
-        assert ".[dev]" in recorded
-        assert "-m pip install" not in recorded
-    finally:
-        _remove_path(APP_VENV)
-        if moved:
-            shutil.move(displaced, APP_VENV)
+    log = tmp_path / "retry-pip.log"
+    _patch_pip_main(venv, log, 0)
+    retry = subprocess.run(
+        ["make", "install-dev"],
+        cwd=checkout,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+    assert retry.returncode == 0, _output(retry)
+    assert "pip is missing" not in _output(retry)
+    assert (venv / ".install.stamp").is_file()
+    assert (venv / ".install-dev.stamp").is_file()
+    recorded = log.read_text(encoding="utf-8")
+    assert "install" in recorded
+    assert ".[dev]" in recorded
+    assert "-m pip install" not in recorded
 
 
 def test_empty_venv_is_rejected_before_any_write(tmp_path: Path) -> None:
@@ -879,15 +847,19 @@ def test_redirected_pip_destination_is_not_stamped(tmp_path: Path) -> None:
         {"PIP_TARGET": str(outside)},
         {"PIP_PREFIX": str(outside)},
         {"PIP_USER": "1"},
+        {"PIP_PYTHON": str(outside / "python")},
+        {"PIP_DRY_RUN": "true"},
         {"PIP_CONFIG_FILE": str(conf)},
         {"HOME": str(home), "XDG_CONFIG_HOME": str(home / ".config")},
     )
     expected = (
-        f"PIP_TARGET={outside}",
-        f"PIP_PREFIX={outside}",
-        "PIP_USER=1",
-        f"{conf}: global.target={outside}",
-        "install.user=true",
+        "PIP_TARGET",
+        "PIP_PREFIX",
+        "PIP_USER",
+        "PIP_PYTHON",
+        "PIP_DRY_RUN",
+        "PIP_TARGET",
+        "PIP_USER",
     )
     for extra, token in zip(cases, expected, strict=True):
         env = _real_env()
@@ -907,6 +879,31 @@ def test_redirected_pip_destination_is_not_stamped(tmp_path: Path) -> None:
         assert [path.name for path in outside.iterdir()] == ["KEEP"]
         assert not (outside / "synthpkg.py").exists()
         assert list(outside.rglob("*.dist-info")) == []
+
+
+def test_site_target_and_separate_named_pip_config(tmp_path: Path) -> None:
+    venv = tmp_path / "env"
+    subprocess.run([sys.executable, "-m", "venv", str(venv)], check=True)
+    outside = tmp_path / "outside"
+    (venv / "pip.conf").write_text(f"[install]\ntarget = {outside}\n", encoding="utf-8")
+    named = tmp_path / "pip.conf"
+    named.write_text("[global]\nindex-url = https://example.invalid/a%2Fb\n", encoding="utf-8")
+    env = {**_real_env(), "PIP_CONFIG_FILE": str(named), "PIP_NO_INDEX": "1"}
+    refused = _make("install", venv, env)
+    assert refused.returncode == 2
+    assert "PIP_TARGET" in _output(refused)
+    assert "example.invalid" not in _output(refused)
+    assert not outside.exists()
+    assert not (venv / ".install.stamp").exists()
+
+    # The same percent-encoded URL is harmless when the redirection is removed.
+    (venv / "pip.conf").unlink()
+    log = tmp_path / "install.log"
+    _patch_pip_main(venv, log, 0)
+    installed = _make("install", venv, env)
+    assert installed.returncode == 0, _output(installed)
+    assert "-e ." in log.read_text(encoding="utf-8")
+    assert (venv / ".install.stamp").exists()
 
 
 def test_nonredirecting_pip_settings_still_install(tmp_path: Path) -> None:

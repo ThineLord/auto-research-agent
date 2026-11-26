@@ -335,92 +335,35 @@ stamp_is_fresh() {
 # successful install at another directory. Refuse those destinations before
 # pip runs. The stamp below is written only after the install command exits 0.
 reject_redirected_install() {
-  local reasons="" config_hits value
-  if [ -n "${PIP_TARGET-}" ]; then
-    reasons="${reasons}PIP_TARGET=${PIP_TARGET}"$'\n'
-  fi
-  if [ -n "${PIP_PREFIX-}" ]; then
-    reasons="${reasons}PIP_PREFIX=${PIP_PREFIX}"$'\n'
-  fi
-  if [ -n "${PIP_ROOT-}" ]; then
-    reasons="${reasons}PIP_ROOT=${PIP_ROOT}"$'\n'
-  fi
-  value="$(printf '%s' "${PIP_USER-}" | tr '[:upper:]' '[:lower:]')"
-  case "${value}" in
-    1|true|yes|on|y|t)
-      reasons="${reasons}PIP_USER=${PIP_USER}"$'\n'
-      ;;
-  esac
-  if ! config_hits="$(ARA_ENV_DIR="${VENV}" "${venv_python}" -c 'import configparser, os
-from pathlib import Path
-venv = Path(os.environ["ARA_ENV_DIR"]).resolve()
-dest_keys = {"target", "prefix", "root", "user"}
-falsey = {"0", "false", "no", "off", "n", "f"}
-paths = []
-named = os.environ.get("PIP_CONFIG_FILE", "")
-if named:
-    if os.path.abspath(named) != os.path.abspath(os.devnull):
-        paths.append(named)
-else:
-    home = os.environ.get("HOME", "")
-    xdg = os.environ.get("XDG_CONFIG_HOME", "")
-    candidates = []
-    if xdg:
-        candidates.append(Path(xdg) / "pip" / "pip.conf")
-        candidates.append(Path(xdg) / "pip" / "pip.ini")
-    if home:
-        candidates.append(Path(home) / ".config" / "pip" / "pip.conf")
-        candidates.append(Path(home) / ".config" / "pip" / "pip.ini")
-        candidates.append(Path(home) / ".pip" / "pip.conf")
-        candidates.append(Path(home) / ".pip" / "pip.ini")
-    candidates.append(Path("/etc/pip.conf"))
-    candidates.append(venv / "pip.conf")
-    candidates.append(venv / "pip.ini")
-    seen = set()
-    for candidate in candidates:
-        if not candidate.is_file():
-            continue
-        text = str(candidate)
-        if text in seen:
-            continue
-        seen.add(text)
-        paths.append(text)
-for name in paths:
-    parser = configparser.ConfigParser()
-    try:
-        read = parser.read(name)
-    except configparser.Error:
-        print(name + ": unreadable")
-        continue
-    if not read:
-        print(name + ": unreadable")
-        continue
-    for section in parser.sections():
-        for key, value in parser.items(section):
-            if key not in dest_keys:
-                continue
-            cleaned = value.strip()
-            if key == "user":
-                if cleaned == "" or cleaned.lower() in falsey:
-                    continue
-            elif cleaned == "":
-                continue
-            print("%s: %s.%s=%s" % (name, section, key, cleaned))
-')"; then
-    printf '%s\n' "Pip configuration could not be read, so packages were not installed." >&2
+  local settings
+  # Parse with this venv's pip so site, user, explicit files and environment
+  # variables have the same precedence as the install below. Only print option
+  # names: unrelated configuration may contain private index credentials.
+  if ! settings="$("${venv_python}" -c 'from pip._internal.cli.main_parser import create_main_parser
+from pip._internal.commands import create_command
+
+general, _ = create_main_parser().parse_args(["install"])
+options, _ = create_command("install").parse_args([])
+if getattr(general, "python", None) or getattr(options, "python", None):
+    print("PIP_PYTHON (--python)")
+for label, value in (
+    ("PIP_TARGET (--target)", options.target_dir),
+    ("PIP_PREFIX (--prefix)", options.prefix_path),
+    ("PIP_ROOT (--root)", options.root_path),
+    ("PIP_USER (--user)", options.use_user_site),
+    ("PIP_DRY_RUN (--dry-run)", getattr(options, "dry_run", False)),
+):
+    if value:
+        print(label)' 2>/dev/null)"; then
+    printf '%s\n' "Pip configuration could not be checked. No packages were installed." >&2
     exit 2
   fi
-  if [ -n "${config_hits}" ]; then
-    reasons="${reasons}${config_hits}"$'\n'
+  if [ -n "${settings}" ]; then
+    printf 'Packages would not be installed into %s. Check these pip settings:\n%s\n' \
+      "$(venv_show)" "${settings}" >&2
+    printf '%s\n' "No packages were installed. No changes were made and no install stamp was written." >&2
+    exit 2
   fi
-  if [ -z "${reasons}" ]; then
-    return 0
-  fi
-  printf '%s\n' "Packages would not be installed into $(venv_show)." >&2
-  printf '%s' "${reasons}" >&2
-  printf '%s\n' "The selected environment was left unchanged and no install stamp was written." >&2
-  printf '%s\n' "No packages were installed." >&2
-  exit 2
 }
 
 install_requirements() {
