@@ -12,9 +12,18 @@ Create the local environment and install runtime plus development dependencies:
 make install-dev
 ```
 
-The project targets Python 3.10+. Model-backed research workflows can run against local Ollama or
-cloud Gemini, while Literature Survey Mode is deterministic and local-only. CI does not start
-Ollama, call Gemini, or run model-backed workflows.
+`make venv`, `make install`, `make install-dev`, and `./start` require Python 3.10 or newer. They
+use the first supported interpreter on `PATH`: `python3.13`, `python3.12`, `python3.11`,
+`python3.10`, then `python3` and `python`. Pass `PYTHON=python3.13` to choose one, or `VENV=` to
+place the environment somewhere else. A qualified environment keeps working when `PYTHON` is also
+set. If every interpreter on `PATH` is older, the command stops before creating an environment or
+installing packages and prints Python 3.10 as the minimum, the interpreters it actually found, and
+the recovery command. An existing `.venv` below 3.10 is left in place; the message explains how to
+keep it or move it aside and recreate it.
+
+Model-backed research workflows can run against local Ollama or cloud Gemini, while Literature
+Survey Mode is deterministic and local-only. CI does not start Ollama, call Gemini, or run
+model-backed workflows.
 
 Useful local commands:
 

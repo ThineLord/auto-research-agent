@@ -36,7 +36,7 @@ cp config.example.yaml config.yaml
 make install-dev
 ```
 
-这会先创建本地配置，再用 `python3` 创建 `.venv`，并安装运行和测试所需依赖。
+这会先创建本地配置，再选择可用的 Python 3.10+ 创建 `.venv`，并安装运行和测试所需依赖。默认 `python3` 若低于 3.10，会改用 PATH 上更新的受支持解释器。已有的过旧 `.venv` 会原样保留，并提示如何移开后重建。
 `config.yaml` 是本地文件，不应该提交到 Git。
 
 ## 稳定工作流

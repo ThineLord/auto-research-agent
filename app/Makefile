@@ -6,6 +6,8 @@ VENV_PYTHON := $(VENV)/bin/python
 VENV_PIP := $(VENV_PYTHON) -m pip
 INSTALL_STAMP := $(VENV)/.install.stamp
 DEV_STAMP := $(VENV)/.install-dev.stamp
+# origin distinguishes an explicit PYTHON= from the python3 default above.
+ENSURE_PYTHON_ENV = PYTHON='$(PYTHON)' PYTHON_ORIGIN='$(origin PYTHON)' VENV='$(VENV)' ./scripts/ensure_python_env.sh
 
 .DEFAULT_GOAL := help
 
@@ -36,6 +38,8 @@ help:
 		"  make ui            Start the local research dashboard" \
 		"" \
 		"Run make install-dev once on a new checkout before testing or running." \
+		"Python 3.10+ is selected from PATH. Pass PYTHON=python3.13 to choose one." \
+		"An older .venv is left unchanged." \
 		"Pass extra CLI flags with ARGS, for example:" \
 		"  make diagnostic ARGS=\"--model qwen3:8b\""
 
@@ -43,21 +47,26 @@ bootstrap:
 	./scripts/bootstrap.sh
 
 $(VENV_PYTHON):
-	$(PYTHON) -m venv $(VENV)
+	@$(ENSURE_PYTHON_ENV)
 
 venv: $(VENV_PYTHON)
+	@$(ENSURE_PYTHON_ENV)
 
 $(INSTALL_STAMP): pyproject.toml scripts/dependencies/constraints.txt | $(VENV_PYTHON)
+	@$(ENSURE_PYTHON_ENV)
 	$(VENV_PIP) install -c scripts/dependencies/constraints.txt -e .
 	@touch $(INSTALL_STAMP)
 
 $(DEV_STAMP): pyproject.toml scripts/dependencies/constraints.txt | $(VENV_PYTHON)
+	@$(ENSURE_PYTHON_ENV)
 	$(VENV_PIP) install -c scripts/dependencies/constraints.txt -e ".[dev]"
 	@touch $(INSTALL_STAMP) $(DEV_STAMP)
 
 install: $(INSTALL_STAMP)
+	@$(ENSURE_PYTHON_ENV)
 
 install-dev: $(DEV_STAMP)
+	@$(ENSURE_PYTHON_ENV)
 
 format: install-dev
 	$(VENV_PYTHON) -m ruff check --fix --select I src tests ui scripts
