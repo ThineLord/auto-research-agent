@@ -37,6 +37,18 @@ MODEL_JOB_PROCESS_META_FILENAME = "ui_model_job_process.json"
 RUN_LOCK_GUARD_FILENAME = "active_run.guard"
 RUN_LOCK_SCHEMA_VERSION = 1
 MAX_PROCESS_ID = (1 << 32) - 1
+# Research modes that honor STOP_REQUESTED. Edit and maintenance locks use the
+# same guard but are not a run the dashboard can stop.
+STOPPABLE_RUN_MODES = frozenset(
+    {
+        "mock",
+        "normal",
+        "continuous",
+        "diagnostic",
+        "session",
+        "resume",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -384,6 +396,88 @@ def _open_guard_file(guard_path: Path) -> BinaryIO:
 def _guard_identity(guard_file: BinaryIO) -> tuple[int, int]:
     guard_stat = os.fstat(guard_file.fileno())
     return guard_stat.st_dev, guard_stat.st_ino
+
+
+def _lock_int(value: object) -> Optional[int]:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def _write_flock_held_by(device: int, inode: int, pid: int) -> bool:
+    """True when that PID holds the write flock for this guard inode.
+
+    Linux flock is not visible to fcntl F_GETLK. Reading /proc/locks observes
+    the kernel lock without acquiring it, so a status poll cannot block a run
+    that is about to take the guard. Other platforms fail closed.
+    """
+    identity = f"{os.major(device):02x}:{os.minor(device):02x}:{inode}"
+    try:
+        lines = Path("/proc/locks").read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return False
+    for line in lines:
+        parts = line.split()
+        if len(parts) < 6:
+            continue
+        if parts[1] == "FLOCK" and parts[3] == "WRITE" and parts[4] == str(pid):
+            if parts[5] == identity:
+                return True
+    return False
+
+
+def read_stoppable_cli_run(project_dir: Path) -> Dict[str, Any]:
+    """Return a live owned research run, or nothing for idle and non-runs.
+
+    Ownerless metadata and edit/maintenance locks stay invisible. A matching
+    UI process record is preferred by the dashboard and is not read here.
+    """
+    try:
+        ensure_project_runtime_paths_safe(project_dir, anchor=project_dir.parent)
+    except OSError:
+        return {}
+    lock_path = project_dir / RUN_LOCK_FILENAME
+    guard_path = project_dir / RUN_LOCK_GUARD_FILENAME
+    if not artifact_path_is_safe(lock_path, allow_missing=False, anchor=project_dir.parent):
+        return {}
+    if not artifact_path_is_safe(guard_path, allow_missing=False, anchor=project_dir.parent):
+        return {}
+    try:
+        lock_data = read_json_file(lock_path)
+        guard_stat = guard_path.lstat()
+    except OSError:
+        return {}
+    if not stat.S_ISREG(guard_stat.st_mode) or not isinstance(lock_data, dict):
+        return {}
+    mode = lock_data.get("mode")
+    owner = lock_data.get("owner_token")
+    model = lock_data.get("model")
+    pid = _parse_lock_pid(lock_data.get("pid"))
+    device = _lock_int(lock_data.get("guard_device"))
+    inode = _lock_int(lock_data.get("guard_inode"))
+    if (
+        lock_data.get("schema_version") != RUN_LOCK_SCHEMA_VERSION
+        or not isinstance(owner, str)
+        or not owner
+        or not isinstance(mode, str)
+        or mode not in STOPPABLE_RUN_MODES
+        or not isinstance(model, str)
+        or not pid
+        or not is_pid_running(pid)
+        or device != guard_stat.st_dev
+        or inode != guard_stat.st_ino
+        or not _write_flock_held_by(guard_stat.st_dev, guard_stat.st_ino, pid)
+    ):
+        return {}
+    started = lock_data.get("started_at")
+    return {
+        "pid": pid,
+        "mode": mode,
+        "model": model,
+        "started_at": started if isinstance(started, str) else "",
+        "kind": "cli_run",
+        "command": " ".join(part for part in (mode, model) if part),
+    }
 
 
 def _metadata_guard_matches(lock_data: Dict[str, Any], device: int, inode: int) -> bool:

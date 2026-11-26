@@ -232,6 +232,14 @@ crash releases the kernel guard automatically, so the next process can replace s
 without a check/delete race. If the guard path is accidentally recreated while an owner remains
 live, the stored PID/identity prevents the new inode from taking over. Existing live legacy
 PID-only locks remain blocking; malformed or dead legacy metadata is recovered under the guard.
+The dashboard prefers live `ui_run_process.json` metadata. With none, it treats a lock as the
+current run only when schema 1 has an owner token, the recorded PID is running, the guard
+identity matches, and that PID holds the guard's write flock. Stoppable modes are mock, normal,
+continuous, diagnostic, session, and resume; the stop is the existing `STOP_REQUESTED` signal.
+Ownerless metadata and edit or maintenance locks (`input_edit`, `literature_survey`,
+`legacy_history_migration`) are not stoppable runs. A `/api/action` model list does not take the
+dashboard operation lock, so stopping one verified run is not held behind another project's read.
+Same-project writes and starts still take that lock, and a live run still refuses a second start.
 
 Progress comes from:
 

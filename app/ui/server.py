@@ -60,7 +60,7 @@ def status(name: str, model: str = "") -> dict:
 
 def _status(path: Path, checkpoint: dict, model: str = "") -> dict:
     """Build status from this request's validated project and checkpoint."""
-    meta = h.get_active_process_meta(h.run_meta_path(path))
+    meta = h.get_active_run_meta(path)
     log = h.tail_file_lines(path / "run.log", 120)
     return {
         "progress": h.infer_running_stage(log_text=log, checkpoint=checkpoint, run_meta=meta),
@@ -187,7 +187,7 @@ def action(data: dict) -> dict:
     if operation == "save":
         inputs = save_inputs(path, data.get("changes"), data.get("revisions"))
         return {"message_key": "input_saved", **inputs}
-    active = h.get_active_process_meta(h.run_meta_path(path))
+    active = h.get_active_run_meta(path)
     job = h.get_active_process_meta(h.model_job_meta_path(path))
     if operation == "stop":
         if not active:
@@ -433,13 +433,18 @@ class Handler(BaseHTTPRequestHandler):
             data = json.loads(self.rfile.read(size))
             if not isinstance(data, dict):
                 raise ValueError("Invalid request")
-            if not ACTION_LOCK.acquire(blocking=False):
+            # Listing models only reads the configured endpoint. It must not hold
+            # the operation lock, or one project's verified stop waits on another
+            # project's read. Writes and starts still take the lock.
+            read_only = data.get("action") == "models"
+            if not read_only and not ACTION_LOCK.acquire(blocking=False):
                 self.respond({"error": "Another operation is in progress"}, 409)
                 return
             try:
                 result = action(data)
             finally:
-                ACTION_LOCK.release()
+                if not read_only:
+                    ACTION_LOCK.release()
             self.respond(result)
         except InputEditConflict as exc:
             self.respond({"error": exc.code, "code": exc.code, "current": exc.current}, 409)

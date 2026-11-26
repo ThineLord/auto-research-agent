@@ -29,6 +29,7 @@ from src.config import (
 from src.runtime import (
     acquire_run_lock,
     get_active_process_meta,
+    read_stoppable_cli_run,
     release_run_lock,
     run_project_tests,
     start_background_process,
@@ -1159,6 +1160,75 @@ release_run_lock(handle)
             self.assertIsNotNone(parent_handle)
             self.assertIsNone(parent_error)
             release_run_lock(parent_handle)
+
+    def test_stoppable_cli_run_requires_a_live_owned_research_lock(self) -> None:
+        import fcntl
+
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "alpha"
+            other_dir = Path(tmp) / "beta"
+            project_dir.mkdir()
+            other_dir.mkdir()
+
+            handle, error = acquire_run_lock(
+                project_dir, mode="mock", model_name="mock-deterministic"
+            )
+            self.assertIsNone(error)
+            try:
+                meta = read_stoppable_cli_run(project_dir)
+                self.assertEqual(meta["pid"], os.getpid())
+                self.assertEqual(meta["mode"], "mock")
+                self.assertEqual(meta["model"], "mock-deterministic")
+                self.assertNotIn("owner_token", meta)
+                self.assertEqual(read_stoppable_cli_run(other_dir), {})
+            finally:
+                release_run_lock(handle)
+            self.assertEqual(read_stoppable_cli_run(project_dir), {})
+
+            for mode in ("input_edit", "literature_survey", "legacy_history_migration", "run"):
+                with self.subTest(mode=mode):
+                    held, held_error = acquire_run_lock(project_dir, mode=mode, model_name="")
+                    self.assertIsNone(held_error)
+                    try:
+                        self.assertEqual(read_stoppable_cli_run(project_dir), {})
+                    finally:
+                        release_run_lock(held)
+
+            guard_path = project_dir / "active_run.guard"
+            guard = guard_path.open("a+b")
+            try:
+                fcntl.flock(guard.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                stat_result = os.fstat(guard.fileno())
+                write_json_file(
+                    project_dir / "active_run.json",
+                    {
+                        "schema_version": 1,
+                        "pid": os.getpid(),
+                        "guard_device": stat_result.st_dev,
+                        "guard_inode": stat_result.st_ino,
+                        "mode": "mock",
+                        "model": "mock-deterministic",
+                        "started_at": "ownerless",
+                    },
+                )
+                self.assertEqual(read_stoppable_cli_run(project_dir), {})
+                write_json_file(
+                    project_dir / "active_run.json",
+                    {
+                        "schema_version": 1,
+                        "owner_token": "dead-owner",
+                        "pid": 2**20,
+                        "guard_device": stat_result.st_dev,
+                        "guard_inode": stat_result.st_ino,
+                        "mode": "mock",
+                        "model": "mock-deterministic",
+                        "started_at": "dead",
+                    },
+                )
+                self.assertEqual(read_stoppable_cli_run(project_dir), {})
+            finally:
+                fcntl.flock(guard.fileno(), fcntl.LOCK_UN)
+                guard.close()
 
     def test_run_lock_simultaneous_processes_have_exactly_one_owner(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

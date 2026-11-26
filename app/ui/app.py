@@ -76,6 +76,7 @@ from src.run_compare import compare_runs
 from src.runtime import (
     get_active_process_meta,
     model_job_meta_path,
+    read_stoppable_cli_run,
     run_meta_path,
     run_project_tests,
     start_background_process,
@@ -877,6 +878,14 @@ def check_model_health(
         installed_model_names=installed_model_names,
         timeout_seconds=timeout_seconds,
     )
+
+
+def get_active_run_meta(project_dir: Path) -> dict[str, Any]:
+    """Prefer a live UI-started process, then a verified CLI research run."""
+    recorded = get_active_process_meta(run_meta_path(project_dir))
+    if recorded:
+        return recorded
+    return read_stoppable_cli_run(project_dir)
 
 
 def infer_running_stage(
@@ -2115,7 +2124,7 @@ def render_live_progress_and_logs(
     except OSError:
         st.warning(t("unsafe_project_paths"))
         return
-    run_meta = get_active_process_meta(run_meta_path(proj_path))
+    run_meta = get_active_run_meta(proj_path)
     checkpoint = read_json_file(checkpoint_path)
     run_log_text = tail_file_lines(run_log_path, max_lines=240)
 
@@ -2237,7 +2246,7 @@ def main() -> None:
     model_job_log_path = proj_path / "model_ops.log"
     checkpoint_path = proj_path / "checkpoint.json"
     stop_signal_path = proj_path / "STOP_REQUESTED"
-    run_meta = get_active_process_meta(run_meta_path(proj_path))
+    run_meta = get_active_run_meta(proj_path)
     model_job_meta = get_active_process_meta(model_job_meta_path(proj_path))
     checkpoint = read_json_file(checkpoint_path)
 
