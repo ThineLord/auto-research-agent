@@ -46,6 +46,38 @@ from src.storage import (
 )
 
 
+def _subinterpreter_failure(script: str) -> str | None:
+    """Run script in a fresh subinterpreter. None means it finished."""
+    for name in ("concurrent.interpreters", "_interpreters", "_xxsubinterpreters"):
+        try:
+            interpreters = __import__(name, fromlist=["create"])
+        except ImportError:
+            continue
+        return _run_subinterpreter(interpreters, script)
+    return "unavailable"
+
+
+def _run_subinterpreter(interpreters: object, script: str) -> str | None:
+    create = getattr(interpreters, "create")
+    interp = create()
+    try:
+        if hasattr(interp, "exec"):
+            interp.exec(script)
+        elif hasattr(interpreters, "run_string"):
+            interpreters.run_string(interp, script)
+        else:
+            interpreters.exec(interp, script)
+    except BaseException as exc:  # noqa: BLE001 - the child result is the assertion
+        return f"{type(exc).__name__}: {exc}"
+    finally:
+        close = getattr(interp, "close", None)
+        if close is not None:
+            close()
+        elif hasattr(interpreters, "destroy"):
+            interpreters.destroy(interp)
+    return None
+
+
 class SharedUiBackendHelperTests(unittest.TestCase):
     def test_text_json_and_tail_helpers_handle_missing_and_invalid_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1314,6 +1346,86 @@ release_run_lock(handle)
         self.assertTrue(runtime_module._open_inode_matches(5, 9, [(5, 9), (1, 2)]))
         self.assertTrue(runtime_module._open_inode_matches(0x100000005, 9, [(5, 9)]))
         self.assertFalse(runtime_module._open_inode_matches(5, 9, [(5, 8), (4, 9)]))
+
+    def test_darwin_proc_library_imports_ctypes_util_in_a_clean_interpreter(self) -> None:
+        app_root = Path(__file__).resolve().parents[1]
+        script = f"""
+import sys
+sys.path.insert(0, {str(app_root)!r})
+import ctypes
+from src.runtime import _darwin_proc_library
+sys.modules.pop("ctypes.util", None)
+if hasattr(ctypes, "util"):
+    del ctypes.util
+try:
+    ctypes.util.find_library("proc")
+except AttributeError:
+    pass
+else:
+    raise SystemExit("ctypes.util stayed available in the clean interpreter")
+try:
+    _darwin_proc_library()
+except AttributeError as exc:
+    raise SystemExit("AttributeError: " + str(exc))
+except OSError:
+    pass
+"""
+        error = _subinterpreter_failure(script)
+        # 3.12 and earlier cannot import ctypes in a subinterpreter. A fresh
+        # process still has a clean sys.modules, which is what masked this bug.
+        if error is not None and (
+            error == "unavailable" or "does not support loading in subinterpreters" in error
+        ):
+            completed = subprocess.run(
+                [sys.executable, "-c", script],
+                check=False,
+                capture_output=True,
+                text=True,
+                cwd=app_root,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr or completed.stdout)
+            return
+        self.assertIsNone(error, error)
+
+    def test_committed_summary_is_only_the_live_run(self) -> None:
+        import ui.app as ui_app
+
+        started = "2026-11-26T02:16:28.123456"
+        summary = (
+            "run_summary completed_rounds=1 stop_reason=MAX_ROUNDS "
+            "best_score=N/A last_successful_agent=judge"
+        )
+        previous = (
+            "2026-11-26 02:16:20 | mode=mock | run_start run_id=old\n"
+            f"2026-11-26 02:16:20 | mode=mock | {summary}\n"
+        )
+        current_start = "2026-11-26 02:16:28 | mode=mock | run_start run_id=current\n"
+        current_summary = f"2026-11-26 02:16:28 | mode=mock | {summary}\n"
+        self.assertFalse(ui_app.live_run_has_committed_summary(previous + current_start, started))
+        committed = previous + current_start + current_summary
+        self.assertTrue(ui_app.live_run_has_committed_summary(committed, started))
+        self.assertFalse(
+            ui_app.live_run_has_committed_summary(
+                committed + "2026-11-26 02:16:28 | mode=mock | run_start run_id=next\n",
+                started,
+            )
+        )
+        self.assertFalse(ui_app.live_run_has_committed_summary(committed, ""))
+        self.assertFalse(ui_app.live_run_has_committed_summary("", started))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "example"
+            project.mkdir()
+            meta = {"mode": "mock", "stoppable": True, "started_at": started}
+            self.assertTrue(ui_app.cooperative_stop_can_be_requested(project, meta))
+            (project / "run.log").write_text(committed, encoding="utf-8")
+            self.assertFalse(ui_app.cooperative_stop_can_be_requested(project, meta))
+            manual = project / "STOP_REQUESTED"
+            manual.write_text("STOP_REQUESTED\n", encoding="utf-8")
+            self.assertFalse(ui_app.cooperative_stop_can_be_requested(project, meta))
+            self.assertEqual(manual.read_text(encoding="utf-8"), "STOP_REQUESTED\n")
+            diagnostic = {"mode": "diagnostic", "stoppable": False, "started_at": started}
+            self.assertFalse(ui_app.cooperative_stop_can_be_requested(project, diagnostic))
 
     def test_process_meta_cleanup_leaves_a_record_replaced_during_the_read(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

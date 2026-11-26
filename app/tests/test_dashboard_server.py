@@ -1106,6 +1106,144 @@ def test_diagnostic_stop_is_refused_before_a_signal_and_the_next_mock_finishes(
     assert not (root / "STOP_REQUESTED").exists()
 
 
+def _log_line(stamp, body: str) -> str:
+    return f"{stamp.strftime('%Y-%m-%d %H:%M:%S')} | mode=mock | {body}\n"
+
+
+def test_winding_down_stop_is_refused_and_the_next_mock_finishes(http_server, project, monkeypatch):
+    from datetime import datetime, timedelta
+    from io import StringIO
+
+    from rich.console import Console
+
+    from src.mock_run import (
+        MOCK_MODEL_NAME,
+        MOCK_MODEL_PROVIDER,
+        build_mock_agents,
+        mock_model_parameters,
+    )
+    from src.runner import run_iterative_rounds
+    from src.runtime import acquire_run_lock, get_active_process_meta, release_run_lock
+
+    root, _launch = project
+    monkeypatch.setattr(web.h, "get_active_process_meta", get_active_process_meta)
+    other = root.parent / "beta"
+    other.mkdir()
+    (other / "task.md").write_text("Other synthetic project\n", encoding="utf-8")
+    (other / "memory.md").write_text("Context\n", encoding="utf-8")
+    handle, error = acquire_run_lock(root, mode="mock", model_name="mock-deterministic")
+    other_handle, other_error = acquire_run_lock(
+        other, mode="mock", model_name="mock-deterministic"
+    )
+    assert error is None and other_error is None
+    token = {"X-Dashboard-Token": web.TOKEN}
+    summary = (
+        "run_summary completed_rounds=1 stop_reason=MAX_ROUNDS "
+        "best_score=N/A last_successful_agent=judge"
+    )
+    try:
+        started = datetime.fromisoformat(
+            json.loads((root / "active_run.json").read_text(encoding="utf-8"))["started_at"]
+        ).replace(microsecond=0)
+        previous = started - timedelta(seconds=5)
+        (root / "run.log").write_text(
+            _log_line(previous, "run_start run_id=old")
+            + _log_line(previous, summary)
+            + _log_line(started, "run_start run_id=current"),
+            encoding="utf-8",
+        )
+        active = web.status("example")
+        assert active["progress"]["run_active"] is True
+        assert active["progress"]["stoppable"] is True
+        accepted, _body, _headers = request(
+            http_server,
+            "POST",
+            "/api/action",
+            json.dumps(payload(action="stop")),
+            token,
+        )
+        assert accepted == 200
+        assert (root / "STOP_REQUESTED").is_file()
+        assert not (other / "STOP_REQUESTED").exists()
+        (root / "STOP_REQUESTED").unlink()
+
+        with (root / "run.log").open("a", encoding="utf-8") as log:
+            log.write(_log_line(started, summary))
+        winding = web.status("example")
+        assert winding["progress"]["run_active"] is True
+        assert winding["progress"]["mode"] == "mock"
+        assert winding["progress"]["stoppable"] is False
+        refused, body, _headers = request(
+            http_server,
+            "POST",
+            "/api/action",
+            json.dumps(payload(action="stop")),
+            token,
+        )
+        assert refused == 400
+        assert b"cannot be stopped" in body
+        assert not (root / "STOP_REQUESTED").exists()
+
+        manual = root / "STOP_REQUESTED"
+        manual.write_text("STOP_REQUESTED\n", encoding="utf-8")
+        refused_manual, _body, _headers = request(
+            http_server,
+            "POST",
+            "/api/action",
+            json.dumps(payload(action="stop")),
+            token,
+        )
+        assert refused_manual == 400
+        assert manual.read_text(encoding="utf-8") == "STOP_REQUESTED\n"
+        manual.unlink()
+
+        other_stopped, _body, _headers = request(
+            http_server,
+            "POST",
+            "/api/action",
+            json.dumps(
+                {"project": "beta", "provider": "ollama", "model": "qwen3:8b", "action": "stop"}
+            ),
+            token,
+        )
+        assert other_stopped == 200
+        assert (other / "STOP_REQUESTED").is_file()
+        assert not (root / "STOP_REQUESTED").exists()
+    finally:
+        release_run_lock(handle)
+        release_run_lock(other_handle)
+
+    assert web.status("example")["progress"]["run_active"] is False
+    assert (other / "STOP_REQUESTED").is_file()
+    console = Console(file=StringIO(), force_terminal=False, width=80)
+    prompt_dir = root.parent / "prompts"
+    prompt_dir.mkdir()
+    for name in ("draft.md", "review.md", "revise.md", "judge.md"):
+        (prompt_dir / name).write_text(f"{name} prompt\n", encoding="utf-8")
+    result = run_iterative_rounds(
+        console=console,
+        agents=build_mock_agents(topic_context="Topic: mock demo"),
+        task_text="Demonstrate provider-free artifact generation.",
+        project_dir=root,
+        memory_path=root / "memory.md",
+        mode="mock",
+        model_name=MOCK_MODEL_NAME,
+        max_rounds=1,
+        stop_if_no_improvement_rounds=10,
+        global_max_runtime_seconds=60,
+        per_agent_timeout_seconds=1,
+        model_provider=MOCK_MODEL_PROVIDER,
+        model_parameters=mock_model_parameters(),
+        topic_snapshot={"title": "Mock Demo", "description": "", "keywords": ["mock"]},
+        prompt_dir=prompt_dir,
+        repo_root=root.parent,
+    )
+    assert result["stop_reason"] == "MAX_ROUNDS"
+    assert result["completed_rounds"] == 1
+    assert not (root / "STOP_REQUESTED").exists()
+    assert (other / "STOP_REQUESTED").is_file()
+
+
 def test_ui_diagnostic_refuses_stop_and_a_normal_ui_run_still_writes_it(project, monkeypatch):
     from src.runtime import get_active_process_meta
 

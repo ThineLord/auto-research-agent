@@ -10,6 +10,7 @@ import stat
 import sys
 from collections.abc import Mapping, MutableMapping
 from dataclasses import replace
+from datetime import datetime
 from functools import partial
 from pathlib import Path
 from typing import Any, Sequence
@@ -898,6 +899,67 @@ def get_active_run_meta(project_dir: Path, *, cleanup: bool = True) -> dict[str,
     return read_live_cli_run(project_dir)
 
 
+_RUN_LOG_LINE = re.compile(
+    r"^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \| mode=\S+ \| (?P<body>.*)$"
+)
+
+
+def _run_log_started_second(started_at: object) -> datetime | None:
+    if not isinstance(started_at, str):
+        return None
+    text = started_at.strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone().replace(tzinfo=None)
+    return parsed.replace(microsecond=0)
+
+
+def live_run_has_committed_summary(log_text: str, started_at: object) -> bool:
+    """True after this live run has logged run_summary and will not read a new stop."""
+    started = _run_log_started_second(started_at)
+    if started is None or not log_text:
+        return False
+    seen_start = False
+    committed = False
+    for raw_line in log_text.splitlines():
+        match = _RUN_LOG_LINE.match(raw_line.strip())
+        if match is None:
+            continue
+        try:
+            stamped = datetime.strptime(match.group("ts"), "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            continue
+        if stamped < started:
+            continue
+        body = match.group("body")
+        if body.startswith("run_start "):
+            seen_start = True
+            committed = False
+        elif seen_start and body.startswith("run_summary completed_rounds="):
+            committed = True
+    return committed
+
+
+def cooperative_stop_can_be_requested(project_dir: Path, run_meta: Mapping[str, Any]) -> bool:
+    """False when a new STOP_REQUESTED file would not be consumed by this run."""
+    if not run_accepts_cooperative_stop(run_meta):
+        return False
+    try:
+        log_text = read_regular_text(
+            project_dir / "run.log",
+            missing_ok=True,
+            anchor=project_dir.parent,
+        )
+    except (OSError, UnicodeError):
+        return True
+    return not live_run_has_committed_summary(log_text, run_meta.get("started_at"))
+
+
 def infer_running_stage(
     *,
     log_text: str,
@@ -950,7 +1012,9 @@ def infer_running_stage(
         "stop_reason": checkpoint.get("stop_reason", "N/A"),
         "can_resume": bool(checkpoint.get("can_resume", False)),
         "drafting_mode": run_meta.get("drafting_mode") or checkpoint.get("drafting_mode", "N/A"),
-        "stoppable": bool(run_active) and run_accepts_cooperative_stop(run_meta),
+        "stoppable": bool(run_active)
+        and run_accepts_cooperative_stop(run_meta)
+        and not live_run_has_committed_summary(log_text, run_meta.get("started_at")),
     }
 
 
@@ -2866,7 +2930,7 @@ def main() -> None:
             ):
                 launch_run("resume", "started_resume")
         with stop_col:
-            can_stop = run_active and run_accepts_cooperative_stop(run_meta)
+            can_stop = run_active and cooperative_stop_can_be_requested(proj_path, run_meta)
             if st.button(
                 t("pause_stop_safely"),
                 key="stop_run",

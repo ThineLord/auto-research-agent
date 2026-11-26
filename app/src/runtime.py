@@ -562,7 +562,10 @@ def _darwin_lock_is_held(
 
 def _darwin_proc_library() -> Any:
     import ctypes
+    import ctypes.util
 
+    # `import ctypes` does not load ctypes.util. A clean interpreter raises
+    # AttributeError here, and the caller then treats the guard as unlocked.
     library = ctypes.util.find_library("proc") or "/usr/lib/libSystem.B.dylib"
     loaded = ctypes.CDLL(library, use_errno=True)
     for name in ("proc_pidinfo", "proc_pidfdinfo"):

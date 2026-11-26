@@ -222,7 +222,7 @@ def action(data: dict) -> dict:
         active = h.get_active_run_meta(path, cleanup=False)
         if not active:
             raise ValueError("No active run")
-        if not h.run_accepts_cooperative_stop(active):
+        if not h.cooperative_stop_can_be_requested(path, active):
             raise ValueError("This run cannot be stopped safely")
         if not h.create_stop_signal(path / "STOP_REQUESTED"):
             raise OSError("Could not request a safe stop")
