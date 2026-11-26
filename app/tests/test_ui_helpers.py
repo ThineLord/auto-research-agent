@@ -46,38 +46,6 @@ from src.storage import (
 )
 
 
-def _subinterpreter_failure(script: str) -> str | None:
-    """Run script in a fresh subinterpreter. None means it finished."""
-    for name in ("concurrent.interpreters", "_interpreters", "_xxsubinterpreters"):
-        try:
-            interpreters = __import__(name, fromlist=["create"])
-        except ImportError:
-            continue
-        return _run_subinterpreter(interpreters, script)
-    return "unavailable"
-
-
-def _run_subinterpreter(interpreters: object, script: str) -> str | None:
-    create = getattr(interpreters, "create")
-    interp = create()
-    try:
-        if hasattr(interp, "exec"):
-            interp.exec(script)
-        elif hasattr(interpreters, "run_string"):
-            interpreters.run_string(interp, script)
-        else:
-            interpreters.exec(interp, script)
-    except BaseException as exc:  # noqa: BLE001 - the child result is the assertion
-        return f"{type(exc).__name__}: {exc}"
-    finally:
-        close = getattr(interp, "close", None)
-        if close is not None:
-            close()
-        elif hasattr(interpreters, "destroy"):
-            interpreters.destroy(interp)
-    return None
-
-
 class SharedUiBackendHelperTests(unittest.TestCase):
     def test_text_json_and_tail_helpers_handle_missing_and_invalid_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1351,43 +1319,35 @@ release_run_lock(handle)
 
     def test_darwin_proc_library_imports_ctypes_util_in_a_clean_interpreter(self) -> None:
         app_root = Path(__file__).resolve().parents[1]
-        script = f"""
-import sys
-sys.path.insert(0, {str(app_root)!r})
+        script = """
 import ctypes
+import sys
+from unittest.mock import Mock, patch
+
+sys.path.insert(0, sys.argv[1])
 from src.runtime import _darwin_proc_library
+
+# Model a fresh dashboard interpreter even if an installed site hook imported util.
 sys.modules.pop("ctypes.util", None)
 if hasattr(ctypes, "util"):
     del ctypes.util
-try:
-    ctypes.util.find_library("proc")
-except AttributeError:
-    pass
+if sys.platform == "darwin":
+    library = _darwin_proc_library()
+    assert library.proc_pidinfo and library.proc_pidfdinfo
 else:
-    raise SystemExit("ctypes.util stayed available in the clean interpreter")
-try:
-    _darwin_proc_library()
-except AttributeError as exc:
-    raise SystemExit("AttributeError: " + str(exc))
-except OSError:
-    pass
+    # libproc is a Darwin API. Exercise the import and symbol setup without
+    # claiming a native Darwin lock check on this platform.
+    with patch.object(ctypes, "CDLL", return_value=Mock()) as load:
+        assert _darwin_proc_library() is load.return_value
+assert ctypes.util is sys.modules["ctypes.util"]
 """
-        error = _subinterpreter_failure(script)
-        # 3.12 and earlier cannot import ctypes in a subinterpreter. A fresh
-        # process still has a clean sys.modules, which is what masked this bug.
-        if error is not None and (
-            error == "unavailable" or "does not support loading in subinterpreters" in error
-        ):
-            completed = subprocess.run(
-                [sys.executable, "-c", script],
-                check=False,
-                capture_output=True,
-                text=True,
-                cwd=app_root,
-            )
-            self.assertEqual(completed.returncode, 0, completed.stderr or completed.stdout)
-            return
-        self.assertIsNone(error, error)
+        completed = subprocess.run(
+            [sys.executable, "-I", "-c", script, str(app_root)],
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr or completed.stdout)
 
     def test_scoped_stop_cannot_reach_another_generation_and_manual_stop_survives(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
