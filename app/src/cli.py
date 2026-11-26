@@ -1141,6 +1141,7 @@ def main() -> None:
                 project_input=project_input,
                 config=config.literature_survey,
                 output_path=survey_output_path,
+                workspace_root=root,
             )
         except KeyboardInterrupt:
             console.print(

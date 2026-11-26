@@ -267,6 +267,13 @@ make survey
 Survey mode 会扫描 `projects/<project>/task.md`、可选 `memory.md`、项目 markdown 和已有
 `runs/**/*.md` 输出，生成 `projects/<project>/survey/survey_report.md`、
 `paper_metadata.json`、`related_work.md` 和 `survey_manifest.json`。
+默认 `survey/` 产物，以及 `--survey-output` 指定的报告和它同组的 `related_work.md`，
+不会再次被当成论文来源；配置的输出目录本身也不会被读取。换回默认目录、使用新的报告名，
+或在这些位置之间来回切换时，早先生成的调查报告和 related-work 草稿同样不会被当作来源。
+判断依据是已生成的正文，因此真正的项目 Markdown，以及与报告或 `related_work.md` 同名的用户笔记，仍会读取。已有报告保留在原地。
+平铺项目和旧式 `projects/<project>/` 都是这样。JSON 和报告里的来源路径相对于工作区根目录。
+平铺项目即使工作区目录名叫 `projects` 也记为 `<project>/...`；旧式项目仍是 `projects/<project>/...`。
+平铺项目会保留 run 目录，并且不写入绝对路径。
 输出会规范化 DOI/arXiv 标识并在 JSON 中记录缺失作者、年份、venue、URL/DOI/arXiv 的质量计数。
 
 如果你只想做 CI/docs 友好的 demo run，不想安装 Ollama 或配置 Gemini key，运行：

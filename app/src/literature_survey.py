@@ -404,6 +404,100 @@ def _extract_issue_lines(text: str, markers: Sequence[str], *, limit: int = 4) -
     return tuple(lines)
 
 
+_SURVEY_REPORT_NAME = "survey_report.md"
+_SURVEY_RELATED_WORK_NAME = "related_work.md"
+_SURVEY_METADATA_NAME = "paper_metadata.json"
+_SURVEY_MANIFEST_NAME = "survey_manifest.json"
+
+
+def _survey_artifact_paths(report_path: Path) -> tuple[Path, ...]:
+    """Return the report and the sibling artifacts written beside it."""
+    return (
+        report_path,
+        report_path.with_name(_SURVEY_RELATED_WORK_NAME),
+        report_path.with_name(_SURVEY_METADATA_NAME),
+        report_path.with_name(_SURVEY_MANIFEST_NAME),
+    )
+
+
+def _lexical_project_relative(path: Path, project_dir: Path) -> Path | None:
+    lexical_project = Path(os.path.abspath(project_dir))
+    lexical_path = Path(os.path.abspath(path))
+    try:
+        relative = lexical_path.relative_to(lexical_project)
+    except ValueError:
+        return None
+    if any(part == ".." for part in relative.parts):
+        return None
+    return relative
+
+
+def _generated_survey_relatives(
+    project_dir: Path,
+    config: LiteratureSurveyConfig,
+    report_path: Path | None,
+) -> set[str]:
+    """Project-relative paths of this run's generated survey artifacts.
+
+    The default ``output_dir`` report and an explicit report each contribute the
+    same sibling group. Paths outside the project are not sources.
+    """
+    reports = [Path(os.path.abspath(project_dir)) / config.output_dir / _SURVEY_REPORT_NAME]
+    if report_path is not None:
+        reports.append(report_path)
+    excluded: set[str] = set()
+    for report in reports:
+        for artifact in _survey_artifact_paths(report):
+            relative = _lexical_project_relative(artifact, project_dir)
+            if relative is not None:
+                excluded.add(relative.as_posix())
+    return excluded
+
+
+def _survey_repo_root(project_dir: Path) -> Path:
+    """Fallback workspace root when the caller does not pass one.
+
+    Legacy ``<root>/projects/<name>`` stays ``projects/<name>/...``. A flat project
+    uses its parent. A workspace directory that is itself named ``projects`` cannot
+    be inferred from that parent and must be passed in.
+    """
+    parent = project_dir.parent
+    if parent.name == "projects":
+        return parent.parent
+    return parent
+
+
+def _is_generated_survey_markdown(text: str) -> bool:
+    """Return whether text is a survey report or related-work draft this mode writes.
+
+    Recognition uses the generated text, not the file name. User notes that reuse a
+    report or related-work name stay sources, and the files themselves are unchanged.
+    """
+    lines = text.splitlines()
+    if (
+        len(lines) >= 7
+        and lines[0] == "# Literature Survey Report"
+        and lines[1] == ""
+        and lines[2].startswith("- project: ")
+        and lines[3].startswith("- title: ")
+        and lines[4].startswith("- generated_at: ")
+        and lines[5].startswith("- source_files_scanned: ")
+        and lines[6].startswith("- unique_papers: ")
+    ):
+        return True
+    prefix = "# Related Work Draft\n\n"
+    if not text.startswith(prefix):
+        return False
+    body = text[len(prefix) :]
+    if body.startswith(
+        "Related work could not be generated because no paper metadata was found in the "
+    ):
+        return True
+    represented = body.find(" is represented by ")
+    cluster = body.find(". Across this cluster, recurring methods include ")
+    return body.startswith("Work on ") and 0 < represented < cluster
+
+
 def _source_kind(path: Path, project_dir: Path) -> str:
     lexical_path = Path(os.path.abspath(path))
     lexical_project = Path(os.path.abspath(project_dir))
@@ -442,11 +536,23 @@ def _matches_source_glob(path: Path, pattern: str) -> bool:
     return matches(0, 0)
 
 
-def collect_source_files(project_dir: Path, config: LiteratureSurveyConfig) -> list[Path]:
-    """Collect survey source files from a project without leaving the project root."""
+def collect_source_files(
+    project_dir: Path,
+    config: LiteratureSurveyConfig,
+    *,
+    report_path: Path | None = None,
+) -> list[Path]:
+    """Collect survey source files from a project without leaving the project root.
+
+    Generated survey artifacts are not sources. That covers the current report
+    group, the configured output directory, and survey reports or related-work
+    drafts already written at another output location. Other markdown, including
+    user notes that reuse those filenames, stays eligible.
+    """
 
     ensure_project_runtime_paths_safe(project_dir)
     lexical_project = Path(os.path.abspath(project_dir))
+    excluded_relatives = _generated_survey_relatives(lexical_project, config, report_path)
     allowed_directories: set[str] | None = {"runs"} if config.include_run_outputs else set()
     for pattern in config.source_globs:
         parts = Path(pattern).parts
@@ -468,6 +574,8 @@ def collect_source_files(project_dir: Path, config: LiteratureSurveyConfig) -> l
             lexical_path = Path(os.path.abspath(path))
             relative_path = lexical_path.relative_to(lexical_project)
         except ValueError:
+            continue
+        if relative_path.as_posix() in excluded_relatives:
             continue
         if output_parts and relative_path.parts[: len(output_parts)] == output_parts:
             continue
@@ -492,6 +600,8 @@ def collect_source_files(project_dir: Path, config: LiteratureSurveyConfig) -> l
             )
         )
         if not include or not artifact_path_is_safe(lexical_path, allow_missing=False):
+            continue
+        if _is_generated_survey_markdown(read_file_text(lexical_path)):
             continue
         source_files.append(lexical_path)
         if len(source_files) >= config.max_source_files:
@@ -814,9 +924,12 @@ def deduplicate_papers(papers: Iterable[PaperMetadata], *, max_papers: int) -> l
 
 
 def collect_papers(
-    project_dir: Path, config: LiteratureSurveyConfig
+    project_dir: Path,
+    config: LiteratureSurveyConfig,
+    *,
+    report_path: Path | None = None,
 ) -> tuple[list[PaperMetadata], list[Path]]:
-    source_files = collect_source_files(project_dir, config)
+    source_files = collect_source_files(project_dir, config, report_path=report_path)
     collected: list[PaperMetadata] = []
     for path in source_files:
         collected.extend(parse_papers_from_file(path, project_dir))
@@ -958,6 +1071,7 @@ def generate_survey_report(
     source_files: Sequence[Path],
     project_input: ProjectInput,
     generated_at: str,
+    repo_root: Path | None = None,
 ) -> str:
     theme_groups = _build_theme_groups(papers)
     topic_counts = _count_terms(papers, "topics")
@@ -1086,19 +1200,11 @@ def generate_survey_report(
         lines.append("No references collected.")
 
     lines.extend(["", "## Source Files", ""])
+    if repo_root is None:
+        repo_root = _survey_repo_root(project_input.project_dir)
     for path in source_files:
-        try:
-            rel = path.relative_to(project_input.project_dir)
-        except ValueError:
-            rel = path
-        lines.append(f"- {rel}")
+        lines.append(f"- {display_path(path, repo_root)}")
     return "\n".join(lines).rstrip() + "\n"
-
-
-def _survey_repo_root(project_dir: Path) -> Path | None:
-    if project_dir.parent.name == "projects":
-        return project_dir.parent.parent
-    return None
 
 
 def _serialize_paper_for_artifact(paper: PaperMetadata, repo_root: Path | None) -> dict[str, Any]:
@@ -1125,6 +1231,7 @@ def run_literature_survey_mode(
     project_input: ProjectInput,
     config: LiteratureSurveyConfig,
     output_path: Path | None = None,
+    workspace_root: Path | None = None,
 ) -> SurveyResult:
     console.rule("Literature Survey Mode")
     console.print(
@@ -1133,11 +1240,11 @@ def run_literature_survey_mode(
 
     project_dir = project_input.project_dir
     ensure_project_runtime_paths_safe(project_dir)
-    repo_root = _survey_repo_root(project_dir)
+    repo_root = workspace_root if workspace_root is not None else _survey_repo_root(project_dir)
     artifact_project_metadata = _project_metadata_for_artifact(project_input, repo_root)
     generated_at = datetime.now().isoformat()
     output_dir = project_dir / config.output_dir
-    report_path = output_path or (output_dir / "survey_report.md")
+    report_path = output_path or (output_dir / _SURVEY_REPORT_NAME)
     if not report_path.is_absolute():
         report_path = project_dir / report_path
     automatic_output = output_path is None
@@ -1146,9 +1253,9 @@ def run_literature_survey_mode(
     else:
         report_path = report_path.resolve(strict=False)
         report_path.parent.mkdir(parents=True, exist_ok=True)
-    metadata_path = report_path.with_name("paper_metadata.json")
-    related_work_path = report_path.with_name("related_work.md")
-    manifest_path = report_path.with_name("survey_manifest.json")
+    metadata_path = report_path.with_name(_SURVEY_METADATA_NAME)
+    related_work_path = report_path.with_name(_SURVEY_RELATED_WORK_NAME)
+    manifest_path = report_path.with_name(_SURVEY_MANIFEST_NAME)
     if automatic_output:
         ensure_artifact_paths_safe(
             (report_path, metadata_path, related_work_path, manifest_path),
@@ -1159,7 +1266,7 @@ def run_literature_survey_mode(
         related_work_path = related_work_path.resolve(strict=False)
         manifest_path = manifest_path.resolve(strict=False)
 
-    papers, source_files = collect_papers(project_dir, config)
+    papers, source_files = collect_papers(project_dir, config, report_path=report_path)
     metadata_quality = _metadata_quality_summary(papers)
     source_summary = _source_summary(source_files, project_dir)
     representative_groups = _representative_group_summary(papers)
@@ -1168,6 +1275,7 @@ def run_literature_survey_mode(
         source_files=source_files,
         project_input=project_input,
         generated_at=generated_at,
+        repo_root=repo_root,
     )
     related_work = generate_related_work(papers)
 
