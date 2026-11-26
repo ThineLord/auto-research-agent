@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 from .metrics import JUDGE_RUBRIC_KEYS, summarize_round_metrics
 from .round_commit_recovery import (
@@ -56,13 +57,104 @@ def _as_int(value: Any) -> int | None:
         return None
 
 
+# The runner starts best_score at exactly -1 and only replaces it after a
+# successful round. Nearby finite values, such as a saved -1.004, are ordinary
+# historical scores.
+_UNIMPROVED_BEST_SENTINEL = -1.0
+
+
+def _is_unimproved_best_sentinel(score: float) -> bool:
+    return score == _UNIMPROVED_BEST_SENTINEL
+
+
+def is_runner_unscored_best(value: Any) -> bool:
+    """True only for the runner's exact untouched -1 best-score placeholder."""
+    score = _as_float(value)
+    return score is not None and _is_unimproved_best_sentinel(score)
+
+
+def _error_texts(entry: Mapping[str, Any]) -> list[str]:
+    texts: list[str] = []
+    errors = entry.get("errors")
+    if isinstance(errors, str):
+        texts.append(errors)
+    elif isinstance(errors, Sequence) and not isinstance(errors, (str, bytes)):
+        texts.extend(item for item in errors if isinstance(item, str))
+    agent_errors = entry.get("agent_errors")
+    if isinstance(agent_errors, Mapping):
+        judge_error = agent_errors.get("judge")
+        if isinstance(judge_error, str):
+            texts.append(judge_error)
+    return texts
+
+
+def _errors_name_invalid_judge(entry: Mapping[str, Any]) -> bool:
+    return any("invalid judge" in text.casefold() for text in _error_texts(entry))
+
+
+def score_is_unusable_for_trend(entry: Mapping[str, Any]) -> bool:
+    """True when a recorded number must not enter means or score trends.
+
+    An explicit invalid Judge flag is the runner's zero fallback. Early rows can
+    omit that flag and still show an invalid judge response. A row with no
+    judgment clue, including a real zero, stays usable.
+    """
+    if entry.get("invalid_score_this_round") is True:
+        return True
+    if "invalid_score_this_round" in entry:
+        return False
+    return _errors_name_invalid_judge(entry)
+
+
+def _trend_score(entry: Mapping[str, Any]) -> float | None:
+    """Finite score for means and trends.
+
+    Missing validity flags stay rankable, including a real zero and a finite
+    negative legacy value. An explicit invalid Judge score, or an older row
+    whose errors identify an invalid judge response, does not count.
+    """
+    if score_is_unusable_for_trend(entry):
+        return None
+    return _as_float(entry.get("score"))
+
+
+def _publish_best_score(score: float | None) -> float | None:
+    """Round ordinary scores without turning a near -1 history value into -1."""
+    if score is None:
+        return None
+    rounded = round(score, 2)
+    if _is_unimproved_best_sentinel(rounded) and not _is_unimproved_best_sentinel(score):
+        return score
+    return rounded
+
+
+def _valid_round_score(entry: dict[str, Any]) -> float | None:
+    """Finite score from a round that existing success evidence still accepts."""
+    if entry.get("successful_research_round") is False:
+        return None
+    return _trend_score(entry)
+
+
 def _score_values(round_metrics: Sequence[dict[str, Any]]) -> list[float]:
     scores: list[float] = []
     for entry in round_metrics:
-        score = _as_float(entry.get("score"))
+        score = _trend_score(entry)
         if score is not None:
             scores.append(score)
     return scores
+
+
+def _valid_round_scores(round_metrics: Sequence[dict[str, Any]]) -> list[float]:
+    scores: list[float] = []
+    for entry in round_metrics:
+        score = _valid_round_score(entry)
+        if score is not None:
+            scores.append(score)
+    return scores
+
+
+def _metrics_record_invalid_score(round_metrics: Sequence[Mapping[str, Any]]) -> bool:
+    return any(score_is_unusable_for_trend(entry) for entry in round_metrics)
 
 
 def _rubric_short_name(key: str) -> str:
@@ -141,11 +233,17 @@ def _load_run_summary_and_metrics(
     runtime_config = runtime_config if isinstance(runtime_config, dict) else {}
     round_metrics = _read_json_list(round_metrics_path, safe_artifacts=safe_artifacts)
     scores = _score_values(round_metrics)
+    valid_scores = _valid_round_scores(round_metrics)
     summary_best_score = _as_float(summary.get("best_score"))
     config_best_score = _as_float(run_config.get("best_score"))
     best_score = summary_best_score
     if best_score is None:
-        best_score = max(scores) if scores else config_best_score
+        if valid_scores:
+            best_score = max(valid_scores)
+        elif not scores:
+            best_score = config_best_score
+    if best_score is not None and _is_unimproved_best_sentinel(best_score):
+        best_score = max(valid_scores) if valid_scores else None
     if scores:
         total = sum(scores)
         if math.isfinite(total):
@@ -155,6 +253,8 @@ def _load_run_summary_and_metrics(
             normalized_average = math.fsum(score / scale for score in scores) / len(scores)
             average_score = _as_float(normalized_average * scale)
         average_score = round(average_score, 2) if average_score is not None else None
+    elif _metrics_record_invalid_score(round_metrics):
+        average_score = None
     else:
         average_score = _as_float(summary.get("average_score"))
     completed_rounds = _as_int(summary.get("completed_rounds"))
@@ -262,7 +362,7 @@ def _load_run_summary_and_metrics(
         "drafting_mode": summary.get("drafting_mode") or run_config.get("drafting_mode", ""),
         "max_rounds": runtime_config.get("max_rounds") or summary.get("max_rounds"),
         "completed_rounds": completed_rounds,
-        "best_score": round(best_score, 2) if best_score is not None else None,
+        "best_score": _publish_best_score(best_score),
         "average_score": average_score,
         "stop_reason": summary.get("stop_reason") or run_config.get("stop_reason", ""),
         "timeout_count": len(timeout_rounds),
@@ -310,16 +410,15 @@ def compare_runs(
         load_run_summary(Path(run_root), safe_artifacts=safe_artifacts) for run_root in run_roots
     ]
 
-    def rank_key(item: dict[str, Any]) -> tuple[bool, float, int]:
+    def rank_key(item: dict[str, Any]) -> tuple[float, int]:
         score = _as_float(item.get("best_score"))
         return (
-            score is not None,
             score if score is not None else 0.0,
             _as_int(item.get("completed_rounds")) or 0,
         )
 
-    ranked = sorted(runs, key=rank_key, reverse=True)
-    best_run = ranked[0] if ranked else {}
+    rankable = [item for item in runs if _as_float(item.get("best_score")) is not None]
+    best_run = sorted(rankable, key=rank_key, reverse=True)[0] if rankable else {}
     baseline_score = _as_float(runs[0].get("best_score")) if runs else None
     best_score = _as_float(best_run.get("best_score"))
     best_vs_baseline_delta = (
