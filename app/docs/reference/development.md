@@ -23,7 +23,11 @@ installing packages and prints Python 3.10 as the minimum, the interpreters it a
 the recovery command. An existing environment below 3.10, a directory that is not that virtual
 environment, and an environment whose pip is missing are left in place. The message explains how
 to keep the directory or move it aside and recreate it. A missing pip can be what an interrupted
-ensurepip leaves behind; the message also shows how to install pip there without deleting it.
+ensurepip leaves behind; the repair command prints that environment's absolute Python path, so it
+runs from the repository root. An empty `VENV` is rejected before any file is created. `PIP_TARGET`,
+`PIP_PREFIX`, `PIP_ROOT`, a truthy `PIP_USER`, and a pip configuration that sets `target`, `prefix`,
+`root`, or `user` are rejected before installation. The selected environment is stamped only after
+that install command succeeds.
 
 Model-backed research workflows can run against local Ollama or cloud Gemini, while Literature
 Survey Mode is deterministic and local-only. CI does not start Ollama, call Gemini, or run

@@ -8,7 +8,7 @@ Auto Research Agent 帮助你迭代研究任务、检查保存的过程和成果
 
 ## 安装与打开
 
-需要 Python 3.10+、Git 和 Make。`./start` 和 `make install-dev` 会在 `python3` 过旧时改用可用的受支持解释器，并原样保留不兼容的 `app/.venv`。首次克隆后，在仓库根目录执行：
+需要 Python 3.10+、Git 和 Make。`./start` 和 `make install-dev` 会在 `python3` 过旧时改用可用的受支持解释器，并原样保留不兼容的 `app/.venv`。空的 `VENV` 会在创建文件前被拒绝；缺少 pip 时用该环境的绝对路径在仓库根目录修复；若软件包会装到所选环境之外，安装会停止。首次克隆后，在仓库根目录执行：
 
 ```bash
 ./start

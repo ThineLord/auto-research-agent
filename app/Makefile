@@ -41,6 +41,8 @@ help:
 		"Python 3.10+ is selected from PATH. Pass PYTHON=python3.13 to choose one." \
 		"Pass VENV=path to place the environment. ./start and Make then use that Python." \
 		"An older or incomplete environment is left unchanged." \
+		"An empty VENV is rejected before files are created." \
+		"An install stops when pip would write outside that environment." \
 		"Pass extra CLI flags with ARGS, for example:" \
 		"  make diagnostic ARGS=\"--model qwen3:8b\""
 

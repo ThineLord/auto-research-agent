@@ -2,8 +2,10 @@
 # Choose Python >= 3.10 before make creates a virtual environment or installs
 # packages. An existing incompatible environment is left in place.
 # Packages are installed only into the requested virtualenv, and only when
-# that environment's own pip imports. Compatible with macOS /bin/bash 3.2:
-# no associative arrays or namerefs.
+# that environment's own pip imports. An empty VENV is rejected before any
+# directory is created. Destination overrides are rejected before pip runs,
+# and the install stamp is written only after that install succeeds.
+# Compatible with macOS /bin/bash 3.2: no associative arrays or namerefs.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,6 +17,11 @@ CANDIDATE_NAMES="python3.13 python3.12 python3.11 python3.10 python3 python"
 PYTHON="${PYTHON-}"
 PYTHON_ORIGIN="${PYTHON_ORIGIN-undefined}"
 VENV="${VENV-.venv}"
+if [ -z "${VENV}" ]; then
+  printf '%s\n' "VENV is empty." >&2
+  printf '%s\n' "No virtual environment was created and no packages were installed." >&2
+  exit 2
+fi
 
 # The first argument selects the action. Later arguments belong to `run`
 # and are the interpreter's argv, not shell text.
@@ -210,9 +217,10 @@ print_recreate_command() {
   printf '  make install-dev%s\n' "$(recovery_venv_assignment)" >&2
 }
 
-# One interpreter run classifies the directory. The program text avoids the
-# contiguous letters used by the in-repo fakes' logs. A version-only answer
-# did not run the check, so it cannot count as ready.
+# One interpreter run classifies the directory. A version-only answer
+# did not run the pip check, so it cannot count as ready. The check names
+# pyvenv.cfg and pip directly. Installing packages is a separate command:
+# python -m pip install.
 classify_env() {
   local out
   env_class=absent
@@ -235,19 +243,17 @@ classify_env() {
     return 0
   fi
   if ! out="$(ARA_ENV_DIR="${VENV}" "${venv_python}" -c 'import os, sys
-marker = "py" + "ve" + "nv.cfg"
-mod = "pi" + "p"
 def emit(kind):
     print(kind)
     raise SystemExit(0)
 requested = os.path.realpath(os.environ["ARA_ENV_DIR"])
 prefix = os.path.realpath(sys.prefix)
 base = os.path.realpath(sys.base_prefix)
-cfg = os.path.join(requested, marker)
+cfg = os.path.join(requested, "pyvenv.cfg")
 if (not os.path.isfile(cfg)) or prefix == base or prefix != requested:
     emit("base")
 try:
-    module = __import__(mod)
+    module = __import__("pip")
 except Exception:
     emit("missing")
 located = getattr(module, "__file__", "") or ""
@@ -299,7 +305,9 @@ reject_existing() {
   printf '%s\n' "Keep it where it is, or move it aside and create a new environment." >&2
   if [ "${env_class}" = "no-pip" ]; then
     printf '%s\n' "To keep this directory and install pip into it:" >&2
-    printf '  %s -m ensurepip --upgrade\n' "$(token "${venv_python}")" >&2
+    # venv_show is absolute whenever the directory exists, so this command
+    # runs from the repository root. The relative venv interpreter does not.
+    printf '  %s -m ensurepip --upgrade\n' "$(token "$(venv_show)/bin/python")" >&2
   fi
   printf '%s\n' "Moving is required before a supported environment can be created at this path:" >&2
   printf '  mv %s %s\n' "$(token "${shown}")" "$(token "$(move_destination "${shown}" "${move_version}")")" >&2
@@ -323,6 +331,98 @@ stamp_is_fresh() {
   return 0
 }
 
+# Environment variables and pip configuration can point an otherwise
+# successful install at another directory. Refuse those destinations before
+# pip runs. The stamp below is written only after the install command exits 0.
+reject_redirected_install() {
+  local reasons="" config_hits value
+  if [ -n "${PIP_TARGET-}" ]; then
+    reasons="${reasons}PIP_TARGET=${PIP_TARGET}"$'\n'
+  fi
+  if [ -n "${PIP_PREFIX-}" ]; then
+    reasons="${reasons}PIP_PREFIX=${PIP_PREFIX}"$'\n'
+  fi
+  if [ -n "${PIP_ROOT-}" ]; then
+    reasons="${reasons}PIP_ROOT=${PIP_ROOT}"$'\n'
+  fi
+  value="$(printf '%s' "${PIP_USER-}" | tr '[:upper:]' '[:lower:]')"
+  case "${value}" in
+    1|true|yes|on|y|t)
+      reasons="${reasons}PIP_USER=${PIP_USER}"$'\n'
+      ;;
+  esac
+  if ! config_hits="$(ARA_ENV_DIR="${VENV}" "${venv_python}" -c 'import configparser, os
+from pathlib import Path
+venv = Path(os.environ["ARA_ENV_DIR"]).resolve()
+dest_keys = {"target", "prefix", "root", "user"}
+falsey = {"0", "false", "no", "off", "n", "f"}
+paths = []
+named = os.environ.get("PIP_CONFIG_FILE", "")
+if named:
+    if os.path.abspath(named) != os.path.abspath(os.devnull):
+        paths.append(named)
+else:
+    home = os.environ.get("HOME", "")
+    xdg = os.environ.get("XDG_CONFIG_HOME", "")
+    candidates = []
+    if xdg:
+        candidates.append(Path(xdg) / "pip" / "pip.conf")
+        candidates.append(Path(xdg) / "pip" / "pip.ini")
+    if home:
+        candidates.append(Path(home) / ".config" / "pip" / "pip.conf")
+        candidates.append(Path(home) / ".config" / "pip" / "pip.ini")
+        candidates.append(Path(home) / ".pip" / "pip.conf")
+        candidates.append(Path(home) / ".pip" / "pip.ini")
+    candidates.append(Path("/etc/pip.conf"))
+    candidates.append(venv / "pip.conf")
+    candidates.append(venv / "pip.ini")
+    seen = set()
+    for candidate in candidates:
+        if not candidate.is_file():
+            continue
+        text = str(candidate)
+        if text in seen:
+            continue
+        seen.add(text)
+        paths.append(text)
+for name in paths:
+    parser = configparser.ConfigParser()
+    try:
+        read = parser.read(name)
+    except configparser.Error:
+        print(name + ": unreadable")
+        continue
+    if not read:
+        print(name + ": unreadable")
+        continue
+    for section in parser.sections():
+        for key, value in parser.items(section):
+            if key not in dest_keys:
+                continue
+            cleaned = value.strip()
+            if key == "user":
+                if cleaned == "" or cleaned.lower() in falsey:
+                    continue
+            elif cleaned == "":
+                continue
+            print("%s: %s.%s=%s" % (name, section, key, cleaned))
+')"; then
+    printf '%s\n' "Pip configuration could not be read, so packages were not installed." >&2
+    exit 2
+  fi
+  if [ -n "${config_hits}" ]; then
+    reasons="${reasons}${config_hits}"$'\n'
+  fi
+  if [ -z "${reasons}" ]; then
+    return 0
+  fi
+  printf '%s\n' "Packages would not be installed into $(venv_show)." >&2
+  printf '%s' "${reasons}" >&2
+  printf '%s\n' "The selected environment was left unchanged and no install stamp was written." >&2
+  printf '%s\n' "No packages were installed." >&2
+  exit 2
+}
+
 install_requirements() {
   local stamp="${VENV}/.install.stamp"
   local dev_stamp="${VENV}/.install-dev.stamp"
@@ -330,6 +430,7 @@ install_requirements() {
     if stamp_is_fresh "${dev_stamp}"; then
       return 0
     fi
+    reject_redirected_install
     "${venv_python}" -m pip install -c scripts/dependencies/constraints.txt -e ".[dev]"
     touch "${stamp}" "${dev_stamp}"
     return 0
@@ -337,6 +438,7 @@ install_requirements() {
   if stamp_is_fresh "${stamp}"; then
     return 0
   fi
+  reject_redirected_install
   "${venv_python}" -m pip install -c scripts/dependencies/constraints.txt -e .
   touch "${stamp}"
 }
