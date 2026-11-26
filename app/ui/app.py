@@ -61,7 +61,7 @@ from src.config import (
 from src.constants import UI_GEMINI_API_KEY_ENV
 from src.input_editing import InputEditConflict, read_inputs, save_inputs
 from src.llm import GeminiClient
-from src.resume import build_resume_preview
+from src.resume import OFFLINE_MOCK_BLOCKED_REASON, build_resume_preview
 from src.resume_safety import (
     resume_artifact_links_are_safe,
     validate_project_run_root,
@@ -1003,6 +1003,41 @@ def describe_resume_state(
         checkpoint=checkpoint,
         repo_root=ROOT,
     )
+    if preview.get("blocked_reason") == OFFLINE_MOCK_BLOCKED_REASON:
+        command = str(preview.get("mock_restart_command") or "")
+        last_completed_round = _safe_int(preview.get("last_completed_round"))
+        next_round = _safe_int(preview.get("next_round"), last_completed_round + 1)
+        existing_files = preview.get("next_round_existing_files", [])
+        return {
+            "can_resume": False,
+            "level": "warning",
+            "message": str(preview.get("message") or ""),
+            "message_key": "resume_offline_mock",
+            "message_args": {
+                "command_note": f" `{command}`" if command else "",
+                "model_note": "",
+            },
+            "model_mismatch": model_mismatch,
+            "checkpoint_model": checkpoint_model,
+            "selected_model": selected_model,
+            "details": {
+                "run_id": str(preview.get("run_id") or checkpoint.get("run_id") or "N/A"),
+                "run_root": str(preview.get("run_root_display") or "N/A"),
+                "last_completed_round": last_completed_round,
+                "next_round": next_round,
+                "stop_reason": str(
+                    preview.get("stop_reason") or checkpoint.get("stop_reason") or "unknown"
+                ),
+                "can_resume": checkpoint.get("can_resume") is True,
+                "completed_round_files_preserved": checkpoint.get("can_resume") is True,
+                "next_round_status": preview.get("next_round_status", "unknown"),
+                "next_round_safety_action": preview.get("next_round_safety_action", "none"),
+                "next_round_path": preview.get("next_round_display", "N/A"),
+                "next_round_blocks_resume": bool(preview.get("next_round_blocks_resume")),
+                "next_round_existing_files": ", ".join(str(name) for name in existing_files)
+                or "none",
+            },
+        }
     if preview.get("blocked_reason") in {
         "round_commit_recovery_required",
         "round_commit_recovery_conflict",

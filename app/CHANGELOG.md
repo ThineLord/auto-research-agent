@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Refuse ordinary resume of an offline mock before any provider check or run-artifact change. The checkpoint can still say the run is resumable; start a new offline mock instead of continuing that history with a real model. A real provider run whose model is named `mock` or `mock-deterministic` still resumes, including when normal mode and the real provider are split across the checkpoint and run config. A truncated same-run `run_config.json` does not hide an explicit mock manifest and is not rewritten from it. Non-string mode or model name fields do not stop dashboard status from loading. Resuming that explicit mock project without `config.yaml` explains the new offline mock instead of only reporting a missing config file. An existing conflict or path block keeps its own guidance, and a mock revealed by in-lock recovery is refused again before any provider call.
 - Ignore a late same-project analytics response after a newer refresh. An older success cannot replace the newer comparison, and an older or stale error cannot clear it. Idle polls still do not reread analytics.
 - Refresh an already-open dashboard after an external CLI run finishes between polls, including Research Outputs and run-comparison checkboxes. Polling still skips unchanged catalogs and does not reread output files on every tick.
 - Reject an empty `--create-project` name before starting a run or writing to a project.

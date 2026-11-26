@@ -80,7 +80,7 @@ from .package_resources import (
     validate_generation_resources,
 )
 from .project_input import ProjectInputError, load_project_input
-from .resume import checkpoint_read_problem, run_resume_mode
+from .resume import checkpoint_read_problem, ordinary_resume_refusal, run_resume_mode
 from .round_commit_recovery import (
     RoundCommitReadError,
     classify_diagnostic_finalize_recovery,
@@ -484,6 +484,42 @@ def _display_repo_path(root: Path, value: object) -> str:
         return path.resolve().relative_to(root.resolve()).as_posix()
     except ValueError:
         return f"<repo>/{path.name}"
+
+
+def _explicit_resume_project_dir(root: Path, project_name: str) -> Path | None:
+    """Resolve only the project named on the command line."""
+
+    try:
+        project_dir = resolve_project_dir(root, project_name)
+        if not project_dir.is_dir():
+            return None
+        ensure_project_runtime_paths_safe(project_dir)
+    except (ValueError, OSError):
+        return None
+    return project_dir
+
+
+def _exit_if_ordinary_mock_resume(
+    *,
+    console: Console,
+    project_dir: Path,
+    repo_root: Path,
+    explicit_workspace: Path | None,
+    source_layout: bool | None,
+) -> None:
+    message = ordinary_resume_refusal(
+        project_dir=project_dir,
+        repo_root=repo_root,
+        explicit_workspace=explicit_workspace,
+        source_layout=source_layout,
+    )
+    if not message:
+        return
+    if message.endswith((".", "`")):
+        console.print(f"[red]Cannot resume: {message}[/red]")
+    else:
+        console.print(f"[red]Cannot resume: {message}.[/red]")
+    raise SystemExit(_EXIT_STARTUP_ERROR)
 
 
 def _print_run_lock_recovery_hint(console: Console, root: Path, project_dir: Path) -> None:
@@ -923,6 +959,18 @@ def main() -> None:
                 "without creating local config.[/yellow]"
             )
         else:
+            if args.resume and args.project is not None and isinstance(exc, FileNotFoundError):
+                # A stopped mock can be resumed by name before config.yaml exists.
+                # Keep the named project; do not fall through to another selection.
+                project_dir = _explicit_resume_project_dir(root, args.project)
+                if project_dir is not None:
+                    _exit_if_ordinary_mock_resume(
+                        console=console,
+                        project_dir=project_dir,
+                        repo_root=root,
+                        explicit_workspace=explicit_workspace,
+                        source_layout=layout.source_layout,
+                    )
             console.print(f"[red]Config error: {exc}[/red]")
             raise SystemExit(_EXIT_STARTUP_ERROR) from None
 
@@ -1059,6 +1107,18 @@ def main() -> None:
                 "unavailable.[/red]"
             )
         raise SystemExit(_EXIT_STARTUP_ERROR) from None
+
+    if args.resume:
+        # A stopped mock stays resumable in its checkpoint, but ordinary resume would
+        # build a real client and append that provider's output to the mock run.
+        # This is the no-write fast reject for a mock the checkpoint already shows.
+        _exit_if_ordinary_mock_resume(
+            console=console,
+            project_dir=project_dir,
+            repo_root=root,
+            explicit_workspace=explicit_workspace,
+            source_layout=layout.source_layout,
+        )
 
     if getattr(args, "survey", False):
         survey_output = getattr(args, "survey_output", None)
@@ -1339,6 +1399,15 @@ def main() -> None:
             if checkpoint_problem:
                 console.print(f"[red]Cannot resume: {checkpoint_problem}.[/red]")
                 raise SystemExit(_EXIT_STARTUP_ERROR)
+            # In-lock recovery, or a change before the lock, can reveal a mock that
+            # the earlier checkpoint read could not see. Re-check before any provider call.
+            _exit_if_ordinary_mock_resume(
+                console=console,
+                project_dir=project_dir,
+                repo_root=root,
+                explicit_workspace=explicit_workspace,
+                source_layout=layout.source_layout,
+            )
         _validate_model_provider_startup(
             args=args,
             console=console,
