@@ -1167,17 +1167,27 @@ release_run_lock(handle)
             release_path = project_dir / "release-owner"
             result_paths = [project_dir / f"result-{index}" for index in range(4)]
             script = """
+import os
 import sys
 import time
 from pathlib import Path
 from src.runtime import acquire_run_lock, release_run_lock
+
+def publish_result(path: Path, payload: str) -> None:
+    # Existence is the parent's completion signal, so the payload must appear atomically.
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(payload, encoding="utf-8")
+    os.replace(temporary, path)
 
 root, start, release, result = map(Path, sys.argv[1:])
 deadline = time.monotonic() + 10
 while not start.exists() and time.monotonic() < deadline:
     time.sleep(0.005)
 handle, error = acquire_run_lock(root, mode="run", model_name=result.name)
-result.write_text("acquired" if handle is not None and error is None else "blocked")
+publish_result(
+    result,
+    "acquired" if handle is not None and error is None else "blocked",
+)
 while handle is not None and not release.exists() and time.monotonic() < deadline:
     time.sleep(0.005)
 release_run_lock(handle)
