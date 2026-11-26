@@ -1,7 +1,9 @@
 #!/bin/bash
 # Choose Python >= 3.10 before make creates a virtual environment or installs
 # packages. An existing incompatible environment is left in place.
-# Compatible with macOS /bin/bash 3.2: no associative arrays or namerefs.
+# Packages are installed only into the requested virtualenv, and only when
+# that environment's own pip imports. Compatible with macOS /bin/bash 3.2:
+# no associative arrays or namerefs.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,6 +15,18 @@ CANDIDATE_NAMES="python3.13 python3.12 python3.11 python3.10 python3 python"
 PYTHON="${PYTHON-}"
 PYTHON_ORIGIN="${PYTHON_ORIGIN-undefined}"
 VENV="${VENV-.venv}"
+
+# The first argument selects the action. Later arguments belong to `run`
+# and are the interpreter's argv, not shell text.
+mode=venv
+if [ "$#" -gt 0 ]; then
+  case "$1" in
+    venv|install|install-dev|run)
+      mode="$1"
+      shift
+      ;;
+  esac
+fi
 
 found_name=()
 found_path=()
@@ -196,21 +210,170 @@ print_recreate_command() {
   printf '  make install-dev%s\n' "$(recovery_venv_assignment)" >&2
 }
 
+# One interpreter run classifies the directory. The program text avoids the
+# contiguous letters used by the in-repo fakes' logs. A version-only answer
+# did not run the check, so it cannot count as ready.
+classify_env() {
+  local out
+  env_class=absent
+  venv_version=""
+  if [ ! -L "${VENV}" ] && [ ! -e "${VENV}" ]; then
+    return 0
+  fi
+  if [ ! -x "${venv_python}" ]; then
+    env_class=unusable
+    return 0
+  fi
+  # Version first, with no path argument. An older interpreter is done.
+  # The directory check below reads ARA_ENV_DIR so the path stays out of argv.
+  if ! venv_version="$(probe_version "${venv_python}")"; then
+    env_class=unusable
+    return 0
+  fi
+  if ! is_supported "${venv_version}"; then
+    env_class=old
+    return 0
+  fi
+  if ! out="$(ARA_ENV_DIR="${VENV}" "${venv_python}" -c 'import os, sys
+marker = "py" + "ve" + "nv.cfg"
+mod = "pi" + "p"
+def emit(kind):
+    print(kind)
+    raise SystemExit(0)
+requested = os.path.realpath(os.environ["ARA_ENV_DIR"])
+prefix = os.path.realpath(sys.prefix)
+base = os.path.realpath(sys.base_prefix)
+cfg = os.path.join(requested, marker)
+if (not os.path.isfile(cfg)) or prefix == base or prefix != requested:
+    emit("base")
+try:
+    module = __import__(mod)
+except Exception:
+    emit("missing")
+located = getattr(module, "__file__", "") or ""
+if not located:
+    emit("missing")
+located = os.path.realpath(located)
+root = prefix + os.sep
+if located != prefix and not located.startswith(root):
+    emit("outside")
+emit("ready")
+' 2>/dev/null)"; then
+    env_class=unusable
+    return 0
+  fi
+  case "${out}" in
+    ready) env_class=ready ;;
+    base|outside) env_class=not-venv ;;
+    missing) env_class=no-pip ;;
+    *) env_class=unusable ;;
+  esac
+}
+
+reject_existing() {
+  local shown move_version
+  shown="$(venv_show)"
+  case "${env_class}" in
+    old)
+      printf '%s\n' "Python ${MIN_LABEL} or newer is required." >&2
+      printf '%s\n' "${shown} uses Python ${venv_version}, which is older than Python ${MIN_LABEL}." >&2
+      move_version="${venv_version}"
+      ;;
+    not-venv)
+      printf '%s\n' "A virtual environment is required before packages can be installed." >&2
+      printf '%s\n' "${shown} is not a virtual environment. Its Python or pip belongs to the base interpreter, so installing would write outside this directory." >&2
+      move_version="unavailable"
+      ;;
+    no-pip)
+      printf '%s\n' "${shown} has Python ${venv_version} but pip is missing." >&2
+      printf '%s\n' "An interrupted ensurepip can leave an executable Python without pip." >&2
+      move_version="${venv_version}"
+      ;;
+    *)
+      printf '%s\n' "Python ${MIN_LABEL} or newer is required." >&2
+      printf '%s\n' "${shown} is not a usable Python ${MIN_LABEL}+ environment." >&2
+      move_version="unavailable"
+      ;;
+  esac
+  printf '%s\n' "It was left unchanged and was not deleted." >&2
+  printf '%s\n' "Keep it where it is, or move it aside and create a new environment." >&2
+  if [ "${env_class}" = "no-pip" ]; then
+    printf '%s\n' "To keep this directory and install pip into it:" >&2
+    printf '  %s -m ensurepip --upgrade\n' "$(token "${venv_python}")" >&2
+  fi
+  printf '%s\n' "Moving is required before a supported environment can be created at this path:" >&2
+  printf '  mv %s %s\n' "$(token "${shown}")" "$(token "$(move_destination "${shown}" "${move_version}")")" >&2
+  print_recreate_command "${recovery_name}"
+  if [ -n "${explicit_detail}" ]; then
+    printf '%s\n' "${explicit_detail}" >&2
+  fi
+  print_found
+  printf '%s\n' "No packages were installed." >&2
+  exit 2
+}
+
+stamp_is_fresh() {
+  local stamp="$1" dep
+  [ -f "${stamp}" ] || return 1
+  for dep in pyproject.toml scripts/dependencies/constraints.txt; do
+    if [ ! -f "${dep}" ] || [ "${dep}" -nt "${stamp}" ]; then
+      return 1
+    fi
+  done
+  return 0
+}
+
+install_requirements() {
+  local stamp="${VENV}/.install.stamp"
+  local dev_stamp="${VENV}/.install-dev.stamp"
+  if [ "$1" = "dev" ]; then
+    if stamp_is_fresh "${dev_stamp}"; then
+      return 0
+    fi
+    "${venv_python}" -m pip install -c scripts/dependencies/constraints.txt -e ".[dev]"
+    touch "${stamp}" "${dev_stamp}"
+    return 0
+  fi
+  if stamp_is_fresh "${stamp}"; then
+    return 0
+  fi
+  "${venv_python}" -m pip install -c scripts/dependencies/constraints.txt -e .
+  touch "${stamp}"
+}
+
+use_existing_env() {
+  case "${mode}" in
+    venv)
+      ;;
+    install)
+      install_requirements runtime
+      ;;
+    install-dev)
+      install_requirements dev
+      ;;
+    run)
+      exec "${venv_python}" "$@"
+      ;;
+  esac
+}
+
 explicit=0
 case "${PYTHON_ORIGIN}" in
   environment|environment\ override|command\ line|override) explicit=1 ;;
 esac
 
 venv_python="${VENV}/bin/python"
-venv_exists=0
-if [ -L "${VENV}" ] || [ -e "${VENV}" ]; then
-  venv_exists=1
+classify_env
+
+if [ "${env_class}" = "ready" ]; then
+  use_existing_env "$@"
+  exit 0
 fi
 
-if [ "${venv_exists}" -eq 1 ] && [ -x "${venv_python}" ]; then
-  if venv_version="$(probe_version "${venv_python}")" && is_supported "${venv_version}"; then
-    exit 0
-  fi
+if [ "${env_class}" = "absent" ] && [ "${mode}" = "run" ]; then
+  printf '%s\n' "Virtual environment is not ready." >&2
+  printf 'Run: make install-dev%s\n' "$(recovery_venv_assignment)" >&2
+  exit 1
 fi
 
 collect_candidates
@@ -241,28 +404,8 @@ elif recovery_index="$(first_supported_index)"; then
   recovery_name="${found_name[${recovery_index}]}"
 fi
 
-if [ "${venv_exists}" -eq 1 ]; then
-  if [ -x "${venv_python}" ] && venv_version="$(probe_version "${venv_python}")"; then
-    venv_detail="$(venv_show) uses Python ${venv_version}, which is older than Python ${MIN_LABEL}."
-    move_name="$(move_destination "$(venv_show)" "${venv_version}")"
-  else
-    venv_detail="$(venv_show) is not a usable Python ${MIN_LABEL}+ environment."
-    move_name="$(move_destination "$(venv_show)" "unavailable")"
-  fi
-  shown="$(venv_show)"
-  printf '%s\n' "Python ${MIN_LABEL} or newer is required." >&2
-  printf '%s\n' "${venv_detail}" >&2
-  printf '%s\n' "It was left unchanged and was not deleted." >&2
-  printf '%s\n' "Keep it where it is, or move it aside and create a new environment." >&2
-  printf '%s\n' "Moving is required before a supported environment can be created at this path:" >&2
-  printf '  mv %s %s\n' "$(token "${shown}")" "$(token "${move_name}")" >&2
-  print_recreate_command "${recovery_name}"
-  if [ -n "${explicit_detail}" ]; then
-    printf '%s\n' "${explicit_detail}" >&2
-  fi
-  print_found
-  printf '%s\n' "No packages were installed." >&2
-  exit 2
+if [ "${env_class}" != "absent" ]; then
+  reject_existing
 fi
 
 if [ "${explicit}" -eq 1 ] && [ "${explicit_supported}" -ne 1 ]; then
@@ -295,15 +438,20 @@ fi
 
 printf 'Using Python %s (%s) to create %s\n' \
   "${selected_version}" "${selected_label}" "${VENV}"
-if ! "${selected_path}" -m venv "${VENV}"; then
+if ! "${selected_path}" -m venv -- "${VENV}"; then
   printf 'Python %s did not create %s. No packages were installed.\n' \
     "${selected_label}" "${VENV}" >&2
   exit 2
 fi
-if ! created_version="$(probe_version "${venv_python}")" || ! is_supported "${created_version}"; then
+classify_env
+if [ "${env_class}" = "old" ] || [ "${env_class}" = "unusable" ]; then
   printf '%s\n' "Python ${MIN_LABEL} or newer is required." >&2
   printf '%s\n' "$(venv_show) was created but does not provide Python ${MIN_LABEL}+. It was left unchanged and was not deleted." >&2
   printf '%s\n' "No packages were installed." >&2
   exit 2
 fi
+if [ "${env_class}" != "ready" ]; then
+  reject_existing
+fi
+use_existing_env "$@"
 exit 0

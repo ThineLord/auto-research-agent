@@ -84,7 +84,7 @@ source .venv/bin/activate
 make install-dev
 ```
 
-用 Python 3.10+ 创建 `.venv`，并安装运行依赖和测试工具。已有的过旧环境会保留。
+用 Python 3.10+ 创建 `.venv`，并安装运行依赖和测试工具。已有的过旧环境、不是虚拟环境的目录，以及缺少 pip 的目录都会原样保留。
 
 ```bash
 make help

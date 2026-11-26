@@ -8,7 +8,13 @@ WORKSPACE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # still uses the parent of app/. Absolute paths are not rewritten here.
 export AUTO_RESEARCH_AGENT_START_CWD="$(pwd)"
 cd "${WORKSPACE_DIR}/app"
-# app/Makefile selects Python >= 3.10, or explains an explicit PYTHON= and an
-# existing incompatible .venv, before it installs packages.
+# app/Makefile selects Python >= 3.10 and installs into VENV. The same value
+# is the interpreter used below. Unset means .venv; a set value, including
+# one with spaces, is kept as one path.
+if [ -n "${VENV+x}" ]; then
+  venv="${VENV}"
+else
+  venv=".venv"
+fi
 make install
-exec .venv/bin/python -m ui.server "$@"
+exec "${venv}/bin/python" -m ui.server "$@"

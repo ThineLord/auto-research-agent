@@ -15,11 +15,15 @@ make install-dev
 `make venv`, `make install`, `make install-dev`, and `./start` require Python 3.10 or newer. They
 use the first supported interpreter on `PATH`: `python3.13`, `python3.12`, `python3.11`,
 `python3.10`, then `python3` and `python`. Pass `PYTHON=python3.13` to choose one, or `VENV=` to
-place the environment somewhere else. A qualified environment keeps working when `PYTHON` is also
+place the environment somewhere else. `./start` and Make use that environment's Python for the
+install and for the command that follows it, including when `app/.venv` does not exist. A path
+with spaces or quotes is one path. A qualified environment keeps working when `PYTHON` is also
 set. If every interpreter on `PATH` is older, the command stops before creating an environment or
 installing packages and prints Python 3.10 as the minimum, the interpreters it actually found, and
-the recovery command. An existing `.venv` below 3.10 is left in place; the message explains how to
-keep it or move it aside and recreate it.
+the recovery command. An existing environment below 3.10, a directory that is not that virtual
+environment, and an environment whose pip is missing are left in place. The message explains how
+to keep the directory or move it aside and recreate it. A missing pip can be what an interrupted
+ensurepip leaves behind; the message also shows how to install pip there without deleting it.
 
 Model-backed research workflows can run against local Ollama or cloud Gemini, while Literature
 Survey Mode is deterministic and local-only. CI does not start Ollama, call Gemini, or run

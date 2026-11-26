@@ -393,3 +393,271 @@ def test_start_keeps_incompatible_venv_instead_of_reusing_it(tmp_path: Path) -> 
     assert "usage:" not in output.lower()
     assert "pip" not in _log(old_log)
     assert "venv" not in _log(new_log)
+
+
+def _real_env() -> dict[str, str]:
+    env = os.environ.copy()
+    for key in (*MAKE_ENV_KEYS, "PYTHON", "VENV"):
+        env.pop(key, None)
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    return env
+
+
+def _patch_pip_main(venv: Path, log: Path, code: int) -> None:
+    location = subprocess.check_output(
+        [
+            str(venv / "bin" / "python"),
+            "-c",
+            "import pathlib, pip\n"
+            "print(pathlib.Path(pip.__file__).resolve().parent / '__main__.py')",
+        ],
+        text=True,
+        env=_real_env(),
+    ).strip()
+    Path(location).write_text(
+        "import pathlib, sys\n"
+        f"path = pathlib.Path({str(log)!r})\n"
+        "with path.open('a', encoding='utf-8') as handle:\n"
+        "    handle.write(' '.join(sys.argv[1:]) + '\\n')\n"
+        f"raise SystemExit({code})\n",
+        encoding="utf-8",
+    )
+
+
+def _remove_pip(venv: Path) -> None:
+    for site in venv.glob("lib/python*/site-packages"):
+        for child in list(site.iterdir()):
+            if child.name == "pip" or child.name.startswith("pip-"):
+                shutil.rmtree(child)
+    for name in ("pip", "pip3", "pip3.12"):
+        path = venv / "bin" / name
+        if path.is_symlink() or path.exists():
+            path.unlink()
+
+
+def _make(
+    goal: str, venv: Path, env: dict[str, str], *extra: str
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["make", goal, f"VENV={venv}", *extra],
+        cwd=REPO,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=90,
+    )
+
+
+def test_spaced_and_quoted_venv_paths_stay_one_directory(tmp_path: Path) -> None:
+    env = _real_env()
+    for name in ("my env", "my'env", 'my"env'):
+        target = tmp_path / name
+        result = _make("venv", target, env)
+        output = _output(result)
+        assert result.returncode == 0, output
+        assert (target / "pyvenv.cfg").is_file()
+        assert not (target / ".install.stamp").exists()
+        assert not (target / ".install-dev.stamp").exists()
+        assert "pip install" not in output
+        assert ".[dev]" not in output
+        assert "overriding recipe" not in output
+        cfg = (target / "pyvenv.cfg").read_bytes()
+        quoted = subprocess.run(
+            ["make", "venv"],
+            cwd=REPO,
+            env={**env, "VENV": str(target)},
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=90,
+        )
+        assert quoted.returncode == 0, _output(quoted)
+        assert (target / "pyvenv.cfg").read_bytes() == cfg
+
+
+def test_install_stamp_retries_until_pip_succeeds(tmp_path: Path) -> None:
+    venv = tmp_path / "venv"
+    created = subprocess.run(
+        [sys.executable, "-m", "venv", str(venv)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert created.returncode == 0, created.stderr
+    log = tmp_path / "pip.log"
+    _patch_pip_main(venv, log, 0)
+    env = _real_env()
+
+    first = _make("install", venv, env)
+    assert first.returncode == 0, _output(first)
+    recorded = log.read_text(encoding="utf-8")
+    assert "-e ." in recorded
+    assert ".[dev]" not in recorded
+    assert (venv / ".install.stamp").is_file()
+    assert not (venv / ".install-dev.stamp").exists()
+
+    again = _make("install", venv, env)
+    assert again.returncode == 0, _output(again)
+    assert log.read_text(encoding="utf-8") == recorded
+
+    dev = _make("install-dev", venv, env)
+    assert dev.returncode == 0, _output(dev)
+    dev_log = log.read_text(encoding="utf-8")
+    assert ".[dev]" in dev_log
+    assert (venv / ".install-dev.stamp").is_file()
+    skipped = _make("install-dev", venv, env)
+    assert skipped.returncode == 0, _output(skipped)
+    assert log.read_text(encoding="utf-8") == dev_log
+
+    os.utime(venv / ".install.stamp", (1, 1))
+    _patch_pip_main(venv, log, 9)
+    failed = _make("install", venv, env)
+    assert failed.returncode != 0, _output(failed)
+    assert (venv / ".install.stamp").stat().st_mtime == 1
+    retry = log.read_text(encoding="utf-8")
+    assert retry != dev_log
+    held = retry
+    _patch_pip_main(venv, log, 0)
+    recovered = _make("install", venv, env)
+    assert recovered.returncode == 0, _output(recovered)
+    assert (venv / ".install.stamp").stat().st_mtime != 1
+    assert log.read_text(encoding="utf-8") != held
+    final = log.read_text(encoding="utf-8")
+    quiet = _make("install", venv, env)
+    assert quiet.returncode == 0, _output(quiet)
+    assert log.read_text(encoding="utf-8") == final
+
+
+def test_directory_pointing_at_system_python_does_not_install(tmp_path: Path) -> None:
+    target = tmp_path / "not-a-venv"
+    log = tmp_path / "python.log"
+    bindir = target / "bin"
+    bindir.mkdir(parents=True)
+    real = Path(sys.executable).resolve()
+    launcher = bindir / "python"
+    launcher.write_text(
+        "#!/bin/bash\n"
+        f"printf '%s\\n' \"$*\" >> {shlex_quote(log)}\n"
+        f'exec {shlex_quote(real)} "$@"\n',
+        encoding="utf-8",
+    )
+    launcher.chmod(0o755)
+    (target / "KEEP").write_text("keep", encoding="utf-8")
+    env = _real_env()
+    env["PIP_REQUIRE_VIRTUALENV"] = "true"
+    result = _make("install", target, env)
+    output = _output(result)
+
+    assert result.returncode == 2, output
+    assert (target / "KEEP").read_text(encoding="utf-8") == "keep"
+    assert not (target / ".install.stamp").exists()
+    assert "not a virtual environment" in output
+    assert "write outside this directory" in output
+    assert "left unchanged and was not deleted" in output
+    assert "Keep it where it is" in output
+    assert "No packages were installed." in output
+    assert "pip" not in _log(log)
+    assert "Successfully installed" not in output
+
+    linked = tmp_path / "linked"
+    (linked / "bin").mkdir(parents=True)
+    (linked / "bin" / "python").symlink_to(real)
+    (linked / "pyvenv.cfg").write_text(
+        "home = /usr/bin\ninclude-system-site-packages = true\nversion = 3.12.3\n",
+        encoding="utf-8",
+    )
+    (linked / "KEEP").write_text("keep", encoding="utf-8")
+    linked_result = _make("install", linked, env)
+    linked_output = _output(linked_result)
+    assert linked_result.returncode == 2, linked_output
+    assert (linked / "KEEP").read_text(encoding="utf-8") == "keep"
+    assert not (linked / ".install.stamp").exists()
+    assert "write outside this directory" in linked_output
+    assert "No packages were installed." in linked_output
+    assert "Successfully installed" not in linked_output
+
+
+def test_interrupted_ensurepip_is_not_qualified(tmp_path: Path) -> None:
+    venv = tmp_path / "half"
+    created = subprocess.run(
+        [sys.executable, "-m", "venv", str(venv)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert created.returncode == 0, created.stderr
+    _remove_pip(venv)
+    (venv / "KEEP").write_text("keep", encoding="utf-8")
+    result = _make("install", venv, _real_env())
+    output = _output(result)
+
+    assert result.returncode == 2, output
+    assert (venv / "KEEP").read_text(encoding="utf-8") == "keep"
+    assert (venv / "pyvenv.cfg").is_file()
+    assert (venv / "bin" / "python").exists()
+    assert not (venv / ".install.stamp").exists()
+    assert "pip is missing" in output
+    assert "interrupted ensurepip" in output
+    assert "left unchanged and was not deleted" in output
+    assert "Keep it where it is" in output
+    assert "ensurepip --upgrade" in output
+    assert "No packages were installed." in output
+    assert "No module named pip" not in output
+
+
+def test_start_and_make_use_custom_venv_python(tmp_path: Path) -> None:
+    checkout = _mini_checkout(tmp_path)
+    app = checkout / "app"
+    ui = app / "ui"
+    ui.mkdir()
+    (ui / "__init__.py").write_text("", encoding="utf-8")
+    (ui / "server.py").write_text(
+        "import pathlib, sys\n"
+        "pathlib.Path(sys.argv[1]).write_text(sys.executable, encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    src = app / "src"
+    src.mkdir()
+    (src / "__init__.py").write_text("", encoding="utf-8")
+    (src / "main.py").write_text(
+        "import pathlib, sys\n"
+        "pathlib.Path(sys.argv[1]).write_text(sys.executable, encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    custom = tmp_path / "custom env"
+    created = subprocess.run(
+        [sys.executable, "-m", "venv", str(custom)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert created.returncode == 0, created.stderr
+    stamp_time = (app / "pyproject.toml").stat().st_mtime + 10
+    for name in (".install.stamp", ".install-dev.stamp"):
+        stamp = custom / name
+        stamp.write_text("ready", encoding="utf-8")
+        os.utime(stamp, (stamp_time, stamp_time))
+    env = _real_env()
+    env["VENV"] = str(custom)
+    marker = tmp_path / "start-python"
+    started = _start(checkout, env, [str(marker)])
+    assert started.returncode == 0, _output(started)
+    python = Path(marker.read_text(encoding="utf-8")).resolve()
+    assert python == (custom / "bin" / "python").resolve()
+    assert not (app / ".venv").exists()
+    assert "pip install" not in _output(started)
+
+    ran_marker = tmp_path / "make-python"
+    ran = subprocess.run(
+        ["make", "run", f"ARGS={ran_marker}"],
+        cwd=app,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=90,
+    )
+    assert ran.returncode == 0, _output(ran)
+    assert Path(ran_marker.read_text(encoding="utf-8")).resolve() == python
+    assert not (app / ".venv").exists()
