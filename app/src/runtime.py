@@ -5,6 +5,7 @@ from __future__ import annotations
 import errno
 import os
 import stat
+import struct
 import subprocess
 import sys
 import time
@@ -37,14 +38,24 @@ MODEL_JOB_PROCESS_META_FILENAME = "ui_model_job_process.json"
 RUN_LOCK_GUARD_FILENAME = "active_run.guard"
 RUN_LOCK_SCHEMA_VERSION = 1
 MAX_PROCESS_ID = (1 << 32) - 1
-# Research modes that honor STOP_REQUESTED. Edit and maintenance locks use the
-# same guard but are not a run the dashboard can stop.
-STOPPABLE_RUN_MODES = frozenset(
+# Research modes that hold the run guard. Diagnostic is live but does not read
+# STOP_REQUESTED, so it is not stoppable. Edit and maintenance locks use the
+# same guard and are not a run.
+LIVE_RESEARCH_MODES = frozenset(
     {
         "mock",
         "normal",
         "continuous",
         "diagnostic",
+        "session",
+        "resume",
+    }
+)
+STOPPABLE_RUN_MODES = frozenset(
+    {
+        "mock",
+        "normal",
+        "continuous",
         "session",
         "resume",
     }
@@ -170,27 +181,95 @@ def model_job_meta_path(project_dir: Path) -> Path:
     return project_dir / MODEL_JOB_PROCESS_META_FILENAME
 
 
-def get_active_process_meta(meta_path: Path) -> Dict[str, Any]:
+def _recorded_pid(meta: Dict[str, Any]) -> int:
+    try:
+        pid = int(meta.get("pid", 0)) if meta else 0
+    except (TypeError, ValueError):
+        return 0
+    if pid <= 0 or pid > MAX_PROCESS_ID:
+        return 0
+    return pid
+
+
+def _process_meta_snapshot(
+    meta_path: Path,
+) -> tuple[Dict[str, Any], Optional[tuple[int, int, int, int]]]:
+    """Return metadata and the file identity observed with it.
+
+    A missing file has no identity, so the caller must not unlink. A file that
+    changes between the stat and the read also has no identity: that is a new
+    record and must be left in place.
+    """
     try:
         ensure_project_runtime_paths_safe(
             meta_path.parent,
             anchor=meta_path.parent.parent,
         )
     except OSError:
-        return {}
+        return {}, None
+    if not artifact_path_is_safe(meta_path, allow_missing=True):
+        return {}, None
+    try:
+        before = meta_path.lstat()
+    except FileNotFoundError:
+        return {}, None
+    except OSError:
+        return {}, None
+    if not stat.S_ISREG(before.st_mode):
+        return {}, None
     meta = read_json_file(meta_path)
     try:
-        pid = int(meta.get("pid", 0)) if meta else 0
-    except (TypeError, ValueError):
-        pid = 0
-    if pid and is_pid_running(pid):
-        return meta
-    if not artifact_path_is_safe(meta_path, allow_missing=False):
-        return {}
+        after = meta_path.lstat()
+    except OSError:
+        return {}, None
+    identity = (after.st_dev, after.st_ino, after.st_size, getattr(after, "st_mtime_ns", 0))
+    observed = (before.st_dev, before.st_ino, before.st_size, getattr(before, "st_mtime_ns", 0))
+    if identity != observed:
+        return {}, None
+    return meta if isinstance(meta, dict) else {}, identity
+
+
+def _unlink_process_meta(meta_path: Path, identity: tuple[int, int, int, int]) -> None:
+    try:
+        current = meta_path.lstat()
+    except OSError:
+        return
+    if (
+        current.st_dev,
+        current.st_ino,
+        current.st_size,
+        getattr(current, "st_mtime_ns", 0),
+    ) != identity:
+        return
     try:
         unlink_artifact_file(meta_path)
     except OSError:
         pass
+
+
+def get_active_process_meta(meta_path: Path, *, cleanup: bool = True) -> Dict[str, Any]:
+    """Return live process metadata.
+
+    ``cleanup`` removes a stale record this call actually observed. Read-only
+    callers pass False so they cannot delete a record published after the read
+    decided the file was missing or expired.
+    """
+    meta, identity = _process_meta_snapshot(meta_path)
+    pid = _recorded_pid(meta)
+    if pid and is_pid_running(pid):
+        return meta
+    if not cleanup or identity is None:
+        return {}
+    current, current_identity = _process_meta_snapshot(meta_path)
+    if current_identity != identity:
+        current_pid = _recorded_pid(current)
+        if current_pid and is_pid_running(current_pid):
+            return current
+        return {}
+    current_pid = _recorded_pid(current)
+    if current_pid and is_pid_running(current_pid):
+        return current
+    _unlink_process_meta(meta_path, identity)
     return {}
 
 
@@ -404,43 +483,227 @@ def _lock_int(value: object) -> Optional[int]:
     return value
 
 
-def _write_flock_held_by(device: int, inode: int, pid: int) -> bool:
-    """True when that PID holds the write flock for this guard inode.
+_PROC_LOCKS_PATH = Path("/proc/locks")
+# Darwin struct flock: off_t, off_t, pid_t, short, short. Native alignment is 24 bytes.
+_DARWIN_FLOCK = struct.Struct("@qqihh")
+_DARWIN_VNODE = 1
+_DARWIN_LIST_FDS = 1
+_DARWIN_FD_VNODE = 1
 
-    Linux flock is not visible to fcntl F_GETLK. Reading /proc/locks observes
-    the kernel lock without acquiring it, so a status poll cannot block a run
-    that is about to take the guard. Other platforms fail closed.
-    """
-    identity = f"{os.major(device):02x}:{os.minor(device):02x}:{inode}"
-    try:
-        lines = Path("/proc/locks").read_text(encoding="utf-8").splitlines()
-    except OSError:
+
+def run_accepts_cooperative_stop(meta: Dict[str, Any]) -> bool:
+    """True when this live record belongs to a mode that consumes STOP_REQUESTED."""
+    if not isinstance(meta, dict) or not meta:
         return False
-    for line in lines:
+    marker = meta.get("stoppable")
+    if isinstance(marker, bool):
+        return marker
+    mode = meta.get("mode")
+    if isinstance(mode, str) and mode in LIVE_RESEARCH_MODES:
+        return mode in STOPPABLE_RUN_MODES
+    return True
+
+
+def _proc_locks_text() -> Optional[str]:
+    try:
+        return _PROC_LOCKS_PATH.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+
+def _proc_locks_show_write_flock(text: str, device: int, inode: int, pid: int) -> bool:
+    identity = f"{os.major(device):02x}:{os.minor(device):02x}:{inode}"
+    for line in text.splitlines():
         parts = line.split()
         if len(parts) < 6:
             continue
-        if parts[1] == "FLOCK" and parts[3] == "WRITE" and parts[4] == str(pid):
-            if parts[5] == identity:
-                return True
+        if (
+            parts[1] == "FLOCK"
+            and parts[3] == "WRITE"
+            and parts[4] == str(pid)
+            and parts[5] == identity
+        ):
+            return True
     return False
 
 
-def read_stoppable_cli_run(project_dir: Path) -> Dict[str, Any]:
-    """Return a live owned research run, or nothing for idle and non-runs.
+def _devices_match(left: int, right: int) -> bool:
+    return left == right or (left & 0xFFFFFFFF) == (right & 0xFFFFFFFF)
 
-    Ownerless metadata and edit/maintenance locks stay invisible. A matching
-    UI process record is preferred by the dashboard and is not read here.
+
+def _open_inode_matches(device: int, inode: int, records: Sequence[tuple[int, int]]) -> bool:
+    return any(
+        seen_inode == inode and _devices_match(seen_device, device)
+        for seen_device, seen_inode in records
+    )
+
+
+def _darwin_lock_is_held(
+    lock_type: int,
+    lock_pid: int,
+    pid: int,
+    write_type: int,
+    inode_open: bool,
+) -> bool:
+    """Attribute a Darwin F_GETLK result to this project's flock holder.
+
+    flock(2) is visible to F_GETLK, but its owner pid is -1. A write lock with
+    an unknown owner counts only when the recorded PID still has that inode
+    open. A different pid, or a live PID alone, does not.
     """
+    if lock_type != write_type:
+        return False
+    if lock_pid == pid:
+        return True
+    if lock_pid == -1:
+        return inode_open
+    return False
+
+
+def _darwin_proc_library() -> Any:
+    import ctypes
+
+    library = ctypes.util.find_library("proc") or "/usr/lib/libSystem.B.dylib"
+    loaded = ctypes.CDLL(library, use_errno=True)
+    for name in ("proc_pidinfo", "proc_pidfdinfo"):
+        function = getattr(loaded, name)
+        function.restype = ctypes.c_int
+    loaded.proc_pidinfo.argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_uint64,
+        ctypes.c_void_p,
+        ctypes.c_int,
+    ]
+    loaded.proc_pidfdinfo.argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_void_p,
+        ctypes.c_int,
+    ]
+    return loaded
+
+
+def _darwin_open_inodes(pid: int) -> Optional[list[tuple[int, int]]]:
+    import ctypes
+
+    try:
+        library = _darwin_proc_library()
+    except (AttributeError, OSError):
+        return None
+    fd_size = 8
+    capacity = 256
+    listed: Optional[bytes] = None
+    while capacity <= 65536:
+        raw = ctypes.create_string_buffer(capacity * fd_size)
+        written = library.proc_pidinfo(pid, _DARWIN_LIST_FDS, 0, raw, len(raw))
+        if written < 0:
+            return None
+        if written < len(raw) or capacity >= 65536:
+            listed = raw.raw[: max(written, 0)]
+            break
+        capacity *= 2
+    if not listed:
+        return []
+    records: list[tuple[int, int]] = []
+    info = ctypes.create_string_buffer(256)
+    for offset in range(0, len(listed) - (fd_size - 1), fd_size):
+        fd, fd_type = struct.unpack_from("@iI", listed, offset)
+        if fd_type != _DARWIN_VNODE:
+            continue
+        size = library.proc_pidfdinfo(pid, fd, _DARWIN_FD_VNODE, info, len(info))
+        if size < 40:
+            continue
+        # proc_fileinfo is 24 bytes; vinfo_stat.vst_dev then vst_ino at +8.
+        device, inode = struct.unpack_from("@IQ", info.raw, 24)
+        records.append((device, inode))
+    return records
+
+
+def _darwin_blocking_lock(fd: int) -> Optional[tuple[int, int]]:
+    import fcntl
+
+    query = _DARWIN_FLOCK.pack(0, 0, 0, fcntl.F_WRLCK, os.SEEK_SET)
+    try:
+        raw = fcntl.fcntl(fd, fcntl.F_GETLK, query)
+    except OSError:
+        return None
+    if not isinstance(raw, (bytes, bytearray)) or len(raw) < _DARWIN_FLOCK.size:
+        return None
+    _start, _length, lock_pid, lock_type, _whence = _DARWIN_FLOCK.unpack_from(raw)
+    return lock_type, lock_pid
+
+
+def _darwin_write_flock_held_by(guard_path: Path, device: int, inode: int, pid: int) -> bool:
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(guard_path, flags)
+    except OSError:
+        return False
+    try:
+        opened = os.fstat(descriptor)
+        if opened.st_ino != inode or not _devices_match(opened.st_dev, device):
+            return False
+        import fcntl
+
+        found = _darwin_blocking_lock(descriptor)
+        if found is None:
+            return False
+        lock_type, lock_pid = found
+        if lock_type != fcntl.F_WRLCK:
+            return False
+        if lock_pid == pid:
+            return True
+        if lock_pid != -1:
+            return False
+        records = _darwin_open_inodes(pid)
+        if records is None:
+            return False
+        return _darwin_lock_is_held(
+            lock_type, lock_pid, pid, fcntl.F_WRLCK, _open_inode_matches(device, inode, records)
+        )
+    except OSError:
+        return False
+    finally:
+        os.close(descriptor)
+
+
+def _non_proc_write_flock_held_by(guard_path: Path, device: int, inode: int, pid: int) -> bool:
+    """Observe a write flock where /proc/locks does not exist.
+
+    macOS reports the project's BSD flock through F_GETLK and attributes it
+    with libproc. Tests replace this function to exercise that branch offline.
+    """
+    if sys.platform != "darwin":
+        return False
+    return _darwin_write_flock_held_by(guard_path, device, inode, pid)
+
+
+def _write_flock_held_by(guard_path: Path, device: int, inode: int, pid: int) -> bool:
+    """True when that PID holds the guard's write flock.
+
+    Linux flock is not visible to fcntl F_GETLK, so /proc/locks is read without
+    acquiring the lock. macOS uses F_GETLK plus the PID's open inodes. A poll
+    never takes the guard, and a merely live PID is not enough.
+    """
+    text = _proc_locks_text()
+    if text is not None:
+        return _proc_locks_show_write_flock(text, device, inode, pid)
+    return _non_proc_write_flock_held_by(guard_path, device, inode, pid)
+
+
+def _live_cli_run_record(project_dir: Path) -> Dict[str, Any]:
     try:
         ensure_project_runtime_paths_safe(project_dir, anchor=project_dir.parent)
     except OSError:
         return {}
     lock_path = project_dir / RUN_LOCK_FILENAME
     guard_path = project_dir / RUN_LOCK_GUARD_FILENAME
-    if not artifact_path_is_safe(lock_path, allow_missing=False, anchor=project_dir.parent):
+    anchor = project_dir.parent
+    if not artifact_path_is_safe(lock_path, allow_missing=False, anchor=anchor):
         return {}
-    if not artifact_path_is_safe(guard_path, allow_missing=False, anchor=project_dir.parent):
+    if not artifact_path_is_safe(guard_path, allow_missing=False, anchor=anchor):
         return {}
     try:
         lock_data = read_json_file(lock_path)
@@ -460,13 +723,13 @@ def read_stoppable_cli_run(project_dir: Path) -> Dict[str, Any]:
         or not isinstance(owner, str)
         or not owner
         or not isinstance(mode, str)
-        or mode not in STOPPABLE_RUN_MODES
+        or mode not in LIVE_RESEARCH_MODES
         or not isinstance(model, str)
         or not pid
         or not is_pid_running(pid)
         or device != guard_stat.st_dev
         or inode != guard_stat.st_ino
-        or not _write_flock_held_by(guard_stat.st_dev, guard_stat.st_ino, pid)
+        or not _write_flock_held_by(guard_path, guard_stat.st_dev, guard_stat.st_ino, pid)
     ):
         return {}
     started = lock_data.get("started_at")
@@ -476,8 +739,26 @@ def read_stoppable_cli_run(project_dir: Path) -> Dict[str, Any]:
         "model": model,
         "started_at": started if isinstance(started, str) else "",
         "kind": "cli_run",
+        "stoppable": mode in STOPPABLE_RUN_MODES,
         "command": " ".join(part for part in (mode, model) if part),
     }
+
+
+def read_live_cli_run(project_dir: Path) -> Dict[str, Any]:
+    """Return a live owned research run, including a non-stoppable diagnostic.
+
+    Ownerless metadata and edit/maintenance locks stay invisible. A matching
+    UI process record is preferred by the dashboard and is not read here.
+    """
+    return _live_cli_run_record(project_dir)
+
+
+def read_stoppable_cli_run(project_dir: Path) -> Dict[str, Any]:
+    """Return a live run that will consume STOP_REQUESTED."""
+    meta = _live_cli_run_record(project_dir)
+    if not meta.get("stoppable"):
+        return {}
+    return meta
 
 
 def _metadata_guard_matches(lock_data: Dict[str, Any], device: int, inode: int) -> bool:

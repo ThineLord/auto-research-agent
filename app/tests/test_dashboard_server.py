@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -29,7 +30,7 @@ def project(tmp_path: Path, monkeypatch):
     config.write_text(web.h.CONFIG_EXAMPLE_PATH.read_text(), encoding="utf-8")
     monkeypatch.setattr(web.h, "ROOT", tmp_path)
     monkeypatch.setattr(web.h, "CONFIG_PATH", config)
-    monkeypatch.setattr(web.h, "get_active_process_meta", lambda _: {})
+    monkeypatch.setattr(web.h, "get_active_process_meta", lambda *_args, **_kwargs: {})
     monkeypatch.setattr(web.h, "query_ollama_models", lambda **_: ([{"name": "qwen3:8b"}], ""))
     launch = Mock(return_value=SimpleNamespace(pid=4321, error=None))
     monkeypatch.setattr(web.h, "start_background_process", launch)
@@ -174,7 +175,7 @@ def test_invalid_execution_options_are_rejected(project, changes):
 
 def test_active_run_blocks_new_run_and_model_operations(project, monkeypatch):
     _, launch = project
-    monkeypatch.setattr(web.h, "get_active_process_meta", lambda _: {"pid": 42})
+    monkeypatch.setattr(web.h, "get_active_process_meta", lambda *_args, **_kwargs: {"pid": 42})
     for operation in ("run", "pull", "delete", "tests"):
         with pytest.raises(ValueError):
             web.action(payload(action=operation, target="qwen3:8b"))
@@ -588,3 +589,545 @@ def test_stop_verified_run_during_other_project_model_read(http_server, project,
     assert web.status("beta")["progress"]["run_active"] is False
     assert models_result["value"][0] == 200
     assert json.loads(models_result["value"][1])["models"][0]["name"] == "slow-local:latest"
+
+
+def _point_config_at(port: int) -> None:
+    config_path = web.h.CONFIG_PATH
+    text = config_path.read_text(encoding="utf-8")
+    text = text.replace("stop_if_no_improvement_rounds: 2", "stop_if_no_improvement_rounds: 100")
+    text = text.replace("http://localhost:11434", f"http://127.0.0.1:{port}")
+    config_path.write_text(text, encoding="utf-8")
+
+
+def test_stop_verified_run_during_other_project_health(http_server, project, monkeypatch):
+    """A read-only health check must not hold another project's cooperative stop."""
+    from src.config import query_ollama_models
+    from src.runtime import (
+        get_active_process_meta,
+        read_stoppable_cli_run,
+        start_background_process,
+    )
+
+    root, _launch = project
+    monkeypatch.setattr(web.h, "get_active_process_meta", get_active_process_meta)
+    monkeypatch.setattr(web.h, "query_ollama_models", query_ollama_models)
+    monkeypatch.setattr(web.h, "start_background_process", start_background_process)
+    other = root.parent / "beta"
+    other.mkdir()
+    (other / "task.md").write_text("Other synthetic project\n", encoding="utf-8")
+    (other / "memory.md").write_text("Context\n", encoding="utf-8")
+    entered = threading.Event()
+    release = threading.Event()
+
+    class SlowHealth(BaseHTTPRequestHandler):
+        def log_message(self, _format, *_args):
+            pass
+
+        def do_GET(self):
+            entered.set()
+            release.wait(timeout=8)
+            body = json.dumps({"models": [{"name": "qwen3:8b"}]}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    fake = ThreadingHTTPServer(("127.0.0.1", 0), SlowHealth)
+    fake_thread = threading.Thread(target=fake.serve_forever, daemon=True)
+    fake_thread.start()
+    _point_config_at(fake.server_address[1])
+    import src.runtime as runtime_module
+
+    launched = []
+    original_popen = runtime_module.subprocess.Popen
+
+    def tracking_popen(*args, **kwargs):
+        process = original_popen(*args, **kwargs)
+        launched.append(process)
+        return process
+
+    monkeypatch.setattr(runtime_module.subprocess, "Popen", tracking_popen)
+    child = start_background_process(
+        command=[
+            sys.executable,
+            "-m",
+            "src.main",
+            "--mock",
+            "--max-rounds",
+            "40",
+            "--workspace",
+            str(web.h.ROOT),
+            "--project",
+            "example",
+        ],
+        cwd=web.h.APP_ROOT,
+        log_path=root / "run.log",
+        meta_path=web.h.run_meta_path(root),
+        kind="run",
+        extra={"mode": "mock", "model": "mock-deterministic", "provider": "mock"},
+    )
+    token = {"X-Dashboard-Token": web.TOKEN}
+    health_result = {}
+    checker = None
+    verified = False
+
+    def check_health():
+        health_result["value"] = request(
+            http_server,
+            "POST",
+            "/api/action",
+            json.dumps(payload(action="health", project="beta")),
+            token,
+            timeout=15,
+        )
+
+    try:
+        assert child.pid
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            if read_stoppable_cli_run(root).get("mode") == "mock":
+                break
+            time.sleep(0.05)
+        else:
+            log_path = root / "run.log"
+            log = log_path.read_text(encoding="utf-8") if log_path.is_file() else ""
+            raise AssertionError(f"CLI mock did not become active\n{log}")
+        (root / "ui_run_process.json").unlink()
+        assert web.status("example")["progress"]["run_active"] is True
+        assert web.status("example")["progress"]["stoppable"] is True
+        original = (root / "task.md").read_text(encoding="utf-8")
+        revisions = web.read_inputs(root)["revisions"]
+        checker = threading.Thread(target=check_health)
+        checker.start()
+        assert entered.wait(5)
+        saved, saved_body, _headers = request(
+            http_server,
+            "POST",
+            "/api/action",
+            json.dumps(
+                {
+                    "action": "save",
+                    "project": "example",
+                    "changes": {"task": "Must not land"},
+                    "revisions": revisions,
+                }
+            ),
+            token,
+        )
+        started, started_body, _headers = request(
+            http_server,
+            "POST",
+            "/api/action",
+            json.dumps(payload(action="run", mode="normal")),
+            token,
+        )
+        stopped, stopped_body, _headers = request(
+            http_server,
+            "POST",
+            "/api/action",
+            json.dumps(payload(action="stop")),
+            token,
+        )
+        assert not release.is_set()
+        assert saved == 409
+        assert json.loads(saved_body)["code"] == "input_busy"
+        assert (root / "task.md").read_text(encoding="utf-8") == original
+        assert started == 400
+        assert "active" in json.loads(started_body)["error"]
+        assert stopped == 200
+        assert json.loads(stopped_body)["message_key"] == "stop_signal_created"
+        assert (root / "STOP_REQUESTED").is_file()
+        assert not (other / "STOP_REQUESTED").exists()
+        assert b"Another operation is in progress" not in stopped_body
+        verified = True
+    finally:
+        release.set()
+        if checker is not None:
+            checker.join(timeout=15)
+        fake.shutdown()
+        fake.server_close()
+        fake_thread.join(timeout=5)
+        if not verified and launched and launched[0].poll() is None:
+            launched[0].kill()
+            launched[0].wait(timeout=5)
+    process = launched[0]
+    try:
+        process.wait(timeout=20)
+    except Exception:
+        process.kill()
+        process.wait(timeout=5)
+        raise AssertionError((root / "run.log").read_text(encoding="utf-8")) from None
+    assert process.returncode == 0
+    checkpoint = json.loads((root / "checkpoint.json").read_text(encoding="utf-8"))
+    assert checkpoint["stop_reason"] == "USER_STOP_REQUESTED"
+    assert health_result["value"][0] == 200
+    assert web.status("example")["progress"]["run_active"] is False
+
+
+def test_gemini_health_read_does_not_block_a_verified_stop(http_server, project, monkeypatch):
+    from src.runtime import acquire_run_lock, get_active_process_meta, release_run_lock
+
+    root, launch = project
+    monkeypatch.setattr(web.h, "get_active_process_meta", get_active_process_meta)
+    other = root.parent / "beta"
+    other.mkdir()
+    (other / "task.md").write_text("Other synthetic project\n", encoding="utf-8")
+    entered = threading.Event()
+    release = threading.Event()
+
+    def blocked(**_kwargs):
+        entered.set()
+        release.wait(timeout=8)
+        return {"ok": True, "message": "held"}
+
+    monkeypatch.setattr(web.h, "check_gemini_model_health", blocked)
+    handle, error = acquire_run_lock(root, mode="mock", model_name="mock-deterministic")
+    assert error is None
+    token = {"X-Dashboard-Token": web.TOKEN}
+    result = {}
+
+    def check_health():
+        result["value"] = request(
+            http_server,
+            "POST",
+            "/api/action",
+            json.dumps(
+                payload(
+                    action="health", provider="gemini", model="gemini-2.5-flash", project="beta"
+                )
+            ),
+            token,
+            timeout=15,
+        )
+
+    checker = threading.Thread(target=check_health)
+    try:
+        checker.start()
+        assert entered.wait(5)
+        stopped, body, _headers = request(
+            http_server,
+            "POST",
+            "/api/action",
+            json.dumps(payload(action="stop")),
+            token,
+        )
+        started, started_body, _headers = request(
+            http_server,
+            "POST",
+            "/api/action",
+            json.dumps(payload(action="run", mode="normal")),
+            token,
+        )
+        assert not release.is_set()
+        assert stopped == 200
+        assert json.loads(body)["message_key"] == "stop_signal_created"
+        assert (root / "STOP_REQUESTED").is_file()
+        assert not (other / "STOP_REQUESTED").exists()
+        assert started == 400
+        assert "active" in json.loads(started_body)["error"]
+        launch.assert_not_called()
+    finally:
+        release.set()
+        checker.join(timeout=15)
+        release_run_lock(handle)
+    assert result["value"][0] == 200
+
+
+def test_cached_cloud_read_does_not_block_a_verified_stop(http_server, project, monkeypatch):
+    from src.runtime import acquire_run_lock, get_active_process_meta, release_run_lock
+
+    root, launch = project
+    monkeypatch.setattr(web.h, "get_active_process_meta", get_active_process_meta)
+    other = root.parent / "beta"
+    other.mkdir()
+    (other / "task.md").write_text("Other synthetic project\n", encoding="utf-8")
+    (other / "memory.md").write_text("Context\n", encoding="utf-8")
+    entered = threading.Event()
+    release = threading.Event()
+    original = web.h.load_discovery_artifact
+
+    def slow_load(path):
+        entered.set()
+        release.wait(timeout=8)
+        return original(path)
+
+    monkeypatch.setattr(web.h, "load_discovery_artifact", slow_load)
+    handle, error = acquire_run_lock(root, mode="normal", model_name="fixture:latest")
+    assert error is None
+    token = {"X-Dashboard-Token": web.TOKEN}
+    result = {}
+
+    def read_cloud():
+        result["value"] = request(
+            http_server,
+            "POST",
+            "/api/action",
+            json.dumps(payload(action="cloud", project="beta")),
+            token,
+            timeout=15,
+        )
+
+    reader = threading.Thread(target=read_cloud)
+    try:
+        reader.start()
+        assert entered.wait(5)
+        revisions = web.read_inputs(root)["revisions"]
+        original_task = (root / "task.md").read_text(encoding="utf-8")
+        saved, saved_body, _headers = request(
+            http_server,
+            "POST",
+            "/api/action",
+            json.dumps(
+                {
+                    "action": "save",
+                    "project": "example",
+                    "changes": {"task": "Must not land"},
+                    "revisions": revisions,
+                }
+            ),
+            token,
+        )
+        started, started_body, _headers = request(
+            http_server,
+            "POST",
+            "/api/action",
+            json.dumps(payload(action="run", mode="normal")),
+            token,
+        )
+        stopped, body, _headers = request(
+            http_server,
+            "POST",
+            "/api/action",
+            json.dumps(payload(action="stop")),
+            token,
+        )
+        assert not release.is_set()
+        assert saved == 409
+        assert json.loads(saved_body)["code"] == "input_busy"
+        assert (root / "task.md").read_text(encoding="utf-8") == original_task
+        assert started == 400
+        assert "active" in json.loads(started_body)["error"]
+        assert stopped == 200
+        assert json.loads(body)["message_key"] == "stop_signal_created"
+        assert not (other / "STOP_REQUESTED").exists()
+        launch.assert_not_called()
+    finally:
+        release.set()
+        reader.join(timeout=15)
+        release_run_lock(handle)
+    assert result["value"][0] == 200
+    assert "candidates" in json.loads(result["value"][1])
+
+
+@pytest.mark.parametrize("action_name", ["models", "health", "cloud"])
+def test_readonly_action_keeps_a_model_job_published_during_the_request(
+    http_server, project, monkeypatch, action_name
+):
+    import src.runtime as runtime_module
+    from src.config import query_ollama_models
+    from src.runtime import get_active_process_meta
+    from src.storage import write_json_file
+
+    root, _launch = project
+    monkeypatch.setattr(web.h, "get_active_process_meta", get_active_process_meta)
+    monkeypatch.setattr(web.h, "query_ollama_models", query_ollama_models)
+    meta_path = root / "ui_model_job_process.json"
+    entered = threading.Event()
+    release = threading.Event()
+    state = {"arm": True}
+    original_read = runtime_module.read_json_file
+
+    def stalled_read(path, *args, **kwargs):
+        payload = original_read(path, *args, **kwargs)
+        if state["arm"] and Path(path).name == "ui_model_job_process.json":
+            entered.set()
+            assert release.wait(5)
+        return payload
+
+    monkeypatch.setattr(runtime_module, "read_json_file", stalled_read)
+    sleeper = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    fake = None
+    fake_thread = None
+    try:
+        if action_name == "cloud":
+            original_load = web.h.load_discovery_artifact
+
+            def slow_load(path):
+                entered.set()
+                release.wait(timeout=8)
+                return original_load(path)
+
+            monkeypatch.setattr(web.h, "load_discovery_artifact", slow_load)
+            body = payload(action="cloud")
+        else:
+
+            class SlowTags(BaseHTTPRequestHandler):
+                def log_message(self, _format, *_args):
+                    pass
+
+                def do_GET(self):
+                    entered.set()
+                    release.wait(timeout=8)
+                    raw = json.dumps({"models": [{"name": "qwen3:8b"}]}).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(raw)))
+                    self.end_headers()
+                    self.wfile.write(raw)
+
+            fake = ThreadingHTTPServer(("127.0.0.1", 0), SlowTags)
+            fake_thread = threading.Thread(target=fake.serve_forever, daemon=True)
+            fake_thread.start()
+            _point_config_at(fake.server_address[1])
+            body = payload(action=action_name)
+        token = {"X-Dashboard-Token": web.TOKEN}
+        result = {}
+
+        def call():
+            result["value"] = request(
+                http_server,
+                "POST",
+                "/api/action",
+                json.dumps(body),
+                token,
+                timeout=15,
+            )
+
+        worker = threading.Thread(target=call)
+        worker.start()
+        assert entered.wait(8)
+        write_json_file(
+            meta_path,
+            {"pid": sleeper.pid, "command": "sleep 30", "kind": "model_pull"},
+        )
+        release.set()
+        state["arm"] = False
+        worker.join(timeout=15)
+        assert result["value"][0] == 200
+        assert meta_path.is_file()
+        saved = json.loads(meta_path.read_text(encoding="utf-8"))
+        assert saved["pid"] == sleeper.pid
+        assert sleeper.poll() is None
+        assert web.status("example")["model_job"]["pid"] == sleeper.pid
+    finally:
+        release.set()
+        state["arm"] = False
+        if fake is not None:
+            fake.shutdown()
+            fake.server_close()
+        if fake_thread is not None:
+            fake_thread.join(timeout=5)
+        if sleeper.poll() is None:
+            sleeper.kill()
+            sleeper.wait(timeout=5)
+
+
+def test_diagnostic_stop_is_refused_before_a_signal_and_the_next_mock_finishes(
+    http_server, project, monkeypatch
+):
+    from io import StringIO
+
+    from rich.console import Console
+
+    from src.diagnostic import run_diagnostic_mode
+    from src.mock_run import (
+        MOCK_MODEL_NAME,
+        MOCK_MODEL_PROVIDER,
+        build_mock_agents,
+        mock_model_parameters,
+    )
+    from src.runner import run_iterative_rounds
+    from src.runtime import acquire_run_lock, get_active_process_meta, release_run_lock
+    from tests.test_diagnostic import FakeDiagnosticLLM
+
+    root, _launch = project
+    monkeypatch.setattr(web.h, "get_active_process_meta", get_active_process_meta)
+    handle, error = acquire_run_lock(root, mode="diagnostic", model_name="fake-model")
+    assert error is None
+    token = {"X-Dashboard-Token": web.TOKEN}
+    try:
+        current = web.status("example")
+        assert current["progress"]["run_active"] is True
+        assert current["progress"]["mode"] == "diagnostic"
+        assert current["progress"]["stoppable"] is False
+        stopped, body, _headers = request(
+            http_server,
+            "POST",
+            "/api/action",
+            json.dumps(payload(action="stop")),
+            token,
+        )
+        assert stopped == 400
+        assert b"cannot be stopped" in body
+        assert not (root / "STOP_REQUESTED").exists()
+    finally:
+        release_run_lock(handle)
+    assert web.status("example")["progress"]["run_active"] is False
+
+    console = Console(file=StringIO(), force_terminal=False, width=80)
+    run_diagnostic_mode(
+        console=console,
+        llm=FakeDiagnosticLLM(),
+        task_text=(root / "task.md").read_text(encoding="utf-8"),
+        project_dir=root,
+        memory_path=root / "memory.md",
+        model_name="fake-model",
+        model_provider="ollama",
+    )
+    diagnostic_checkpoint = json.loads((root / "checkpoint.json").read_text(encoding="utf-8"))
+    assert diagnostic_checkpoint["stop_reason"] == "MAX_ROUNDS"
+    assert not (root / "STOP_REQUESTED").exists()
+
+    prompt_dir = root.parent / "prompts"
+    prompt_dir.mkdir()
+    for name in ("draft.md", "review.md", "revise.md", "judge.md"):
+        (prompt_dir / name).write_text(f"{name} prompt\n", encoding="utf-8")
+    result = run_iterative_rounds(
+        console=console,
+        agents=build_mock_agents(topic_context="Topic: mock demo"),
+        task_text="Demonstrate provider-free artifact generation.",
+        project_dir=root,
+        memory_path=root / "memory.md",
+        mode="mock",
+        model_name=MOCK_MODEL_NAME,
+        max_rounds=1,
+        stop_if_no_improvement_rounds=10,
+        global_max_runtime_seconds=60,
+        per_agent_timeout_seconds=1,
+        model_provider=MOCK_MODEL_PROVIDER,
+        model_parameters=mock_model_parameters(),
+        topic_snapshot={"title": "Mock Demo", "description": "", "keywords": ["mock"]},
+        prompt_dir=prompt_dir,
+        repo_root=root.parent,
+    )
+    assert result["stop_reason"] != "USER_STOP_REQUESTED"
+    assert result["completed_rounds"] == 1
+    assert not (root / "STOP_REQUESTED").exists()
+
+
+def test_ui_diagnostic_refuses_stop_and_a_normal_ui_run_still_writes_it(project, monkeypatch):
+    from src.runtime import get_active_process_meta
+
+    monkeypatch.setattr(web.h, "get_active_process_meta", get_active_process_meta)
+    root, _launch = project
+    meta = root / "ui_run_process.json"
+    meta.write_text(
+        json.dumps(
+            {"pid": os.getpid(), "command": "ui-diagnostic", "kind": "run", "mode": "diagnostic"}
+        ),
+        encoding="utf-8",
+    )
+    current = web.status("example")
+    assert current["progress"]["run_active"] is True
+    assert current["progress"]["stoppable"] is False
+    with pytest.raises(ValueError, match="cannot be stopped"):
+        web.action({"action": "stop", "project": "example"})
+    assert not (root / "STOP_REQUESTED").exists()
+    meta.write_text(
+        json.dumps({"pid": os.getpid(), "command": "ui-normal", "kind": "run", "mode": "normal"}),
+        encoding="utf-8",
+    )
+    stopped = web.action({"action": "stop", "project": "example"})
+    assert stopped["message_key"] == "stop_signal_created"
+    assert (root / "STOP_REQUESTED").is_file()

@@ -29,6 +29,7 @@ from src.config import (
 from src.runtime import (
     acquire_run_lock,
     get_active_process_meta,
+    read_live_cli_run,
     read_stoppable_cli_run,
     release_run_lock,
     run_project_tests,
@@ -1229,6 +1230,152 @@ release_run_lock(handle)
             finally:
                 fcntl.flock(guard.fileno(), fcntl.LOCK_UN)
                 guard.close()
+
+    def test_non_proc_lock_probe_recognizes_only_the_injected_holder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "alpha"
+            project_dir.mkdir()
+            handle, error = acquire_run_lock(
+                project_dir, mode="mock", model_name="mock-deterministic"
+            )
+            self.assertIsNone(error)
+            guard = (project_dir / "active_run.guard").stat()
+            try:
+
+                def allow(guard_path: Path, device: int, inode: int, pid: int) -> bool:
+                    self.assertEqual(device, guard.st_dev)
+                    self.assertEqual(inode, guard.st_ino)
+                    self.assertEqual(pid, os.getpid())
+                    self.assertTrue(Path(guard_path).name == "active_run.guard")
+                    return True
+
+                with (
+                    patch.object(runtime_module, "_proc_locks_text", return_value=None),
+                    patch.object(
+                        runtime_module,
+                        "_non_proc_write_flock_held_by",
+                        side_effect=allow,
+                    ),
+                ):
+                    meta = read_stoppable_cli_run(project_dir)
+                self.assertEqual(meta["pid"], os.getpid())
+                self.assertEqual(meta["mode"], "mock")
+                self.assertTrue(meta["stoppable"])
+
+                with (
+                    patch.object(runtime_module, "_proc_locks_text", return_value=None),
+                    patch.object(
+                        runtime_module,
+                        "_non_proc_write_flock_held_by",
+                        return_value=False,
+                    ),
+                ):
+                    self.assertEqual(read_stoppable_cli_run(project_dir), {})
+                    self.assertEqual(read_live_cli_run(project_dir), {})
+            finally:
+                release_run_lock(handle)
+
+    def test_diagnostic_lock_stays_live_and_not_stoppable_without_proc(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            handle, error = acquire_run_lock(project_dir, mode="diagnostic", model_name="fake")
+            self.assertIsNone(error)
+            try:
+                with (
+                    patch.object(runtime_module, "_proc_locks_text", return_value=None),
+                    patch.object(
+                        runtime_module,
+                        "_non_proc_write_flock_held_by",
+                        return_value=True,
+                    ),
+                ):
+                    meta = read_live_cli_run(project_dir)
+                    self.assertEqual(meta["mode"], "diagnostic")
+                    self.assertFalse(meta["stoppable"])
+                    self.assertEqual(read_stoppable_cli_run(project_dir), {})
+            finally:
+                release_run_lock(handle)
+
+    def test_proc_locks_parser_matches_one_write_flock(self) -> None:
+        device = os.makedev(8, 3)
+        inode = 4455
+        identity = f"{os.major(device):02x}:{os.minor(device):02x}:{inode}"
+        text = f"7: FLOCK  ADVISORY  WRITE 4242 {identity} 0 EOF\n"
+        self.assertTrue(runtime_module._proc_locks_show_write_flock(text, device, inode, 4242))
+        self.assertFalse(runtime_module._proc_locks_show_write_flock(text, device, inode, 4243))
+
+    def test_darwin_lock_query_does_not_treat_a_live_pid_as_the_holder(self) -> None:
+        write_type = 3
+        self.assertTrue(runtime_module._darwin_lock_is_held(write_type, -1, 10, write_type, True))
+        self.assertFalse(runtime_module._darwin_lock_is_held(write_type, -1, 10, write_type, False))
+        self.assertTrue(runtime_module._darwin_lock_is_held(write_type, 10, 10, write_type, False))
+        self.assertFalse(runtime_module._darwin_lock_is_held(write_type, 11, 10, write_type, True))
+        self.assertFalse(runtime_module._darwin_lock_is_held(2, -1, 10, write_type, True))
+        self.assertTrue(runtime_module._open_inode_matches(5, 9, [(5, 9), (1, 2)]))
+        self.assertTrue(runtime_module._open_inode_matches(0x100000005, 9, [(5, 9)]))
+        self.assertFalse(runtime_module._open_inode_matches(5, 9, [(5, 8), (4, 9)]))
+
+    def test_process_meta_cleanup_leaves_a_record_replaced_during_the_read(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            meta_path = Path(tmp) / "ui_model_job_process.json"
+            write_json_file(meta_path, {"pid": 1, "command": "stale"})
+            original = runtime_module.read_json_file
+
+            def replace_during_read(path: Path, *args: object, **kwargs: object) -> dict:
+                payload = original(path, *args, **kwargs)
+                if Path(path) == meta_path:
+                    write_json_file(
+                        meta_path,
+                        {"pid": os.getpid(), "command": "published", "kind": "model_pull"},
+                    )
+                return payload
+
+            def running(pid: int) -> bool:
+                return pid == os.getpid()
+
+            with (
+                patch.object(runtime_module, "read_json_file", side_effect=replace_during_read),
+                patch.object(runtime_module, "is_pid_running", side_effect=running),
+            ):
+                meta = get_active_process_meta(meta_path)
+
+            saved = json.loads(meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(saved["pid"], os.getpid())
+            self.assertEqual(saved["command"], "published")
+            self.assertNotEqual(meta.get("pid"), 1)
+            self.assertNotEqual(meta.get("command"), "stale")
+
+    def test_process_meta_cleanup_does_not_delete_a_file_created_after_a_miss(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            meta_path = Path(tmp) / "ui_model_job_process.json"
+            original = runtime_module.read_json_file
+            created = {"yes": False}
+
+            def publish_on_read(path: Path, *args: object, **kwargs: object) -> dict:
+                payload = original(path, *args, **kwargs)
+                if Path(path) == meta_path and not created["yes"]:
+                    write_json_file(
+                        meta_path,
+                        {"pid": os.getpid(), "command": "published", "kind": "model_pull"},
+                    )
+                    created["yes"] = True
+                return payload
+
+            with (
+                patch.object(runtime_module, "read_json_file", side_effect=publish_on_read),
+                patch.object(
+                    runtime_module,
+                    "is_pid_running",
+                    side_effect=lambda pid: pid == os.getpid(),
+                ),
+            ):
+                get_active_process_meta(meta_path)
+
+            if created["yes"]:
+                saved = json.loads(meta_path.read_text(encoding="utf-8"))
+                self.assertEqual(saved["pid"], os.getpid())
+            else:
+                self.assertFalse(meta_path.exists())
 
     def test_run_lock_simultaneous_processes_have_exactly_one_owner(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

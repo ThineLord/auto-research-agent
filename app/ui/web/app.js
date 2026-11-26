@@ -518,7 +518,7 @@ function renderDashboard() {
         ["diagnostic", "diagnostic"],
       ],
       prefs.mode,
-    )}<button class="primary" data-action="run" ${p.run_active || needsKey ? "disabled" : ""}>${icon("play")}${t("start")}</button><div class="run-secondary"><button data-action="resume" ${!data.resume.can_resume || needsKey ? "disabled" : ""}>${icon("resume")}${t("resume")}</button><button data-action="stop" ${!p.run_active || data.stop_requested ? "disabled" : ""}>${icon("stop")}${t("stop")}</button></div><p class="run-hint">${needsKey ? t("keyHint") : `${prefs.provider === "gemini" ? "Gemini" : "Ollama"} · ${t(prefs.drafting_mode === "best_guided" ? "best" : prefs.drafting_mode === "continue_from_previous_draft" ? "previous" : "fresh")}`} <button class="link-button" data-nav="settings">${t("configure")}</button></p><div class="divider"></div><button class="detail-link" data-action="logs"><span>${t("logs")}</span>${icon("arrow")}</button><button class="detail-link" data-action="checkpoint"><span>${t("checkpoint")}</span>${icon("arrow")}</button>${data.stop_requested && p.run_active ? `<p class="run-hint">${t("stopPending")}</p>` : ""}</aside></div>`;
+    )}<button class="primary" data-action="run" ${p.run_active || needsKey ? "disabled" : ""}>${icon("play")}${t("start")}</button><div class="run-secondary"><button data-action="resume" ${!data.resume.can_resume || needsKey ? "disabled" : ""}>${icon("resume")}${t("resume")}</button><button data-action="stop" ${!p.run_active || data.stop_requested || p.stoppable === false ? "disabled" : ""}>${icon("stop")}${t("stop")}</button></div><p class="run-hint">${needsKey ? t("keyHint") : `${prefs.provider === "gemini" ? "Gemini" : "Ollama"} · ${t(prefs.drafting_mode === "best_guided" ? "best" : prefs.drafting_mode === "continue_from_previous_draft" ? "previous" : "fresh")}`} <button class="link-button" data-nav="settings">${t("configure")}</button></p><div class="divider"></div><button class="detail-link" data-action="logs"><span>${t("logs")}</span>${icon("arrow")}</button><button class="detail-link" data-action="checkpoint"><span>${t("checkpoint")}</span>${icon("arrow")}</button>${data.stop_requested && p.run_active ? `<p class="run-hint">${t("stopPending")}</p>` : ""}</aside></div>`;
 }
 function renderOutputs() {
   const row = data.outputs.find((o) => o.id === outputIndex) || data.outputs[0];
@@ -1157,7 +1157,9 @@ async function refreshStatus() {
       $('[data-action="resume"]').disabled =
         !data.resume.can_resume || needsKey;
       $('[data-action="stop"]').disabled =
-        !data.progress.run_active || data.stop_requested;
+        !data.progress.run_active ||
+        data.stop_requested ||
+        data.progress.stoppable === false;
     }
     if ($("#live-log"))
       $("#live-log").textContent =

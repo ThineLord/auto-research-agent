@@ -82,7 +82,8 @@ from src.run_compare import (
 from src.runtime import (
     get_active_process_meta,
     model_job_meta_path,
-    read_stoppable_cli_run,
+    read_live_cli_run,
+    run_accepts_cooperative_stop,
     run_meta_path,
     run_project_tests,
     start_background_process,
@@ -886,12 +887,15 @@ def check_model_health(
     )
 
 
-def get_active_run_meta(project_dir: Path) -> dict[str, Any]:
+def get_active_run_meta(project_dir: Path, *, cleanup: bool = True) -> dict[str, Any]:
     """Prefer a live UI-started process, then a verified CLI research run."""
-    recorded = get_active_process_meta(run_meta_path(project_dir))
+    recorded = get_active_process_meta(run_meta_path(project_dir), cleanup=cleanup)
     if recorded:
+        if not isinstance(recorded.get("stoppable"), bool):
+            recorded = dict(recorded)
+            recorded["stoppable"] = run_accepts_cooperative_stop(recorded)
         return recorded
-    return read_stoppable_cli_run(project_dir)
+    return read_live_cli_run(project_dir)
 
 
 def infer_running_stage(
@@ -946,6 +950,7 @@ def infer_running_stage(
         "stop_reason": checkpoint.get("stop_reason", "N/A"),
         "can_resume": bool(checkpoint.get("can_resume", False)),
         "drafting_mode": run_meta.get("drafting_mode") or checkpoint.get("drafting_mode", "N/A"),
+        "stoppable": bool(run_active) and run_accepts_cooperative_stop(run_meta),
     }
 
 
@@ -2194,7 +2199,7 @@ def render_live_progress_and_logs(
     except OSError:
         st.warning(t("unsafe_project_paths"))
         return
-    run_meta = get_active_run_meta(proj_path)
+    run_meta = get_active_run_meta(proj_path, cleanup=False)
     checkpoint = read_json_file(checkpoint_path)
     run_log_text = tail_file_lines(run_log_path, max_lines=240)
 
@@ -2316,8 +2321,8 @@ def main() -> None:
     model_job_log_path = proj_path / "model_ops.log"
     checkpoint_path = proj_path / "checkpoint.json"
     stop_signal_path = proj_path / "STOP_REQUESTED"
-    run_meta = get_active_run_meta(proj_path)
-    model_job_meta = get_active_process_meta(model_job_meta_path(proj_path))
+    run_meta = get_active_run_meta(proj_path, cleanup=False)
+    model_job_meta = get_active_process_meta(model_job_meta_path(proj_path), cleanup=False)
     checkpoint = read_json_file(checkpoint_path)
 
     with workspace_tab:
@@ -2861,11 +2866,15 @@ def main() -> None:
             ):
                 launch_run("resume", "started_resume")
         with stop_col:
+            can_stop = run_active and run_accepts_cooperative_stop(run_meta)
             if st.button(
-                t("pause_stop_safely"), key="stop_run", width="stretch", disabled=not run_active
+                t("pause_stop_safely"),
+                key="stop_run",
+                width="stretch",
+                disabled=not can_stop,
             ):
                 stop_signal_display = output_display_path(stop_signal_path)
-                if create_stop_signal(stop_signal_path):
+                if can_stop and create_stop_signal(stop_signal_path):
                     st.warning(t("stop_signal_created", path=stop_signal_display))
                 else:
                     st.error(t("stop_signal_failed", path=stop_signal_display))

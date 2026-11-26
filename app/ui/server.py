@@ -22,6 +22,9 @@ from ui.i18n import TRANSLATIONS
 WEB = Path(__file__).with_name("web")
 TOKEN = secrets.token_urlsafe(32)
 ACTION_LOCK = threading.Lock()
+# Reads of an endpoint or the local cloud cache. They must not take ACTION_LOCK
+# or delete process records, or one project's stop waits on another's read.
+READ_ONLY_ACTIONS = frozenset({"models", "health", "cloud"})
 # Set by ./start for the server process it execs, then removed before serving.
 START_CALLER_CWD_ENV = "AUTO_RESEARCH_AGENT_START_CWD"
 
@@ -60,14 +63,14 @@ def status(name: str, model: str = "") -> dict:
 
 def _status(path: Path, checkpoint: dict, model: str = "") -> dict:
     """Build status from this request's validated project and checkpoint."""
-    meta = h.get_active_run_meta(path)
+    meta = h.get_active_run_meta(path, cleanup=False)
     log = h.tail_file_lines(path / "run.log", 120)
     return {
         "progress": h.infer_running_stage(log_text=log, checkpoint=checkpoint, run_meta=meta),
         "resume": h.describe_resume_state(
             project_dir=path, checkpoint=checkpoint, run_active=bool(meta), selected_model=model
         ),
-        "model_job": h.get_active_process_meta(h.model_job_meta_path(path)),
+        "model_job": h.get_active_process_meta(h.model_job_meta_path(path), cleanup=False),
         "log": log,
         "model_log": h.tail_file_lines(path / "model_ops.log", 80),
         "stop_requested": h.artifact_path_exists(path / "STOP_REQUESTED"),
@@ -174,31 +177,8 @@ def cloud_pool(path: Path, config, preset: str) -> dict:
     }
 
 
-def action(data: dict) -> dict:
-    if data.get("action") == "create_project":
-        path = create_project(h.ROOT, data.get("name", ""), data.get("task", ""))
-        select_project(h.ROOT, path.name)
-        return {"project": path.name, "projects": h.discover_project_names(h.ROOT)}
-    if data.get("action") == "select_project":
-        select_project(h.ROOT, str(data.get("project", "")))
-        return {"project": data["project"]}
-    path = project(str(data.get("project", "")))
-    operation = data.get("action")
-    if operation == "save":
-        inputs = save_inputs(path, data.get("changes"), data.get("revisions"))
-        return {"message_key": "input_saved", **inputs}
-    active = h.get_active_run_meta(path)
-    job = h.get_active_process_meta(h.model_job_meta_path(path))
-    if operation == "stop":
-        if not active:
-            raise ValueError("No active run")
-        if not h.create_stop_signal(path / "STOP_REQUESTED"):
-            raise OSError("Could not request a safe stop")
-        return {"message_key": "stop_signal_created", "message_args": {"path": "STOP_REQUESTED"}}
-    if operation == "tests":
-        if active:
-            raise ValueError("A research run is active")
-        return h.run_project_tests(h.APP_ROOT)
+def _read_only_action(path: Path, data: dict, operation: str) -> dict:
+    """Endpoint and cached-cloud reads. No process-record cleanup."""
     config, provider, model, env, key = selection(data)
     if operation == "models":
         models, error = h.query_ollama_models(base_url=config.ollama_base_url, timeout_seconds=5)
@@ -217,6 +197,41 @@ def action(data: dict) -> dict:
             selected_model=model,
             installed_model_names=[m["name"] for m in models],
         )
+    preset = data.get("free_runner_preset", config.cloud_free.free_runner_preset)
+    if preset not in h.FREE_RUNNER_PRESETS:
+        raise ValueError("Invalid preset")
+    return cloud_pool(path, config, preset)
+
+
+def action(data: dict) -> dict:
+    if data.get("action") == "create_project":
+        path = create_project(h.ROOT, data.get("name", ""), data.get("task", ""))
+        select_project(h.ROOT, path.name)
+        return {"project": path.name, "projects": h.discover_project_names(h.ROOT)}
+    if data.get("action") == "select_project":
+        select_project(h.ROOT, str(data.get("project", "")))
+        return {"project": data["project"]}
+    path = project(str(data.get("project", "")))
+    operation = data.get("action")
+    if operation == "save":
+        inputs = save_inputs(path, data.get("changes"), data.get("revisions"))
+        return {"message_key": "input_saved", **inputs}
+    if operation in READ_ONLY_ACTIONS:
+        return _read_only_action(path, data, operation)
+    if operation == "stop":
+        active = h.get_active_run_meta(path, cleanup=False)
+        if not active:
+            raise ValueError("No active run")
+        if not h.run_accepts_cooperative_stop(active):
+            raise ValueError("This run cannot be stopped safely")
+        if not h.create_stop_signal(path / "STOP_REQUESTED"):
+            raise OSError("Could not request a safe stop")
+        return {"message_key": "stop_signal_created", "message_args": {"path": "STOP_REQUESTED"}}
+    if operation == "tests":
+        if h.get_active_run_meta(path, cleanup=False):
+            raise ValueError("A research run is active")
+        return h.run_project_tests(h.APP_ROOT)
+    config, provider, model, env, key = selection(data)
     if operation == "default":
         error = h.save_default_model_selection(
             h.CONFIG_PATH, provider=provider, model_name=model, gemini_api_key_env=env
@@ -224,7 +239,9 @@ def action(data: dict) -> dict:
         if error:
             raise ValueError(error)
         return {"message_key": "saved_default_model", "message_args": {"model": model}}
-    if operation in {"cloud", "discover", "profile"}:
+    active = h.get_active_run_meta(path)
+    job = h.get_active_process_meta(h.model_job_meta_path(path))
+    if operation in {"discover", "profile"}:
         preset = data.get("free_runner_preset", config.cloud_free.free_runner_preset)
         if preset not in h.FREE_RUNNER_PRESETS:
             raise ValueError("Invalid preset")
@@ -433,10 +450,10 @@ class Handler(BaseHTTPRequestHandler):
             data = json.loads(self.rfile.read(size))
             if not isinstance(data, dict):
                 raise ValueError("Invalid request")
-            # Listing models only reads the configured endpoint. It must not hold
-            # the operation lock, or one project's verified stop waits on another
-            # project's read. Writes and starts still take the lock.
-            read_only = data.get("action") == "models"
+            # Endpoint reads and a cached cloud read must not hold the operation
+            # lock, or one project's verified stop waits on another project's
+            # read. Writes and starts still take the lock.
+            read_only = data.get("action") in READ_ONLY_ACTIONS
             if not read_only and not ACTION_LOCK.acquire(blocking=False):
                 self.respond({"error": "Another operation is in progress"}, 409)
                 return
