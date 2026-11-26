@@ -2,10 +2,12 @@ PYTHON ?= python3
 VENV ?= .venv
 ARGS ?=
 
-VENV_PYTHON := $(VENV)/bin/python
-VENV_PIP := $(VENV_PYTHON) -m pip
-INSTALL_STAMP := $(VENV)/.install.stamp
-DEV_STAMP := $(VENV)/.install-dev.stamp
+# VENV is exported as data. It is not a Make target and it is not inserted
+# into a shell command, so a path with spaces or quotes stays one path.
+# PYTHON reaches the recipe environment only when the user set it. The
+# default above stays unexported, so it is not an explicit interpreter.
+export VENV
+ENSURE = PYTHON_ORIGIN='$(origin PYTHON)' ./scripts/ensure_python_env.sh
 
 .DEFAULT_GOAL := help
 
@@ -36,84 +38,81 @@ help:
 		"  make ui            Start the local research dashboard" \
 		"" \
 		"Run make install-dev once on a new checkout before testing or running." \
+		"Python 3.10+ is selected from PATH. Pass PYTHON=python3.13 to choose one." \
+		"Pass VENV=path to place the environment. ./start and Make then use that Python." \
+		"An older or incomplete environment is left unchanged." \
+		"An empty VENV is rejected before files are created." \
+		"An install stops when pip would write outside that environment." \
 		"Pass extra CLI flags with ARGS, for example:" \
 		"  make diagnostic ARGS=\"--model qwen3:8b\""
 
 bootstrap:
 	./scripts/bootstrap.sh
 
-$(VENV_PYTHON):
-	$(PYTHON) -m venv $(VENV)
+venv:
+	@$(ENSURE) venv
 
-venv: $(VENV_PYTHON)
+install:
+	@$(ENSURE) install
 
-$(INSTALL_STAMP): pyproject.toml scripts/dependencies/constraints.txt | $(VENV_PYTHON)
-	$(VENV_PIP) install -c scripts/dependencies/constraints.txt -e .
-	@touch $(INSTALL_STAMP)
-
-$(DEV_STAMP): pyproject.toml scripts/dependencies/constraints.txt | $(VENV_PYTHON)
-	$(VENV_PIP) install -c scripts/dependencies/constraints.txt -e ".[dev]"
-	@touch $(INSTALL_STAMP) $(DEV_STAMP)
-
-install: $(INSTALL_STAMP)
-
-install-dev: $(DEV_STAMP)
+install-dev:
+	@$(ENSURE) install-dev
 
 format: install-dev
-	$(VENV_PYTHON) -m ruff check --fix --select I src tests ui scripts
-	$(VENV_PYTHON) -m ruff format src tests ui scripts
+	@$(ENSURE) run -m ruff check --fix --select I src tests ui scripts
+	@$(ENSURE) run -m ruff format src tests ui scripts
 
 format-check: install-dev
-	$(VENV_PYTHON) -m ruff format --check src tests ui scripts
+	@$(ENSURE) run -m ruff format --check src tests ui scripts
 
 lint: install-dev
-	$(VENV_PYTHON) -m ruff check src tests ui scripts
+	@$(ENSURE) run -m ruff check src tests ui scripts
 
 import-check: install-dev
-	$(VENV_PYTHON) scripts/import_check.py
+	@$(ENSURE) run scripts/import_check.py
 
 repo-safety: install-dev
-	$(VENV_PYTHON) scripts/check_repo_safety.py --self-test
-	$(VENV_PYTHON) scripts/check_repo_safety.py
-	$(VENV_PYTHON) scripts/check_repo_safety.py --staged
+	@$(ENSURE) run scripts/check_repo_safety.py --self-test
+	@$(ENSURE) run scripts/check_repo_safety.py
+	@$(ENSURE) run scripts/check_repo_safety.py --staged
 
 test: install-dev
-	$(VENV_PYTHON) -m pytest -q
+	@$(ENSURE) run -m pytest -q
 
 release-check: install-dev
-	$(VENV_PYTHON) scripts/check_release.py
+	@$(ENSURE) run scripts/check_release.py
 
 check: format-check lint import-check repo-safety release-check test
 
 .PHONY: browser-test
 browser-test:
-	$(VENV_PYTHON) -m pytest -q tests/browser
+	@$(ENSURE) run -m pytest -q tests/browser
 
 ci: check
 
 performance: install
-	$(VENV_PYTHON) scripts/benchmark_local_performance.py $(ARGS)
+	@$(ENSURE) run scripts/benchmark_local_performance.py $(ARGS)
 
 run: install
-	$(VENV_PYTHON) -m src.main $(ARGS)
+	@$(ENSURE) run -m src.main $(ARGS)
 
 diagnostic: install
-	$(VENV_PYTHON) -m src.main --diagnostic $(ARGS)
+	@$(ENSURE) run -m src.main --diagnostic $(ARGS)
 
 continuous: install
-	$(VENV_PYTHON) -m src.main --continuous $(ARGS)
+	@$(ENSURE) run -m src.main --continuous $(ARGS)
 
 resume: install
-	$(VENV_PYTHON) -m src.main --resume $(ARGS)
+	@$(ENSURE) run -m src.main --resume $(ARGS)
 
 session: install
-	$(VENV_PYTHON) -m src.main --session $(ARGS)
+	@$(ENSURE) run -m src.main --session $(ARGS)
 
 survey: install
-	$(VENV_PYTHON) -m src.main --survey $(ARGS)
+	@$(ENSURE) run -m src.main --survey $(ARGS)
 
 mock: install
-	$(VENV_PYTHON) -m src.main --mock $(ARGS)
+	@$(ENSURE) run -m src.main --mock $(ARGS)
 
 ui: install
-	$(VENV_PYTHON) -m ui.server $(ARGS)
+	@$(ENSURE) run -m ui.server $(ARGS)
