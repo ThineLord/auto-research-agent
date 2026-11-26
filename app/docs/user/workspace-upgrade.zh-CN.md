@@ -1,4 +1,4 @@
-# 工作区安全升级与回滚（0.3.0）
+# 工作区安全升级与回滚（0.3.x）
 
 [English](workspace-upgrade.md) · [简体中文](workspace-upgrade.zh-CN.md)
 

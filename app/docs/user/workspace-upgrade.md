@@ -1,4 +1,4 @@
-# Workspace upgrade and rollback (0.3.0)
+# Workspace upgrade and rollback (0.3.x)
 
 [English](workspace-upgrade.md) · [简体中文](workspace-upgrade.zh-CN.md)
 

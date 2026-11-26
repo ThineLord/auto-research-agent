@@ -11,7 +11,7 @@
 - Refresh saved outputs, downloads and run comparisons when an external CLI run finishes. A delayed response cannot replace newer results. The dashboard explains blocked or missing downloads.
 - Keep generated surveys out of subsequent inputs, preserve user Markdown and distinguish source paths in flat and legacy projects.
 - Exclude failed scores from ranking, averages and trends. Valid zero scores and historical finite negative scores retain their meaning.
-- Preserve Ollama tag names in model discovery and make concurrent lock-test reporting deterministic. Browser CI uses Ubuntu 24.04 with the pinned Playwright release. Project initialization errors and the development guide use the current example path.
+- Make concurrent lock-test reporting deterministic. Browser CI uses Ubuntu 24.04 with the pinned Playwright release. Project initialization errors and the development guide use the current example path.
 
 [English release notes](docs/releases/0.3.1.md) · [中文更新说明](docs/releases/0.3.1.zh-CN.md)
 
