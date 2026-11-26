@@ -8,11 +8,14 @@ from argparse import Namespace
 from contextlib import redirect_stderr
 from io import StringIO
 from pathlib import Path
+from types import SimpleNamespace
 
 from rich.console import Console
 
 from src.cli import _run_compare_cli, parse_args
+from src.run_analytics import analyze_run
 from src.run_compare import compare_runs, load_run_summary, write_run_comparison
+from src.runner import run_iterative_rounds
 
 
 class RunCompareTests(unittest.TestCase):
@@ -417,6 +420,253 @@ class RunCompareTests(unittest.TestCase):
             self.assertEqual(comparison["runs"][0]["run_path"], "runs/a")
             self.assertEqual(comparison["runs"][0]["run_config_path"], "runs/a/run_config.json")
             self.assertEqual(json.loads(output_path.read_text(encoding="utf-8")), comparison)
+
+    def test_invalid_judge_runs_do_not_select_a_winner_or_a_zero_trend(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            one_round = self._run_invalid_judge(root / "one-round", max_rounds=1)
+            two_rounds = self._run_invalid_judge(root / "two-rounds", max_rounds=2)
+
+            for run_root, completed in ((one_round, 1), (two_rounds, 2)):
+                raw_summary = json.loads(
+                    (run_root / "run_summary.json").read_text(encoding="utf-8")
+                )
+                raw_metrics = json.loads(
+                    (run_root / "round_metrics.json").read_text(encoding="utf-8")
+                )
+                self.assertEqual(raw_summary["best_score"], -1)
+                self.assertEqual(raw_summary["successful_rounds"], [])
+                self.assertEqual(len(raw_metrics), completed)
+                self.assertTrue(
+                    all(entry["successful_research_round"] is False for entry in raw_metrics)
+                )
+                self.assertTrue(
+                    all(entry["invalid_score_this_round"] is True for entry in raw_metrics)
+                )
+                self.assertTrue(all(entry["score"] == 0 for entry in raw_metrics))
+
+            comparison = compare_runs([one_round, two_rounds])
+            one_analysis = analyze_run(one_round)
+            two_analysis = analyze_run(two_rounds)
+
+        self.assertEqual(comparison["run_count"], 2)
+        self.assertEqual(comparison["best_run_id"], "")
+        self.assertIsNone(comparison["best_score"])
+        self.assertIsNone(comparison["best_vs_baseline_delta"])
+        self.assertEqual(comparison["baseline_run_id"], one_round.name)
+        self.assertTrue(
+            all(
+                run["best_score"] is None and run["average_score"] is None
+                for run in comparison["runs"]
+            )
+        )
+        self.assertEqual([run["error_count"] for run in comparison["runs"]], [0, 0])
+        self.assertEqual([run["successful_rounds"] for run in comparison["runs"]], [[], []])
+        for analysis, completed in ((one_analysis, 1), (two_analysis, 2)):
+            self.assertIsNone(analysis["score"]["best_score"])
+            self.assertIsNone(analysis["score"]["average_score"])
+            self.assertIsNone(analysis["score"]["first_score"])
+            self.assertIsNone(analysis["score"]["latest_score"])
+            self.assertIsNone(analysis["score"]["score_delta_first_to_latest"])
+            self.assertEqual(analysis["score"]["trend"], "unknown")
+            self.assertEqual(analysis["rounds"]["completed_rounds"], completed)
+            self.assertEqual(analysis["rounds"]["successful_rounds"], [])
+            self.assertEqual(analysis["robustness"]["error_count"], 0)
+            self.assertEqual(analysis["robustness"]["error_rounds"], [])
+            self.assertEqual(analysis["robustness"]["timeout_count"], 0)
+
+    def test_null_best_scores_do_not_announce_a_winner(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            older = root / "older"
+            newer = root / "newer"
+            older.mkdir()
+            newer.mkdir()
+            (older / "run_summary.json").write_text(
+                json.dumps({"run_id": "older", "best_score": None, "completed_rounds": 1}),
+                encoding="utf-8",
+            )
+            (newer / "run_summary.json").write_text(
+                json.dumps({"run_id": "newer", "best_score": None, "completed_rounds": 6}),
+                encoding="utf-8",
+            )
+
+            comparison = compare_runs([older, newer])
+
+        self.assertEqual(comparison["best_run_id"], "")
+        self.assertIsNone(comparison["best_score"])
+        self.assertIsNone(comparison["best_vs_baseline_delta"])
+        self.assertEqual(comparison["baseline_run_id"], "older")
+        self.assertEqual(comparison["runs"][1]["completed_rounds"], 6)
+
+    def test_valid_zero_ranks_above_invalid_fallbacks_and_null_summaries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_run(
+                root / "null-history",
+                {"run_id": "null-history", "best_score": None, "completed_rounds": 9},
+            )
+            self._write_run(
+                root / "sentinel",
+                {
+                    "run_id": "sentinel",
+                    "best_score": -1,
+                    "completed_rounds": 8,
+                    "error_rounds": [1],
+                },
+                [
+                    {
+                        "round": 1,
+                        "score": 0,
+                        "successful_research_round": False,
+                        "invalid_score_this_round": True,
+                        "errors": ["judge returned no score"],
+                    }
+                ],
+            )
+            self._write_run(
+                root / "real-zero",
+                {"run_id": "real-zero", "best_score": 0, "completed_rounds": 1},
+                [
+                    {
+                        "round": 1,
+                        "score": 0,
+                        "successful_research_round": True,
+                        "invalid_score_this_round": False,
+                    }
+                ],
+            )
+            self._write_run(
+                root / "real-six",
+                {"run_id": "real-six", "best_score": 6, "completed_rounds": 2},
+            )
+            self._write_run(
+                root / "legacy-negative",
+                {"run_id": "legacy-negative", "best_score": -5, "completed_rounds": 1},
+            )
+
+            mixed = compare_runs(
+                [
+                    root / "null-history",
+                    root / "sentinel",
+                    root / "real-zero",
+                    root / "real-six",
+                ]
+            )
+            zero_versus_invalid = compare_runs([root / "real-zero", root / "sentinel"])
+            negative_versus_sentinel = compare_runs([root / "legacy-negative", root / "sentinel"])
+            sentinel_summary = load_run_summary(root / "sentinel")
+            zero_summary = load_run_summary(root / "real-zero")
+
+        self.assertEqual(mixed["best_run_id"], "real-six")
+        self.assertEqual(mixed["best_score"], 6)
+        self.assertIsNone(mixed["best_vs_baseline_delta"])
+        self.assertEqual(zero_versus_invalid["best_run_id"], "real-zero")
+        self.assertEqual(zero_versus_invalid["best_score"], 0)
+        self.assertEqual(zero_versus_invalid["best_vs_baseline_delta"], 0)
+        self.assertEqual(negative_versus_sentinel["best_run_id"], "legacy-negative")
+        self.assertEqual(negative_versus_sentinel["best_score"], -5)
+        self.assertIsNone(sentinel_summary["best_score"])
+        self.assertIsNone(sentinel_summary["average_score"])
+        self.assertEqual(sentinel_summary["error_count"], 1)
+        self.assertEqual(sentinel_summary["error_rounds"], [1])
+        self.assertEqual(zero_summary["best_score"], 0)
+        self.assertEqual(zero_summary["average_score"], 0)
+
+    def test_real_zero_trend_ignores_an_invalid_fallback_and_keeps_failure_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "mixed"
+            self._write_run(
+                run_root,
+                {"run_id": "mixed", "best_score": 0, "completed_rounds": 3},
+                [
+                    {
+                        "round": 1,
+                        "score": 0,
+                        "successful_research_round": False,
+                        "invalid_score_this_round": True,
+                        "errors": ["judge returned no score"],
+                        "timeout_this_round": True,
+                    },
+                    {
+                        "round": 2,
+                        "score": 0,
+                        "successful_research_round": True,
+                        "invalid_score_this_round": False,
+                    },
+                    {
+                        "round": 3,
+                        "score": 0,
+                        "successful_research_round": True,
+                        "invalid_score_this_round": False,
+                    },
+                ],
+            )
+
+            summary = load_run_summary(run_root)
+            analysis = analyze_run(run_root)
+
+        self.assertEqual(summary["best_score"], 0)
+        self.assertEqual(summary["average_score"], 0)
+        self.assertEqual(summary["error_count"], 1)
+        self.assertEqual(summary["timeout_count"], 1)
+        self.assertEqual(analysis["score"]["first_score"], 0)
+        self.assertEqual(analysis["score"]["latest_score"], 0)
+        self.assertEqual(analysis["score"]["score_delta_first_to_latest"], 0)
+        self.assertEqual(analysis["score"]["trend"], "flat")
+        self.assertEqual(analysis["score"]["first_round"], 2)
+        self.assertEqual(analysis["robustness"]["error_count"], 1)
+        self.assertEqual(analysis["robustness"]["timeout_rounds"], [1])
+
+    @staticmethod
+    def _write_run(
+        run_root: Path,
+        summary: dict[str, object],
+        metrics: list[dict[str, object]] | None = None,
+    ) -> None:
+        run_root.mkdir(parents=True, exist_ok=True)
+        (run_root / "run_summary.json").write_text(json.dumps(summary), encoding="utf-8")
+        if metrics is not None:
+            (run_root / "round_metrics.json").write_text(json.dumps(metrics), encoding="utf-8")
+
+    @staticmethod
+    def _run_invalid_judge(project_dir: Path, *, max_rounds: int) -> Path:
+        project_dir.mkdir()
+        memory_path = project_dir / "memory.md"
+        memory_path.write_text("Manual memory.\n", encoding="utf-8")
+        result = run_iterative_rounds(
+            console=Console(),
+            agents=_InvalidJudgeAgents(),
+            task_text="Design a privacy-aware memory adapter.",
+            project_dir=project_dir,
+            memory_path=memory_path,
+            mode="normal",
+            model_name="fake-model",
+            max_rounds=max_rounds,
+            stop_if_no_improvement_rounds=10,
+            global_max_runtime_seconds=60,
+            per_agent_timeout_seconds=300,
+            disable_no_improvement_stop=True,
+            disable_timeout_stop=True,
+        )
+        return Path(result["run_root"])
+
+
+class _InvalidJudgeAgents:
+    def __init__(self) -> None:
+        self.llm = SimpleNamespace(timeout_seconds=300)
+
+    def draft(self, **_kwargs: object) -> str:
+        return "Draft from the invalid-judge fixture."
+
+    def review(self, **_kwargs: object) -> str:
+        return "Review from the invalid-judge fixture."
+
+    def revise(self, **_kwargs: object) -> str:
+        return "Revised from the invalid-judge fixture."
+
+    def judge(self, **_kwargs: object) -> str:
+        return "Judge completed without a numeric score."
 
 
 if __name__ == "__main__":

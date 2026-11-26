@@ -1519,11 +1519,14 @@ def build_run_analytics_dashboard(project_dir: Path, checkpoint: dict[str, Any])
         checkpoint.get("last_completed_round"),
         len(score_rows) if score_rows else None,
     )
-    best_score = _first_present(
-        score.get("best_score"),
-        run_summary.get("best_score"),
-        _max_numeric(score_rows, "score"),
-    )
+    ranked_score_rows = [row for row in score_rows if row.get("invalid_score") is not True]
+    if analysis:
+        best_score = score.get("best_score")
+    else:
+        best_score = _first_present(
+            run_summary.get("best_score"),
+            _max_numeric(ranked_score_rows, "score"),
+        )
     timeout_count = _first_present(
         robustness.get("timeout_count"),
         run_summary.get("timeout_count"),
@@ -1589,6 +1592,7 @@ def _flatten_metric_rows(entries: Sequence[dict[str, Any]]) -> list[dict[str, An
             {
                 "round": entry.get("round"),
                 "score": entry.get("score"),
+                "invalid_score": entry.get("invalid_score_this_round", False),
                 "timeout": entry.get("timeout_this_round", False),
                 "errors": len(entry.get("errors") or []),
                 "draft_s": timings.get("draft", 0.0),
@@ -1636,6 +1640,8 @@ def _format_seconds(value: Any) -> str:
 def _score_trend_rows(rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     trend_rows: list[dict[str, Any]] = []
     for row in rows:
+        if row.get("invalid_score") is True:
+            continue
         score = _safe_float(row.get("score"))
         if score is None:
             continue

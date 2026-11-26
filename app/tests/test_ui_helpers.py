@@ -2048,6 +2048,47 @@ release_run_lock(handle)
         self.assertEqual(dashboard["rubric_rows"], [])
         self.assertEqual(dashboard["similarity_rows"], [])
 
+    def test_ui_analytics_dashboard_hides_invalid_score_fallbacks_from_best_and_trend(self) -> None:
+        import ui.app as ui_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            run_root = project_dir / "runs" / "invalid-judge"
+            run_root.mkdir(parents=True)
+            (run_root / "run_summary.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "invalid-judge",
+                        "best_score": -1,
+                        "completed_rounds": 1,
+                        "successful_rounds": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (run_root / "round_metrics.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "round": 1,
+                            "score": 0,
+                            "successful_research_round": False,
+                            "invalid_score_this_round": True,
+                            "errors": ["judge returned no score"],
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            checkpoint = {"run_root": str(run_root)}
+
+            dashboard = ui_app.build_run_analytics_dashboard(project_dir, checkpoint)
+
+        cards = {card["label_key"]: card["value"] for card in dashboard["cards"]}
+        self.assertIsNone(cards["analytics_best_score"])
+        self.assertEqual(cards["analytics_timeout_errors"], "0 / 1")
+        self.assertEqual(dashboard["score_rows"], [])
+
     def test_ui_run_metadata_rows_summarize_latest_run_without_absolute_paths(self) -> None:
         import ui.app as ui_app
 

@@ -56,13 +56,59 @@ def _as_int(value: Any) -> int | None:
         return None
 
 
+# The runner starts best_score at -1 and only replaces it after a successful round.
+_UNIMPROVED_BEST_SENTINEL = -1.0
+_SCORE_MATCH_TOLERANCE = 0.005
+
+
+def _is_unimproved_best_sentinel(score: float) -> bool:
+    return math.isclose(
+        score,
+        _UNIMPROVED_BEST_SENTINEL,
+        rel_tol=0.0,
+        abs_tol=_SCORE_MATCH_TOLERANCE,
+    )
+
+
+def _trend_score(entry: dict[str, Any]) -> float | None:
+    """Finite score for means and trends.
+
+    Missing validity flags stay rankable, including a real zero and a finite
+    negative legacy value. An explicit invalid Judge score is the runner's
+    zero fallback and does not count.
+    """
+    if entry.get("invalid_score_this_round") is True:
+        return None
+    return _as_float(entry.get("score"))
+
+
+def _valid_round_score(entry: dict[str, Any]) -> float | None:
+    """Finite score from a round that existing success evidence still accepts."""
+    if entry.get("successful_research_round") is False:
+        return None
+    return _trend_score(entry)
+
+
 def _score_values(round_metrics: Sequence[dict[str, Any]]) -> list[float]:
     scores: list[float] = []
     for entry in round_metrics:
-        score = _as_float(entry.get("score"))
+        score = _trend_score(entry)
         if score is not None:
             scores.append(score)
     return scores
+
+
+def _valid_round_scores(round_metrics: Sequence[dict[str, Any]]) -> list[float]:
+    scores: list[float] = []
+    for entry in round_metrics:
+        score = _valid_round_score(entry)
+        if score is not None:
+            scores.append(score)
+    return scores
+
+
+def _metrics_record_invalid_score(round_metrics: Sequence[dict[str, Any]]) -> bool:
+    return any(entry.get("invalid_score_this_round") is True for entry in round_metrics)
 
 
 def _rubric_short_name(key: str) -> str:
@@ -141,11 +187,14 @@ def _load_run_summary_and_metrics(
     runtime_config = runtime_config if isinstance(runtime_config, dict) else {}
     round_metrics = _read_json_list(round_metrics_path, safe_artifacts=safe_artifacts)
     scores = _score_values(round_metrics)
+    valid_scores = _valid_round_scores(round_metrics)
     summary_best_score = _as_float(summary.get("best_score"))
     config_best_score = _as_float(run_config.get("best_score"))
     best_score = summary_best_score
     if best_score is None:
         best_score = max(scores) if scores else config_best_score
+    if best_score is not None and _is_unimproved_best_sentinel(best_score):
+        best_score = max(valid_scores) if valid_scores else None
     if scores:
         total = sum(scores)
         if math.isfinite(total):
@@ -155,6 +204,8 @@ def _load_run_summary_and_metrics(
             normalized_average = math.fsum(score / scale for score in scores) / len(scores)
             average_score = _as_float(normalized_average * scale)
         average_score = round(average_score, 2) if average_score is not None else None
+    elif _metrics_record_invalid_score(round_metrics):
+        average_score = None
     else:
         average_score = _as_float(summary.get("average_score"))
     completed_rounds = _as_int(summary.get("completed_rounds"))
@@ -310,16 +361,15 @@ def compare_runs(
         load_run_summary(Path(run_root), safe_artifacts=safe_artifacts) for run_root in run_roots
     ]
 
-    def rank_key(item: dict[str, Any]) -> tuple[bool, float, int]:
+    def rank_key(item: dict[str, Any]) -> tuple[float, int]:
         score = _as_float(item.get("best_score"))
         return (
-            score is not None,
             score if score is not None else 0.0,
             _as_int(item.get("completed_rounds")) or 0,
         )
 
-    ranked = sorted(runs, key=rank_key, reverse=True)
-    best_run = ranked[0] if ranked else {}
+    rankable = [item for item in runs if _as_float(item.get("best_score")) is not None]
+    best_run = sorted(rankable, key=rank_key, reverse=True)[0] if rankable else {}
     baseline_score = _as_float(runs[0].get("best_score")) if runs else None
     best_score = _as_float(best_run.get("best_score"))
     best_vs_baseline_delta = (

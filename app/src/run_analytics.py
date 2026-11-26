@@ -6,7 +6,7 @@ import math
 from pathlib import Path
 from typing import Any
 
-from .run_compare import _load_run_summary_and_metrics
+from .run_compare import _load_run_summary_and_metrics, _trend_score
 from .storage import write_json_file
 
 
@@ -23,7 +23,7 @@ def _as_float(value: Any) -> float | None:
 def _numeric_scores(round_metrics: list[dict[str, Any]]) -> list[tuple[Any, float]]:
     scores: list[tuple[Any, float]] = []
     for entry in round_metrics:
-        score = _as_float(entry.get("score"))
+        score = _trend_score(entry)
         if score is not None:
             scores.append((entry.get("round"), score))
     return scores
