@@ -2,25 +2,20 @@
 
 ## Unreleased
 
-- Import `ctypes.util` when attributing a macOS process lock. A clean interpreter otherwise raises AttributeError and the dashboard reports the live CLI run as idle.
-- Scope dashboard stop requests to the current run. Startup failures and finalization cannot leave a request for its successor. Manual stop files remain supported.
-- Recognize a live owned CLI run, including an offline mock, on Linux and macOS, and stop modes that honor the cooperative signal. A diagnostic run stays visible but is not stoppable, so a stop does not leave a signal for the next run. Model list, health, and cached cloud reads do not block that stop or delete a model job published while they are in flight. Ownerless metadata and edit or maintenance locks are not runs. Same-project writes and starts stay protected.
-- Select Python 3.10 or newer for `make venv`, `make install`, `make install-dev`, and `./start` when `python3` is older. An explicit `PYTHON=` is used while creating an environment, and `VENV=` still chooses its location. If no supported interpreter is available, setup stops before creating an environment or installing packages and prints the minimum version plus the interpreters it found. An existing incompatible `.venv` is left in place with steps to keep it or move it aside; it is not deleted or overwritten.
-- After `VENV=` selects an environment, `./start` and Make run that environment's Python, including when `app/.venv` is absent. A path with spaces or quotes is passed as the path. Setup does not install into a directory that is not that virtual environment, or into one whose pip is missing, and it leaves the directory in place with steps to keep it or recreate it.
-- Print an absolute path for the in-place ensurepip repair so it runs from the repository root. Reject an empty `VENV` before creating files. Reject pip destination redirects such as `PIP_TARGET` and destination settings in pip configuration, and stamp the selected environment only after the install succeeds.
-- Keep unscored placeholders out of visible best scores and chart score changes. A scoring-failure zero no longer supplies the next valid round's displayed delta, a saved best score near -1 stays a historical value, and an early invalid-judge zero stays out of means and trends. A failed round cannot outrank a successful score. All-failure archives still show an empty best score in run metadata and workspace progress, while a live valid score stays visible.
-- Ignore explicit invalid-score fallbacks in run comparison and analysis. The runner's zero substitute and untouched -1 best-score placeholder no longer enter averages, score trends, or ranking, and a comparison with no valid score does not name a winner. Real zeros, finite negative legacy scores, mixed ranked and unranked runs, and failure counts stay in place.
-- Keep repeated literature surveys stable by skipping this run's generated artifacts, including an explicit `--survey-output` report and the default survey paths, in flat and legacy projects. Other project Markdown remains a source. Flat projects record distinguishable workspace-relative source paths for same-named run drafts.
-- Skip survey reports and related-work drafts generated at another output location, including a return to the default directory, a new report name, and consecutive switches, in flat and legacy projects. User Markdown and same-named notes stay sources, and earlier reports stay on disk. Record paths from the workspace root, so a flat project stays `<project>/...` even when that directory is named `projects`; legacy `projects/<name>/` paths stay unchanged.
-- Refuse ordinary resume of an offline mock before any provider check or run-artifact change. The checkpoint can still say the run is resumable; start a new offline mock instead of continuing that history with a real model. A real provider run whose model is named `mock` or `mock-deterministic` still resumes, including when normal mode and the real provider are split across the checkpoint and run config. A truncated same-run `run_config.json` does not hide an explicit mock manifest and is not rewritten from it. Non-string mode or model name fields do not stop dashboard status from loading. Resuming that explicit mock project without `config.yaml` explains the new offline mock instead of only reporting a missing config file. An existing conflict or path block keeps its own guidance, and a mock revealed by in-lock recovery is refused again before any provider call.
-- Ignore a late same-project analytics response after a newer refresh. An older success cannot replace the newer comparison, and an older or stale error cannot clear it. Idle polls still do not reread analytics.
-- Refresh an already-open dashboard after an external CLI run finishes between polls, including Research Outputs and run-comparison checkboxes. Polling still skips unchanged catalogs and does not reread output files on every tick.
-- Reject an empty `--create-project` name before starting a run or writing to a project.
-- Generate recovery commands for the interrupted project and workspace, preserving its provider, model and round limit. An interrupted offline mock offers a new offline mock run.
-- Identify corrupt and unreadable checkpoints before checking the model provider during CLI resume.
-- Explain missing or recovery-blocked outputs in the dashboard. Blocked downloads no longer save empty files, and late responses from a previous project leave the selected output alone.
-- Correct the default example path in project initialization errors and the development guide.
-- Run the Chromium and WebKit CI jobs on Ubuntu 24.04 for compatibility with the pinned Playwright release.
+## [0.3.1] - 2026-11-26
+
+- Update dependencies affected by published advisories. Python 3.11+ uses patched Pillow 13. Python 3.10 retains compatibility with Pillow 12.3.0 and its documented upstream image-processing advisories.
+
+- Launch from the requested workspace even when its path is relative. Root Make targets still execute when a project directory has the same name.
+- Select a supported Python for new environments and use the selected virtual environment for both installation and startup. Setup checks pip’s effective configuration for redirected installs and prints a working recovery command for an environment missing pip.
+- Show live CLI runs on Linux and macOS. A dashboard stop belongs to the selected run, including during preflight and finalization. Unrelated read-only requests can proceed concurrently.
+- Reject empty project names and report damaged checkpoints before provider preflight. Recovery commands preserve the interrupted run’s workspace, project, provider, model and round limit. Interrupted offline mocks offer a fresh offline run.
+- Refresh saved outputs, downloads and run comparisons when an external CLI run finishes. A delayed response cannot replace newer results. The dashboard explains blocked or missing downloads.
+- Keep generated surveys out of subsequent inputs, preserve user Markdown and distinguish source paths in flat and legacy projects.
+- Exclude failed scores from ranking, averages and trends. Valid zero scores and historical finite negative scores retain their meaning.
+- Make concurrent lock-test reporting deterministic. Browser CI uses Ubuntu 24.04 with the pinned Playwright release. Project initialization errors and the development guide use the current example path.
+
+[English release notes](docs/releases/0.3.1.md) · [中文更新说明](docs/releases/0.3.1.zh-CN.md)
 
 ## [0.3.0] - 2026-11-09
 

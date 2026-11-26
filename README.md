@@ -22,7 +22,7 @@ Auto Research Agent runs **Draft → Review → Revise → Judge** with local Ol
 
 ## Start locally
 
-Use Python **3.10+**, Git, and Make. The launcher prints the local URL; open it in your browser. Run these commands in a new checkout:
+Use Python **3.11+** for a new installation, plus Git and Make. Python 3.10 remains supported with a [dependency security limitation](app/docs/releases/0.3.1.md#dependency-security). The launcher prints the local URL; open it in your browser. Run these commands in a new checkout:
 
 ```bash
 git clone https://github.com/ThineLord/auto-research-agent.git
@@ -51,9 +51,9 @@ Existing `projects/<name>/` folders load in place; no automatic migration occurs
 
 ## Versions and documentation
 
-Current version: **0.3.0**. Releases use `vMAJOR.MINOR.PATCH` tags matched to `pyproject.toml`. Historical milestone tags remain available. Application releases and saved research artifacts have separate compatibility boundaries.
+Current version: **0.3.1**. Releases use `vMAJOR.MINOR.PATCH` tags matched to `pyproject.toml`. Historical milestone tags remain available. Application releases and saved research artifacts have separate compatibility boundaries.
 
-- [Releases](https://github.com/ThineLord/auto-research-agent/releases) · [0.3.0 notes](app/docs/releases/0.3.0.md) · [Changelog](app/CHANGELOG.md)
+- [Releases](https://github.com/ThineLord/auto-research-agent/releases) · [0.3.1 notes](app/docs/releases/0.3.1.md) · [Changelog](app/CHANGELOG.md)
 - [User README](app/docs/user/README.md) · [Agent README](app/docs/agent/README.md)
 - [Documentation map](app/docs/README.md) · [Version and release policy](app/docs/agent/releases.md)
 

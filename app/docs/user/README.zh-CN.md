@@ -1,4 +1,5 @@
-> 0.3.0：通过 `./start` 启动，点击选择器旁 **+** 创建同级研究目录。旧 `projects/<name>/` 原位加载；升级前请读[升级／回滚指南](workspace-upgrade.zh-CN.md)。
+> 0.3.1：通过 `./start` 启动仪表盘，已有项目原位加载。更新旧检出前请阅读[升级与回滚指南](workspace-upgrade.zh-CN.md)。
+> 新安装建议使用 Python 3.11 或更高版本，以获得已修补的图像依赖。详见 [Python 3.10 的安全限制](../releases/0.3.1.zh-CN.md#依赖安全)。
 
 # 用户 README
 
@@ -64,7 +65,7 @@ make mock ARGS="--project demo --max-rounds 1"
 
 从 [GitHub Releases](https://github.com/ThineLord/auto-research-agent/releases) 选择版本并先阅读说明。切换版本标签前停止活动运行、备份私人数据并保持工作区干净。升级后重新执行 `make install`，不要为了升级丢弃本地修改或覆盖配置。
 
-**0.3.0** 精简仓库目录，保留原有运行路径、检查点兼容性及环境元数据。开发安装请使用 `make install-dev`，替代已移除的 `requirements.txt` 入口。高级命令与边界见[版本说明](../releases/0.3.0.zh-CN.md)和[文档导航](../README.md)。网页工作台需要源码仓库；wheel 安装提供命令行程序。
+**0.3.1** 修复了环境选择、CLI 停止与恢复、仪表盘刷新、综述及评分比较。开发安装使用 `make install-dev`。仪表盘通过源码启动，wheel 提供 CLI。详见[版本说明](../releases/0.3.1.zh-CN.md)和[文档导航](../README.md)。
 
 保存只提交已编辑字段。同一字段被其他标签页或运行更新时，工作台会展示两个版本并保留草稿；你可以使用最新版本，或明确选择以草稿替换冲突字段。项目运行中或存在待恢复写入时，保存会被阻止。
 

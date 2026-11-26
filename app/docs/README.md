@@ -8,7 +8,7 @@ Choose your audience and language. User launch commands run from the workspace r
 | Installation and use | [User README](user/README.md) | [用户 README](user/README.zh-CN.md) |
 | Repository maintenance | [Agent README](agent/README.md) | [Agent README](agent/README.zh-CN.md) |
 | Versions and releases | [Release policy](agent/releases.md) | [版本规则](agent/releases.zh-CN.md) |
-| Version 0.3.0 | [Release notes](releases/0.3.0.md) | [更新说明](releases/0.3.0.zh-CN.md) |
+| Version 0.3.1 | [Release notes](releases/0.3.1.md) | [更新说明](releases/0.3.1.zh-CN.md) |
 
 ## Detailed references
 

@@ -1,4 +1,4 @@
-# Workspace upgrade and rollback (0.3.0)
+# Workspace upgrade and rollback (0.3.x)
 
 [English](workspace-upgrade.md) · [简体中文](workspace-upgrade.zh-CN.md)
 
@@ -6,7 +6,7 @@
 
 Stop runs and the dashboard using the old version, then back up the whole private workspace (including `config.yaml`, `projects/`, external run storage if configured, and any new sibling research). Keep the backup private and verify it can be read. Do not change the program files of a running process. This release never moves, rewrites or deletes old research automatically.
 
-For a clean checkout, fetch the release, review `git status`, switch to `v0.3.0`, then run `./start`. Git should refuse a switch that would overwrite tracked local edits; do not use a force switch, `reset --hard` or `clean` to resolve that. If unsure, keep the old checkout untouched and inspect a separate checkout of the release first. Use Python 3.10+; the new environment lives in `app/.venv/` and the old `.venv/` may be retained for rollback.
+For a clean checkout, fetch the release, review `git status`, switch to `v0.3.1`, then run `./start`. Git should refuse a switch that would overwrite tracked local edits; do not use a force switch, `reset --hard` or `clean` to resolve that. If unsure, keep the old checkout untouched and inspect a separate checkout of the release first. Use Python 3.10+; the new environment lives in `app/.venv/` and the old `.venv/` may be retained for rollback.
 
 ## Existing research stays in place
 

@@ -22,7 +22,7 @@
 
 ## 本地启动
 
-需要 Python **3.10+**、Git 和 Make。首次克隆后执行：
+新安装建议使用 Python **3.11+**、Git 和 Make。Python 3.10 仍受支持，详见[依赖安全限制](app/docs/releases/0.3.1.zh-CN.md#依赖安全)。首次克隆后执行：
 
 ```bash
 git clone https://github.com/ThineLord/auto-research-agent.git
@@ -51,9 +51,9 @@ auto-research-agent/
 
 ## 版本与文档
 
-当前版本：**0.3.0**。发布使用 `v主版本.次版本.修订版本` 标签，与 `pyproject.toml` 保持一致，历史里程碑标签保留。应用版本与研究产物的数据兼容边界分别管理。
+当前版本：**0.3.1**。发布使用 `v主版本.次版本.修订版本` 标签，与 `pyproject.toml` 保持一致，历史里程碑标签保留。应用版本与研究产物的数据兼容边界分别管理。
 
-- [版本发布](https://github.com/ThineLord/auto-research-agent/releases) · [0.3.0 更新说明](app/docs/releases/0.3.0.zh-CN.md) · [变更记录](app/CHANGELOG.md)
+- [版本发布](https://github.com/ThineLord/auto-research-agent/releases) · [0.3.1 更新说明](app/docs/releases/0.3.1.zh-CN.md) · [变更记录](app/CHANGELOG.md)
 - [用户 README](app/docs/user/README.zh-CN.md) · [Agent README](app/docs/agent/README.zh-CN.md)
 - [文档导航](app/docs/README.md) · [版本与发布规则](app/docs/agent/releases.zh-CN.md)
 
