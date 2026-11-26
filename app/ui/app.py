@@ -2228,7 +2228,7 @@ def render_live_progress_and_logs(
         st.write(
             t(
                 "stop_signal_present",
-                present=stop_requested(stop_signal_path),
+                present=stop_requested(stop_signal_path, active_run=run_meta),
             )
         )
         st.write(t("selected_model", model=st.session_state.get("selected_model", default_model)))

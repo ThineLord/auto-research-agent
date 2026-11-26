@@ -73,7 +73,7 @@ def _status(path: Path, checkpoint: dict, model: str = "") -> dict:
         "model_job": h.get_active_process_meta(h.model_job_meta_path(path), cleanup=False),
         "log": log,
         "model_log": h.tail_file_lines(path / "model_ops.log", 80),
-        "stop_requested": h.stop_requested(path / "STOP_REQUESTED"),
+        "stop_requested": h.stop_requested(path / "STOP_REQUESTED", active_run=meta),
     }
 
 

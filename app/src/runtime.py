@@ -151,7 +151,16 @@ def _owner_marker(token: str) -> str:
     return _DASHBOARD_STOP + token
 
 
-def stop_requested(stop_signal_path: Path) -> bool:
+def _owner_generation(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def stop_requested(
+    stop_signal_path: Path,
+    *,
+    active_run: dict | None = None,
+    run_lock_handle: RunLockHandle | None = None,
+) -> bool:
     if not artifact_boundary_is_registered(stop_signal_path):
         try:
             ensure_project_runtime_paths_safe(
@@ -166,12 +175,40 @@ def stop_requested(stop_signal_path: Path) -> bool:
     if not marker:
         return marker == ""
     project = stop_signal_path.parent
-    lock = read_json_file(project / RUN_LOCK_FILENAME)
-    if isinstance(lock.get("owner_token"), str) and marker == _owner_marker(lock["owner_token"]):
-        pid = _parse_lock_pid(lock.get("pid"))
-        return pid == os.getpid() or is_pid_running(pid)
-    ui = get_active_process_meta(run_meta_path(project), cleanup=False)
-    return bool(ui and marker == _ui_marker(ui) and (not lock or lock.get("pid") == ui["pid"]))
+    if marker.startswith(_DASHBOARD_STOP + "ui "):
+        ui = (
+            active_run
+            if active_run is not None
+            else get_active_process_meta(run_meta_path(project), cleanup=False)
+        )
+        return bool(ui and ui.get("kind") != "cli_run" and marker == _ui_marker(ui))
+    token = marker.removeprefix(_DASHBOARD_STOP)
+    if run_lock_handle is not None:
+        return (
+            not run_lock_handle._guard_file.closed
+            and run_lock_handle.pid == os.getpid()
+            and run_lock_handle.path.parent == project
+            and run_lock_handle.owner_token == token
+        )
+    if active_run is not None and (not active_run or active_run.get("kind") == "cli_run"):
+        return active_run.get("generation") == _owner_generation(token)
+    # A UI process record alone cannot authenticate a CLI marker. An independent observer
+    # needs the kernel-owned generation, even when stale metadata names a live or reused PID.
+    cli = read_live_cli_run(project)
+    if cli:
+        return cli["generation"] == _owner_generation(token) and (
+            active_run is None or active_run.get("pid") == cli["pid"]
+        )
+    if os.name == "nt":
+        # Native Windows uses its verified UI process record for dashboard-launched runs.
+        ui = (
+            active_run
+            if active_run is not None
+            else get_active_process_meta(run_meta_path(project), cleanup=False)
+        )
+        lock = read_json_file(project / RUN_LOCK_FILENAME)
+        return bool(ui and lock.get("pid") == ui.get("pid") and lock.get("owner_token") == token)
+    return False
 
 
 def request_dashboard_stop(project: Path, expected: dict) -> None:
@@ -220,7 +257,7 @@ def close_run_stop_window(handle: RunLockHandle | None) -> bool:
         meta = read_json_file(handle.path)
         meta["stoppable"] = False
         write_json_file(handle.path, meta)
-        return stop_requested(project / "STOP_REQUESTED")
+        return stop_requested(project / "STOP_REQUESTED", run_lock_handle=handle)
 
 
 def is_pid_running(pid: int) -> bool:
@@ -851,7 +888,7 @@ def _live_cli_run_record(project_dir: Path) -> Dict[str, Any]:
         "model": model,
         "started_at": started if isinstance(started, str) else "",
         "kind": "cli_run",
-        "generation": hashlib.sha256(owner.encode()).hexdigest(),
+        "generation": _owner_generation(owner),
         "stoppable": mode in STOPPABLE_RUN_MODES and lock_data.get("stoppable") is not False,
         "command": " ".join(part for part in (mode, model) if part),
     }

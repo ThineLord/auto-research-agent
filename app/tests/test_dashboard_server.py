@@ -1360,3 +1360,35 @@ def test_stop_during_failed_cli_preflight_does_not_reach_next_run(
         timeout=15,
     )
     assert web.h.read_json_file(root / "checkpoint.json")["stop_reason"] == "MAX_ROUNDS"
+
+
+def test_idle_status_ignores_old_stop_and_lock_naming_a_still_live_pid(project, monkeypatch):
+    from src import runtime
+
+    root, _ = project
+    handle, error = runtime.acquire_run_lock(root, mode="mock", model_name="fixture")
+    assert error is None
+    try:
+        live = runtime.read_live_cli_run(root)
+        runtime.request_dashboard_stop(root, live)
+        signal = root / "STOP_REQUESTED"
+        previous_marker = signal.read_bytes()
+        previous_lock = handle.path.read_bytes()
+        # The status path already authenticated this generation; avoid scanning a second time.
+        with monkeypatch.context() as patch:
+            patch.setattr(
+                runtime, "read_live_cli_run", lambda *_: pytest.fail("repeated lock scan")
+            )
+            assert runtime.stop_requested(signal, active_run=live)
+            assert runtime.stop_requested(signal, run_lock_handle=handle)
+    finally:
+        runtime.release_run_lock(handle)
+    handle.path.write_bytes(previous_lock)
+    signal.write_bytes(previous_marker)
+    assert not runtime.read_live_cli_run(root)
+    assert not runtime.stop_requested(signal)
+    status = web.status("example")
+    assert not status["progress"]["run_active"] and not status["stop_requested"]
+    assert signal.read_bytes() == previous_marker  # status is read-only
+    signal.write_bytes(b"")
+    assert web.status("example")["stop_requested"]  # manual marker remains visible while idle
