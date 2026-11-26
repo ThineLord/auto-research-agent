@@ -22,7 +22,7 @@ Auto Research Agent runs **Draft → Review → Revise → Judge** with local Ol
 
 ## Start locally
 
-Use Python **3.10+**, Git, and Make. The launcher prints the local URL; open it in your browser. Run these commands in a new checkout:
+Use Python **3.11+** for a new installation, plus Git and Make. Python 3.10 remains supported with a [dependency security limitation](app/docs/releases/0.3.1.md#dependency-security). The launcher prints the local URL; open it in your browser. Run these commands in a new checkout:
 
 ```bash
 git clone https://github.com/ThineLord/auto-research-agent.git

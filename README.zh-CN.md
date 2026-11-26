@@ -22,7 +22,7 @@
 
 ## 本地启动
 
-需要 Python **3.10+**、Git 和 Make。首次克隆后执行：
+新安装建议使用 Python **3.11+**、Git 和 Make。Python 3.10 仍受支持，详见[依赖安全限制](app/docs/releases/0.3.1.zh-CN.md#依赖安全)。首次克隆后执行：
 
 ```bash
 git clone https://github.com/ThineLord/auto-research-agent.git

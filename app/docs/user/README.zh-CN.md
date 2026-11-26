@@ -1,4 +1,5 @@
 > 0.3.1：通过 `./start` 启动仪表盘，已有项目原位加载。更新旧检出前请阅读[升级与回滚指南](workspace-upgrade.zh-CN.md)。
+> 新安装建议使用 Python 3.11 或更高版本，以获得已修补的图像依赖。详见 [Python 3.10 的安全限制](../releases/0.3.1.zh-CN.md#依赖安全)。
 
 # 用户 README
 

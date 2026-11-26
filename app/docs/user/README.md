@@ -1,4 +1,5 @@
 > 0.3.1: Start the dashboard with `./start`. Existing projects load in place. See the [upgrade guide](workspace-upgrade.md) before updating an older checkout.
+> For new installations, use Python 3.11+ to get the patched image dependency. See the [Python 3.10 advisory boundary](../releases/0.3.1.md#dependency-security).
 
 # User README
 

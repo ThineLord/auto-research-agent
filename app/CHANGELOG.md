@@ -4,6 +4,8 @@
 
 ## [0.3.1] - 2026-11-26
 
+- Update dependencies affected by published advisories. Python 3.11+ uses patched Pillow 13. Python 3.10 retains compatibility with Pillow 12.3.0 and its documented upstream image-processing advisories.
+
 - Launch from the requested workspace even when its path is relative. Root Make targets still execute when a project directory has the same name.
 - Select a supported Python for new environments and use the selected virtual environment for both installation and startup. Setup checks pip’s effective configuration for redirected installs and prints a working recovery command for an environment missing pip.
 - Show live CLI runs on Linux and macOS. A dashboard stop belongs to the selected run, including during preflight and finalization. Unrelated read-only requests can proceed concurrently.
