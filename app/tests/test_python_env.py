@@ -666,13 +666,15 @@ def test_start_and_make_use_custom_venv_python(tmp_path: Path) -> None:
         text=True,
     )
     assert created.returncode == 0, created.stderr
-    stamp_time = (app / "pyproject.toml").stat().st_mtime + 10
+    install_inputs = (app / "pyproject.toml", app / "scripts/dependencies/constraints.txt")
+    stamp_time = max(path.stat().st_mtime for path in install_inputs) + 1
     for name in (".install.stamp", ".install-dev.stamp"):
         stamp = custom / name
         stamp.write_text("ready", encoding="utf-8")
         os.utime(stamp, (stamp_time, stamp_time))
     env = _real_env()
     env["VENV"] = str(custom)
+    env["PIP_NO_INDEX"] = "1"
     marker = tmp_path / "start-python"
     started = _start(checkout, env, [str(marker)])
     assert started.returncode == 0, _output(started)
