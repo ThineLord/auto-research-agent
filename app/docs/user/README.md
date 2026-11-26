@@ -1,4 +1,4 @@
-> 0.3.0: Start with `./start`; use **+** beside the selector to create a sibling research folder. Legacy `projects/<name>/` loads in place. Read the [upgrade/rollback guide](workspace-upgrade.md) first when updating.
+> 0.3.1: Start the dashboard with `./start`. Existing projects load in place. See the [upgrade guide](workspace-upgrade.md) before updating an older checkout.
 
 # User README
 
@@ -64,7 +64,7 @@ Local configuration and generated research are ignored by Git. Ignore rules are 
 
 Choose a version from [GitHub Releases](https://github.com/ThineLord/auto-research-agent/releases) and read its notes. Stop active runs, back up private work, and keep the checkout clean before switching to a release tag. Re-run `make install` after an upgrade. Do not discard local changes or overwrite configuration to update.
 
-Version **0.3.0** simplifies the repository layout while preserving runtime paths, checkpoints and environment metadata. Use `make install-dev` in place of the removed `requirements.txt` shim. See [release notes](../releases/0.3.0.md) and the [documentation map](../README.md) for advanced commands and limits. The dashboard requires the source checkout; wheel installations provide the CLI only.
+Version **0.3.1** fixes environment selection, CLI stops and recovery, dashboard refresh, surveys, and score comparisons. Use `make install-dev` for a development checkout. The dashboard runs from source, and the wheel provides the CLI. See the [release notes](../releases/0.3.1.md) and the [documentation map](../README.md).
 
 Saving submits only edited fields. If another tab or a run changed the same field, the dashboard shows both versions and keeps your draft; choose the latest version or explicitly replace the conflicting fields. Saves are blocked while a run owns the project or recovery is pending.
 

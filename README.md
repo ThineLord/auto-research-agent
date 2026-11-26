@@ -51,9 +51,9 @@ Existing `projects/<name>/` folders load in place; no automatic migration occurs
 
 ## Versions and documentation
 
-Current version: **0.3.0**. Releases use `vMAJOR.MINOR.PATCH` tags matched to `pyproject.toml`. Historical milestone tags remain available. Application releases and saved research artifacts have separate compatibility boundaries.
+Current version: **0.3.1**. Releases use `vMAJOR.MINOR.PATCH` tags matched to `pyproject.toml`. Historical milestone tags remain available. Application releases and saved research artifacts have separate compatibility boundaries.
 
-- [Releases](https://github.com/ThineLord/auto-research-agent/releases) · [0.3.0 notes](app/docs/releases/0.3.0.md) · [Changelog](app/CHANGELOG.md)
+- [Releases](https://github.com/ThineLord/auto-research-agent/releases) · [0.3.1 notes](app/docs/releases/0.3.1.md) · [Changelog](app/CHANGELOG.md)
 - [User README](app/docs/user/README.md) · [Agent README](app/docs/agent/README.md)
 - [Documentation map](app/docs/README.md) · [Version and release policy](app/docs/agent/releases.md)
 
