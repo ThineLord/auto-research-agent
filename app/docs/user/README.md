@@ -8,7 +8,7 @@ Auto Research Agent helps you iterate on a research task and inspect the saved w
 
 ## Install and open
 
-Use Python 3.10+, Git, and Make. From a fresh checkout:
+Use Python 3.10+, Git, and Make. `./start` and `make install-dev` select a supported interpreter when `python3` is older, and leave an incompatible `app/.venv` unchanged. An empty `VENV` is rejected before files are created, a missing pip is repaired from the repository root with that environment's absolute path, and an install stops when packages would land outside the selected environment. From a fresh checkout:
 
 ```bash
 ./start
