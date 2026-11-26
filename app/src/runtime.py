@@ -168,7 +168,8 @@ def stop_requested(stop_signal_path: Path) -> bool:
     project = stop_signal_path.parent
     lock = read_json_file(project / RUN_LOCK_FILENAME)
     if isinstance(lock.get("owner_token"), str) and marker == _owner_marker(lock["owner_token"]):
-        return True
+        pid = _parse_lock_pid(lock.get("pid"))
+        return pid == os.getpid() or is_pid_running(pid)
     ui = get_active_process_meta(run_meta_path(project), cleanup=False)
     return bool(ui and marker == _ui_marker(ui) and (not lock or lock.get("pid") == ui["pid"]))
 

@@ -1396,6 +1396,7 @@ except OSError:
             first, error = acquire_run_lock(project, mode="mock", model_name="m")
             self.assertIsNone(error)
             try:
+                previous_lock = read_json_file(project / "active_run.json")
                 previous = runtime_module.read_live_cli_run(project)
                 runtime_module.request_dashboard_stop(project, previous)
                 saved = path.read_text()
@@ -1404,6 +1405,9 @@ except OSError:
                 release_run_lock(first)
             self.assertFalse(path.exists())
             path.write_text(saved)  # e.g. a request left by a process crash
+            # A crashed CLI also leaves its former active_run.json behind.
+            stale_lock = dict(previous_lock, pid=2**31 - 1)
+            write_json_file(project / "active_run.json", stale_lock)
             self.assertFalse(stop_requested(path))
             second, error = acquire_run_lock(project, mode="mock", model_name="m")
             self.assertIsNone(error)
