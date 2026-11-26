@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -635,6 +637,244 @@ Topics: agent memory
                         relative = f"{prefix}/runs/{run_name}/round_01/01_draft.md"
                         self.assertIn(relative, reports[0])
                         self.assertIn(relative, snapshots[0][4])
+
+    def test_switched_output_locations_do_not_reread_generated_artifacts(self) -> None:
+        reading_title = "Kept Reading Note"
+        same_name_title = "Kept User Survey Report Note"
+        plain_title = "Kept Plain Survey Note"
+        expected_titles = PUBLIC_EXAMPLE_TITLES | {reading_title, same_name_title, plain_title}
+        for layout in ("flat", "legacy"):
+            with self.subTest(layout=layout):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    project_dir = _prepare_public_example(root, layout)
+                    _write_paper_block(project_dir / "reading-notes.md", reading_title)
+                    _write_paper_block(project_dir / "survey_report.md", same_name_title)
+                    (project_dir / "survey_notes.md").write_text(
+                        "# Literature Survey Report\n"
+                        "\n"
+                        "These are my own notes.\n"
+                        f"Title: {plain_title}\n"
+                        "Authors: Survey Fixture\n"
+                        "Year: 2016\n"
+                        "Venue: Fixture\n",
+                        encoding="utf-8",
+                    )
+                    preserved = {
+                        path: path.read_bytes()
+                        for path in (
+                            project_dir / "reading-notes.md",
+                            project_dir / "survey_report.md",
+                            project_dir / "survey_notes.md",
+                            project_dir / "literature_survey_sources.md",
+                            project_dir / "task.md",
+                        )
+                    }
+                    project_input = load_project_input(
+                        root=root,
+                        project_name="example",
+                        explicit_project=True,
+                    )
+                    report_one = project_dir / "report-one.md"
+                    report_two = project_dir / "report-two.md"
+                    default_report = project_dir / "survey" / "survey_report.md"
+                    root_related = project_dir / "related_work.md"
+                    outputs = (report_one, None, report_two, report_one)
+                    snapshots = []
+                    report_one_bytes = b""
+                    report_two_bytes = b""
+                    default_report_bytes = b""
+                    root_related_bytes = b""
+                    result = None
+                    for index, output_path in enumerate(outputs):
+                        result = run_literature_survey_mode(
+                            console=Console(),
+                            project_input=project_input,
+                            config=LiteratureSurveyConfig(),
+                            output_path=output_path,
+                            workspace_root=root,
+                        )
+                        snapshots.append(_survey_snapshot(result))
+                        if index == 0:
+                            report_one_bytes = report_one.read_bytes()
+                            root_related_bytes = root_related.read_bytes()
+                        elif index == 1:
+                            self.assertEqual(report_one.read_bytes(), report_one_bytes)
+                            self.assertEqual(root_related.read_bytes(), root_related_bytes)
+                            default_report_bytes = default_report.read_bytes()
+                        elif index == 2:
+                            self.assertEqual(report_one.read_bytes(), report_one_bytes)
+                            self.assertEqual(default_report.read_bytes(), default_report_bytes)
+                            report_two_bytes = report_two.read_bytes()
+                        else:
+                            self.assertEqual(report_two.read_bytes(), report_two_bytes)
+                            self.assertEqual(default_report.read_bytes(), default_report_bytes)
+                    self.assertEqual(snapshots[0], snapshots[1])
+                    self.assertEqual(snapshots[1], snapshots[2])
+                    self.assertEqual(snapshots[2], snapshots[3])
+                    (
+                        paper_count,
+                        quality,
+                        manifest_count,
+                        manifest_quality,
+                        sources,
+                        titles,
+                    ) = snapshots[-1]
+                    self.assertEqual(paper_count, 7)
+                    self.assertEqual(manifest_count, 7)
+                    self.assertEqual(len(titles), 7)
+                    self.assertEqual(quality["paper_count"], 7)
+                    self.assertEqual(manifest_quality, quality)
+                    self.assertEqual(set(titles), expected_titles)
+                    prefix = "projects/example" if layout == "legacy" else "example"
+                    self.assertEqual(
+                        sources,
+                        (
+                            f"{prefix}/literature_survey_sources.md",
+                            f"{prefix}/reading-notes.md",
+                            f"{prefix}/survey_notes.md",
+                            f"{prefix}/survey_report.md",
+                            f"{prefix}/task.md",
+                        ),
+                    )
+                    assert result is not None
+                    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+                    by_title = {
+                        paper["title"]: paper["source_paths"] for paper in metadata["papers"]
+                    }
+                    self.assertEqual(by_title[reading_title], [f"{prefix}/reading-notes.md"])
+                    self.assertEqual(by_title[same_name_title], [f"{prefix}/survey_report.md"])
+                    self.assertEqual(by_title[plain_title], [f"{prefix}/survey_notes.md"])
+                    for paper in metadata["papers"]:
+                        self.assertTrue(set(paper["source_paths"]).issubset(sources))
+                    for path, content in preserved.items():
+                        self.assertEqual(path.read_bytes(), content)
+
+    def test_workspace_root_is_used_for_flat_and_legacy_paths(self) -> None:
+        cases = {
+            "flat": ("projects", "topic", "topic"),
+            "legacy": ("workspace", "topic", "projects/topic"),
+        }
+        for layout, (workspace_name, project_name, prefix) in cases.items():
+            with self.subTest(layout=layout):
+                with tempfile.TemporaryDirectory() as tmp:
+                    workspace = Path(tmp) / workspace_name
+                    project_dir = _project_dir(workspace, layout, project_name)
+                    project_dir.mkdir(parents=True)
+                    (project_dir / "task.md").write_text("# Topic\n", encoding="utf-8")
+                    draft = project_dir / "runs" / "run-one" / "round_01" / "01_draft.md"
+                    _write_paper_block(draft, "Workspace Draft Paper")
+                    project_input = load_project_input(
+                        root=workspace,
+                        project_name=project_name,
+                        explicit_project=True,
+                    )
+                    self.assertEqual(project_input.project_dir.resolve(), project_dir.resolve())
+                    result = run_literature_survey_mode(
+                        console=Console(),
+                        project_input=project_input,
+                        config=LiteratureSurveyConfig(),
+                        workspace_root=workspace,
+                    )
+                    manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+                    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+                    report_rel = f"{prefix}/survey/survey_report.md"
+                    draft_rel = f"{prefix}/runs/run-one/round_01/01_draft.md"
+                    self.assertEqual(manifest["project"]["project_dir"], prefix)
+                    self.assertEqual(manifest["outputs"]["report"], report_rel)
+                    self.assertEqual(
+                        manifest["source_files"],
+                        [draft_rel, f"{prefix}/task.md"],
+                    )
+                    self.assertEqual(manifest["paper_count"], 1)
+                    self.assertTrue((workspace / report_rel).is_file())
+                    self.assertTrue((workspace / draft_rel).is_file())
+                    self.assertEqual(metadata["papers"][0]["source_paths"], [draft_rel])
+                    self.assertIn(f"- {draft_rel}", result.report_path.read_text(encoding="utf-8"))
+                    if layout == "flat":
+                        rendered = (
+                            result.report_path.read_text(encoding="utf-8")
+                            + json.dumps(manifest)
+                            + json.dumps(metadata)
+                        )
+                        self.assertNotIn(f"projects/{project_name}/", rendered)
+                        self.assertFalse((workspace / "projects" / project_name).exists())
+
+    def test_cli_projects_workspace_keeps_flat_paths_across_output_switches(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp) / "projects"
+            project_dir = _prepare_public_example(workspace, "flat")
+            _write_paper_block(project_dir / "reading-notes.md", "Kept Reading Note")
+            preserved = (project_dir / "reading-notes.md").read_bytes()
+            app_dir = Path(__file__).resolve().parents[1]
+            (workspace / "config.yaml").write_text(
+                (app_dir / "config.example.yaml").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            commands = (
+                ["--survey", "--survey-output", "report-one.md"],
+                ["--survey"],
+                ["--survey", "--survey-output", "report-two.md"],
+                ["--survey", "--survey-output", "report-one.md"],
+            )
+            report_one_bytes = b""
+            for index, args in enumerate(commands):
+                completed = subprocess.run(
+                    [
+                        sys.executable,
+                        "-m",
+                        "src.main",
+                        "--workspace",
+                        str(workspace),
+                        "--project",
+                        "example",
+                        *args,
+                    ],
+                    cwd=app_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=40,
+                    check=False,
+                )
+                self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+                if "--survey-output" in args:
+                    manifest_path = project_dir / "survey_manifest.json"
+                    report_rel = f"example/{args[-1]}"
+                else:
+                    manifest_path = project_dir / "survey" / "survey_manifest.json"
+                    report_rel = "example/survey/survey_report.md"
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                metadata = json.loads(
+                    manifest_path.with_name("paper_metadata.json").read_text(encoding="utf-8")
+                )
+                self.assertEqual(manifest["project"]["project_dir"], "example")
+                self.assertEqual(manifest["paper_count"], 5)
+                self.assertEqual(metadata["paper_count"], 5)
+                self.assertEqual(manifest["metadata_quality"]["paper_count"], 5)
+                self.assertEqual(
+                    manifest["source_files"],
+                    [
+                        "example/literature_survey_sources.md",
+                        "example/reading-notes.md",
+                        "example/task.md",
+                    ],
+                )
+                self.assertEqual(
+                    {paper["title"] for paper in metadata["papers"]},
+                    PUBLIC_EXAMPLE_TITLES | {"Kept Reading Note"},
+                )
+                reading = next(
+                    paper for paper in metadata["papers"] if paper["title"] == "Kept Reading Note"
+                )
+                self.assertEqual(reading["source_paths"], ["example/reading-notes.md"])
+                self.assertEqual(manifest["outputs"]["report"], report_rel)
+                self.assertTrue((workspace / report_rel).is_file())
+                self.assertFalse((workspace / "projects" / "example").exists())
+                if index == 0:
+                    report_one_bytes = (project_dir / "report-one.md").read_bytes()
+                elif index < 3:
+                    self.assertEqual((project_dir / "report-one.md").read_bytes(), report_one_bytes)
+            self.assertEqual((project_dir / "reading-notes.md").read_bytes(), preserved)
 
 
 def _project_dir(root: Path, layout: str, name: str) -> Path:

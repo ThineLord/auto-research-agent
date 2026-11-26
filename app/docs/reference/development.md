@@ -363,8 +363,12 @@ Generated survey artifacts live under `projects/<project>/survey/` by default an
 git. Keep example or golden outputs under `docs/examples/` instead of committing local project
 survey output. Collection skips that default group, the rest of the configured output
 directory, and the explicit `--survey-output` group (report, related work, metadata, and
-manifest) in both flat and legacy projects. Other project markdown stays eligible. Recorded source paths stay workspace-relative, including distinct run
-directories for same-named flat-project drafts.
+manifest) in both flat and legacy projects. Reports and related-work drafts generated at
+another output location are also skipped. Other project markdown and same-named user notes
+stay eligible, and earlier reports stay on disk. Recorded paths use the workspace root: a
+flat project stays `<project>/...` even when that directory is named `projects`, and a
+legacy project stays `projects/<project>/...`. Distinct run directories for same-named
+flat-project drafts stay in those paths.
 
 Survey metadata artifacts are expected to stay deterministic and schema-additive: parsers normalize
 DOI/arXiv aliases for deduplication, and both `paper_metadata.json` and `survey_manifest.json`

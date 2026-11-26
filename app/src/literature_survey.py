@@ -455,16 +455,47 @@ def _generated_survey_relatives(
 
 
 def _survey_repo_root(project_dir: Path) -> Path:
-    """Workspace root used to render survey paths.
+    """Fallback workspace root when the caller does not pass one.
 
-    Legacy projects live at ``<root>/projects/<name>`` and stay
-    ``projects/<name>/...``. Flat projects live at ``<root>/<name>``, so the same
-    root keeps same-named run files distinguishable without absolute paths.
+    Legacy ``<root>/projects/<name>`` stays ``projects/<name>/...``. A flat project
+    uses its parent. A workspace directory that is itself named ``projects`` cannot
+    be inferred from that parent and must be passed in.
     """
     parent = project_dir.parent
     if parent.name == "projects":
         return parent.parent
     return parent
+
+
+def _is_generated_survey_markdown(text: str) -> bool:
+    """Return whether text is a survey report or related-work draft this mode writes.
+
+    Recognition uses the generated text, not the file name. User notes that reuse a
+    report or related-work name stay sources, and the files themselves are unchanged.
+    """
+    lines = text.splitlines()
+    if (
+        len(lines) >= 7
+        and lines[0] == "# Literature Survey Report"
+        and lines[1] == ""
+        and lines[2].startswith("- project: ")
+        and lines[3].startswith("- title: ")
+        and lines[4].startswith("- generated_at: ")
+        and lines[5].startswith("- source_files_scanned: ")
+        and lines[6].startswith("- unique_papers: ")
+    ):
+        return True
+    prefix = "# Related Work Draft\n\n"
+    if not text.startswith(prefix):
+        return False
+    body = text[len(prefix) :]
+    if body.startswith(
+        "Related work could not be generated because no paper metadata was found in the "
+    ):
+        return True
+    represented = body.find(" is represented by ")
+    cluster = body.find(". Across this cluster, recurring methods include ")
+    return body.startswith("Work on ") and 0 < represented < cluster
 
 
 def _source_kind(path: Path, project_dir: Path) -> str:
@@ -513,9 +544,10 @@ def collect_source_files(
 ) -> list[Path]:
     """Collect survey source files from a project without leaving the project root.
 
-    Generated survey artifacts are not sources. That covers the default output
-    directory's report group and, when ``report_path`` is set, the explicit report
-    group, for both flat and legacy project folders. Other markdown is unchanged.
+    Generated survey artifacts are not sources. That covers the current report
+    group, the configured output directory, and survey reports or related-work
+    drafts already written at another output location. Other markdown, including
+    user notes that reuse those filenames, stays eligible.
     """
 
     ensure_project_runtime_paths_safe(project_dir)
@@ -568,6 +600,8 @@ def collect_source_files(
             )
         )
         if not include or not artifact_path_is_safe(lexical_path, allow_missing=False):
+            continue
+        if _is_generated_survey_markdown(read_file_text(lexical_path)):
             continue
         source_files.append(lexical_path)
         if len(source_files) >= config.max_source_files:
@@ -1037,6 +1071,7 @@ def generate_survey_report(
     source_files: Sequence[Path],
     project_input: ProjectInput,
     generated_at: str,
+    repo_root: Path | None = None,
 ) -> str:
     theme_groups = _build_theme_groups(papers)
     topic_counts = _count_terms(papers, "topics")
@@ -1165,7 +1200,8 @@ def generate_survey_report(
         lines.append("No references collected.")
 
     lines.extend(["", "## Source Files", ""])
-    repo_root = _survey_repo_root(project_input.project_dir)
+    if repo_root is None:
+        repo_root = _survey_repo_root(project_input.project_dir)
     for path in source_files:
         lines.append(f"- {display_path(path, repo_root)}")
     return "\n".join(lines).rstrip() + "\n"
@@ -1195,6 +1231,7 @@ def run_literature_survey_mode(
     project_input: ProjectInput,
     config: LiteratureSurveyConfig,
     output_path: Path | None = None,
+    workspace_root: Path | None = None,
 ) -> SurveyResult:
     console.rule("Literature Survey Mode")
     console.print(
@@ -1203,7 +1240,7 @@ def run_literature_survey_mode(
 
     project_dir = project_input.project_dir
     ensure_project_runtime_paths_safe(project_dir)
-    repo_root = _survey_repo_root(project_dir)
+    repo_root = workspace_root if workspace_root is not None else _survey_repo_root(project_dir)
     artifact_project_metadata = _project_metadata_for_artifact(project_input, repo_root)
     generated_at = datetime.now().isoformat()
     output_dir = project_dir / config.output_dir
@@ -1238,6 +1275,7 @@ def run_literature_survey_mode(
         source_files=source_files,
         project_input=project_input,
         generated_at=generated_at,
+        repo_root=repo_root,
     )
     related_work = generate_related_work(papers)
 
