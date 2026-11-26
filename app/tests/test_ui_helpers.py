@@ -2089,6 +2089,160 @@ release_run_lock(handle)
         self.assertEqual(cards["analytics_timeout_errors"], "0 / 1")
         self.assertEqual(dashboard["score_rows"], [])
 
+    def test_ui_score_chart_delta_skips_scoring_failure_fallback_zero(self) -> None:
+        from rich.console import Console
+
+        import ui.app as ui_app
+        from src.runner import run_iterative_rounds
+
+        def run_sequence(project_dir: Path, judge_outputs: list[str]) -> Path:
+            project_dir.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            result = run_iterative_rounds(
+                console=Console(),
+                agents=_SequencedJudgeAgents(judge_outputs),
+                task_text="Compare a valid score with a scoring failure.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="normal",
+                model_name="fake-model",
+                max_rounds=len(judge_outputs),
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+                disable_no_improvement_stop=True,
+                disable_timeout_stop=True,
+            )
+            return Path(result["run_root"])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            spanned = run_sequence(
+                root / "spanned",
+                ['{"score": 20}', "invalid judge response", '{"score": 80}'],
+            )
+            opening = run_sequence(
+                root / "opening",
+                ["invalid judge response", '{"score": 80}'],
+            )
+            spanned_metrics_path = spanned / "round_metrics.json"
+            opening_metrics_path = opening / "round_metrics.json"
+            spanned_before = spanned_metrics_path.read_text(encoding="utf-8")
+            opening_before = opening_metrics_path.read_text(encoding="utf-8")
+            spanned_dashboard = ui_app.build_run_analytics_dashboard(
+                root / "spanned",
+                {"run_root": str(spanned)},
+            )
+            opening_dashboard = ui_app.build_run_analytics_dashboard(
+                root / "opening",
+                {"run_root": str(opening)},
+            )
+            self.assertEqual(spanned_metrics_path.read_text(encoding="utf-8"), spanned_before)
+            self.assertEqual(opening_metrics_path.read_text(encoding="utf-8"), opening_before)
+
+        spanned_metrics = json.loads(spanned_before)
+        self.assertEqual(
+            [entry["score"] for entry in spanned_metrics],
+            [20.0, 0.0, 80.0],
+        )
+        self.assertTrue(spanned_metrics[1]["invalid_score_this_round"])
+        self.assertEqual(
+            spanned_metrics[2]["evolution_metrics"]["score_delta_vs_previous"],
+            80.0,
+        )
+        spanned_rows = [
+            (row["round"], row["score"], row["score_delta"])
+            for row in spanned_dashboard["score_rows"]
+        ]
+        self.assertEqual(spanned_rows, [(1, 20.0, None), (3, 80.0, 60.0)])
+        opening_metrics = json.loads(opening_before)
+        self.assertEqual(
+            opening_metrics[1]["evolution_metrics"]["score_delta_vs_previous"],
+            80.0,
+        )
+        opening_rows = [
+            (row["round"], row["score"], row["score_delta"])
+            for row in opening_dashboard["score_rows"]
+        ]
+        self.assertEqual(opening_rows, [(2, 80.0, None)])
+
+    def test_ui_unscored_best_score_display_stays_empty_without_wiping_live_values(self) -> None:
+        from rich.console import Console
+
+        import ui.app as ui_app
+        from src.runner import run_iterative_rounds
+
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "project"
+            project_dir.mkdir()
+            memory_path = project_dir / "memory.md"
+            memory_path.write_text("Manual memory.\n", encoding="utf-8")
+            result = run_iterative_rounds(
+                console=Console(),
+                agents=_SequencedJudgeAgents(["Judge completed without a numeric score."]),
+                task_text="Record an all-failure best-score placeholder.",
+                project_dir=project_dir,
+                memory_path=memory_path,
+                mode="normal",
+                model_name="fake-model",
+                max_rounds=1,
+                stop_if_no_improvement_rounds=10,
+                global_max_runtime_seconds=60,
+                per_agent_timeout_seconds=300,
+                disable_no_improvement_stop=True,
+                disable_timeout_stop=True,
+            )
+            run_root = Path(result["run_root"])
+            summary_path = run_root / "run_summary.json"
+            checkpoint_path = project_dir / "checkpoint.json"
+            summary_before = summary_path.read_text(encoding="utf-8")
+            checkpoint_before = checkpoint_path.read_text(encoding="utf-8")
+            checkpoint = json.loads(checkpoint_before)
+            dashboard = ui_app.build_run_analytics_dashboard(
+                project_dir,
+                {"run_root": str(run_root)},
+            )
+            rows = ui_app.build_run_metadata_rows(
+                project_dir,
+                {"run_root": str(run_root)},
+            )
+            progress = ui_app.infer_running_stage(
+                log_text="",
+                checkpoint=checkpoint,
+                run_meta={"pid": 5, "mode": "normal", "model": "fake-model"},
+            )
+            historical_root = project_dir / "runs" / "historical"
+            historical_root.mkdir()
+            (historical_root / "run_summary.json").write_text(
+                json.dumps({"run_id": "historical", "best_score": -1.004, "best_round": 1}),
+                encoding="utf-8",
+            )
+            historical_rows = ui_app.build_run_metadata_rows(
+                project_dir,
+                {"run_root": str(historical_root)},
+            )
+            self.assertEqual(summary_path.read_text(encoding="utf-8"), summary_before)
+            self.assertEqual(checkpoint_path.read_text(encoding="utf-8"), checkpoint_before)
+
+        cards = {card["label_key"]: card["value"] for card in dashboard["cards"]}
+        metadata = {row["field_key"]: row["value"] for row in rows}
+        historical = {row["field_key"]: row["value"] for row in historical_rows}
+        self.assertIsNone(cards["analytics_best_score"])
+        self.assertEqual(cards["analytics_timeout_errors"], "0 / 0")
+        self.assertEqual(metadata["run_meta_best_score"], "N/A")
+        self.assertEqual(progress["best_score"], "N/A")
+        self.assertEqual(json.loads(summary_before)["best_score"], -1)
+        self.assertEqual(json.loads(checkpoint_before)["best_score"], -1.0)
+        self.assertEqual(historical["run_meta_best_score"], "-1.004")
+        for live_score in (0, 80, -1.004):
+            live = ui_app.infer_running_stage(
+                log_text="",
+                checkpoint={"best_score": live_score, "last_completed_round": 2},
+                run_meta={"pid": 9, "mode": "normal", "model": "fake-model"},
+            )
+            self.assertEqual(live["best_score"], live_score)
+
     def test_ui_run_metadata_rows_summarize_latest_run_without_absolute_paths(self) -> None:
         import ui.app as ui_app
 
@@ -3586,6 +3740,24 @@ release_run_lock(handle)
 
         self.assertFalse(health["ok"])
         self.assertNotIn("private-key-from-provider", repr(health))
+
+
+class _SequencedJudgeAgents:
+    def __init__(self, judge_outputs: list[str]) -> None:
+        self._judge_outputs = list(judge_outputs)
+        self.llm = SimpleNamespace(timeout_seconds=300)
+
+    def draft(self, **_kwargs: object) -> str:
+        return "Draft from the sequenced-judge fixture."
+
+    def review(self, **_kwargs: object) -> str:
+        return "Review from the sequenced-judge fixture."
+
+    def revise(self, **_kwargs: object) -> str:
+        return "Revised from the sequenced-judge fixture."
+
+    def judge(self, **_kwargs: object) -> str:
+        return self._judge_outputs.pop(0)
 
 
 if __name__ == "__main__":

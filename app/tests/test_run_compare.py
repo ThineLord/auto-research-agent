@@ -618,6 +618,147 @@ class RunCompareTests(unittest.TestCase):
         self.assertEqual(analysis["robustness"]["error_count"], 1)
         self.assertEqual(analysis["robustness"]["timeout_rounds"], [1])
 
+    def test_near_sentinel_history_stays_ranked_and_exact_placeholder_does_not(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_run(
+                root / "historical",
+                {
+                    "run_id": "historical",
+                    "best_score": -1.004,
+                    "best_round": 1,
+                    "completed_rounds": 2,
+                },
+                [
+                    {
+                        "round": 1,
+                        "score": -1.004,
+                        "successful_research_round": True,
+                        "invalid_score_this_round": False,
+                    },
+                    {
+                        "round": 2,
+                        "score": 4,
+                        "successful_research_round": True,
+                        "invalid_score_this_round": False,
+                    },
+                ],
+            )
+            self._write_run(
+                root / "adjacent",
+                {"run_id": "adjacent", "best_score": -1.01, "best_round": 1},
+            )
+            self._write_run(
+                root / "sentinel",
+                {
+                    "run_id": "sentinel",
+                    "best_score": -1,
+                    "best_round": 1,
+                    "error_rounds": [1, 2],
+                },
+                [
+                    {
+                        "round": 1,
+                        "score": 0,
+                        "successful_research_round": False,
+                        "invalid_score_this_round": True,
+                        "errors": ["invalid judge response"],
+                    }
+                ],
+            )
+
+            historical = load_run_summary(root / "historical")
+            adjacent = load_run_summary(root / "adjacent")
+            sentinel = load_run_summary(root / "sentinel")
+            comparison = compare_runs([root / "sentinel", root / "historical", root / "adjacent"])
+            archived = json.loads((root / "historical" / "run_summary.json").read_text())
+
+        self.assertEqual(archived["best_score"], -1.004)
+        self.assertEqual(historical["best_score"], -1.004)
+        self.assertEqual(historical["average_score"], 1.5)
+        self.assertEqual(adjacent["best_score"], -1.01)
+        self.assertIsNone(sentinel["best_score"])
+        self.assertEqual(sentinel["error_count"], 2)
+        self.assertEqual(sentinel["error_rounds"], [1, 2])
+        self.assertEqual(comparison["best_run_id"], "historical")
+        self.assertEqual(comparison["best_score"], -1.004)
+        self.assertIsNone(comparison["best_vs_baseline_delta"])
+        self.assertEqual(comparison["runs"][1]["best_score"], -1.004)
+        self.assertEqual(comparison["runs"][2]["best_score"], -1.01)
+        self.assertIsNone(comparison["runs"][0]["best_score"])
+
+    def test_failed_round_judge_number_cannot_outrank_a_successful_zero(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            failed = root / "failed-judge"
+            succeeded = root / "successful-zero"
+            failed.mkdir()
+            (failed / "round_metrics.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "round": 1,
+                            "score": 89,
+                            "successful_research_round": False,
+                            "invalid_score_this_round": False,
+                            "errors": ["draft failed"],
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            self._write_run(
+                succeeded,
+                {"run_id": "successful-zero", "best_score": 0, "completed_rounds": 1},
+                [
+                    {
+                        "round": 1,
+                        "score": 0,
+                        "successful_research_round": True,
+                        "invalid_score_this_round": False,
+                    }
+                ],
+            )
+            mixed = root / "mixed"
+            mixed.mkdir()
+            (mixed / "round_metrics.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "round": 1,
+                            "score": 89,
+                            "successful_research_round": False,
+                            "invalid_score_this_round": False,
+                            "errors": ["review failed"],
+                        },
+                        {
+                            "round": 2,
+                            "score": 0,
+                            "successful_research_round": True,
+                            "invalid_score_this_round": False,
+                        },
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            failed_summary = load_run_summary(failed)
+            mixed_summary = load_run_summary(mixed)
+            zero_first = compare_runs([succeeded, failed])
+            failed_first = compare_runs([failed, succeeded])
+
+        self.assertIsNone(failed_summary["best_score"])
+        self.assertEqual(failed_summary["average_score"], 89)
+        self.assertEqual(failed_summary["error_count"], 1)
+        self.assertEqual(mixed_summary["best_score"], 0)
+        self.assertEqual(mixed_summary["average_score"], 44.5)
+        self.assertEqual(zero_first["best_run_id"], "successful-zero")
+        self.assertEqual(zero_first["best_score"], 0)
+        self.assertEqual(zero_first["best_vs_baseline_delta"], 0)
+        self.assertEqual(failed_first["best_run_id"], "successful-zero")
+        self.assertEqual(failed_first["best_score"], 0)
+        self.assertIsNone(failed_first["best_vs_baseline_delta"])
+
     @staticmethod
     def _write_run(
         run_root: Path,

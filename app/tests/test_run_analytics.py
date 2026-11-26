@@ -411,6 +411,116 @@ class RunAnalyticsTests(unittest.TestCase):
         self.assertEqual(analysis["score"]["score_delta_first_to_latest"], 10)
         self.assertEqual(analysis["score"]["trend"], "improved")
 
+    def test_early_invalid_judge_zero_stays_out_of_means_and_trends(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            evidenced = root / "evidenced"
+            clueless = root / "clueless"
+            judged_failure = root / "judged-failure"
+            invalid_only = root / "invalid-only"
+            evidenced.mkdir()
+            clueless.mkdir()
+            judged_failure.mkdir()
+            invalid_only.mkdir()
+            (invalid_only / "run_summary.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "invalid-only",
+                        "best_score": -1,
+                        "average_score": 0,
+                        "error_rounds": [1],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (invalid_only / "round_metrics.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "round": 1,
+                            "score": 0,
+                            "successful_research_round": False,
+                            "errors": ["invalid judge response"],
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (evidenced / "run_summary.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "evidenced",
+                        "best_score": -1,
+                        "average_score": 0,
+                        "error_rounds": [1],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (evidenced / "round_metrics.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "round": 1,
+                            "score": 0,
+                            "successful_research_round": False,
+                            "errors": ["invalid judge response"],
+                        },
+                        {
+                            "round": 2,
+                            "score": 0,
+                            "agent_errors": {
+                                "judge": "Invalid Judge output: complete 0-100 JSON scoring required"
+                            },
+                        },
+                        {"round": 3, "score": 40},
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (clueless / "round_metrics.json").write_text(
+                json.dumps([{"round": 1, "score": 0, "errors": ["timeout"]}]),
+                encoding="utf-8",
+            )
+            (judged_failure / "round_metrics.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "round": 1,
+                            "score": 12,
+                            "successful_research_round": False,
+                            "errors": ["draft timed out"],
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            evidenced_analysis = analyze_run(evidenced)
+            invalid_only_analysis = analyze_run(invalid_only)
+            clueless_analysis = analyze_run(clueless)
+            judged_failure_analysis = analyze_run(judged_failure)
+
+        self.assertEqual(evidenced_analysis["score"]["best_score"], 40)
+        self.assertEqual(evidenced_analysis["score"]["average_score"], 40)
+        self.assertEqual(evidenced_analysis["score"]["first_round"], 3)
+        self.assertEqual(evidenced_analysis["score"]["first_score"], 40)
+        self.assertEqual(evidenced_analysis["score"]["latest_score"], 40)
+        self.assertIsNone(evidenced_analysis["score"]["score_delta_first_to_latest"])
+        self.assertEqual(evidenced_analysis["score"]["trend"], "single_round")
+        self.assertEqual(evidenced_analysis["robustness"]["error_count"], 1)
+        self.assertEqual(evidenced_analysis["robustness"]["error_rounds"], [1])
+        self.assertIsNone(invalid_only_analysis["score"]["best_score"])
+        self.assertIsNone(invalid_only_analysis["score"]["average_score"])
+        self.assertEqual(invalid_only_analysis["score"]["trend"], "unknown")
+        self.assertEqual(invalid_only_analysis["robustness"]["error_count"], 1)
+        self.assertEqual(invalid_only_analysis["robustness"]["error_rounds"], [1])
+        self.assertEqual(clueless_analysis["score"]["best_score"], 0)
+        self.assertEqual(clueless_analysis["score"]["average_score"], 0)
+        self.assertEqual(clueless_analysis["score"]["first_score"], 0)
+        self.assertEqual(judged_failure_analysis["score"]["average_score"], 12)
+        self.assertIsNone(judged_failure_analysis["score"]["best_score"])
+
 
 if __name__ == "__main__":
     unittest.main()

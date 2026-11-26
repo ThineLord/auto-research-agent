@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import html
 import json
+import math
 import os
 import re
 import stat
@@ -72,7 +73,12 @@ from src.round_commit_recovery import (
     round_commit_read_blocker,
 )
 from src.run_analytics import analyze_run
-from src.run_compare import compare_runs
+from src.run_compare import (
+    compare_runs,
+    is_runner_unscored_best,
+    load_run_summary,
+    score_is_unusable_for_trend,
+)
 from src.runtime import (
     get_active_process_meta,
     model_job_meta_path,
@@ -927,7 +933,7 @@ def infer_running_stage(
         "stage": stage,
         "stage_status": stage_status,
         "last_successful_agent": checkpoint.get("last_successful_agent", "N/A"),
-        "best_score": checkpoint.get("best_score", "N/A"),
+        "best_score": _visible_progress_best_score(checkpoint.get("best_score", "N/A")),
         "stop_reason": checkpoint.get("stop_reason", "N/A"),
         "can_resume": bool(checkpoint.get("can_resume", False)),
         "drafting_mode": run_meta.get("drafting_mode") or checkpoint.get("drafting_mode", "N/A"),
@@ -1301,7 +1307,12 @@ def build_run_metadata_rows(project_dir: Path, checkpoint: dict[str, Any]) -> li
         ),
         (
             "run_meta_best_score",
-            _first_present(run_config.get("best_score"), run_summary.get("best_score")),
+            _visible_metadata_best_score(
+                _first_present(run_config.get("best_score"), run_summary.get("best_score")),
+                project_dir=project_dir,
+                run_root=paths["run_root"],
+                run_scope_valid=paths["run_scope_valid"],
+            ),
         ),
         (
             "run_meta_avg_revised_similarity",
@@ -1592,7 +1603,7 @@ def _flatten_metric_rows(entries: Sequence[dict[str, Any]]) -> list[dict[str, An
             {
                 "round": entry.get("round"),
                 "score": entry.get("score"),
-                "invalid_score": entry.get("invalid_score_this_round", False),
+                "invalid_score": score_is_unusable_for_trend(entry),
                 "timeout": entry.get("timeout_this_round", False),
                 "errors": len(entry.get("errors") or []),
                 "draft_s": timings.get("draft", 0.0),
@@ -1637,19 +1648,72 @@ def _format_seconds(value: Any) -> str:
     return f"{numeric:.2f}s"
 
 
+def _visible_progress_best_score(value: Any) -> Any:
+    """Hide the runner placeholder without clearing a live valid score."""
+    if is_runner_unscored_best(value):
+        return "N/A"
+    return value
+
+
+def _visible_metadata_best_score(
+    value: Any,
+    *,
+    project_dir: Path,
+    run_root: Path,
+    run_scope_valid: bool,
+) -> Any:
+    """Match the analytics card when the archived best score is still -1."""
+    if not is_runner_unscored_best(value):
+        return value
+    if not run_scope_valid:
+        return None
+    resolved = load_run_summary(
+        run_root,
+        safe_artifacts=True,
+        project_dir=project_dir,
+    )
+    return resolved.get("best_score")
+
+
+def _displayed_valid_score_delta(current: float, previous: float) -> float | None:
+    try:
+        delta = current - previous
+    except OverflowError:
+        return None
+    if not math.isfinite(delta):
+        return None
+    return round(delta, 2)
+
+
 def _score_trend_rows(rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Chart rows use the previous valid score, not a hidden fallback zero.
+
+    Disk history keeps the adjacent delta. After a scoring failure, the first
+    valid row has no previous valid score, so its displayed delta stays empty.
+    """
     trend_rows: list[dict[str, Any]] = []
+    previous_valid_score: float | None = None
+    invalid_since_previous_valid = False
     for row in rows:
         if row.get("invalid_score") is True:
+            invalid_since_previous_valid = True
             continue
         score = _safe_float(row.get("score"))
-        if score is None:
+        if score is None or not math.isfinite(score):
             continue
+        if previous_valid_score is None:
+            delta = None if invalid_since_previous_valid else row.get("score_delta_vs_previous")
+        elif invalid_since_previous_valid:
+            delta = _displayed_valid_score_delta(score, previous_valid_score)
+        else:
+            delta = row.get("score_delta_vs_previous")
+        previous_valid_score = score
+        invalid_since_previous_valid = False
         trend_rows.append(
             {
                 "round": row.get("round"),
                 "score": score,
-                "score_delta": row.get("score_delta_vs_previous"),
+                "score_delta": delta,
             }
         )
     return trend_rows
@@ -2058,7 +2122,7 @@ def load_score_history_rows(
                 "improved": entry.get("improved"),
                 "drafting_mode": entry.get("drafting_mode", ""),
                 "timeout": entry.get("timeout_this_round", False),
-                "invalid_score": entry.get("invalid_score_this_round", False),
+                "invalid_score": score_is_unusable_for_trend(entry),
                 "errors": len(entry.get("errors") or []),
                 "draft_s": timings.get("draft", 0.0),
                 "review_s": timings.get("review", 0.0),
