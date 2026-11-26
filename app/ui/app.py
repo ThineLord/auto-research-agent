@@ -82,12 +82,16 @@ from src.run_compare import (
 from src.runtime import (
     get_active_process_meta,
     model_job_meta_path,
+    read_live_cli_run,
+    request_dashboard_stop,
+    run_accepts_cooperative_stop,
     run_meta_path,
     run_project_tests,
     start_background_process,
+    stop_requested,
+    ui_run_generation,
 )
 from src.storage import (
-    artifact_path_exists,
     artifact_path_is_safe,
     ensure_project_runtime_paths_safe,
     list_artifact_directories,
@@ -885,6 +889,18 @@ def check_model_health(
     )
 
 
+def get_active_run_meta(project_dir: Path, *, cleanup: bool = True) -> dict[str, Any]:
+    """Prefer a live UI-started process, then a verified CLI research run."""
+    recorded = get_active_process_meta(run_meta_path(project_dir), cleanup=cleanup)
+    if recorded:
+        lock = read_json_file(project_dir / "active_run.json")
+        stoppable = run_accepts_cooperative_stop(recorded)
+        if lock and lock.get("pid") == recorded.get("pid"):
+            stoppable = stoppable and run_accepts_cooperative_stop(lock)
+        return {**recorded, "stoppable": stoppable, "generation": ui_run_generation(recorded)}
+    return read_live_cli_run(project_dir)
+
+
 def infer_running_stage(
     *,
     log_text: str,
@@ -937,6 +953,8 @@ def infer_running_stage(
         "stop_reason": checkpoint.get("stop_reason", "N/A"),
         "can_resume": bool(checkpoint.get("can_resume", False)),
         "drafting_mode": run_meta.get("drafting_mode") or checkpoint.get("drafting_mode", "N/A"),
+        "generation": run_meta.get("generation") if run_active else None,
+        "stoppable": bool(run_active) and run_accepts_cooperative_stop(run_meta),
     }
 
 
@@ -2185,7 +2203,7 @@ def render_live_progress_and_logs(
     except OSError:
         st.warning(t("unsafe_project_paths"))
         return
-    run_meta = get_active_process_meta(run_meta_path(proj_path))
+    run_meta = get_active_run_meta(proj_path, cleanup=False)
     checkpoint = read_json_file(checkpoint_path)
     run_log_text = tail_file_lines(run_log_path, max_lines=240)
 
@@ -2210,7 +2228,7 @@ def render_live_progress_and_logs(
         st.write(
             t(
                 "stop_signal_present",
-                present=artifact_path_exists(stop_signal_path, allow_directory=True),
+                present=stop_requested(stop_signal_path, active_run=run_meta),
             )
         )
         st.write(t("selected_model", model=st.session_state.get("selected_model", default_model)))
@@ -2307,8 +2325,8 @@ def main() -> None:
     model_job_log_path = proj_path / "model_ops.log"
     checkpoint_path = proj_path / "checkpoint.json"
     stop_signal_path = proj_path / "STOP_REQUESTED"
-    run_meta = get_active_process_meta(run_meta_path(proj_path))
-    model_job_meta = get_active_process_meta(model_job_meta_path(proj_path))
+    run_meta = get_active_run_meta(proj_path, cleanup=False)
+    model_job_meta = get_active_process_meta(model_job_meta_path(proj_path), cleanup=False)
     checkpoint = read_json_file(checkpoint_path)
 
     with workspace_tab:
@@ -2852,14 +2870,20 @@ def main() -> None:
             ):
                 launch_run("resume", "started_resume")
         with stop_col:
+            can_stop = run_active and run_accepts_cooperative_stop(run_meta)
             if st.button(
-                t("pause_stop_safely"), key="stop_run", width="stretch", disabled=not run_active
+                t("pause_stop_safely"),
+                key="stop_run",
+                width="stretch",
+                disabled=not can_stop,
             ):
                 stop_signal_display = output_display_path(stop_signal_path)
-                if create_stop_signal(stop_signal_path):
-                    st.warning(t("stop_signal_created", path=stop_signal_display))
-                else:
+                try:
+                    request_dashboard_stop(proj_path, run_meta)
+                except (OSError, ValueError):
                     st.error(t("stop_signal_failed", path=stop_signal_display))
+                else:
+                    st.warning(t("stop_signal_created", path=stop_signal_display))
         if run_model_blocked:
             st.caption(t("configure_model_hint"))
         with st.expander(t("resume_status")):

@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import errno
+import hashlib
 import os
 import stat
+import struct
 import subprocess
 import sys
 import time
 import uuid
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -28,15 +31,42 @@ from .storage import (
     open_append_text_file,
     open_binary_update_file,
     read_json_file,
+    read_regular_text_bounded,
     unlink_artifact_file,
+    write_file_text,
+    write_file_text_publish_only,
     write_json_file,
 )
 
 RUN_PROCESS_META_FILENAME = "ui_run_process.json"
 MODEL_JOB_PROCESS_META_FILENAME = "ui_model_job_process.json"
 RUN_LOCK_GUARD_FILENAME = "active_run.guard"
+STOP_GUARD_FILENAME = "active_stop.guard"
+_DASHBOARD_STOP = "ARA_DASHBOARD_STOP_V1 "
 RUN_LOCK_SCHEMA_VERSION = 1
 MAX_PROCESS_ID = (1 << 32) - 1
+# Research modes that hold the run guard. Diagnostic is live but does not read
+# STOP_REQUESTED, so it is not stoppable. Edit and maintenance locks use the
+# same guard and are not a run.
+LIVE_RESEARCH_MODES = frozenset(
+    {
+        "mock",
+        "normal",
+        "continuous",
+        "diagnostic",
+        "session",
+        "resume",
+    }
+)
+STOPPABLE_RUN_MODES = frozenset(
+    {
+        "mock",
+        "normal",
+        "continuous",
+        "session",
+        "resume",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -54,6 +84,7 @@ class RunLockHandle:
     pid: int
     guard_device: int
     guard_inode: int
+    mode: str
     _guard_file: BinaryIO = field(repr=False, compare=False)
 
     def __fspath__(self) -> str:
@@ -79,7 +110,57 @@ def log_run(console: Console, log_path: Path, mode: str, message: str) -> None:
     append_log_line(log_path, line)
 
 
-def stop_requested(stop_signal_path: Path) -> bool:
+@contextmanager
+def _stop_guard(project_dir: Path):
+    """Serialize dashboard stop publication, run handoff, and the last stop check."""
+    with open_binary_update_file(
+        project_dir / STOP_GUARD_FILENAME, anchor=project_dir.parent
+    ) as guard:
+        if os.name == "nt":
+            import msvcrt
+
+            guard.seek(0)
+            msvcrt.locking(guard.fileno(), msvcrt.LK_LOCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(guard.fileno(), fcntl.LOCK_EX)
+        yield  # Closing the descriptor releases the lock, including on exceptions.
+
+
+def _dashboard_marker(path: Path) -> str | None:
+    """None means absent; the empty string represents any pre-existing manual marker."""
+    try:
+        text = read_regular_text_bounded(path, max_bytes=256, anchor=path.parent.parent)
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError):
+        return "" if artifact_path_exists(path, allow_directory=True) else None
+    return text.rstrip("\n") if text.startswith(_DASHBOARD_STOP) else ""
+
+
+def _ui_marker(meta: dict) -> str:
+    return _DASHBOARD_STOP + ui_run_generation(meta)
+
+
+def ui_run_generation(meta: dict) -> str:
+    return f"ui {meta.get('pid')} {meta.get('started_at', '')}"
+
+
+def _owner_marker(token: str) -> str:
+    return _DASHBOARD_STOP + token
+
+
+def _owner_generation(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def stop_requested(
+    stop_signal_path: Path,
+    *,
+    active_run: dict | None = None,
+    run_lock_handle: RunLockHandle | None = None,
+) -> bool:
     if not artifact_boundary_is_registered(stop_signal_path):
         try:
             ensure_project_runtime_paths_safe(
@@ -88,7 +169,95 @@ def stop_requested(stop_signal_path: Path) -> bool:
             )
         except OSError:
             return False
-    return artifact_path_exists(stop_signal_path, allow_directory=True)
+    if not artifact_path_exists(stop_signal_path, allow_directory=True):
+        return False
+    marker = _dashboard_marker(stop_signal_path)
+    if not marker:
+        return marker == ""
+    project = stop_signal_path.parent
+    if marker.startswith(_DASHBOARD_STOP + "ui "):
+        ui = (
+            active_run
+            if active_run is not None
+            else get_active_process_meta(run_meta_path(project), cleanup=False)
+        )
+        return bool(ui and ui.get("kind") != "cli_run" and marker == _ui_marker(ui))
+    token = marker.removeprefix(_DASHBOARD_STOP)
+    if run_lock_handle is not None:
+        return (
+            not run_lock_handle._guard_file.closed
+            and run_lock_handle.pid == os.getpid()
+            and run_lock_handle.path.parent == project
+            and run_lock_handle.owner_token == token
+        )
+    if active_run is not None and (not active_run or active_run.get("kind") == "cli_run"):
+        return active_run.get("generation") == _owner_generation(token)
+    # A UI process record alone cannot authenticate a CLI marker. An independent observer
+    # needs the kernel-owned generation, even when stale metadata names a live or reused PID.
+    cli = read_live_cli_run(project)
+    if cli:
+        return cli["generation"] == _owner_generation(token) and (
+            active_run is None or active_run.get("pid") == cli["pid"]
+        )
+    if os.name == "nt":
+        # Native Windows uses its verified UI process record for dashboard-launched runs.
+        ui = (
+            active_run
+            if active_run is not None
+            else get_active_process_meta(run_meta_path(project), cleanup=False)
+        )
+        lock = read_json_file(project / RUN_LOCK_FILENAME)
+        return bool(ui and lock.get("pid") == ui.get("pid") and lock.get("owner_token") == token)
+    return False
+
+
+def request_dashboard_stop(project: Path, expected: dict) -> None:
+    """Revalidate the selected generation while its stop window cannot close."""
+    with _stop_guard(project):
+        cli = read_live_cli_run(project)
+        ui = get_active_process_meta(run_meta_path(project), cleanup=False)
+        current = cli if expected.get("kind") == "cli_run" else ui
+        if current is ui and ui:
+            current = {**ui, "generation": ui_run_generation(ui)}
+        if not current or any(
+            current.get(key) != expected.get(key) for key in ("pid", "started_at", "generation")
+        ):
+            raise ValueError("No active run")
+        lock = read_json_file(project / RUN_LOCK_FILENAME)
+        if not run_accepts_cooperative_stop(current) or (
+            lock
+            and (
+                lock.get("pid") != current.get("pid")
+                or lock.get("mode") not in STOPPABLE_RUN_MODES
+                or lock.get("stoppable") is False
+            )
+        ):
+            raise ValueError("This run cannot be stopped safely")
+        token = lock.get("owner_token")
+        marker = _owner_marker(token) if isinstance(token, str) and token else _ui_marker(current)
+        path = project / "STOP_REQUESTED"
+        existing = _dashboard_marker(path)
+        if existing is None:
+            try:
+                write_file_text_publish_only(path, marker + "\n", anchor=project.parent)
+            except FileExistsError:
+                pass  # A manual marker published concurrently already requests a stop.
+        elif existing and existing != marker:
+            write_file_text(path, marker + "\n", anchor=project.parent)
+
+
+def close_run_stop_window(handle: RunLockHandle | None) -> bool:
+    """Close the window before finalizing, and observe any already accepted stop."""
+    if not isinstance(handle, RunLockHandle):
+        return False
+    project = handle.path.parent
+    with _stop_guard(project):
+        if not run_lock_handle_is_current(project, handle):
+            return False
+        meta = read_json_file(handle.path)
+        meta["stoppable"] = False
+        write_json_file(handle.path, meta)
+        return stop_requested(project / "STOP_REQUESTED", run_lock_handle=handle)
 
 
 def is_pid_running(pid: int) -> bool:
@@ -158,27 +327,95 @@ def model_job_meta_path(project_dir: Path) -> Path:
     return project_dir / MODEL_JOB_PROCESS_META_FILENAME
 
 
-def get_active_process_meta(meta_path: Path) -> Dict[str, Any]:
+def _recorded_pid(meta: Dict[str, Any]) -> int:
+    try:
+        pid = int(meta.get("pid", 0)) if meta else 0
+    except (TypeError, ValueError):
+        return 0
+    if pid <= 0 or pid > MAX_PROCESS_ID:
+        return 0
+    return pid
+
+
+def _process_meta_snapshot(
+    meta_path: Path,
+) -> tuple[Dict[str, Any], Optional[tuple[int, int, int, int]]]:
+    """Return metadata and the file identity observed with it.
+
+    A missing file has no identity, so the caller must not unlink. A file that
+    changes between the stat and the read also has no identity: that is a new
+    record and must be left in place.
+    """
     try:
         ensure_project_runtime_paths_safe(
             meta_path.parent,
             anchor=meta_path.parent.parent,
         )
     except OSError:
-        return {}
+        return {}, None
+    if not artifact_path_is_safe(meta_path, allow_missing=True):
+        return {}, None
+    try:
+        before = meta_path.lstat()
+    except FileNotFoundError:
+        return {}, None
+    except OSError:
+        return {}, None
+    if not stat.S_ISREG(before.st_mode):
+        return {}, None
     meta = read_json_file(meta_path)
     try:
-        pid = int(meta.get("pid", 0)) if meta else 0
-    except (TypeError, ValueError):
-        pid = 0
-    if pid and is_pid_running(pid):
-        return meta
-    if not artifact_path_is_safe(meta_path, allow_missing=False):
-        return {}
+        after = meta_path.lstat()
+    except OSError:
+        return {}, None
+    identity = (after.st_dev, after.st_ino, after.st_size, getattr(after, "st_mtime_ns", 0))
+    observed = (before.st_dev, before.st_ino, before.st_size, getattr(before, "st_mtime_ns", 0))
+    if identity != observed:
+        return {}, None
+    return meta if isinstance(meta, dict) else {}, identity
+
+
+def _unlink_process_meta(meta_path: Path, identity: tuple[int, int, int, int]) -> None:
+    try:
+        current = meta_path.lstat()
+    except OSError:
+        return
+    if (
+        current.st_dev,
+        current.st_ino,
+        current.st_size,
+        getattr(current, "st_mtime_ns", 0),
+    ) != identity:
+        return
     try:
         unlink_artifact_file(meta_path)
     except OSError:
         pass
+
+
+def get_active_process_meta(meta_path: Path, *, cleanup: bool = True) -> Dict[str, Any]:
+    """Return live process metadata.
+
+    ``cleanup`` removes a stale record this call actually observed. Read-only
+    callers pass False so they cannot delete a record published after the read
+    decided the file was missing or expired.
+    """
+    meta, identity = _process_meta_snapshot(meta_path)
+    pid = _recorded_pid(meta)
+    if pid and is_pid_running(pid):
+        return meta
+    if not cleanup or identity is None:
+        return {}
+    current, current_identity = _process_meta_snapshot(meta_path)
+    if current_identity != identity:
+        current_pid = _recorded_pid(current)
+        if current_pid and is_pid_running(current_pid):
+            return current
+        return {}
+    current_pid = _recorded_pid(current)
+    if current_pid and is_pid_running(current_pid):
+        return current
+    _unlink_process_meta(meta_path, identity)
     return {}
 
 
@@ -386,6 +623,294 @@ def _guard_identity(guard_file: BinaryIO) -> tuple[int, int]:
     return guard_stat.st_dev, guard_stat.st_ino
 
 
+def _lock_int(value: object) -> Optional[int]:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+_PROC_LOCKS_PATH = Path("/proc/locks")
+# Darwin struct flock: off_t, off_t, pid_t, short, short. Native alignment is 24 bytes.
+_DARWIN_FLOCK = struct.Struct("@qqihh")
+_DARWIN_VNODE = 1
+_DARWIN_LIST_FDS = 1
+_DARWIN_FD_VNODE = 1
+
+
+def run_accepts_cooperative_stop(meta: Dict[str, Any]) -> bool:
+    """True when this live record belongs to a mode that consumes STOP_REQUESTED."""
+    if not isinstance(meta, dict) or not meta:
+        return False
+    marker = meta.get("stoppable")
+    if isinstance(marker, bool):
+        return marker
+    mode = meta.get("mode")
+    if isinstance(mode, str) and mode in LIVE_RESEARCH_MODES:
+        return mode in STOPPABLE_RUN_MODES
+    return True
+
+
+def _proc_locks_text() -> Optional[str]:
+    try:
+        return _PROC_LOCKS_PATH.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+
+def _proc_locks_show_write_flock(text: str, device: int, inode: int, pid: int) -> bool:
+    identity = f"{os.major(device):02x}:{os.minor(device):02x}:{inode}"
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) < 6:
+            continue
+        if (
+            parts[1] == "FLOCK"
+            and parts[3] == "WRITE"
+            and parts[4] == str(pid)
+            and parts[5] == identity
+        ):
+            return True
+    return False
+
+
+def _devices_match(left: int, right: int) -> bool:
+    return left == right or (left & 0xFFFFFFFF) == (right & 0xFFFFFFFF)
+
+
+def _open_inode_matches(device: int, inode: int, records: Sequence[tuple[int, int]]) -> bool:
+    return any(
+        seen_inode == inode and _devices_match(seen_device, device)
+        for seen_device, seen_inode in records
+    )
+
+
+def _darwin_lock_is_held(
+    lock_type: int,
+    lock_pid: int,
+    pid: int,
+    write_type: int,
+    inode_open: bool,
+) -> bool:
+    """Attribute a Darwin F_GETLK result to this project's flock holder.
+
+    flock(2) is visible to F_GETLK, but its owner pid is -1. A write lock with
+    an unknown owner counts only when the recorded PID still has that inode
+    open. A different pid, or a live PID alone, does not.
+    """
+    if lock_type != write_type:
+        return False
+    if lock_pid == pid:
+        return True
+    if lock_pid == -1:
+        return inode_open
+    return False
+
+
+def _darwin_proc_library() -> Any:
+    import ctypes
+    import ctypes.util
+
+    # `import ctypes` does not load ctypes.util. A clean interpreter raises
+    # AttributeError here, and the caller then treats the guard as unlocked.
+    library = ctypes.util.find_library("proc") or "/usr/lib/libSystem.B.dylib"
+    loaded = ctypes.CDLL(library, use_errno=True)
+    for name in ("proc_pidinfo", "proc_pidfdinfo"):
+        function = getattr(loaded, name)
+        function.restype = ctypes.c_int
+    loaded.proc_pidinfo.argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_uint64,
+        ctypes.c_void_p,
+        ctypes.c_int,
+    ]
+    loaded.proc_pidfdinfo.argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_void_p,
+        ctypes.c_int,
+    ]
+    return loaded
+
+
+def _darwin_open_inodes(pid: int) -> Optional[list[tuple[int, int]]]:
+    import ctypes
+
+    try:
+        library = _darwin_proc_library()
+    except (AttributeError, OSError):
+        return None
+    fd_size = 8
+    capacity = 256
+    listed: Optional[bytes] = None
+    while capacity <= 65536:
+        raw = ctypes.create_string_buffer(capacity * fd_size)
+        written = library.proc_pidinfo(pid, _DARWIN_LIST_FDS, 0, raw, len(raw))
+        if written < 0:
+            return None
+        if written < len(raw) or capacity >= 65536:
+            listed = raw.raw[: max(written, 0)]
+            break
+        capacity *= 2
+    if not listed:
+        return []
+    records: list[tuple[int, int]] = []
+    info = ctypes.create_string_buffer(256)
+    for offset in range(0, len(listed) - (fd_size - 1), fd_size):
+        fd, fd_type = struct.unpack_from("@iI", listed, offset)
+        if fd_type != _DARWIN_VNODE:
+            continue
+        size = library.proc_pidfdinfo(pid, fd, _DARWIN_FD_VNODE, info, len(info))
+        if size < 40:
+            continue
+        # proc_fileinfo is 24 bytes; vinfo_stat.vst_dev then vst_ino at +8.
+        device, inode = struct.unpack_from("@IQ", info.raw, 24)
+        records.append((device, inode))
+    return records
+
+
+def _darwin_blocking_lock(fd: int) -> Optional[tuple[int, int]]:
+    import fcntl
+
+    query = _DARWIN_FLOCK.pack(0, 0, 0, fcntl.F_WRLCK, os.SEEK_SET)
+    try:
+        raw = fcntl.fcntl(fd, fcntl.F_GETLK, query)
+    except OSError:
+        return None
+    if not isinstance(raw, (bytes, bytearray)) or len(raw) < _DARWIN_FLOCK.size:
+        return None
+    _start, _length, lock_pid, lock_type, _whence = _DARWIN_FLOCK.unpack_from(raw)
+    return lock_type, lock_pid
+
+
+def _darwin_write_flock_held_by(guard_path: Path, device: int, inode: int, pid: int) -> bool:
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(guard_path, flags)
+    except OSError:
+        return False
+    try:
+        opened = os.fstat(descriptor)
+        if opened.st_ino != inode or not _devices_match(opened.st_dev, device):
+            return False
+        import fcntl
+
+        found = _darwin_blocking_lock(descriptor)
+        if found is None:
+            return False
+        lock_type, lock_pid = found
+        if lock_type != fcntl.F_WRLCK:
+            return False
+        if lock_pid == pid:
+            return True
+        if lock_pid != -1:
+            return False
+        records = _darwin_open_inodes(pid)
+        if records is None:
+            return False
+        return _darwin_lock_is_held(
+            lock_type, lock_pid, pid, fcntl.F_WRLCK, _open_inode_matches(device, inode, records)
+        )
+    except OSError:
+        return False
+    finally:
+        os.close(descriptor)
+
+
+def _non_proc_write_flock_held_by(guard_path: Path, device: int, inode: int, pid: int) -> bool:
+    """Observe a write flock where /proc/locks does not exist.
+
+    macOS reports the project's BSD flock through F_GETLK and attributes it
+    with libproc. Tests replace this function to exercise that branch offline.
+    """
+    if sys.platform != "darwin":
+        return False
+    return _darwin_write_flock_held_by(guard_path, device, inode, pid)
+
+
+def _write_flock_held_by(guard_path: Path, device: int, inode: int, pid: int) -> bool:
+    """True when that PID holds the guard's write flock.
+
+    Linux flock is not visible to fcntl F_GETLK, so /proc/locks is read without
+    acquiring the lock. macOS uses F_GETLK plus the PID's open inodes. A poll
+    never takes the guard, and a merely live PID is not enough.
+    """
+    text = _proc_locks_text()
+    if text is not None:
+        return _proc_locks_show_write_flock(text, device, inode, pid)
+    return _non_proc_write_flock_held_by(guard_path, device, inode, pid)
+
+
+def _live_cli_run_record(project_dir: Path) -> Dict[str, Any]:
+    try:
+        ensure_project_runtime_paths_safe(project_dir, anchor=project_dir.parent)
+    except OSError:
+        return {}
+    lock_path = project_dir / RUN_LOCK_FILENAME
+    guard_path = project_dir / RUN_LOCK_GUARD_FILENAME
+    anchor = project_dir.parent
+    if not artifact_path_is_safe(lock_path, allow_missing=False, anchor=anchor):
+        return {}
+    if not artifact_path_is_safe(guard_path, allow_missing=False, anchor=anchor):
+        return {}
+    try:
+        lock_data = read_json_file(lock_path)
+        guard_stat = guard_path.lstat()
+    except OSError:
+        return {}
+    if not stat.S_ISREG(guard_stat.st_mode) or not isinstance(lock_data, dict):
+        return {}
+    mode = lock_data.get("mode")
+    owner = lock_data.get("owner_token")
+    model = lock_data.get("model")
+    pid = _parse_lock_pid(lock_data.get("pid"))
+    device = _lock_int(lock_data.get("guard_device"))
+    inode = _lock_int(lock_data.get("guard_inode"))
+    if (
+        lock_data.get("schema_version") != RUN_LOCK_SCHEMA_VERSION
+        or not isinstance(owner, str)
+        or not owner
+        or not isinstance(mode, str)
+        or mode not in LIVE_RESEARCH_MODES
+        or not isinstance(model, str)
+        or not pid
+        or not is_pid_running(pid)
+        or device != guard_stat.st_dev
+        or inode != guard_stat.st_ino
+        or not _write_flock_held_by(guard_path, guard_stat.st_dev, guard_stat.st_ino, pid)
+    ):
+        return {}
+    started = lock_data.get("started_at")
+    return {
+        "pid": pid,
+        "mode": mode,
+        "model": model,
+        "started_at": started if isinstance(started, str) else "",
+        "kind": "cli_run",
+        "generation": _owner_generation(owner),
+        "stoppable": mode in STOPPABLE_RUN_MODES and lock_data.get("stoppable") is not False,
+        "command": " ".join(part for part in (mode, model) if part),
+    }
+
+
+def read_live_cli_run(project_dir: Path) -> Dict[str, Any]:
+    """Return a live owned research run, including a non-stoppable diagnostic.
+
+    Ownerless metadata and edit/maintenance locks stay invisible. A matching
+    UI process record is preferred by the dashboard and is not read here.
+    """
+    return _live_cli_run_record(project_dir)
+
+
+def read_stoppable_cli_run(project_dir: Path) -> Dict[str, Any]:
+    """Return a live run that will consume STOP_REQUESTED."""
+    meta = _live_cli_run_record(project_dir)
+    if not meta.get("stoppable"):
+        return {}
+    return meta
+
+
 def _metadata_guard_matches(lock_data: Dict[str, Any], device: int, inode: int) -> bool:
     stored_device = lock_data.get("guard_device")
     stored_inode = lock_data.get("guard_inode")
@@ -500,19 +1025,32 @@ def acquire_run_lock(
     owner_token = uuid.uuid4().hex
     pid = os.getpid()
     try:
-        write_json_file(
-            lock_path,
-            {
-                "schema_version": RUN_LOCK_SCHEMA_VERSION,
-                "owner_token": owner_token,
-                "pid": pid,
-                "guard_device": guard_device,
-                "guard_inode": guard_inode,
-                "mode": mode,
-                "model": model_name,
-                "started_at": datetime.now().isoformat(),
-            },
-        )
+        with _stop_guard(project_dir) if mode in LIVE_RESEARCH_MODES else nullcontext():
+            if mode in LIVE_RESEARCH_MODES:
+                # Recover after a crash, or adopt a UI request made before its child acquired the guard.
+                path = project_dir / "STOP_REQUESTED"
+                previous = _dashboard_marker(path)
+                if previous:
+                    ui = get_active_process_meta(run_meta_path(project_dir), cleanup=False)
+                    if ui.get("pid") == pid and previous == _ui_marker(ui):
+                        write_file_text(
+                            path, _owner_marker(owner_token) + "\n", anchor=project_dir.parent
+                        )
+                    else:
+                        unlink_artifact_file(path)
+            write_json_file(
+                lock_path,
+                {
+                    "schema_version": RUN_LOCK_SCHEMA_VERSION,
+                    "owner_token": owner_token,
+                    "pid": pid,
+                    "guard_device": guard_device,
+                    "guard_inode": guard_inode,
+                    "mode": mode,
+                    "model": model_name,
+                    "started_at": datetime.now().isoformat(),
+                },
+            )
     except Exception as exc:  # noqa: BLE001
         _close_guard(guard_file)
         return None, f"Run lock metadata could not be written: {exc.__class__.__name__}."
@@ -524,6 +1062,7 @@ def acquire_run_lock(
             pid=pid,
             guard_device=guard_device,
             guard_inode=guard_inode,
+            mode=mode,
             _guard_file=guard_file,
         ),
         None,
@@ -572,18 +1111,17 @@ def release_run_lock(lock_handle: Optional[RunLockHandle | Path]) -> None:
             pass
         return
     try:
-        lock_data, regular_or_missing = _lock_metadata(lock_handle.path)
-        if (
-            regular_or_missing
-            and lock_data.get("owner_token") == lock_handle.owner_token
-            and _parse_lock_pid(lock_data.get("pid")) == lock_handle.pid
-            and _metadata_guard_matches(
-                lock_data,
-                lock_handle.guard_device,
-                lock_handle.guard_inode,
-            )
-        ):
-            unlink_artifact_file(lock_handle.path)
+        project = lock_handle.path.parent
+        with _stop_guard(project) if lock_handle.mode in LIVE_RESEARCH_MODES else nullcontext():
+            if run_lock_handle_is_current(project, lock_handle):
+                if lock_handle.mode in LIVE_RESEARCH_MODES:
+                    path = project / "STOP_REQUESTED"
+                    if _dashboard_marker(path) == _owner_marker(lock_handle.owner_token):
+                        unlink_artifact_file(path)
+                    ui_path = run_meta_path(project)
+                    if read_json_file(ui_path).get("pid") == lock_handle.pid:
+                        unlink_artifact_file(ui_path)
+                unlink_artifact_file(lock_handle.path)
     except OSError:
         pass
     finally:

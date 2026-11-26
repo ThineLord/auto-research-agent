@@ -29,6 +29,8 @@ from src.config import (
 from src.runtime import (
     acquire_run_lock,
     get_active_process_meta,
+    read_live_cli_run,
+    read_stoppable_cli_run,
     release_run_lock,
     run_project_tests,
     start_background_process,
@@ -1114,7 +1116,9 @@ from src.runtime import acquire_run_lock, release_run_lock
 
 root, ready, release = map(Path, sys.argv[1:])
 handle, error = acquire_run_lock(root, mode="run", model_name="child")
-ready.write_text("ok" if handle is not None and error is None else "failed")
+partial = ready.with_suffix(".tmp")
+partial.write_text("ok" if handle is not None and error is None else "failed")
+partial.replace(ready)
 deadline = time.monotonic() + 5
 while not release.exists() and time.monotonic() < deadline:
     time.sleep(0.01)
@@ -1159,6 +1163,291 @@ release_run_lock(handle)
             self.assertIsNotNone(parent_handle)
             self.assertIsNone(parent_error)
             release_run_lock(parent_handle)
+
+    def test_stoppable_cli_run_requires_a_live_owned_research_lock(self) -> None:
+        import fcntl
+
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "alpha"
+            other_dir = Path(tmp) / "beta"
+            project_dir.mkdir()
+            other_dir.mkdir()
+
+            handle, error = acquire_run_lock(
+                project_dir, mode="mock", model_name="mock-deterministic"
+            )
+            self.assertIsNone(error)
+            try:
+                meta = read_stoppable_cli_run(project_dir)
+                self.assertEqual(meta["pid"], os.getpid())
+                self.assertEqual(meta["mode"], "mock")
+                self.assertEqual(meta["model"], "mock-deterministic")
+                self.assertNotIn("owner_token", meta)
+                self.assertEqual(read_stoppable_cli_run(other_dir), {})
+            finally:
+                release_run_lock(handle)
+            self.assertEqual(read_stoppable_cli_run(project_dir), {})
+
+            for mode in ("input_edit", "literature_survey", "legacy_history_migration", "run"):
+                with self.subTest(mode=mode):
+                    held, held_error = acquire_run_lock(project_dir, mode=mode, model_name="")
+                    self.assertIsNone(held_error)
+                    try:
+                        self.assertEqual(read_stoppable_cli_run(project_dir), {})
+                    finally:
+                        release_run_lock(held)
+
+            guard_path = project_dir / "active_run.guard"
+            guard = guard_path.open("a+b")
+            try:
+                fcntl.flock(guard.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                stat_result = os.fstat(guard.fileno())
+                write_json_file(
+                    project_dir / "active_run.json",
+                    {
+                        "schema_version": 1,
+                        "pid": os.getpid(),
+                        "guard_device": stat_result.st_dev,
+                        "guard_inode": stat_result.st_ino,
+                        "mode": "mock",
+                        "model": "mock-deterministic",
+                        "started_at": "ownerless",
+                    },
+                )
+                self.assertEqual(read_stoppable_cli_run(project_dir), {})
+                write_json_file(
+                    project_dir / "active_run.json",
+                    {
+                        "schema_version": 1,
+                        "owner_token": "dead-owner",
+                        "pid": 2**20,
+                        "guard_device": stat_result.st_dev,
+                        "guard_inode": stat_result.st_ino,
+                        "mode": "mock",
+                        "model": "mock-deterministic",
+                        "started_at": "dead",
+                    },
+                )
+                self.assertEqual(read_stoppable_cli_run(project_dir), {})
+            finally:
+                fcntl.flock(guard.fileno(), fcntl.LOCK_UN)
+                guard.close()
+
+    def test_non_proc_lock_probe_recognizes_only_the_injected_holder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "alpha"
+            project_dir.mkdir()
+            handle, error = acquire_run_lock(
+                project_dir, mode="mock", model_name="mock-deterministic"
+            )
+            self.assertIsNone(error)
+            guard = (project_dir / "active_run.guard").stat()
+            try:
+
+                def allow(guard_path: Path, device: int, inode: int, pid: int) -> bool:
+                    self.assertEqual(device, guard.st_dev)
+                    self.assertEqual(inode, guard.st_ino)
+                    self.assertEqual(pid, os.getpid())
+                    self.assertTrue(Path(guard_path).name == "active_run.guard")
+                    return True
+
+                with (
+                    patch.object(runtime_module, "_proc_locks_text", return_value=None),
+                    patch.object(
+                        runtime_module,
+                        "_non_proc_write_flock_held_by",
+                        side_effect=allow,
+                    ),
+                ):
+                    meta = read_stoppable_cli_run(project_dir)
+                self.assertEqual(meta["pid"], os.getpid())
+                self.assertEqual(meta["mode"], "mock")
+                self.assertTrue(meta["stoppable"])
+
+                with (
+                    patch.object(runtime_module, "_proc_locks_text", return_value=None),
+                    patch.object(
+                        runtime_module,
+                        "_non_proc_write_flock_held_by",
+                        return_value=False,
+                    ),
+                ):
+                    self.assertEqual(read_stoppable_cli_run(project_dir), {})
+                    self.assertEqual(read_live_cli_run(project_dir), {})
+            finally:
+                release_run_lock(handle)
+
+    def test_diagnostic_lock_stays_live_and_not_stoppable_without_proc(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            handle, error = acquire_run_lock(project_dir, mode="diagnostic", model_name="fake")
+            self.assertIsNone(error)
+            try:
+                with (
+                    patch.object(runtime_module, "_proc_locks_text", return_value=None),
+                    patch.object(
+                        runtime_module,
+                        "_non_proc_write_flock_held_by",
+                        return_value=True,
+                    ),
+                ):
+                    meta = read_live_cli_run(project_dir)
+                    self.assertEqual(meta["mode"], "diagnostic")
+                    self.assertFalse(meta["stoppable"])
+                    self.assertEqual(read_stoppable_cli_run(project_dir), {})
+            finally:
+                release_run_lock(handle)
+
+    def test_proc_locks_parser_matches_one_write_flock(self) -> None:
+        device = os.makedev(8, 3)
+        inode = 4455
+        identity = f"{os.major(device):02x}:{os.minor(device):02x}:{inode}"
+        text = f"7: FLOCK  ADVISORY  WRITE 4242 {identity} 0 EOF\n"
+        self.assertTrue(runtime_module._proc_locks_show_write_flock(text, device, inode, 4242))
+        self.assertFalse(runtime_module._proc_locks_show_write_flock(text, device, inode, 4243))
+
+    def test_darwin_lock_query_does_not_treat_a_live_pid_as_the_holder(self) -> None:
+        write_type = 3
+        self.assertTrue(runtime_module._darwin_lock_is_held(write_type, -1, 10, write_type, True))
+        self.assertFalse(runtime_module._darwin_lock_is_held(write_type, -1, 10, write_type, False))
+        self.assertTrue(runtime_module._darwin_lock_is_held(write_type, 10, 10, write_type, False))
+        self.assertFalse(runtime_module._darwin_lock_is_held(write_type, 11, 10, write_type, True))
+        self.assertFalse(runtime_module._darwin_lock_is_held(2, -1, 10, write_type, True))
+        self.assertTrue(runtime_module._open_inode_matches(5, 9, [(5, 9), (1, 2)]))
+        self.assertTrue(runtime_module._open_inode_matches(0x100000005, 9, [(5, 9)]))
+        self.assertFalse(runtime_module._open_inode_matches(5, 9, [(5, 8), (4, 9)]))
+
+    def test_darwin_proc_library_imports_ctypes_util_in_a_clean_interpreter(self) -> None:
+        app_root = Path(__file__).resolve().parents[1]
+        script = """
+import ctypes
+import sys
+from unittest.mock import Mock, patch
+
+sys.path.insert(0, sys.argv[1])
+from src.runtime import _darwin_proc_library
+
+# Model a fresh dashboard interpreter even if an installed site hook imported util.
+sys.modules.pop("ctypes.util", None)
+if hasattr(ctypes, "util"):
+    del ctypes.util
+if sys.platform == "darwin":
+    library = _darwin_proc_library()
+    assert library.proc_pidinfo and library.proc_pidfdinfo
+else:
+    # libproc is a Darwin API. Exercise the import and symbol setup without
+    # claiming a native Darwin lock check on this platform.
+    with patch.object(ctypes, "CDLL", return_value=Mock()) as load:
+        assert _darwin_proc_library() is load.return_value
+assert ctypes.util is sys.modules["ctypes.util"]
+"""
+        completed = subprocess.run(
+            [sys.executable, "-I", "-c", script, str(app_root)],
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr or completed.stdout)
+
+    def test_scoped_stop_cannot_reach_another_generation_and_manual_stop_survives(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            path = project / "STOP_REQUESTED"
+            first, error = acquire_run_lock(project, mode="mock", model_name="m")
+            self.assertIsNone(error)
+            try:
+                previous_lock = read_json_file(project / "active_run.json")
+                previous = runtime_module.read_live_cli_run(project)
+                runtime_module.request_dashboard_stop(project, previous)
+                saved = path.read_text()
+                self.assertTrue(stop_requested(path))
+            finally:
+                release_run_lock(first)
+            self.assertFalse(path.exists())
+            path.write_text(saved)  # e.g. a request left by a process crash
+            # A crashed CLI also leaves its former active_run.json behind.
+            stale_lock = dict(previous_lock, pid=2**31 - 1)
+            write_json_file(project / "active_run.json", stale_lock)
+            self.assertFalse(stop_requested(path))
+            second, error = acquire_run_lock(project, mode="mock", model_name="m")
+            self.assertIsNone(error)
+            try:
+                self.assertFalse(path.exists())
+                with self.assertRaisesRegex(ValueError, "No active run"):
+                    runtime_module.request_dashboard_stop(project, previous)
+                path.touch()
+                self.assertTrue(stop_requested(path))
+                runtime_module.request_dashboard_stop(
+                    project, runtime_module.read_live_cli_run(project)
+                )
+                self.assertEqual(path.read_bytes(), b"")
+                self.assertTrue(runtime_module.close_run_stop_window(second))
+                self.assertFalse(runtime_module.read_live_cli_run(project)["stoppable"])
+            finally:
+                release_run_lock(second)
+            self.assertEqual(path.read_bytes(), b"")
+
+    def test_process_meta_cleanup_leaves_a_record_replaced_during_the_read(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            meta_path = Path(tmp) / "ui_model_job_process.json"
+            write_json_file(meta_path, {"pid": 1, "command": "stale"})
+            original = runtime_module.read_json_file
+
+            def replace_during_read(path: Path, *args: object, **kwargs: object) -> dict:
+                payload = original(path, *args, **kwargs)
+                if Path(path) == meta_path:
+                    write_json_file(
+                        meta_path,
+                        {"pid": os.getpid(), "command": "published", "kind": "model_pull"},
+                    )
+                return payload
+
+            def running(pid: int) -> bool:
+                return pid == os.getpid()
+
+            with (
+                patch.object(runtime_module, "read_json_file", side_effect=replace_during_read),
+                patch.object(runtime_module, "is_pid_running", side_effect=running),
+            ):
+                meta = get_active_process_meta(meta_path)
+
+            saved = json.loads(meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(saved["pid"], os.getpid())
+            self.assertEqual(saved["command"], "published")
+            self.assertNotEqual(meta.get("pid"), 1)
+            self.assertNotEqual(meta.get("command"), "stale")
+
+    def test_process_meta_cleanup_does_not_delete_a_file_created_after_a_miss(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            meta_path = Path(tmp) / "ui_model_job_process.json"
+            original = runtime_module.read_json_file
+            created = {"yes": False}
+
+            def publish_on_read(path: Path, *args: object, **kwargs: object) -> dict:
+                payload = original(path, *args, **kwargs)
+                if Path(path) == meta_path and not created["yes"]:
+                    write_json_file(
+                        meta_path,
+                        {"pid": os.getpid(), "command": "published", "kind": "model_pull"},
+                    )
+                    created["yes"] = True
+                return payload
+
+            with (
+                patch.object(runtime_module, "read_json_file", side_effect=publish_on_read),
+                patch.object(
+                    runtime_module,
+                    "is_pid_running",
+                    side_effect=lambda pid: pid == os.getpid(),
+                ),
+            ):
+                get_active_process_meta(meta_path)
+
+            if created["yes"]:
+                saved = json.loads(meta_path.read_text(encoding="utf-8"))
+                self.assertEqual(saved["pid"], os.getpid())
+            else:
+                self.assertFalse(meta_path.exists())
 
     def test_run_lock_simultaneous_processes_have_exactly_one_owner(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

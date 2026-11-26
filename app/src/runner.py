@@ -11,6 +11,7 @@ import sys
 import time
 from datetime import datetime
 from difflib import SequenceMatcher
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
@@ -82,6 +83,7 @@ from .run_config import (
     finalize_run_config,
     read_run_config,
 )
+from .runtime import RunLockHandle, close_run_stop_window
 from .runtime import log_run as _log
 from .runtime import stop_requested as _stop_requested
 from .storage import (
@@ -1174,6 +1176,7 @@ def run_iterative_rounds(
     resume_metadata: Optional[Dict[str, Any]] = None,
     explicit_workspace: Optional[Path] = None,
     source_layout: Optional[bool] = None,
+    run_lock_handle: RunLockHandle | None = None,
 ) -> Dict[str, Any]:
     if max_rounds < 1:
         raise ValueError("max_rounds must be >= 1")
@@ -1199,6 +1202,7 @@ def run_iterative_rounds(
     log_path = project_dir / "run.log"
     checkpoint_path = project_dir / "checkpoint.json"
     stop_signal_path = project_dir / "STOP_REQUESTED"
+    has_stop_request = partial(_stop_requested, stop_signal_path, run_lock_handle=run_lock_handle)
     best_output_path = project_dir / "best_output.md"
     interrupted_report_path = project_dir / "interrupted_report.md"
     run_id = run_root.name
@@ -1588,7 +1592,7 @@ def run_iterative_rounds(
             )
             break
 
-        if _stop_requested(stop_signal_path):
+        if has_stop_request():
             stop_reason = STOP_USER_REQUESTED
             _log(console, log_path, mode, f"user_stop_requested_before_round round={round_index}")
             break
@@ -1649,7 +1653,7 @@ def run_iterative_rounds(
                 memory_text = " ".join(memory_text.split()[-1500:])
                 _log(console, log_path, mode, f"memory_truncated round={round_index}")
 
-            if _stop_requested(stop_signal_path):
+            if has_stop_request():
                 stop_reason = STOP_USER_REQUESTED
                 _stop_current_attempt(STOP_USER_REQUESTED)
                 _log(
@@ -1676,7 +1680,7 @@ def run_iterative_rounds(
                 judge_error = "global runtime limit reached"
                 _log(console, log_path, mode, f"global_runtime_skip_all_agents round={round_index}")
             else:
-                if _stop_requested(stop_signal_path):
+                if has_stop_request():
                     draft_output = "[DRAFT SKIPPED] user stop requested."
                     draft_error = "user stop requested"
                     _log(
@@ -1724,7 +1728,7 @@ def run_iterative_rounds(
                             else "",
                         ),
                     )
-            if not draft_error and _stop_requested(stop_signal_path):
+            if not draft_error and has_stop_request():
                 draft_error = "user stop requested after draft"
                 _log(
                     console, log_path, mode, f"user_stop_requested_after_draft round={round_index}"
@@ -1739,7 +1743,7 @@ def run_iterative_rounds(
                     f"[yellow][Round {round_index}] Skipping review agent due to draft failure.[/yellow]"
                 )
             else:
-                if _stop_requested(stop_signal_path):
+                if has_stop_request():
                     review_output = "[REVIEW SKIPPED] user stop requested."
                     review_error = "user stop requested"
                     _log(
@@ -1775,7 +1779,7 @@ def run_iterative_rounds(
                             draft_output=draft_output,
                         ),
                     )
-                if not review_error and _stop_requested(stop_signal_path):
+                if not review_error and has_stop_request():
                     review_error = "user stop requested after review"
                     _log(
                         console,
@@ -1794,7 +1798,7 @@ def run_iterative_rounds(
                     f"[yellow][Round {round_index}] Skipping revise agent due to upstream failure.[/yellow]"
                 )
             else:
-                if _stop_requested(stop_signal_path):
+                if has_stop_request():
                     revised_output = "[REVISE SKIPPED] user stop requested."
                     revise_error = "user stop requested"
                     _log(
@@ -1831,7 +1835,7 @@ def run_iterative_rounds(
                             review_output=review_output,
                         ),
                     )
-                if not revise_error and _stop_requested(stop_signal_path):
+                if not revise_error and has_stop_request():
                     revise_error = "user stop requested after revise"
                     _log(
                         console,
@@ -1850,7 +1854,7 @@ def run_iterative_rounds(
                     f"[yellow][Round {round_index}] Skipping judge agent due to revise failure (score=0).[/yellow]"
                 )
             else:
-                if _stop_requested(stop_signal_path):
+                if has_stop_request():
                     judge_output = "SCORE: 0\n- Judge skipped because user stop was requested."
                     judge_error = "user stop requested"
                     _log(
@@ -2279,7 +2283,7 @@ def run_iterative_rounds(
             _log(console, log_path, mode, f"stop_reason={STOP_EXCEPTION} round={round_index}")
             break
 
-        if _stop_requested(stop_signal_path):
+        if has_stop_request():
             stop_reason = STOP_USER_REQUESTED
             _log(console, log_path, mode, f"stop_reason={STOP_USER_REQUESTED} round={round_index}")
             break
@@ -2288,6 +2292,10 @@ def run_iterative_rounds(
         _log(console, log_path, mode, f"round_exit round={round_index}")
     else:
         stop_reason = STOP_MAX_ROUNDS
+
+    accepted_stop = close_run_stop_window(run_lock_handle)
+    if accepted_stop and stop_reason in {STOP_MAX_ROUNDS, STOP_NO_IMPROVEMENT}:
+        stop_reason = STOP_USER_REQUESTED
 
     if stop_reason == STOP_MAX_ROUNDS and invalid_score_seen and completed_rounds == 1:
         stop_reason = STOP_INVALID_SCORE
